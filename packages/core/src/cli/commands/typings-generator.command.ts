@@ -1,53 +1,26 @@
 import { filesOrchestrator } from "../../dev-server/files-orchestrator";
-import { Path } from "../../utils/normalized-path";
 import { typeGenerator } from "../../dev-server/type-generator";
-import { getFilesFromDirectory } from "../../dev-server/utils";
-import { srcPath } from "../../utils";
 import { command } from "../../commands/cli-command";
 
+/**
+ * Standalone `warlock generate.typings`.
+ *
+ * Runs `filesOrchestrator.initializeAll()` before generating — the same
+ * full-project discovery `warlock dev` performs at boot — so this produces
+ * the identical registry from a fresh checkout instead of only whatever
+ * config files a caller happened to list. A prior version added just the
+ * config directory's files, which left `TranslationKeyRegistry` empty on any
+ * app whose translation keys came from source outside `src/config`.
+ *
+ * Not `filesOrchestrator.init()` — that also registers the ESM loader hook
+ * for dynamically importing project code, which typings generation, being
+ * purely static AST inspection, never does.
+ */
 export const typingsGeneratorCommand = command({
   name: "generate.typings",
   description: "Generate type definitions for the project",
-  options: [
-    {
-      text: "--files, -f",
-      description:
-        "Files to generate typings for, if not passed, it will generate typings for all files",
-    },
-  ],
-  action: async ({ options }) => {
-    const configFilesPaths: string[] = [];
-    if (options.files) {
-      const files = String(options.files)
-        .split(",")
-        .map((file) => {
-          if (file.startsWith("./")) {
-            return Path.toAbsolute(file);
-          }
-
-          return file;
-        });
-
-      if (files?.length) {
-        configFilesPaths.push(...files);
-      }
-    }
-
-    if (configFilesPaths.length === 0) {
-      // grab all config files
-      const configFiles = await getFilesFromDirectory(srcPath("config"));
-      configFilesPaths.push(...configFiles);
-    }
-
-    const results = await Promise.allSettled(
-      configFilesPaths.map((path) => filesOrchestrator.add(Path.toRelative(path))),
-    );
-
-    const failed = results.filter((r) => r.status === "rejected");
-
-    if (failed.length) {
-      console.warn(`Failed to process ${failed.length} files`);
-    }
+  action: async () => {
+    await filesOrchestrator.initializeAll();
 
     await typeGenerator.generateAll();
   },
