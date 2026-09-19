@@ -56,18 +56,29 @@ cookie rules. [Read the complete cache policy →](/v/latest/web/essentials/rout
 ## Validate page input
 
 A page's `validation` export declares a Seal schema per source. `params` and
-`query` stay separate keys; they are never merged:
+`query` stay separate keys; they are never merged. Declare either or both — a
+page with no dynamic segment can skip `params`, and one that reads no query
+keys can skip `query`:
 
 ```tsx title="src/web/products/[id].page.tsx"
 import { v } from "@warlock.js/seal";
 
 export const validation = {
   params: v.object({ id: v.int().coerce() }),
-  query: v.object({ tab: v.string().optional() }),
+  query: v.object({ tab: v.string().optional() }).stripUnknown(),
 };
 ```
 
-Validation runs once, before any loader. When it fails, the response status is
+`request.params` and `request.query` arrive as strings, so a numeric field
+needs `.coerce()` — `v.int()` alone rejects `"2"` with "This input accepts
+only numbers". Seal objects reject unknown keys by default, so a `query`
+schema without `.stripUnknown()` 400s on an ordinary tracking param such as
+`?utm_source=newsletter`; `.stripUnknown()` is the normal spelling for a
+public page's query.
+
+Validation runs once, after the app and layout loaders and before the page
+loader, so a layout redirect still wins and the error page renders inside
+layouts that have their data. When it fails, the response status is
 **400**, and every failing field is reported together.
 
 - **A full page load** renders your `error.page.tsx` with status 400. The error
@@ -77,7 +88,8 @@ Validation runs once, before any loader. When it fails, the response status is
   import type { ErrorPageProps } from "@warlock.js/web";
 
   export default function ErrorPage({ error, status }: ErrorPageProps) {
-    const issues = (error as { errors?: { input: string; error: string }[] })?.errors;
+    const issues = (error as { errors?: { input: string; type: string; error: string }[] })
+      ?.errors;
 
     return (
       <main>
@@ -91,6 +103,9 @@ Validation runs once, before any loader. When it fails, the response status is
     );
   }
   ```
+
+  In production `errors` is always this safe `{ input, type, error }` shape —
+  which rule failed and where, never the value the visitor submitted.
 
 - **A client navigation** to the same URL receives the same 400.
 
