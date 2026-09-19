@@ -46,7 +46,7 @@ function resolveVariant(name: string, raw: unknown): ImageVariantDefinition {
     throw new ImageVariantsConfigError(`${key} must be an object with a width.`);
   }
 
-  const { width, height, fit, quality } = raw as Record<string, unknown>;
+  const { width, height, fit, quality, enlarge } = raw as Record<string, unknown>;
 
   if (!isPositiveInteger(width, MAX_VARIANT_DIMENSION)) {
     throw new ImageVariantsConfigError(
@@ -85,6 +85,16 @@ function resolveVariant(name: string, raw: unknown): ImageVariantDefinition {
 
     variant.quality = quality;
   }
+
+  if (enlarge !== undefined && typeof enlarge !== "boolean") {
+    throw new ImageVariantsConfigError(
+      `${key}.enlarge must be a boolean, got ${JSON.stringify(enlarge)}.`,
+    );
+  }
+
+  // Always set, never left undefined: the effective flag (default false) is
+  // part of the normalized variant, so toggling it changes the cache key.
+  variant.enlarge = enlarge === true;
 
   return variant;
 }

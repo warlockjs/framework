@@ -269,6 +269,15 @@ export type ImageVariantDefinition = {
    * Output quality, 1-100
    */
   quality?: number;
+
+  /**
+   * Allow this variant to upscale a source narrower or shorter than the
+   * target dimensions. By default a variant never enlarges: a source smaller
+   * than the target is served at its own size.
+   *
+   * @default false
+   */
+  enlarge?: boolean;
 };
 
 /**

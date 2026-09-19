@@ -38,7 +38,12 @@ export async function generateImageVariant({
   format,
   targetPath,
 }: GenerateImageVariantOptions): Promise<void> {
-  image.resize({ width: variant.width, height: variant.height, fit: variant.fit });
+  image.resize({
+    width: variant.width,
+    height: variant.height,
+    fit: variant.fit,
+    withoutEnlargement: variant.enlarge !== true,
+  });
   image.format(format);
 
   if (variant.quality !== undefined) {

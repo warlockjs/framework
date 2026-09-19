@@ -19,7 +19,7 @@ describe("resolveImageVariantsConfig", () => {
     const resolved = resolve({ variants: { thumb: { width: 320 } } });
 
     expect(resolved).toEqual({
-      variants: { thumb: { width: 320 } },
+      variants: { thumb: { width: 320, enlarge: false } },
       formats: [],
       maxSourceBytes: 25 * 1024 * 1024,
       maxSourcePixels: 40_000_000,
@@ -29,7 +29,7 @@ describe("resolveImageVariantsConfig", () => {
 
   it("accepts a complete, valid config", () => {
     const resolved = resolve({
-      variants: { card: { width: 640, height: 480, fit: "inside", quality: 80 } },
+      variants: { card: { width: 640, height: 480, fit: "inside", quality: 80, enlarge: true } },
       formats: ["webp", "avif"],
       maxSourceBytes: 1000,
       maxSourcePixels: 2000,
@@ -41,9 +41,16 @@ describe("resolveImageVariantsConfig", () => {
       height: 480,
       fit: "inside",
       quality: 80,
+      enlarge: true,
     });
     expect(resolved?.formats).toEqual(["webp", "avif"]);
     expect(resolved?.cacheDirectory).toBe(path.resolve("/tmp/variants"));
+  });
+
+  it("defaults enlarge to false when omitted", () => {
+    const resolved = resolve({ variants: { thumb: { width: 320 } } });
+
+    expect(resolved?.variants.thumb.enlarge).toBe(false);
   });
 
   it.each([
@@ -61,6 +68,7 @@ describe("resolveImageVariantsConfig", () => {
     ["quality 101", { variants: { a: { width: 10, quality: 101 } } }],
     ["fractional quality", { variants: { a: { width: 10, quality: 50.5 } } }],
     ["unknown fit", { variants: { a: { width: 10, fit: "fill" } } }],
+    ["non-boolean enlarge", { variants: { a: { width: 10, enlarge: "yes" } } }],
     ["unknown format", { variants: { a: { width: 10 } }, formats: ["png"] }],
     ["non-positive maxSourceBytes", { variants: { a: { width: 10 } }, maxSourceBytes: 0 }],
     ["non-positive maxSourcePixels", { variants: { a: { width: 10 } }, maxSourcePixels: -1 }],

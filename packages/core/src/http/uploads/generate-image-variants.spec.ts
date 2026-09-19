@@ -193,6 +193,40 @@ describe.skipIf(!sharp)("generateImageVariants — descriptor shape", () => {
   });
 });
 
+describe.skipIf(!sharp)("generateImageVariants — enlargement", () => {
+  it("never enlarges a source narrower than the variant by default", async () => {
+    imagesConfig({ variants: { thumb: { width: 320 } } });
+    fs.writeFileSync(path.join(storageRoot, "small.jpg"), await makeImage("jpeg", 100, 100));
+
+    const descriptor = await generateImageVariants("small.jpg", { variants: ["thumb"] });
+
+    expect(descriptor.variants.thumb.width).toBe(100);
+    expect(descriptor.variants.thumb.height).toBe(100);
+  });
+
+  it("upscales when the variant opts in with enlarge: true", async () => {
+    imagesConfig({ variants: { thumb: { width: 320, enlarge: true } } });
+    fs.writeFileSync(path.join(storageRoot, "small2.jpg"), await makeImage("jpeg", 100, 100));
+
+    const descriptor = await generateImageVariants("small2.jpg", { variants: ["thumb"] });
+
+    expect(descriptor.variants.thumb.width).toBe(320);
+    expect(descriptor.variants.thumb.height).toBe(320);
+  });
+
+  it("reports the actual output dimensions, read from the derivative, for a small source", async () => {
+    imagesConfig({ variants: { thumb: { width: 320 } } });
+    fs.writeFileSync(path.join(storageRoot, "small3.jpg"), await makeImage("jpeg", 100, 100));
+
+    const descriptor = await generateImageVariants("small3.jpg", { variants: ["thumb"] });
+
+    expect(descriptor.width).toBe(100);
+    expect(descriptor.height).toBe(100);
+    expect(descriptor.variants.thumb.width).toBe(100);
+    expect(descriptor.variants.thumb.height).toBe(100);
+  });
+});
+
 describe.skipIf(!sharp)("generateImageVariants — variants filter", () => {
   it("only generates the requested variants", async () => {
     fs.writeFileSync(path.join(storageRoot, "filtered.jpg"), await makeImage("jpeg", 64, 64));
