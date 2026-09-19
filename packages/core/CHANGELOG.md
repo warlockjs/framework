@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Image variants (`uploadedFileController` and `generateImageVariants`) no longer enlarge a source smaller than the variant's target width or height. A variant is now rendered with sharp's `withoutEnlargement: true` by default, so a 100px source requested at `{ width: 320 }` stays 100px wide instead of being upscaled. Opt in per variant with `enlarge: true` in `ImageVariantDefinition` (a non-boolean value throws `ImageVariantsConfigError`); the effective flag is part of the normalized variant and its cache key, so flipping it regenerates the derivative. `generateImageVariants`' descriptor now reports the actual rendered width and height, read from the derivative it wrote, not the requested size.
+- `warlock seed` (and `warlock migrate`, for data migrations) now preload the `storage` connector, and `Storage`/`ScopedStorage` throw a named `StorageNotInitializedError` — pointing at `src/config/storage.ts` and a custom command's `preload.connectors` — instead of a bare `TypeError: Cannot read properties of null (reading 'name')` when `activeDriver` is read before storage has been initialized in the process.
 
 ## 5.16.0 - 2026-09-18
 

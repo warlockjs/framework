@@ -13,6 +13,7 @@ import { S3Driver } from "./drivers/s3-driver";
 import { ScopedStorage } from "./scoped-storage";
 import { StorageFile } from "./storage-file";
 import { safeFetchToBuffer } from "./utils/safe-fetch";
+import { StorageNotInitializedError } from "./utils/storage-not-initialized-error";
 import type {
   CloudStorageDriverContract,
   CloudStorageDriverOptions,
@@ -154,12 +155,16 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * Will be enhanced to check AsyncLocalStorage context for multi-tenant support.
    *
    * @returns The active storage driver
+   * @throws {StorageNotInitializedError} When neither a context driver nor
+   * an initialized default driver is available
    */
   public override get activeDriver(): StorageDriverContract {
     // Check context for tenant-specific driver
     const contextDriver = storageDriverContext.getDriver();
 
     if (contextDriver) return contextDriver;
+
+    if (!this._driver) throw new StorageNotInitializedError();
 
     return this._driver;
   }

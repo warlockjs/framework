@@ -7,7 +7,7 @@ export const migrateCommand = command({
   description: "Run database migrations",
   preload: {
     config: ["database", "log"],
-    connectors: ["database", "logger"],
+    connectors: ["database", "logger", "storage"],
   },
   options: [
     {

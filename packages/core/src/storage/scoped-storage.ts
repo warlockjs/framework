@@ -5,6 +5,7 @@ import path from "path";
 import type { Readable } from "stream";
 import type { UploadedFile } from "../http";
 import { StorageFile } from "./storage-file";
+import { StorageNotInitializedError } from "./utils/storage-not-initialized-error";
 import type {
   DeleteManyResult,
   ListOptions,
@@ -87,8 +88,11 @@ export class ScopedStorage implements ScopedStorageContract {
    * Can be overridden in subclasses for dynamic driver resolution (e.g., multi-tenant contexts).
    *
    * @returns The active storage driver
+   * @throws {StorageNotInitializedError} When no driver has been set
    */
   public get activeDriver(): StorageDriverContract {
+    if (!this._driver) throw new StorageNotInitializedError();
+
     return this._driver;
   }
 
