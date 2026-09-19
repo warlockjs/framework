@@ -88,8 +88,7 @@ layouts that have their data. When it fails, the response status is
   import type { ErrorPageProps } from "@warlock.js/web";
 
   export default function ErrorPage({ error, status }: ErrorPageProps) {
-    const issues = (error as { errors?: { input: string; type: string; error: string }[] })
-      ?.errors;
+    const issues = (error as { errors?: { input: string; type: string; error: string }[] })?.errors;
 
     return (
       <main>
@@ -146,6 +145,20 @@ export const loader = (async ({ signal }) => {
 A disconnect also stops SSR, NDJSON navigation streams, and the pipeline
 between loader levels (app → layout → page). A loader that is already running
 and never checks `signal` still runs to the end.
+
+## Loader timeout — `web.loaderTimeout`
+
+The loaders of one request (app → layout → page, plus validation) must finish
+within `web.loaderTimeout` milliseconds, 15000 by default. If they don't,
+`signal` fires and the request gets your `error.page.tsx` with status 504 (a
+504 error record on a client navigation). Deferred values and rendering are
+not bounded by it. Set `0` to turn the limit off:
+
+```ts title="src/config/web.ts"
+export default {
+  loaderTimeout: 30_000,
+};
+```
 
 ## Terminal outcomes
 
