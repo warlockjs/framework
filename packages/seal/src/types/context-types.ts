@@ -45,5 +45,7 @@ export type SchemaContext = {
   /** Validation configurations */
   configurations?: {
     firstErrorOnly?: boolean;
+    /** Rendered as `:value` in error messages instead of the submitted input */
+    redactValue?: string;
   };
 };

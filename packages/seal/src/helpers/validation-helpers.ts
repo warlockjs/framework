@@ -76,7 +76,9 @@ export const invalidRule = (rule: ContextualSchemaRule, context: SchemaContext):
   const attributes: RuleTranslation["attributes"] = {
     path: context.path,
     key: context.key,
-    value: context.value,
+    // A per-call `redactValue` stands in for the submitted input, so neither a
+    // translation nor a custom message can echo it through `:value`
+    value: context.configurations?.redactValue ?? context.value,
     // Raw placeholders (:enumList, :min, :max, etc.) — no translation
     ...rule.context.translationParams,
     // Translated placeholders (:input, :field, etc.) — override raws if key collides

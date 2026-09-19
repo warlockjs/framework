@@ -214,6 +214,11 @@ export const v: ValidatorV = {
 
 export type ValidateOptions = {
   context?: Record<string, any>;
+  /**
+   * Rendered as `:value` in every error message — translated or custom —
+   * instead of the submitted input. Unset keeps the raw value.
+   */
+  redactValue?: string;
 } & SealConfig;
 
 export interface ValidatorV {
