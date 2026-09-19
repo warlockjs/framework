@@ -104,7 +104,11 @@ layouts that have their data. When it fails, the response status is
   ```
 
   In production `errors` is always this safe `{ input, type, error }` shape —
-  which rule failed and where, never the value the visitor submitted.
+  which rule failed and where. In production, the `:value` placeholder in
+  page-validation messages renders `…` instead of the submitted value. A
+  custom rule or translation that builds its message from raw input without
+  `:value` isn't covered, so keep submitted values out of custom message
+  text.
 
 - **A client navigation** to the same URL receives the same 400.
 

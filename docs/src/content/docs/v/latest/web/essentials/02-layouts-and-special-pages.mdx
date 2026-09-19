@@ -144,6 +144,77 @@ Every unhandled error response is forced to
 This applies to every status and includes API-route failures; an intermediary
 must never replay one request's error to another user.
 
+## Reporting errors to your own service
+
+Every server and client failure already logs to the console unconditionally —
+that floor can never be turned off. On top of it, `web` gives you two
+app-owned hooks for sending the same failures to your own error-tracking
+service (Sentry, Bugsnag, your own endpoint, anything). Neither hook ever
+replaces the console floor, and there is no framework-hosted beacon endpoint
+— you decide where the error goes.
+
+### Server: `web.errors.report`
+
+Configure a `report` function under the `web.errors` namespace. It receives
+the thrown value and a context object describing where the failure happened —
+never the raw request URL or query string, only the route's own template path
+and the decoded pathname, so a token or secret sitting in a query parameter
+never reaches your sink by accident.
+
+```ts title="src/config/web.ts"
+import * as Sentry from "@sentry/node";
+
+export default {
+  errors: {
+    report(error, context) {
+      Sentry.captureException(error, {
+        tags: { kind: context.kind, phase: context.phase, routeName: context.routeName },
+        extra: {
+          routePath: context.routePath,
+          pathname: context.pathname,
+          method: context.method,
+          statusCode: context.statusCode,
+          requestId: context.requestId,
+        },
+      });
+    },
+  },
+};
+```
+
+`report` is called fire-and-forget — it is never awaited on the response
+path, so a slow or hanging call to Sentry cannot delay or fail a real HTTP
+response. The same error object reported twice for one request (a render
+failure a deferred value also surfaces, for example) reaches `report` once.
+A `report` that throws or rejects is caught, logged once to the console, and
+never retried for that failure — it cannot recurse into itself and it cannot
+take the server down. On a graceful shutdown, any `report` calls still in
+flight get a brief, bounded window to finish before the process exits.
+
+### Client: `onClientError`
+
+Register a callback from your own client code — typically `src/web/root.tsx`
+or wherever your app initializes — with `onClientError`. It receives every
+uncaught `window` error, unhandled promise rejection, and React hydration
+error the framework observes, plus whatever the framework's own error
+boundary catches after hydration.
+
+```tsx title="src/web/root.tsx"
+import * as Sentry from "@sentry/react";
+import { onClientError } from "@warlock.js/web";
+
+onClientError(({ error, kind, routeName, pathname }) => {
+  Sentry.captureException(error, { tags: { kind, routeName }, extra: { pathname } });
+});
+```
+
+Like the server hook, `onClientError` sits alongside `console.error`, never
+in place of it, dedupes the same error object across overlapping reporting
+paths, and isolates its own failures — a callback that throws is caught,
+logged once, and never called again for that same failure. There is
+deliberately no client-to-server beacon endpoint yet; wire your own tracking
+SDK, or `fetch()` your own endpoint, from inside the callback.
+
 ## The universal `register()` hook
 
 `root.tsx`, `layout.tsx`, and pages may export a synchronous, no-argument

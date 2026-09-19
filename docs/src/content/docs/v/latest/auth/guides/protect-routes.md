@@ -148,6 +148,26 @@ export default authConfig;
 
 This closes the residual CSRF gap that `SameSite=Lax` alone leaves open for cookie auth. It's not a full double-submit-token mechanism — that's deferred to a later release — but it stops the common cross-site cookie-replay case outright, and it costs nothing on header-token routes.
 
+## Default CSRF-Origin guard (applies with or without `authMiddleware`)
+
+**New in 5.17.** The check above only ever ran inside `authMiddleware("cookie:*")` — a cookie-authenticated write reaching any *other* path (an app-owned optional-auth pattern that reads its own `token` cookie directly, without ever calling `authMiddleware`) was never checked at all.
+
+`@warlock.js/core` now runs the same Origin/Referer check at the earliest HTTP seam, before route middleware and before any app handler, for **every** request where:
+
+- the method is `POST` / `PUT` / `PATCH` / `DELETE`, and
+- the request carries a `Cookie` header naming anything other than the framework's own `locale` cookie (a `Cookie` header that fails to parse cleanly counts as carrying one — it fails closed), and
+- the route hasn't opted out (below).
+
+It reuses the exact same same-origin / `auth.csrf.allowedOrigins` comparison and the same `403` / `AuthErrorCodes.CsrfOriginMismatch` (`EC006`) response as the `authMiddleware` check above, so the two never disagree. A header-only API request (no `Cookie` header at all, e.g. `Authorization: Bearer …`) is completely unaffected, and a route already covered by `authMiddleware("cookie:*")` is not checked twice or logged twice — the earlier guard short-circuits the request before that middleware runs.
+
+### Exempting a route — `{ csrf: false }`
+
+⚠️ **Dangerous.** Only exempt a route that cannot present a same-origin `Origin`/`Referer` by construction and is safe without this check — a third-party callback the browser is redirected to directly, or a machine-to-machine route no browser ever calls with cookies. Never exempt a route an ordinary signed-in browser session writes to.
+
+```ts
+router.post("/oauth/callback", oauthCallbackController, { csrf: false });
+```
+
 ## No optional / fallthrough auth
 
 There is no "hydrate `request.locals.user` if a token is present, otherwise continue" mode. `authMiddleware` always requires a valid token. Public routes leave the middleware off entirely; protected groups apply it once:
