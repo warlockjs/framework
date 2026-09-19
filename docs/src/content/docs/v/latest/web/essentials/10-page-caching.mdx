@@ -95,6 +95,35 @@ handed a stale guest page.
 - `"|vary=" + varyBy` is appended only when the route declares
   `cache.varyBy(request)` (see above).
 
+## Where entries live: the page-cache namespace
+
+Stored pages and their tag index live in the page cache's own namespace,
+`warlock.page.<deployment>`. It is separate from your app's cache
+`globalPrefix`, so the GET that stores a page and the POST (or background
+job) that invalidates it always see the same entries, even if your
+`globalPrefix` changes from request to request.
+
+The `<deployment>` part is chosen once, in this order:
+
+1. `pageCache.namespace`, when you set it;
+2. otherwise your cache driver's `globalPrefix`, when it is a static string;
+3. otherwise nothing.
+
+Case 3 is fine for an in-process driver (memory, LRU, memory-extended). On
+a shared backend (redis, pg/database, file) it is a startup error the first
+time the page cache is used. Two deployments sharing one Redis, such as
+staging and production, would otherwise read and invalidate each other's
+pages. The app name and the Host are not enough to tell them apart. Set a
+value unique to each deployment:
+
+```ts title="src/config/pageCache.ts"
+import { env } from "@warlock.js/core";
+
+export default {
+  namespace: env("PAGE_CACHE_NAMESPACE"), // e.g. "shop-production", "shop-staging"
+};
+```
+
 ## What gets stored, for a page with a lazy boundary
 
 On an eligible `HTML` `MISS`, Warlock stores the same streamed document bytes
