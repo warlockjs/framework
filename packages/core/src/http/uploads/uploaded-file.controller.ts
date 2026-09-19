@@ -5,21 +5,16 @@ import { storage } from "../../storage";
 import { HttpError } from "../errors";
 import type { Response } from "../response";
 import { uploadsConfig } from "../uploads-config";
-import {
-  detectImageFormat,
-  IMAGE_SIGNATURE_BYTES,
-  isVariantSourceFormat,
-} from "./detect-image-format";
 import { generateImageVariant } from "./generate-image-variant";
 import type { VariantOutputFormat } from "./image-variant-types";
 import { loadVariantSource } from "./load-variant-source";
 import { matchesIfNoneMatch } from "./matches-if-none-match";
 import { parseUploadedFileQuery } from "./parse-uploaded-file-query";
-import { readFileHead } from "./read-file-head";
 import { resolveImageVariantsConfig } from "./resolve-image-variants-config";
-import { resolveUploadPath } from "./resolve-upload-path";
-import { SingleFlight } from "./single-flight";
+import { resolveUploadPath, type ResolvedUploadPath } from "./resolve-upload-path";
+import { resolveVariantCandidate } from "./resolve-variant-candidate";
 import { variantCacheKey, variantCachePath } from "./variant-cache-key";
+import { variantGenerations } from "./variant-generations";
 
 /**
  * One year, in seconds: originals and derivatives are both long-lived
@@ -32,11 +27,6 @@ const CONTENT_TYPES: Record<VariantOutputFormat, string> = {
   webp: "image/webp",
   avif: "image/avif",
 };
-
-/**
- * In-process single-flight: concurrent misses for one derivative generate it once
- */
-const generations = new SingleFlight<void>();
 
 async function exists(target: string): Promise<boolean> {
   try {
@@ -132,33 +122,23 @@ export const uploadedFileController: RequestHandler = async ({ request, response
     return response.badRequest({ error: `Format "${query.format}" is not allowed.` });
   }
 
-  const source = await resolveUploadPath(request.params["*"], storageRoot, [images.cacheDirectory]);
-
-  if (!source) return notFound(response);
-
   const variant = images.variants[query.variant];
 
+  let source: ResolvedUploadPath | undefined;
+
   try {
-    const stats = await fs.stat(source.absolutePath);
+    const candidate = await resolveVariantCandidate(request.params["*"], storageRoot, images);
 
-    if (stats.size > images.maxSourceBytes) {
-      return response.contentTooLarge({ error: "The source image is too large." });
-    }
+    if (!candidate) return notFound(response);
 
-    const sourceFormat = detectImageFormat(
-      await readFileHead(source.absolutePath, IMAGE_SIGNATURE_BYTES),
-    );
+    const resolvedSource = candidate.source;
 
-    if (!isVariantSourceFormat(sourceFormat)) {
-      return response.send(
-        { error: "Variants are only available for jpeg, png, webp and avif images." },
-        415,
-      );
-    }
+    source = resolvedSource;
 
+    const { stats, sourceFormat } = candidate;
     const format: VariantOutputFormat = requestedFormat ?? sourceFormat;
     const hash = variantCacheKey({
-      relativePath: source.relativePath,
+      relativePath: resolvedSource.relativePath,
       sourceSize: stats.size,
       sourceMtimeMs: stats.mtimeMs,
       variant,
@@ -174,10 +154,10 @@ export const uploadedFileController: RequestHandler = async ({ request, response
       return sendVariant(response, target, hash, format);
     }
 
-    await generations.run(hash, async () => {
+    await variantGenerations.run(hash, async () => {
       if (await exists(target)) return;
 
-      const image = await loadVariantSource(source.absolutePath, {
+      const image = await loadVariantSource(resolvedSource.absolutePath, {
         maxSourceBytes: images.maxSourceBytes,
         maxSourcePixels: images.maxSourcePixels,
         expectedFormat: sourceFormat,
@@ -195,7 +175,7 @@ export const uploadedFileController: RequestHandler = async ({ request, response
     log.error(
       "uploads",
       "variant",
-      `Could not generate variant "${query.variant}" of ${source.relativePath}: ${
+      `Could not generate variant "${query.variant}" of ${source?.relativePath ?? request.params["*"]}: ${
         error instanceof Error ? error.message : String(error)
       }`,
     );
