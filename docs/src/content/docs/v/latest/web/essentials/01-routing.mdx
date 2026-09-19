@@ -82,12 +82,13 @@ window. Remove `cache` entirely to keep the safe default.
 
 The declaration is an opt-in, not permission to cache every response:
 
-| Request or response state                                             | Final `Cache-Control`      |
-| --------------------------------------------------------------------- | -------------------------- |
-| No `cache` declaration                                                | `no-store`                 |
-| Opted in, provably unauthenticated, no cookie written                 | `public, max-age=<maxAge>` |
-| Authenticated state was used, or the response sets or clears a cookie | `private, no-store`        |
-| Warlock cannot determine whether authenticated state was used         | `no-store`                 |
+| Request or response state                                              | Final `Cache-Control`      |
+| ---------------------------------------------------------------------- | -------------------------- |
+| No `cache` declaration                                                 | `no-store`                 |
+| Opted in, provably unauthenticated, no cookie sent or written          | `public, max-age=<maxAge>` |
+| The request carries a cookie other than `locale` (including malformed) | `private, no-store`        |
+| Authenticated state was used, or the response sets or clears a cookie  | `private, no-store`        |
+| Warlock cannot determine whether authenticated state was used          | `no-store`                 |
 
 The final decision is applied once after loaders finish, to both the document
 and data response. A loader cannot bypass it by setting `Cache-Control`

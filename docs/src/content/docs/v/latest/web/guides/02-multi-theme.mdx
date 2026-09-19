@@ -44,9 +44,7 @@ import type { AppProps, HttpContext } from "@warlock.js/web";
 import { themeSources, type ThemeId } from "./themes";
 
 const selectTheme = async ({ request }: HttpContext) => {
-  const theme: ThemeId = String(request.header("host", "")).startsWith("beta.")
-    ? "beta"
-    : "alpha";
+  const theme: ThemeId = String(request.header("host", "")).startsWith("beta.") ? "beta" : "alpha";
 
   shared.theme = theme;
   linkStylesheetsFor(request, themeSources[theme]);
@@ -81,7 +79,7 @@ export default function HomePage() {
   one the server rendered.
 - Keep the map static: one literal `import()` per theme. Vite emits one chunk
   plus one CSS file per theme this way. A computed specifier such as
-  `` import(`./themes/${id}`) `` is not supported.
+  ``import(`./themes/${id}`)`` is not supported.
 
 ## 3. CSS: `linkStylesheetsFor(request, sourceFile)`
 
@@ -118,10 +116,13 @@ export const route = {
 
 - The server page cache key always includes the request `Host`, so tenants on
   different hosts never share an entry.
-- If the theme depends on something other than the host (a preview cookie),
-  add `varyBy: (request) => string`. It runs before the cache lookup and
-  before middleware, so it must read the request directly —
-  `varyBy: (request) => String(request.cookie("preview_theme") ?? "")`.
+- If the theme depends on something other than the host (a header set by an
+  edge proxy), add `varyBy: (request) => string`. It runs before the cache
+  lookup and before middleware, so it must read the request directly —
+  `varyBy: (request) => String(request.header("x-theme") ?? "")`.
+- A theme chosen by a cookie (a preview cookie, say) needs no `varyBy`. Any
+  request carrying a cookie other than `locale` bypasses the page cache and
+  gets a fresh render.
 - A function-form `tags` receives `(data, { shared })` — the sealed `shared`
   snapshot at store time — so a route can invalidate one theme's pages with
   `invalidatePageCache(["theme:alpha"])`.

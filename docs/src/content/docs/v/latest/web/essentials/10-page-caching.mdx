@@ -7,6 +7,8 @@ sidebar:
   label: Page caching
 ---
 
+import { Aside } from "@astrojs/starlight/components";
+
 The server-side page cache is new in `@warlock.js/web` 5.12. It is a second,
 independent opt-in on `route.cache` — separate from `public`/`maxAge`, which
 only decide the `Cache-Control` header a downstream CDN/proxy should honour.
@@ -41,11 +43,12 @@ export const route = {
 - `ttl` is the server cache's own freshness window in seconds, independent of
   the CDN-facing `maxAge`. Omit it to reuse `maxAge`.
 - `varyBy?: (request) => string` adds a request-derived component to the cache
-  key, for entries that split on something other than the host (a preview
-  cookie, a header). It runs before the cache lookup — and before
+  key, for entries that split on something other than the host (a header an
+  edge proxy sets, for example). It runs before the cache lookup — and before
   middleware — so it must read the request directly, e.g.
-  `varyBy: (request) => String(request.cookie("preview_theme") ?? "")`. A
-  non-function `varyBy` is a boot-time error naming the page file.
+  `varyBy: (request) => String(request.header("x-theme") ?? "")`. Don't vary
+  on a cookie: a request that carries one bypasses the cache entirely (see
+  below). A non-function `varyBy` is a boot-time error naming the page file.
 
 ## What gets cached
 
@@ -66,10 +69,24 @@ and a `[warlock:web]` warning is logged. A value that isn't a positive integer
 fails when the config is read.
 
 **Bypass happens earlier, before storage is even considered.** A request
-carrying an `Authorization` header or the configured auth cookie
-(`auth.cookie.name`, default `access_token`) never consults the cache at
-all — that check runs before any loader, so a credentialed visitor is never
-handed a stale guest page.
+carrying an `Authorization` header or **any cookie** never consults the cache
+and is never stored. That check runs before any loader, so a credentialed
+visitor is never handed a stale guest page. Their own page is never stored
+for guests either, whatever the session cookie is called. The one exception
+is the `locale` cookie: the resolved locale is already part of the key, so a
+request whose only cookie is `locale` is still cached. An empty or malformed
+`Cookie` header counts as a cookie.
+
+In practice, a browser that holds any other cookie (a session, analytics, a
+consent banner) always gets a fresh render. Anonymous traffic without cookies
+(first visits, crawlers, link previews) is what the page cache serves.
+
+<Aside type="caution" title="Upgrading from 5.16 or earlier">
+  Before 5.17, only the configured `auth.cookie.name` (default `access_token`) bypassed the cache.
+  An app whose session cookie had another name could have a signed-in render stored and served to
+  guests. Purge existing page-cache entries, and any CDN copies of `public` pages, when you deploy
+  5.17.
+</Aside>
 
 ## The cache key
 
