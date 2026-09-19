@@ -1,16 +1,24 @@
 import { log } from "@warlock.js/logger";
 import fs from "node:fs/promises";
+import path from "node:path";
 import type { RequestHandler } from "../../router";
 import { storage } from "../../storage";
 import { HttpError } from "../errors";
 import type { Response } from "../response";
 import { uploadsConfig } from "../uploads-config";
+import {
+  detectImageFormat,
+  IMAGE_SIGNATURE_BYTES,
+  isVariantSourceFormat,
+} from "./detect-image-format";
 import { generateImageVariant } from "./generate-image-variant";
 import type { VariantOutputFormat } from "./image-variant-types";
 import { loadVariantSource } from "./load-variant-source";
 import { matchesIfNoneMatch } from "./matches-if-none-match";
 import { parseUploadedFileQuery } from "./parse-uploaded-file-query";
+import { readFileHead } from "./read-file-head";
 import { resolveImageVariantsConfig } from "./resolve-image-variants-config";
+import { resolveOriginalContentType } from "./resolve-original-content-type";
 import { resolveUploadPath, type ResolvedUploadPath } from "./resolve-upload-path";
 import { resolveVariantCandidate } from "./resolve-variant-candidate";
 import { variantCacheKey, variantCachePath } from "./variant-cache-key";
@@ -57,6 +65,26 @@ async function sendVariant(
 }
 
 /**
+ * Serve an upload original that is not a known raster format inline: html,
+ * xml and the svg family are markup a browser will parse and execute, so
+ * every non-raster original goes out as a download instead of a rendered
+ * response. `Content-Type` stays extension-derived, except the svg/html/xml
+ * family, which is downgraded to `application/octet-stream` so the browser
+ * never renders it even if it ignores the disposition.
+ */
+async function sendOriginalAsAttachment(response: Response, absolutePath: string) {
+  response.header("Content-Security-Policy", "sandbox");
+
+  return response.sendBuffer(await fs.readFile(absolutePath), {
+    contentType: resolveOriginalContentType(absolutePath),
+    cacheTime: ONE_YEAR,
+    immutable: true,
+    inline: false,
+    filename: path.basename(absolutePath),
+  });
+}
+
+/**
  * Serves local uploads, and bounded on-demand variants of the images among them.
  *
  * ```ts
@@ -93,6 +121,11 @@ export const uploadedFileController: RequestHandler = async ({ request, response
     return response.badRequest({ error: query.reason });
   }
 
+  // Every uploads response — originals and variants — tells the browser not
+  // to guess a content type from the bytes, so a mislabeled body can never be
+  // sniffed into something executable.
+  response.header("X-Content-Type-Options", "nosniff");
+
   if (query.type === "original") {
     const images = uploadsConfig("images");
     const cacheDirectory = images?.cacheDirectory ? [images.cacheDirectory] : [];
@@ -102,6 +135,15 @@ export const uploadedFileController: RequestHandler = async ({ request, response
     ]);
 
     if (!source) return notFound(response);
+
+    // Inline is decided by SNIFFED bytes, never by extension: an svg (or any
+    // other non-raster file) named `.png` must still download, not render.
+    const head = await readFileHead(source.absolutePath, IMAGE_SIGNATURE_BYTES);
+    const sniffedFormat = detectImageFormat(head);
+
+    if (!isVariantSourceFormat(sniffedFormat)) {
+      return sendOriginalAsAttachment(response, source.absolutePath);
+    }
 
     return response.sendFile(source.absolutePath, ONE_YEAR);
   }

@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.17.0 - Unreleased
 
+### Security
+
+- `uploadedFileController` no longer serves an upload original inline unless its bytes sniff as jpeg, png, webp or avif (never its extension — an svg or html file named `.png` still downloads). Every other original — svg, html, xml, text, pdf, unknown, and any raster-named file whose bytes don't back it up — is sent with `Content-Disposition: attachment`, `Content-Security-Policy: sandbox`, and its extension-derived `Content-Type`, except the svg/html/xml family, which is downgraded to `application/octet-stream`. This closes a stored-XSS hole: an uploaded `.svg` (or `.html`/`.xml`/`.xhtml`) was previously served inline with its real content type, so a `<script>` inside it ran on the app's own origin. Every uploads response — originals and variants — now also carries `X-Content-Type-Options: nosniff`.
+
 ### Added
 
 - `uploadedFileController`, a ready-made handler for `router.get("/uploads/*", uploadedFileController)` that serves local uploads safely. The request path must resolve inside the storage root, symlinks included, and never into the variant cache. Anything else gets the same 404 as a missing file, so the route cannot be used to probe for files. Originals are sent with a one-year cache.

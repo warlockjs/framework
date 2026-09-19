@@ -268,6 +268,73 @@ describe.skipIf(!sharp)("uploadedFileController — originals", () => {
   });
 });
 
+describe("uploadedFileController — content sniffing (security)", () => {
+  it("serves an svg with a script as an attachment, sandboxed, and never as its real type", async () => {
+    fs.writeFileSync(
+      path.join(storageRoot, "evil.svg"),
+      '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+    );
+
+    const result = await get("/uploads/evil.svg");
+
+    expect(result.statusCode).toBe(200);
+    expect(result.headers["content-disposition"]).toContain("attachment");
+    expect(result.headers["content-disposition"]).toContain('filename="evil.svg"');
+    expect(result.headers["content-security-policy"]).toBe("sandbox");
+    expect(result.headers["x-content-type-options"]).toBe("nosniff");
+    expect(result.headers["content-type"]).not.toBe("image/svg+xml");
+    expect(result.headers["content-type"]).toContain("application/octet-stream");
+  });
+
+  it("serves an html original as an attachment", async () => {
+    fs.writeFileSync(
+      path.join(storageRoot, "page.html"),
+      "<script>alert(document.cookie)</script>",
+    );
+
+    const result = await get("/uploads/page.html");
+
+    expect(result.statusCode).toBe(200);
+    expect(result.headers["content-disposition"]).toContain("attachment");
+    expect(result.headers["content-type"]).toContain("application/octet-stream");
+  });
+
+  it("serves svg bytes named .png as an attachment, never inline", async () => {
+    fs.writeFileSync(
+      path.join(storageRoot, "liar.png"),
+      '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+    );
+
+    const result = await get("/uploads/liar.png");
+
+    expect(result.statusCode).toBe(200);
+    expect(result.headers["content-disposition"]).toContain("attachment");
+  });
+
+  it.skipIf(!sharp)(
+    "serves a png original inline, with its image content type and nosniff",
+    async () => {
+      fs.writeFileSync(path.join(storageRoot, "real.png"), await makeImage("png"));
+
+      const result = await get("/uploads/real.png");
+
+      expect(result.statusCode).toBe(200);
+      expect(result.headers["content-disposition"]).toBeUndefined();
+      expect(result.headers["content-type"]).toBe("image/png");
+      expect(result.headers["x-content-type-options"]).toBe("nosniff");
+    },
+  );
+
+  it.skipIf(!sharp)("carries nosniff on variant responses too", async () => {
+    fs.writeFileSync(path.join(storageRoot, "hero-nosniff.jpg"), await makeImage("jpeg", 64, 64));
+
+    const result = await get("/uploads/hero-nosniff.jpg?variant=thumb");
+
+    expect(result.statusCode).toBe(200);
+    expect(result.headers["x-content-type-options"]).toBe("nosniff");
+  });
+});
+
 describe.skipIf(!sharp)("uploadedFileController — source checks", () => {
   it("returns 404 for a variant of a missing source", async () => {
     const result = await get("/uploads/nothing.jpg?variant=thumb");
