@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.17.0 - Unreleased
+
+### Added
+
+- `uploadedFileController`, a ready-made handler for `router.get("/uploads/*", uploadedFileController)` that serves local uploads safely. The request path must resolve inside the storage root, symlinks included, and never into the variant cache. Anything else gets the same 404 as a missing file, so the route cannot be used to probe for files. Originals are sent with a one-year cache.
+- Bounded on-demand image variants, configured under `uploads.images`: `?variant=<name>` renders a variant named in `uploads.images.variants` (width and height from 1 to 8192, quality from 1 to 100, `fit` of `cover`, `contain` or `inside`), and `&format=` picks an output format from the `formats` allowlist (`webp`, `avif`). Any other query key, a repeated key, an unknown variant or a format that is not allowed returns 400. Only jpeg, png, webp and avif sources are resized, detected by their magic bytes, never their extension. gif and svg return 415. `maxSourceBytes` (default 25 MB) and `maxSourcePixels` (default 40,000,000) cap the source, and a larger one returns 413. Each derivative is cached on disk under a sha256 of the source path, size, mtime, variant and format, and it is written atomically. Concurrent requests for the same derivative generate it once. It is served with `Cache-Control: public, max-age=31536000, immutable` and an ETag that answers 304. Rewriting the source changes the key, so the next request renders a new derivative. An invalid `uploads.images` config throws `ImageVariantsConfigError` the first time a variant is requested. The variant path needs `sharp`, but originals are served without it.
+
 ## 5.16.0 - 2026-09-18
 
 ### Added

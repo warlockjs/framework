@@ -10,6 +10,8 @@ export * from "./request-controller";
 export * from "./uploaded-file";
 export * from "./uploads-config";
 export * from "./uploads-types";
+// local uploads serving + bounded image variants
+export * from "./uploads";
 // errors
 export * from "./errors";
 // middleware

@@ -214,6 +214,111 @@ export type UploadsConfigurations = {
    * @default "dd-mm-yyyy-HH-ii-ss"
    */
   defaultPrefixFormat?: string;
+
+  /**
+   * Bounded on-demand image variants for local `/uploads` images, served by
+   * `uploadedFileController`.
+   *
+   * Only the named variants below can be requested (`?variant=thumb`), so the
+   * set of derivatives a client can make the server compute is fixed by the
+   * app, not by the query string.
+   *
+   * When omitted, every `?variant=` request is refused with 400. Originals are
+   * still served.
+   */
+  images?: UploadsImagesConfigurations;
+};
+
+/**
+ * Output formats a client may request with `&format=` on an image variant
+ */
+export type ImageVariantOutputFormat = "avif" | "webp";
+
+/**
+ * How an image variant fits into its box, see sharp's `fit` resize option
+ */
+export type ImageVariantFit = "cover" | "contain" | "inside";
+
+/**
+ * One named image variant
+ *
+ * @example
+ * ```typescript
+ * { width: 640, height: 480, fit: "cover", quality: 80 }
+ * ```
+ */
+export type ImageVariantDefinition = {
+  /**
+   * Target width in pixels, a positive integer up to 8192
+   */
+  width: number;
+
+  /**
+   * Target height in pixels, a positive integer up to 8192
+   */
+  height?: number;
+
+  /**
+   * Resize fit mode
+   *
+   * @default sharp's default ("cover")
+   */
+  fit?: ImageVariantFit;
+
+  /**
+   * Output quality, 1-100
+   */
+  quality?: number;
+};
+
+/**
+ * The `uploads.images` configuration section
+ *
+ * @example
+ * ```typescript
+ * images: {
+ *   variants: {
+ *     thumb: { width: 320 },
+ *     card: { width: 640 },
+ *     hero: { width: 1280 },
+ *   },
+ *   formats: ["webp"],
+ * }
+ * ```
+ */
+export type UploadsImagesConfigurations = {
+  /**
+   * The named variants a client may request with `?variant=<name>`
+   */
+  variants: Readonly<Record<string, ImageVariantDefinition>>;
+
+  /**
+   * Formats a client may request with `&format=`. Anything else is refused.
+   *
+   * @default [] (a variant keeps its source format)
+   */
+  formats?: readonly ImageVariantOutputFormat[];
+
+  /**
+   * Largest source file, in bytes, a variant may be generated from
+   *
+   * @default 25 MB
+   */
+  maxSourceBytes?: number;
+
+  /**
+   * Largest source image, in pixels (width x height), a variant may be generated from
+   *
+   * @default 40_000_000
+   */
+  maxSourcePixels?: number;
+
+  /**
+   * Absolute directory the generated variants are cached in
+   *
+   * @default storage.root(".cache/image-variants")
+   */
+  cacheDirectory?: string;
 };
 
 /**
