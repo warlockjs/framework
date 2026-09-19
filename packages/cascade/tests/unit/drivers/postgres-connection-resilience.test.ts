@@ -20,7 +20,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * 2. `commit()` / `rollback()` released the client only on the statement
  *    after `COMMIT`/`ROLLBACK` succeeded — a throw from that query (e.g. the
  *    connection was terminated mid-transaction) skipped `release()` and
- *    leaked the client the same way.
+ *    leaked the client the same way. Fixed so a failing COMMIT or ROLLBACK
+ *    releases exactly once, and with the error (`release(error)`), so pg
+ *    discards the client instead of recycling one left in an unknown
+ *    transaction state. `transaction()` no longer issues ROLLBACK after a
+ *    failed COMMIT — the client is already released, and doing so would
+ *    touch a released client, double-release it, and could mask the
+ *    original COMMIT error.
  * 3. `new pg.Pool(poolConfig)` had no `error` listener. pg's Pool emits
  *    `'error'` for problems on an already-idle client (a dropped idle
  *    connection — the "Connection terminated unexpectedly" symptom); with no
@@ -29,10 +35,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * 4. `connectionTimeoutMillis` defaulted to 2000ms, too tight for queued
  *    checkouts under concurrency; raised to 10000ms. `keepAlive` was never
  *    passed to pg at all; now defaults to `true`.
- * 5. `query()` now retries once, only for a `SELECT` outside a transaction,
- *    when the failure is pg's "connection terminated" family — covers the
- *    "first request after the server sat idle" symptom where the pool hands
- *    out a client whose socket was already closed by the OS/NAT.
+ *
+ * `query()` does NOT retry. An earlier version of this fix retried once for
+ * anything that looked like a `SELECT` on a "connection terminated" error,
+ * but SQL text isn't a reliable idempotency signal — `SELECT nextval('seq')`
+ * and `SELECT some_write_function()` both change state, and retrying after
+ * the connection drops between the side effect and the response would
+ * duplicate it. Removed; see the "no retry" describe block below.
  */
 
 const connect = vi.fn();
@@ -145,6 +154,9 @@ describe("PostgresDriver — connection resilience (ba1193b4)", () => {
 
       await expect(tx.commit()).rejects.toThrow("Connection terminated unexpectedly");
       expect(client.release).toHaveBeenCalledTimes(1);
+      // Released WITH the error, so pg discards rather than recycles a
+      // client left in an unknown transaction state.
+      expect(client.release).toHaveBeenCalledWith(expect.any(Error));
     });
 
     it("releases the client when ROLLBACK throws", async () => {
@@ -162,6 +174,7 @@ describe("PostgresDriver — connection resilience (ba1193b4)", () => {
 
       await expect(tx.rollback()).rejects.toThrow("Connection terminated unexpectedly");
       expect(client.release).toHaveBeenCalledTimes(1);
+      expect(client.release).toHaveBeenCalledWith(expect.any(Error));
     });
 
     it("still releases exactly once on the happy path (no leak, no double-release)", async () => {
@@ -176,35 +189,93 @@ describe("PostgresDriver — connection resilience (ba1193b4)", () => {
     });
   });
 
-  describe("query() — one-time retry on a connection-terminated error", () => {
-    it("retries an idempotent SELECT once and returns the retry's result", async () => {
+  describe("transaction() — a failed COMMIT is not followed by ROLLBACK", () => {
+    it("propagates the original COMMIT error, releases exactly once with release(error), and never issues ROLLBACK", async () => {
       const driver = await connectedDriver();
-      poolQuery
-        .mockRejectedValueOnce(new Error("Connection terminated unexpectedly"))
-        .mockResolvedValueOnce({ rows: [{ id: 1 }], rowCount: 1 });
-
-      const result = await driver.query("SELECT * FROM posts WHERE id = $1", [1]);
-
-      expect(result.rows).toEqual([{ id: 1 }]);
-      expect(poolQuery).toHaveBeenCalledTimes(2);
-    });
-
-    it("retries when the timeout error carries 'Connection terminated unexpectedly' as its cause", async () => {
-      const driver = await connectedDriver();
-      const timeoutError = new Error("Connection terminated due to connection timeout", {
-        cause: new Error("Connection terminated unexpectedly"),
+      const client = makeClient();
+      const commitError = new Error("Connection terminated unexpectedly");
+      client.query.mockImplementation((sql: string) => {
+        if (sql === "COMMIT") {
+          return Promise.reject(commitError);
+        }
+        return Promise.resolve({ rows: [], rowCount: 0 });
       });
-      poolQuery
-        .mockRejectedValueOnce(timeoutError)
-        .mockResolvedValueOnce({ rows: [{ id: 2 }], rowCount: 1 });
+      connect.mockResolvedValue(client);
 
-      const result = await driver.query("select * from posts");
+      await expect(driver.transaction(async () => "ok")).rejects.toBe(commitError);
 
-      expect(result.rows).toEqual([{ id: 2 }]);
-      expect(poolQuery).toHaveBeenCalledTimes(2);
+      const queriedSql = client.query.mock.calls.map(([sql]) => sql);
+      expect(queriedSql).not.toContain("ROLLBACK");
+
+      expect(client.release).toHaveBeenCalledTimes(1);
+      expect(client.release).toHaveBeenCalledWith(commitError);
     });
 
-    it("does NOT retry a non-SELECT statement (would double-apply a write)", async () => {
+    it("still rolls back when the callback itself throws (COMMIT never reached)", async () => {
+      const driver = await connectedDriver();
+      const client = makeClient();
+      connect.mockResolvedValue(client);
+      const callbackError = new Error("callback exploded");
+
+      await expect(
+        driver.transaction(async () => {
+          throw callbackError;
+        }),
+      ).rejects.toBe(callbackError);
+
+      const queriedSql = client.query.mock.calls.map(([sql]) => sql);
+      expect(queriedSql).toContain("ROLLBACK");
+      expect(queriedSql).not.toContain("COMMIT");
+      expect(client.release).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the callback's error when ROLLBACK also fails, releasing once with the rollback error", async () => {
+      const driver = await connectedDriver();
+      const client = makeClient();
+      const rollbackError = new Error("Connection terminated unexpectedly");
+      client.query.mockImplementation((sql: string) =>
+        sql === "ROLLBACK"
+          ? Promise.reject(rollbackError)
+          : Promise.resolve({ rows: [], rowCount: 0 }),
+      );
+      connect.mockResolvedValue(client);
+      const callbackError = new Error("callback exploded");
+
+      await expect(
+        driver.transaction(async () => {
+          throw callbackError;
+        }),
+      ).rejects.toBe(callbackError);
+
+      expect(client.release).toHaveBeenCalledTimes(1);
+      expect(client.release).toHaveBeenCalledWith(rollbackError);
+    });
+  });
+
+  describe("query() — no automatic retry (removed: SQL-text idempotency is not a safe signal)", () => {
+    it("does NOT retry a connection-terminated error, even on a plain SELECT", async () => {
+      const driver = await connectedDriver();
+      poolQuery.mockRejectedValueOnce(new Error("Connection terminated unexpectedly"));
+
+      await expect(driver.query("SELECT * FROM posts")).rejects.toThrow(
+        "Connection terminated unexpectedly",
+      );
+
+      expect(poolQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it("does NOT retry SELECT nextval('seq') — a 'read-only-looking' SELECT that mutates state", async () => {
+      const driver = await connectedDriver();
+      poolQuery.mockRejectedValueOnce(new Error("Connection terminated unexpectedly"));
+
+      await expect(driver.query("SELECT nextval('seq')")).rejects.toThrow(
+        "Connection terminated unexpectedly",
+      );
+
+      expect(poolQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it("does NOT retry a non-SELECT statement either", async () => {
       const driver = await connectedDriver();
       poolQuery.mockRejectedValueOnce(new Error("Connection terminated unexpectedly"));
 
@@ -213,28 +284,6 @@ describe("PostgresDriver — connection resilience (ba1193b4)", () => {
       ).rejects.toThrow("Connection terminated unexpectedly");
 
       expect(poolQuery).toHaveBeenCalledTimes(1);
-    });
-
-    it("does NOT retry a SELECT that fails for an unrelated reason", async () => {
-      const driver = await connectedDriver();
-      poolQuery.mockRejectedValueOnce(new Error('column "bogus" does not exist'));
-
-      await expect(driver.query("SELECT bogus FROM posts")).rejects.toThrow(
-        'column "bogus" does not exist',
-      );
-
-      expect(poolQuery).toHaveBeenCalledTimes(1);
-    });
-
-    it("only retries once — a SELECT that keeps failing surfaces the error", async () => {
-      const driver = await connectedDriver();
-      poolQuery.mockRejectedValue(new Error("Connection terminated unexpectedly"));
-
-      await expect(driver.query("SELECT * FROM posts")).rejects.toThrow(
-        "Connection terminated unexpectedly",
-      );
-
-      expect(poolQuery).toHaveBeenCalledTimes(2);
     });
   });
 

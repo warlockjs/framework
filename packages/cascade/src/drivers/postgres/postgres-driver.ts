@@ -1242,19 +1242,27 @@ export class PostgresDriver implements DriverContract {
       commit: async () => {
         // COMMIT/ROLLBACK failing must still release the client — a bare
         // `await client.query(...); client.release();` skips release() on
-        // that throw, which is the other leak this card describes.
+        // that throw, which is the other leak this card describes. A failed
+        // COMMIT releases with the error (exactly once) so pg discards the
+        // client instead of recycling a connection left in an unknown
+        // transaction state; the original COMMIT error still propagates and
+        // the caller must NOT issue ROLLBACK afterwards (see transaction()).
         try {
           await client.query("COMMIT");
-        } finally {
-          client.release();
+        } catch (error) {
+          client.release(error instanceof Error ? error : new Error(String(error)));
+          throw error;
         }
+        client.release();
       },
       rollback: async () => {
         try {
           await client.query("ROLLBACK");
-        } finally {
-          client.release();
+        } catch (error) {
+          client.release(error instanceof Error ? error : new Error(String(error)));
+          throw error;
         }
+        client.release();
       },
     };
   }
@@ -1300,22 +1308,46 @@ export class PostgresDriver implements DriverContract {
     // Set transaction context for queries within callback
     databaseTransactionContext.enter({ session: tx.context });
 
+    // Tracks whether tx.commit() was reached, so the catch block below can
+    // tell a callback failure (client still live, must ROLLBACK) apart from
+    // a COMMIT failure (commit() already released the client — with the
+    // error, per above — so it's discarded; issuing ROLLBACK on it would
+    // touch an already-released client and double-release it).
+    let commitStarted = false;
+
     try {
       // Execute callback
       const result = await fn(ctx);
 
       // Auto-commit on success
+      commitStarted = true;
       await tx.commit();
 
       return result;
     } catch (error) {
-      // Auto-rollback on any error (including explicit rollback)
-      await tx.rollback();
-      log.error(
-        `database.postgress`,
-        "transaction",
-        "Transaction operation failed, rolled back everything",
-      );
+      if (commitStarted) {
+        // COMMIT itself failed: the original error propagates unchanged and
+        // no ROLLBACK is issued after it.
+        log.error(
+          `database.postgress`,
+          "transaction",
+          "Transaction COMMIT failed; client discarded, no rollback issued",
+        );
+      } else {
+        // Auto-rollback on any error (including explicit rollback). A failing
+        // ROLLBACK is logged, never thrown: the callback's error is the one
+        // the caller needs, and rollback() has already discarded the client.
+        try {
+          await tx.rollback();
+          log.error(
+            `database.postgress`,
+            "transaction",
+            "Transaction operation failed, rolled back everything",
+          );
+        } catch (rollbackError) {
+          log.error(`database.postgress`, "transaction", rollbackError);
+        }
+      }
       throw error;
     } finally {
       // Guaranteed cleanup
@@ -1436,22 +1468,18 @@ export class PostgresDriver implements DriverContract {
       if (txClient) {
         result = await txClient.query(sql, params);
       } else {
-        try {
-          result = await this.pool.query(sql, params);
-        } catch (error) {
-          // A client that looked idle-healthy to the pool can already have
-          // been dropped by the server/OS (card ba1193b4: "Connection
-          // terminated unexpectedly" after the process sat idle) — the pool
-          // only discovers this on the query that reuses it. One retry on a
-          // fresh checkout is safe here specifically because we're outside a
-          // transaction (no txClient) and the statement is a read-only
-          // SELECT: re-running it can't double-apply a write.
-          if (this.isConnectionTerminatedError(error) && this.isIdempotentSelect(sql)) {
-            result = await this.pool.query(sql, params);
-          } else {
-            throw error;
-          }
-        }
+        // No automatic retry here: a client that looked idle-healthy to the
+        // pool can already have been dropped by the server/OS (card
+        // ba1193b4: "Connection terminated unexpectedly" after the process
+        // sat idle), and the pool only discovers this on the query that
+        // reuses it. Re-running based on the SQL text "looking like" a
+        // read-only SELECT is not a safe idempotency check — `SELECT
+        // nextval('seq')` and `SELECT some_write_function()` both change
+        // state, and a retry after the connection dropped between the
+        // side effect and the response would duplicate it. Callers that
+        // need retry semantics must implement them with real idempotency
+        // guarantees at the call site.
+        result = await this.pool.query(sql, params);
       }
 
       if (this.config.logging) {
@@ -1587,35 +1615,6 @@ export class PostgresDriver implements DriverContract {
     const whereClause = condition ? `WHERE ${condition}` : "";
 
     return { whereClause, whereParams: params, condition };
-  }
-
-  /**
-   * Whether `error` is pg's "connection terminated" family — either the
-   * pool's own `Error: Connection terminated unexpectedly` (thrown when the
-   * socket closes while idle/mid-query) or the query-time
-   * `Error: timeout exceeded when trying to connect` surfaced with that as
-   * its `cause`. Both are the one-time-retry trigger in {@link query}.
-   */
-  private isConnectionTerminatedError(error: unknown): boolean {
-    if (!(error instanceof Error)) {
-      return false;
-    }
-
-    const cause = (error as { cause?: unknown }).cause;
-    const messages = [error.message, cause instanceof Error ? cause.message : undefined];
-
-    return messages.some(
-      (message) => message !== undefined && /connection terminated/i.test(message),
-    );
-  }
-
-  /**
-   * Whether `sql` is a read-only `SELECT` — the only statement shape the
-   * connection-terminated retry in {@link query} may safely re-run, since
-   * re-executing it can't double-apply a write.
-   */
-  private isIdempotentSelect(sql: string): boolean {
-    return /^\s*select\b/i.test(sql);
   }
 
   /**

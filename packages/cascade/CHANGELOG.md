@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - `where(field, undefined)` / `where(field, operator, undefined)` / `where({ field: undefined })` (and the `orWhere` equivalents, on both the Postgres and MongoDB query builders) now throw `UndefinedWhereValueError` instead of silently reaching the driver. A bound `undefined` used to bind as `= NULL` (SQL) / "field missing" (MongoDB) — a comparison that never matches but never fails either, hiding call sites that forgot to guard a value that turned out to be missing (card 62e0e781: a blog author lookup ran `User.find(post.authorId)` with an undefined id under load). Pass `null` to match NULL explicitly; guard the call site to skip the query when there's no value.
+- Postgres pool leaks (card ba1193b4): `beginTransaction()` now releases its client on every path, including when `BEGIN`, `COMMIT` or `ROLLBACK` throws. A failed `COMMIT`/`ROLLBACK` discards the client (`release(error)`) instead of recycling one left in an unknown transaction state, and `transaction()` no longer issues `ROLLBACK` after a failed `COMMIT`. The pool also gets an `error` listener (an idle client dropped by the server no longer crashes the process), `keepAlive`, and a 10s connect timeout.
 
 ## 5.13.0 - 2026-09-17
 
