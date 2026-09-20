@@ -20,27 +20,8 @@ import { setBaseUrl } from "../utils/urls";
 import { container } from "./../container";
 import { BaseConnector } from "./base-connector";
 import { describeServerAddress } from "./describe-server-address";
+import { readBoundPort } from "./read-bound-port";
 import { ConnectorLifecyclePhase, ConnectorPriority } from "./types";
-
-/**
- * The port actually bound, read back from the address `listen()` resolved
- * with — never the port that was asked for. See the call site in
- * {@link HttpConnector.start} for why this matters (`http.port: 0`).
- *
- * `fallback` only fires if `boundAddress` turns out unparseable as a URL,
- * which does not happen in practice — Fastify's resolved address is always a
- * well-formed `http://host:port` (or `https://`) string with an explicit
- * port — but a best-effort read of a socket address must never throw.
- */
-function readBoundPort(boundAddress: string, fallback: number): number {
-  try {
-    const port = new URL(boundAddress).port;
-
-    return port ? Number(port) : fallback;
-  } catch {
-    return fallback;
-  }
-}
 
 function environmentColor(environment: Environment) {
   switch (environment) {
