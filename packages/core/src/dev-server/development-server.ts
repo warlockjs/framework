@@ -184,7 +184,7 @@ export class DevelopmentServer {
         batch.timings,
       );
 
-      typeGenerator.executeTypingsGenerator([...batch.added, ...batch.changed]);
+      typeGenerator.executeTypingsGenerator([...batch.added, ...batch.changed, ...batch.deleted]);
 
       filesOrchestrator.checkHealth(batch);
     } catch (error) {
