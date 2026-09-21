@@ -10,7 +10,7 @@ sidebar:
 import { Aside } from "@astrojs/starlight/components";
 
 The server-side page cache is new in `@warlock.js/web` 5.12. It is a second,
-independent opt-in on `route.cache` — separate from `public`/`maxAge`, which
+independent opt-in in `config.cache` — separate from `public`/`maxAge`, which
 only decide the `Cache-Control` header a downstream CDN/proxy should honour.
 `serverCache` has the framework itself hold the resolved bytes and serve a
 HIT without re-running loaders or rendering at all.
@@ -18,9 +18,10 @@ HIT without re-running loaders or rendering at all.
 ## Opt in with `serverCache` and `tags`
 
 ```tsx title="src/web/products/index.page.tsx"
-export const route = {
-  path: "/products",
-  name: "products.index",
+import type { PageConfig } from "@warlock.js/web";
+
+export const config = {
+  route: { path: "/products", name: "products.index" },
   cache: {
     public: true,
     maxAge: 60,
@@ -29,10 +30,10 @@ export const route = {
     // or: tags: (data) => [`product:${data.id}`],
     ttl: 300, // optional — defaults to maxAge
   },
-} as const;
+} satisfies PageConfig;
 ```
 
-- `serverCache` requires `public: true` — like every `cache` opt-in — **and**
+- `serverCache` requires `public: true` — like every `config.cache` opt-in — **and**
   `tags`. A stored entry with no tags could never be invalidated early, so
   `serverCache: true` with no `tags` is a boot-time `InvalidPageCacheOptInError`.
 - `tags` is a static array, or a function `(data, { shared }) => string[]` —
@@ -183,7 +184,7 @@ application that never opts in is never forced to install it. Enabling
 `serverCache` without the package installed fails loudly, naming the package:
 
 ```
-A route declares `route.cache.serverCache: true`, but "@warlock.js/cache" could not be
+A page declares `config.cache.serverCache: true`, but "@warlock.js/cache" could not be
 loaded. Install it as a dependency of your application — it is an optional peer of
 @warlock.js/web and is only required when a route opts into the server-side page cache.
 ```

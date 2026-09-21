@@ -19,7 +19,7 @@ so one slow value no longer holds up everything else.
 ```tsx title="src/web/products/product-details.page.tsx"
 import { use, Suspense } from "react";
 import { defer } from "@warlock.js/web";
-import type { PageLoader, PageProps } from "@warlock.js/web";
+import type { PageConfig, PageLoader, PageProps } from "@warlock.js/web";
 
 export const loader = (async ({ request }) => {
   const { id } = request.validated();
@@ -96,10 +96,7 @@ page's own `error.page.tsx`:
 ```tsx title="src/web/products/reviews-boundary.tsx"
 import { Component, type ReactNode } from "react";
 
-export class ReviewsBoundary extends Component<
-  { children: ReactNode },
-  { error?: unknown }
-> {
+export class ReviewsBoundary extends Component<{ children: ReactNode }, { error?: unknown }> {
   state: { error?: unknown } = {};
 
   static getDerivedStateFromError(error: unknown) {
@@ -141,29 +138,30 @@ export default {
 The budget applies **per deferred key**, not per request — three deferred
 keys on one page each get their own timer.
 
-## `metadata()` may only read resolved keys
+## `config.metadata` may only read resolved keys
 
-`metadata()` runs before the shell flushes; a deferred key resolves only
+`config.metadata` runs before the shell flushes; a deferred key resolves only
 after. Reading one throws `DeferredKeyInMetadataError`, naming the key and
 the page, in dev **and** in production:
 
 ```tsx
 export const loader = (async () =>
-  defer({ product: await getProduct(id), reviews: getReviews(id) })
-) satisfies PageLoader;
+  defer({ product: await getProduct(id), reviews: getReviews(id) })) satisfies PageLoader;
 
 // Wrong — "reviews" is deferred:
-export const metadata = (({ data }) => ({
-  title: `${data.reviews.length} reviews`, // throws DeferredKeyInMetadataError
-})) satisfies PageMetadata<typeof loader>;
+export const config = {
+  metadata: ({ data }) => ({
+    title: `${data.reviews.length} reviews`, // throws DeferredKeyInMetadataError
+  }),
+} satisfies PageConfig<typeof loader>;
 
 // Right — describe the page from what's already resolved:
-export const metadata = (({ data }) => ({
-  title: data.product.name,
-})) satisfies PageMetadata<typeof loader>;
+export const config = {
+  metadata: ({ data }) => ({ title: data.product.name }),
+} satisfies PageConfig<typeof loader>;
 ```
 
-There is no way to make `metadata()` wait for a deferred value. If the
+There is no way to make `config.metadata` wait for a deferred value. If the
 document `<head>` genuinely needs it, resolve it inside the loader instead of
 deferring it.
 

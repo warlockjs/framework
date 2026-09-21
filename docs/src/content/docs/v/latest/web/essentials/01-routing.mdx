@@ -7,7 +7,7 @@ sidebar:
   label: Routing
 ---
 
-A page with no `route` export derives its URL and name from its location beneath
+A page with no `config.route` derives its URL and name from its location beneath
 `src/web/`.
 
 ## Filesystem routing
@@ -35,13 +35,14 @@ The rules are:
 
 ## Explicit routes
 
-Export a bare literal path or a literal object:
+Put a literal path or object in the page's `config`:
 
 ```tsx title="src/web/products/[id].page.tsx"
-export const route = {
-  path: "/catalog/:id",
-  name: "products.show",
-} as const;
+import type { PageConfig } from "@warlock.js/web";
+
+export const config = {
+  route: { path: "/catalog/:id", name: "products.show" },
+} satisfies PageConfig;
 
 export default function ProductPage() {
   return <main>Product</main>;
@@ -49,14 +50,16 @@ export default function ProductPage() {
 ```
 
 An explicit route wins over filesystem derivation for both path and name. A
-bare string is also valid:
+bare string inside `config` is also valid:
 
 ```ts
-export const route = "/products";
+import type { PageConfig } from "@warlock.js/web";
+
+export const config = { route: "/products" } satisfies PageConfig;
 ```
 
-Warlock reads this export without executing application code. Variables,
-function calls, computed keys, spreads, and indirect `export { route }` forms
+Warlock reads `config.route` without executing application code. Route
+variables, function calls, computed keys, spreads, and indirect config aliases
 are refused.
 
 Two pages that resolve to the same effective path or name fail discovery and
@@ -65,14 +68,15 @@ name both files, instead of leaving one page silently unreachable.
 ## Cache public pages explicitly
 
 Page documents and their `x-warlock-data` representations are `no-store` by
-default. Opt a public page into shared caching on its route:
+default. Opt a public page into shared caching with `config.cache`:
 
 ```tsx title="src/web/products/index.page.tsx"
-export const route = {
-  path: "/products",
-  name: "products.index",
+import type { PageConfig } from "@warlock.js/web";
+
+export const config = {
+  route: { path: "/products", name: "products.index" },
   cache: { public: true, maxAge: 60 },
-} as const;
+} satisfies PageConfig;
 ```
 
 `maxAge` is seconds. Both keys are required:
@@ -127,10 +131,11 @@ both the page and rejected segment:
 Use an explicit terminal wildcard instead:
 
 ```tsx title="src/web/docs/catch-all.page.tsx"
-export const route = {
-  path: "/docs/*",
-  name: "docs.catchAll",
-} as const;
+import type { PageConfig } from "@warlock.js/web";
+
+export const config = {
+  route: { path: "/docs/*", name: "docs.catchAll" },
+} satisfies PageConfig;
 ```
 
 ## Default export failures

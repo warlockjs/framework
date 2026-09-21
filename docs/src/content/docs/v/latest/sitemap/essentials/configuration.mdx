@@ -12,7 +12,7 @@ import { Aside } from "@astrojs/starlight/components";
 `@warlock.js/web` calls the package, just as an Express handler would. Web
 handles everything that depends on the app:
 
-- finding pages and applying the page-level `sitemap` export;
+- finding pages and applying page-level `config.sitemap` policy;
 - expanding locales into `hreflang` alternates;
 - choosing `Sitemap` or `SitemapIndex`;
 - generating the file at `warlock build` and at boot;
@@ -51,30 +51,32 @@ know its public origin yet. To turn it on:
 2. Set `sitemap.enabled` to `true`.
 
 <Aside type="caution" title="No origin, no sitemap">
-If the sitemap is enabled but has no origin, generation throws
-`MissingPublicUrlError`. It never builds URLs from a guessed or
-request-derived host. `warlock build` fails. At boot, the error is logged and
-`/sitemap.xml` returns `503` until a later generation succeeds.
+  If the sitemap is enabled but has no origin, generation throws `MissingPublicUrlError`. It never
+  builds URLs from a guessed or request-derived host. Sitemap generation runs at runtime, not during
+  `warlock build`. At boot, the error is logged and `/sitemap.xml` returns `503` until a later
+  generation succeeds.
 </Aside>
 
 The [Sitemap and robots.txt guide](/v/latest/web/guides/sitemap-and-robots/)
-covers the rest: every `web.sitemap` key, the page-level `sitemap` export,
+covers the rest: every `web.sitemap` key, page-level `config.sitemap`,
 locales, `robots.txt`, and regenerating after your data changes.
 
 ## Upgrading from 5.15
 
 5.16 rewrites this package, and the 5.15 API is gone. That includes the
 connector, its standalone config file, the page-registry helpers, and the
-`sitemap.path`/`defaults` config module.
+`sitemap.path`/`defaults` config module. In 5.17, page sitemap policy moves
+into the page's direct `config` object, typed with `PageConfig` from
+`@warlock.js/web`.
 
-| 5.15 | 5.16 |
-| --- | --- |
-| A connector registered in `warlock.config.ts` | Nothing to register. `@warlock.js/web` reads `web.sitemap` itself. Remove the connector entry. |
-| A standalone sitemap config file | A `sitemap` section in `src/config/web.ts`, typed as `WebSitemapConfig` from `@warlock.js/web/sitemap`. Move `enabled`, `path`, and `defaults` there. |
-| `export const sitemap = async () => [...]` on a page | The same export still works. Type it as `SitemapPageExport` from `@warlock.js/web/sitemap`. It can also be a static options object. |
-| API-only apps passing an `entries` supplier | Build a `Sitemap` yourself and return it with `response.xml(sitemap)`. See [Build a sitemap](/v/latest/sitemap/essentials/standalone/#toxml). |
-| Collecting and serialising pages yourself | `new Sitemap({ baseUrl })`, then `add()` and `toXML()`. |
-| `MissingPublicUrlError` from the sitemap package | `MissingPublicUrlError` from `@warlock.js/web/sitemap`, raised when generation runs rather than at connector boot. |
+| 5.15                                                 | Current API (5.17)                                                                                                                                                            |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A connector registered in `warlock.config.ts`        | Nothing to register. `@warlock.js/web` reads `web.sitemap` itself. Remove the connector entry.                                                                                |
+| A standalone sitemap config file                     | A `sitemap` section in `src/config/web.ts`, typed as `WebSitemapConfig` from `@warlock.js/web/sitemap`. Move `enabled`, `path`, and `defaults` there.                         |
+| `export const sitemap = async () => [...]` on a page | Move the function into `config.sitemap` and type the direct config object with `PageConfig` from `@warlock.js/web`. The value can also be a static options object or `false`. |
+| API-only apps passing an `entries` supplier          | Build a `Sitemap` yourself and return it with `response.xml(sitemap)`. See [Build a sitemap](/v/latest/sitemap/essentials/standalone/#toxml).                                 |
+| Collecting and serialising pages yourself            | `new Sitemap({ baseUrl })`, then `add()` and `toXML()`.                                                                                                                       |
+| `MissingPublicUrlError` from the sitemap package     | `MissingPublicUrlError` from `@warlock.js/web/sitemap`, raised when generation runs rather than at connector boot.                                                            |
 
 The builder takes its origin as the `baseUrl` argument, so the standalone
 package can no longer be missing one.

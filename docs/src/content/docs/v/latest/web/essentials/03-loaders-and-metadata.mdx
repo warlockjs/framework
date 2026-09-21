@@ -14,13 +14,7 @@ React component.
 ## Type loader data into the page
 
 ```tsx title="src/web/products/[id].page.tsx"
-import type { PageLoader, PageMetadata, PageProps } from "@warlock.js/web";
-
-export const route = {
-  path: "/products/:id",
-  name: "products.show",
-  cache: { public: true, maxAge: 60 },
-} as const;
+import type { PageConfig, PageLoader, PageProps } from "@warlock.js/web";
 
 export const loader = (async ({ request }) => {
   const id = request.input("id");
@@ -28,12 +22,16 @@ export const loader = (async ({ request }) => {
   return {
     product: { id, name: `Product ${id}` },
   };
-}) satisfies PageLoader<undefined, typeof route>;
+}) satisfies PageLoader;
 
-export const metadata: PageMetadata<typeof loader> = ({ data }) => ({
-  title: data.product.name,
-  description: `Details for ${data.product.name}`,
-});
+export const config = {
+  route: { path: "/products/:id", name: "products.show" },
+  cache: { public: true, maxAge: 60 },
+  metadata: ({ data }) => ({
+    title: data.product.name,
+    description: `Details for ${data.product.name}`,
+  }),
+} satisfies PageConfig<typeof loader>;
 
 export default function ProductPage({ data }: PageProps<typeof loader>) {
   return <h1>{data.product.name}</h1>;
@@ -48,25 +46,28 @@ Components receive data, not HTTP objects. Keep repositories, secrets, and
 request work in the loader; the default component must also render in the
 browser.
 
-The route-level `cache` declaration is the only shared-cache opt-in. Warlock
+The `config.cache` declaration is the only shared-cache opt-in. Warlock
 applies its final cache floor after loader buffers commit, so a loader-written
 `Cache-Control` header cannot override the `no-store`, authentication, or
 cookie rules. [Read the complete cache policy →](/v/latest/web/essentials/routing/#cache-public-pages-explicitly)
 
 ## Validate page input
 
-A page's `validation` export declares a Seal schema per source. `params` and
+A page's `config.validation` declares a Seal schema per source. `params` and
 `query` stay separate keys; they are never merged. Declare either or both — a
 page with no dynamic segment can skip `params`, and one that reads no query
 keys can skip `query`:
 
 ```tsx title="src/web/products/[id].page.tsx"
 import { v } from "@warlock.js/seal";
+import type { PageConfig } from "@warlock.js/web";
 
-export const validation = {
-  params: v.object({ id: v.int().coerce() }),
-  query: v.object({ tab: v.string().optional() }).stripUnknown(),
-};
+export const config = {
+  validation: {
+    params: v.object({ id: v.int().coerce() }),
+    query: v.object({ tab: v.string().optional() }).stripUnknown(),
+  },
+} satisfies PageConfig;
 ```
 
 `request.params` and `request.query` arrive as strings, so a numeric field
@@ -177,7 +178,7 @@ export default {
 
 ## Metadata behavior
 
-`metadata` can be a static object or a function of resolved loader data. It
+`config.metadata` can be a static object or a function of resolved loader data. It
 supports `title`, `description`, `keywords`, `canonical`, `robots`, `openGraph`,
 and `twitter`.
 
@@ -187,7 +188,7 @@ function's `data` is never an optional failure-state value.
 
 Unknown metadata fields fail the build with the field name, source line, and a
 nearby suggestion when one exists. This catches typos such as `tittle` even
-when the export has no explicit TypeScript annotation.
+when `config` has no explicit TypeScript annotation.
 
 ## What survives the wire
 

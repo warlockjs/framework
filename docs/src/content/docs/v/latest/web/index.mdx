@@ -43,11 +43,11 @@ the project-specific aliases, stylesheet, design tokens, and `cn` helper.
 Create `src/web/about.page.tsx`:
 
 ```tsx title="src/web/about.page.tsx"
-import type { PageMetadata } from "@warlock.js/web";
+import type { PageConfig } from "@warlock.js/web";
 
-export const metadata: PageMetadata = {
-  title: "About",
-};
+export const config = {
+  metadata: { title: "About" },
+} satisfies PageConfig;
 
 export default function AboutPage() {
   return (
@@ -58,9 +58,9 @@ export default function AboutPage() {
 }
 ```
 
-With no `route` export, that file serves `/about`. Warlock derives routes from
-files beneath `src/web/`; an explicit literal `route` can override the path and
-name when needed.
+With no `config.route`, that file serves `/about`. Warlock derives routes from
+files beneath `src/web/`; an explicit literal `config.route` can override the
+path and name when needed.
 
 ## Learn Web by task
 

@@ -15,12 +15,14 @@ React component Warlock renders on the server and hydrates in the browser.
 Create `src/web/about.page.tsx`:
 
 ```tsx title="src/web/about.page.tsx"
-import type { PageMetadata } from "@warlock.js/web";
+import type { PageConfig } from "@warlock.js/web";
 
-export const metadata: PageMetadata = {
-  title: "About us",
-  description: "Meet the team behind the product.",
-};
+export const config = {
+  metadata: {
+    title: "About us",
+    description: "Meet the team behind the product.",
+  },
+} satisfies PageConfig;
 
 export default function AboutPage() {
   return (
@@ -38,14 +40,15 @@ directory, so `src/web/index.page.tsx` serves `/` and
 
 ## Declare a stable route name
 
-Export a literal `route` when the public URL should differ from the file path,
-or when callers need a stable name:
+Put a literal `route` in the page's `config` when the public URL should differ
+from the file path, or when callers need a stable name:
 
 ```tsx title="src/web/company/about.page.tsx"
-export const route = {
-  path: "/about",
-  name: "company.about",
-} as const;
+import type { PageConfig } from "@warlock.js/web";
+
+export const config = {
+  route: { path: "/about", name: "company.about" },
+} satisfies PageConfig;
 
 export default function AboutPage() {
   return <main>About us</main>;
@@ -72,7 +75,7 @@ hydration, not React Server Components.
 
 ## A runtime default export is required
 
-`route` is optional; the default component is not. A page with named exports
+`config.route` is optional; the default component is not. A page with named exports
 but no runtime default export fails discovery and names the file. These forms
 matter:
 

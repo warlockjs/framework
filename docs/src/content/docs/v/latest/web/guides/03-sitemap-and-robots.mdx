@@ -11,9 +11,9 @@ import { Aside } from "@astrojs/starlight/components";
 
 `@warlock.js/web/sitemap` turns your page graph into a `sitemap.xml`. It uses
 the framework-independent [`@warlock.js/sitemap`](/v/latest/sitemap/) builder
-for the XML. Web finds the pages, applies each page's `sitemap` export, and
-expands locales into `hreflang` alternates. It generates the file at build and
-at boot, and serves `/sitemap.xml` and `/robots.txt`. Both features are off
+for the XML. Web finds the pages, applies each page's `config.sitemap`, and
+expands locales into `hreflang` alternates. It generates at runtime boot or
+when the app requests regeneration, and serves `/sitemap.xml` and `/robots.txt`. Both features are off
 until you enable them.
 
 ## Turn it on
@@ -58,79 +58,82 @@ The sitemap has no `baseUrl` key. The origin always comes from `app.publicUrl`,
 or from `PUBLIC_APP_URL` when `app.publicUrl` isn't set.
 
 <Aside type="caution" title="MissingPublicUrlError">
-If the sitemap is enabled and neither `app.publicUrl` nor `PUBLIC_APP_URL` is
-set, generation throws `MissingPublicUrlError` before it reads any page. It
-never builds URLs from a guessed host. `warlock build` fails. At boot, the
-error is logged and the app still starts, but `/sitemap.xml` returns `503`.
+  If the sitemap is enabled and neither `app.publicUrl` nor `PUBLIC_APP_URL` is set, generation
+  throws `MissingPublicUrlError` before it reads any page. It never builds URLs from a guessed host.
+  At boot, the error is logged and the app still starts, but `/sitemap.xml` returns `503`.
 </Aside>
 
 ## `web.sitemap`
 
-| Key | Default | Meaning |
-| --- | --- | --- |
-| `enabled` | `false` | Nothing is discovered, generated, or served until this is `true`. |
-| `path` | `"/sitemap.xml"` | Where the sitemap, or the index for a large site, is served. |
-| `outputDir` | `storagePath("sitemap")` | Where generated files are written. The sitemap must be the only thing in this directory. |
-| `gzip` | `false` | Writes shards as `.xml.gz` when the index path is used. |
-| `defaults` | — | `{ changefreq?, priority? }`, used for any URL that doesn't set its own values. |
-| `locales` | — | `{ codes?, defaultLocale?, splitByLocale? }`. See [Locales](#locales). |
-| `localeUrl` | — | `(path, localeCode) => string`. Overrides how a locale's URL is built. |
-| `regenerate` | `{ onBoot: true }` | `onBoot: false` skips generation at boot. |
+| Key          | Default                  | Meaning                                                                                  |
+| ------------ | ------------------------ | ---------------------------------------------------------------------------------------- |
+| `enabled`    | `false`                  | Nothing is discovered, generated, or served until this is `true`.                        |
+| `path`       | `"/sitemap.xml"`         | Where the sitemap, or the index for a large site, is served.                             |
+| `outputDir`  | `storagePath("sitemap")` | Where generated files are written. The sitemap must be the only thing in this directory. |
+| `gzip`       | `false`                  | Writes shards as `.xml.gz` when the index path is used.                                  |
+| `defaults`   | —                        | `{ changefreq?, priority? }`, used for any URL that doesn't set its own values.          |
+| `locales`    | —                        | `{ codes?, defaultLocale?, splitByLocale? }`. See [Locales](#locales).                   |
+| `localeUrl`  | —                        | `(path, localeCode) => string`. Overrides how a locale's URL is built.                   |
+| `regenerate` | `{ onBoot: true }`       | `onBoot: false` skips generation at boot.                                                |
 
 <Aside type="caution" title="outputDir is replaced as a whole">
-Each publish swaps the entire `outputDir` atomically. Never point it at
-`public/` or any other directory that holds other files. The package refuses
-to replace a non-empty directory it didn't create, and throws
-`UnownedOutputDirectoryError`. Files are served from `outputDir`, so the
-default `storage/sitemap` doesn't change any public URL.
+  Each publish swaps the entire `outputDir` atomically. Never point it at `public/` or any other
+  directory that holds other files. The package refuses to replace a non-empty directory it didn't
+  create, and throws `UnownedOutputDirectoryError`. Files are served from `outputDir`, so the
+  default `storage/sitemap` doesn't change any public URL.
 </Aside>
 
 ## What goes into the sitemap
 
 Every routable page is considered. The not-found page and `error.page.tsx`
-are never included. Each page can control its entries with a `sitemap`
-export:
+are never included. Each page can control its entries with `config.sitemap`:
 
-| Page | Its `sitemap` export | Result |
-| --- | --- | --- |
-| Static route | none | One URL at the route's path. |
-| Static route | an options object | One URL, with those options. |
-| Static route | a function | The URLs the function returns. |
-| Dynamic route (`[id]`, `[...slug]`) | a function | The URLs the function returns. |
-| Dynamic route | none, or an options object | **No URLs.** The route is reported with `count: 0`. |
-| Any route | `false` | Left out, and not reported. |
+| Page                   | Its `config.sitemap`       | Result                                              |
+| ---------------------- | -------------------------- | --------------------------------------------------- |
+| Static route           | none                       | One URL at the route's path.                        |
+| Static route           | an options object          | One URL, with those options.                        |
+| Static route           | a function                 | The URLs the function returns.                      |
+| Dynamic route (`[id]`) | a function                 | The URLs the function returns.                      |
+| Dynamic route          | none, or an options object | **No URLs.** The route is reported with `count: 0`. |
+| Any route              | `false`                    | Left out, and not reported.                         |
 
 A pattern like `/posts/:id` is not a URL, so a dynamic route needs a function
 that returns its concrete paths:
 
 ```tsx title="src/web/posts/[slug].page.tsx"
-import type { SitemapPageExport } from "@warlock.js/web/sitemap";
+import type { PageConfig } from "@warlock.js/web";
 
-export const sitemap: SitemapPageExport = async () =>
-  (await Post.all()).map((post) => ({
-    path: `/posts/${post.slug}`,
-    lastmod: post.updatedAt,
-    priority: 0.8,
-  }));
+export const config = {
+  sitemap: async () =>
+    (await Post.all()).map((post) => ({
+      path: `/posts/${post.slug}`,
+      lastmod: post.updatedAt,
+      priority: 0.8,
+    })),
+} satisfies PageConfig;
 ```
 
 Pass options to a static page, or opt a page out:
 
 ```tsx title="src/web/pricing.page.tsx"
-import type { SitemapPageExport } from "@warlock.js/web/sitemap";
+import type { PageConfig } from "@warlock.js/web";
 
-export const sitemap: SitemapPageExport = { priority: 0.9, changefreq: "monthly" };
+export const config = {
+  sitemap: { priority: 0.9, changefreq: "monthly" },
+} satisfies PageConfig;
 ```
 
 ```tsx title="src/web/admin/[id].page.tsx"
-export const sitemap = false;
+import type { PageConfig } from "@warlock.js/web";
+
+export const config = { sitemap: false } satisfies PageConfig;
 ```
 
-| Options field | Meaning |
-| --- | --- |
-| `priority`, `changefreq`, `lastmod` | Per-page values. They take precedence over `web.sitemap.defaults`. |
-| `locales: false` | The page is the same in every locale. It gets one URL with no alternates. |
-| `localePaths` | `{ [code]: path }`, for pages whose slugs differ by locale. |
+| Options field                       | Meaning                                                                   |
+| ----------------------------------- | ------------------------------------------------------------------------- |
+| `priority`, `changefreq`, `lastmod` | Per-page values. They take precedence over `web.sitemap.defaults`.        |
+| `locales: false`                    | The page is the same in every locale. It gets one URL with no alternates. |
+| `localePaths`                       | `{ [code]: path }`, for pages whose slugs differ by locale.               |
 
 Each URL a function returns can set `path`, `lastmod`, `changefreq`,
 `priority`, and its own `localePaths`.
@@ -141,7 +144,8 @@ up in the generation result's `routes` with `count: 0`. See the
 
 ## Locales
 
-Locale codes default to `app.locales`. With one or more codes configured,
+Locale codes come from `app.localeCodes`, with `app.localeCode` as the default.
+With one or more codes configured,
 **each URL becomes one `<url>` per locale**, and each carries the complete set
 of `hreflang` alternates, including itself. Setting `defaultLocale` adds an
 `x-default` alternate that points at the page's plain path.
@@ -162,6 +166,23 @@ sitemap: {
 A page's own `localePaths` take precedence over both. `locales.splitByLocale:
 true` writes one set of shard files per locale, listed in one index.
 
+With `web.localeRouting.strategy`, generated locale URLs, `hreflang`
+alternates, and `x-default` use the same prefix rule as the router. A leading
+`[locale]` route substitutes the visited locale segment. A page's
+`config.sitemap.localePaths` or `web.sitemap.localeUrl` still overrides the
+derived URL where an application has translated slugs.
+
+## Page and layout policy
+
+Sitemap policy is server/build configuration, not a top-level page export.
+Put a page supplier or option object in `config.sitemap` as shown above. A
+positional layout may provide only a static sitemap default; descendants use
+the nearest layout default unless their own page config supplies a value. A
+layout cannot supply dynamic URLs. Layout metadata is likewise limited to a
+static `metadata.robots` default. Put site-wide `robots.txt` and sitemap
+settings in `src/config/web.ts`; `root.tsx` accepts middleware only and does
+not contribute metadata or sitemap inheritance.
+
 ## Large sites
 
 Up to 50,000 URLs, web writes one `sitemap.xml`. Above that, or when
@@ -172,11 +193,9 @@ or `.xml.gz` with `gzip: true`) is served at the site root. See
 
 ## When it's generated
 
-- **`warlock build`** generates the sitemap when it's enabled. A failure fails
-  the build.
 - **Boot**, in development and production, registers the routes and then
   generates, unless `regenerate.onBoot` is `false`. A failure at boot is logged
-  and the app still starts.
+  and the app still starts. `warlock build` does not generate the sitemap.
 - **A request never triggers generation.** `/sitemap.xml` serves the last set
   that generated successfully. Before the first successful run, it returns
   `503` with `Retry-After`.
@@ -226,12 +245,12 @@ file is served as is, so add the `Sitemap:` line to it yourself.
 Exported from `@warlock.js/web/sitemap`. This subpath is separate because it
 imports page modules. It is not part of the `@warlock.js/web` root export.
 
-| Export | Kind |
-| --- | --- |
-| `generateSitemap(options?)` | `Promise<SitemapSetResult \| SitemapResult>`. Generates the sitemap and doesn't update what is served. |
-| `regenerateSitemap(options?)` | Same result type. Generates the sitemap, joins a run already in progress, and updates what `/sitemap.xml` serves. |
-| `MissingPublicUrlError` | Thrown when the sitemap is enabled and has no origin. |
-| `WebSitemapConfig`, `SitemapLocaleConfig`, `RegeneratePolicy` | The `web.sitemap` shape. |
-| `RobotsConfig`, `RobotsGroup` | The `web.robots` shape. |
-| `SitemapPageExport`, `SitemapPageOptions`, `SitemapPageUrl` | The page-level export. |
-| `SitemapResult` | `{ mode: "single" \| "disabled", path?, urls, duplicates, routes }`. |
+| Export                                                        | Kind                                                                                                              |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `generateSitemap(options?)`                                   | `Promise<SitemapSetResult \| SitemapResult>`. Generates the sitemap and doesn't update what is served.            |
+| `regenerateSitemap(options?)`                                 | Same result type. Generates the sitemap, joins a run already in progress, and updates what `/sitemap.xml` serves. |
+| `MissingPublicUrlError`                                       | Thrown when the sitemap is enabled and has no origin.                                                             |
+| `WebSitemapConfig`, `SitemapLocaleConfig`, `RegeneratePolicy` | The `web.sitemap` shape.                                                                                          |
+| `RobotsConfig`, `RobotsGroup`                                 | The `web.robots` shape.                                                                                           |
+| `SitemapPageExport`, `SitemapPageOptions`, `SitemapPageUrl`   | The page-level export.                                                                                            |
+| `SitemapResult`                                               | `{ mode: "single" \| "disabled", path?, urls, duplicates, routes }`.                                              |

@@ -15,8 +15,9 @@ loader to pages below its directory.
 Every `layout.tsx` from the Web root down to the page contributes outermost
 first:
 
-- **Middleware always composes.** Every ancestor layout with a `middleware`
-  export participates, whether the layout renders a component or not.
+- **Middleware always composes.** Every ancestor layout with
+  `config.middleware` participates, whether the layout renders a component or
+  not.
 - **Rendering is capped at one layout.** A layout counts only when it has a
   default export. Prefix/middleware-only layouts may nest freely; two rendering
   layouts on one page path fail the build and name every offender.
@@ -25,24 +26,30 @@ first:
   `src/web/products/index.page.tsx` resolves to `/store`, not
   `/store/products`.
 - **A prefix prepends an explicit page path.** The composed prefix joins the
-  literal `route.path`; root values do not create doubled slashes.
+  literal `config.route.path`; root values do not create doubled slashes.
 
 ```tsx title="src/web/products/layout.tsx"
-import type { LayoutProps } from "@warlock.js/web";
+import type { LayoutConfig, LayoutProps } from "@warlock.js/web";
 
-export const prefix = "/store";
+export const config = { prefix: "/store" } satisfies LayoutConfig;
 
 export default function StoreLayout({ children }: LayoutProps) {
   return <section className="store-shell">{children}</section>;
 }
 ```
 
+Layouts can also provide inherited crawl defaults with
+`metadata: { robots: "noindex" }` or `sitemap: false` inside this same
+`LayoutConfig`. They cannot set page metadata, a page cache policy, validation,
+or a sitemap URL supplier. A root module may export a `config satisfies
+RootConfig`, but its only policy is `middleware`.
+
 ## Page middleware return values
 
-**Fixed in 5.12.** A layout or page `middleware` export runs as part of the
-same composed chain described above — outermost layout first, the page's own
-`middleware` last. What a middleware function returns decides what happens
-next:
+**Fixed in 5.12.** A layout or page `config.middleware` declaration runs as
+part of the same composed chain described above — outermost layout first, the
+page's own `config.middleware` last. What a middleware function returns
+decides what happens next:
 
 - **Returns nothing (`undefined`).** The chain continues to the next
   middleware, then to validation and the loader — an ordinary pass-through
@@ -62,14 +69,18 @@ next:
   loader or render runs.
 
 ```tsx title="src/web/account/layout.tsx"
-export const middleware = [
-  ({ request, response }) => {
-    if (!request.locals.user) {
-      response.setStatusCode(403);
-      return { error: "Sign in required" }; // >= 400 → error.page.tsx boundary
-    }
-  },
-];
+import type { LayoutConfig } from "@warlock.js/web";
+
+export const config = {
+  middleware: [
+    ({ request, response }) => {
+      if (!request.locals.user) {
+        response.setStatusCode(403);
+        return { error: "Sign in required" }; // >= 400 → error.page.tsx boundary
+      }
+    },
+  ],
+} satisfies LayoutConfig;
 ```
 
 Before this fix, a middleware that returned a value without writing the reply
@@ -81,7 +92,7 @@ change.
 ## The not-found page
 
 `404.page.tsx` is the application-owned not-found page. It has no browsable
-route of its own and must not export `route`. When no application file exists,
+route of its own and must not declare `config.route`. When no application file exists,
 Warlock still answers unmatched URLs with its built-in `404` response.
 
 ```tsx title="src/web/404.page.tsx"
@@ -99,8 +110,8 @@ of an unmatched request.
 ## The error boundary
 
 `error.page.tsx` is the one application-wide error boundary. A second copy
-beneath `src/web/` fails the build. It does not declare a route and does not
-handle ordinary 404s.
+beneath `src/web/` fails the build. It does not declare `config.route` and does
+not handle ordinary 404s.
 
 ```tsx title="src/web/error.page.tsx"
 import type { ErrorPageProps } from "@warlock.js/web";

@@ -40,7 +40,7 @@ declare module "@warlock.js/web" {
 
 ```tsx title="src/web/root.tsx"
 import { Head, Scripts, linkStylesheetsFor, shared } from "@warlock.js/web";
-import type { AppProps, HttpContext } from "@warlock.js/web";
+import type { AppProps, HttpContext, RootConfig } from "@warlock.js/web";
 import { themeSources, type ThemeId } from "./themes";
 
 const selectTheme = async ({ request }: HttpContext) => {
@@ -50,7 +50,7 @@ const selectTheme = async ({ request }: HttpContext) => {
   linkStylesheetsFor(request, themeSources[theme]);
 };
 
-export const middleware = [selectTheme];
+export const config = { middleware: [selectTheme] } satisfies RootConfig;
 ```
 
 Each theme imports its own stylesheet (`import "./alpha.css";`) — never an
@@ -103,15 +103,17 @@ called from middleware or a loader:
 ## 4. Page cache: keyed by host, plus `varyBy`
 
 ```ts title="src/web/home.page.tsx"
-export const route = {
-  path: "/",
+import type { PageConfig } from "@warlock.js/web";
+
+export const config = {
+  route: "/",
   cache: {
     public: true,
     maxAge: 60,
     serverCache: true,
     tags: (_data, { shared }) => [`theme:${shared.theme}`],
   },
-} as const;
+} satisfies PageConfig;
 ```
 
 - The server page cache key always includes the request `Host`, so tenants on

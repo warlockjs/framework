@@ -11,6 +11,42 @@ sidebar:
 resolved — and exposes it through `useLocale()`. `localeDirection()`,
 `useTextDirection()`, and `changeLocaleCode()` are new in 5.12.
 
+## Route dictionaries — `locales.json`
+
+Put a JSON dictionary anywhere below `src/web`. Its values are complete
+per-locale leaves; Web discovers the physical ancestor chain for the page and
+selects one immutable locale snapshot for SSR, hydration, client navigation,
+and error rendering. It never merges route dictionaries into
+`@mongez/localization`'s global registry.
+
+```json title="src/web/account/locales.json"
+{
+  "save": { "en": "Save", "ar": "حفظ" },
+  "profile": { "title": { "en": "Profile", "ar": "الملف الشخصي" } }
+}
+```
+
+Without `$group`, a file's namespace comes from its static directories below
+`src/web`: `src/web/account/locales.json` owns `account.save` and
+`account.profile.title`. The root `src/web/locales.json` has no implicit
+namespace. Route groups such as `(marketing)` and dynamic directories such as
+`[id]` do not contribute namespace segments. Set a nonempty `$group` at the
+JSON root to replace that derived prefix:
+
+```json title="src/web/account/locales.json"
+{
+  "$group": "settings.profile",
+  "save": { "en": "Save", "ar": "حفظ" }
+}
+```
+
+This file owns `settings.profile.save`, not `account.save`. `$group` is not a
+prefix to append, cannot be empty, and is allowed only at the JSON root.
+Every flattened key has one owner across every route dictionary: duplicate
+keys, including an ancestor/child conflict, stop discovery with both source
+files named. Each leaf must provide the configured locale codes, so there is
+no route-JSON fallback for a missing translation.
+
 ## Read the current locale
 
 ```tsx title="src/web/components/locale-badge.tsx"
@@ -41,25 +77,32 @@ export function Greeting() {
 `useTrans()` translates against the current request/page locale directly,
 without consulting any process-global locale.
 
-### Survives hydration — fixed in 5.15
+On the server, Web supplies the same scoped snapshot to `request.t()`,
+`request.trans()`, and explicit `request.transFrom(locale, key, placeholders?)`.
+That override applies only while the Web request is rendering; code outside a
+route snapshot keeps the configured localization behavior. A JSON key absent
+from the selected snapshot returns its key rather than falling back to another
+route dictionary. Non-string translatable values continue through the regular
+localization behavior.
 
-The hydration payload carries the active locale's translated keywords (a
-`translations` key), registered into the client's lookup table before the
-page hydrates. Before 5.15, nothing filled that table in the browser: the
-server-rendered HTML showed the correct translation, then React silently
-replaced it with the raw key the moment hydration ran. No app code needs to
-change — this was a framework-internal fix.
+### The same selected snapshot reaches every render
+
+The hydration payload carries only the selected locale snapshot and installs
+it before the page hydrates. A navigation or locale switch replaces that
+snapshot with the destination page's selection. This preserves matching
+server/client output without exposing dictionaries from unrelated routes or
+mutating the global registry. `useTrans()` is the client component API; it
+reads this scoped snapshot directly.
 
 ### Typed keys — new in 5.13
 
-`warlock dev` scans your app's `groupedTranslations(...)` dictionaries and
-generates `.warlock/typings/translations.d.ts`, augmenting web's
-`TranslationKeyRegistry` interface with every registered key as a literal
-union. Once that file exists, `trans("welcome")` is checked against your
-actual dictionary — a typo'd or removed key is a compile error instead of a
-silent runtime miss. Before the dev server has generated anything,
-`TranslationKey` falls back to plain `string`, so nothing breaks on a fresh
-checkout.
+`warlock dev` watches `locales.json` additions, edits, deletions, and `$group`
+changes, then regenerates `.warlock/typings/translations.d.ts`. `warlock
+generate.typings` does the same for a non-development run. The declaration
+augments `TranslationKeyRegistry` with flattened route JSON keys and existing
+literal `groupedTranslations(...)` keys. Include `.warlock/typings/**/*.d.ts`
+in the app TypeScript project. Runtime values still come from the selected
+route artifact, never from this declaration file.
 
 ```ts
 export type TranslationKey = keyof TranslationKeyRegistry extends never
@@ -115,42 +158,66 @@ localeDirection("az-Arab"); // "rtl" — an explicit script subtag wins over the
 Call it directly when you need a direction outside a component (for example,
 in a loader). It never throws — an unparseable locale resolves to `"ltr"`.
 
-## Switch locale without a reload — `changeLocaleCode()`
+## Switch locale without a reload — `useChangeLocaleCode()`
 
 ```tsx title="src/web/components/locale-switcher.tsx"
-import { changeLocaleCode, useLocale } from "@warlock.js/web";
+import { useChangeLocaleCode, useLocale } from "@warlock.js/web";
+import { useState } from "react";
 
 export function LocaleSwitcher() {
   const locale = useLocale();
+  const { changeLocaleCode, isLoading } = useChangeLocaleCode();
+  const [error, setError] = useState("");
 
   const switchTo = async (code: string) => {
+    setError("");
     try {
       await changeLocaleCode(code);
     } catch {
-      window.location.reload();
+      setError("Could not change language. Try again.");
     }
   };
 
   return (
-    <select value={locale} onChange={(event) => switchTo(event.target.value)}>
-      <option value="en">English</option>
-      <option value="ar">العربية</option>
-    </select>
+    <>
+      <select
+        value={locale}
+        disabled={isLoading}
+        onChange={(event) => void switchTo(event.target.value)}
+      >
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+      </select>
+      {error && <p role="alert">{error}</p>}
+    </>
   );
 }
 ```
 
-`changeLocaleCode(code)` re-fetches the current route's data with
-`?locale=code` on the request only — the visible address bar is left alone —
-and swaps in the fresh page, the same way `refresh()` swaps in fresh data.
+`useChangeLocaleCode()` returns the local pending state for this picker and a
+`changeLocaleCode(code)` function that rejects when a switch fails. Its
+deprecated `changeLocale` alias remains available. The function re-fetches
+the current route and swaps in the fresh page, the same way `refresh()` swaps
+in fresh data.
 `useLocale()`, `useTextDirection()`, and the root `<html lang dir>` all
 follow from the new payload in that same render.
 
-**The server persists the choice.** The server resolves a request's locale
-as the first present of a `?locale=` query param, its `locale` cookie, or a
-`locale` header. `changeLocaleCode()` sends `?locale=` on that one request,
-and the server writes the `locale` cookie in response — so the next full page
-load agrees without the client ever writing a cookie itself.
+Render the picker in a layout or page component beneath `#vessel`, where
+Warlock hydrates interactive components. Keep `root.tsx` as the document
+shell. The imperative `changeLocaleCode()` export remains available when
+the caller does not need the hook's loading state.
+
+With `web.localeRouting.strategy: "none"` (the default), the request uses a
+provisional locale and the client persists a locale preference only after the
+current navigation succeeds. Under `"prefix-except-default"` or `"prefix"`,
+the function changes the visible route to the selected locale prefix while
+preserving query string and hash. Links and `href()` follow the same strategy.
+
+A leading `:locale` page route — normally from a `src/web/[locale]/` folder —
+uses the URL segment without a global strategy. It fills a missing leading
+locale parameter in links and swaps that segment on a locale change. Do not
+enable a prefix strategy in an app with such a route: boot refuses
+the combination because it would double-prefix URLs.
 
 Calling it with the already-active locale is a no-op — no request is made.
 On failure (network error, or the fresh page could not be built), the
@@ -163,8 +230,8 @@ they were.
   `LocaleProvider`.
 - **`localeDirection()` is pure.** It never reads ambient state and never
   throws; an unparseable locale resolves to `"ltr"`.
-- **`changeLocaleCode()` does not change the URL.** Only the response
-  cookie changes; the current path stays the same.
+- **The URL strategy decides URL changes.** `"none"` keeps the current path;
+  prefix routing and a leading `:locale` route change it.
 
 ## See also
 
