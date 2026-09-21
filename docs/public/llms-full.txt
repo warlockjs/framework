@@ -15411,6 +15411,28 @@ if (result.isValid) {
 }
 ```
 
+## Granular object and string schemas
+
+For code that only constructs object and string schemas, import the dedicated
+factories instead of the package-root `v` factory:
+
+```ts
+import { object } from "@warlock.js/seal/object";
+import { string } from "@warlock.js/seal/string";
+
+const commentSchema = object({
+  comment: string().trim().required().minLength(3),
+});
+
+const result = await commentSchema["~standard"].validate({
+  comment: "  Hello  ",
+});
+```
+
+These entries provide the `object` and `string` factories, their validator
+classes, chain methods, and the Standard Schema bridge. They do not replace the
+root `v` factory when a schema needs other factories.
+
 ## Foundations
 
 The 12 things that are true in every seal use:
