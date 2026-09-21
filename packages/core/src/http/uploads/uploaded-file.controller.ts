@@ -192,6 +192,9 @@ export const uploadedFileController: RequestHandler = async ({ request, response
   }
 
   const variant = images.variants[query.variant];
+  if (variant === undefined) {
+    return response.badRequest({ error: `Unknown variant "${query.variant}".` });
+  }
 
   let source: ResolvedUploadPath | undefined;
 

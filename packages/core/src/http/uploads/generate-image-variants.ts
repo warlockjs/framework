@@ -3,7 +3,7 @@ import { Image } from "../../image";
 import { storage } from "../../storage";
 import { HttpError } from "../errors";
 import { uploadsConfig } from "../uploads-config";
-import type { ImageVariantDefinition, ImageVariantOutputFormat } from "../uploads-types";
+import type { ImageVariantOutputFormat } from "../uploads-types";
 import { generateImageVariant } from "./generate-image-variant";
 import { ImageVariantsConfigError } from "./image-variants-config-error";
 import type {
@@ -148,7 +148,10 @@ export async function generateImageVariants(
   const variants: Record<string, GeneratedImageVariant> = {};
 
   for (const name of names) {
-    const variant: ImageVariantDefinition = images.variants[name];
+    const variant = images.variants[name];
+    if (variant === undefined) {
+      throw new HttpError(400, `Unknown variant "${name}".`);
+    }
     const formats = outputFormatsFor(sourceFormat, images.formats);
     let dimensions: { width: number; height: number } | undefined;
 
