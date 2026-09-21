@@ -743,7 +743,7 @@ import { setCurrentLocaleCode } from "@mongez/localization";
 import { Form, useFormControl, type FormControlProps } from "@mongez/react-form";
 import { transX } from "@mongez/react-localization";
 import { v } from "@warlock.js/seal";
-import { Link, type PageProps } from "@warlock.js/web";
+import { Link, type PageConfig, type PageProps } from "@warlock.js/web";
 import { useState } from "react";
 
 export { register } from "./index.register";
@@ -753,13 +753,14 @@ export { register } from "./index.register";
  * instead of returning JSON.
  *
  * The URL and stable hydration name are the ones this file DECLARES below.
- * This page answers \`GET "/"\` because \`route.path = "/"\`, not because of
+ * This page answers \`GET "/"\` because \`config.route.path = "/"\`, not because of
  * where the file lives. A page file with
- * no \`route\` export is REFUSED by both the dev server and the build.
+ * no \`config.route\` declaration derives its URL from the filesystem.
  */
-export const route = { path: "/", name: "index" } as const;
-
-export const metadata = { title: "Home" };
+export const config = {
+  route: { path: "/", name: "index" },
+  metadata: { title: "Home" },
+} as const satisfies PageConfig;
 
 const contactSchema = v.object({
   name: v.string().min(2),
