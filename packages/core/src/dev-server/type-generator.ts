@@ -1,7 +1,7 @@
 import { ensureDirectoryAsync } from "@warlock.js/fs";
 import { constants } from "fs";
 import { access, readFile, writeFile } from "fs/promises";
-import { createRequire } from "node:module";
+import { moduleResolve } from "import-meta-resolve";
 import { join, resolve } from "path";
 import { pathToFileURL } from "node:url";
 import ts from "typescript";
@@ -28,9 +28,9 @@ function isAbsentOptionalWebPackage(thrown: unknown): boolean {
     typeof thrown === "object" &&
     thrown !== null &&
     "code" in thrown &&
-    (thrown as { code?: unknown }).code === "MODULE_NOT_FOUND" &&
+    (thrown as { code?: unknown }).code === "ERR_MODULE_NOT_FOUND" &&
     thrown instanceof Error &&
-    thrown.message.includes(`Cannot find module '${WEB_PACKAGE}'`)
+    thrown.message.includes(`Cannot find package '${WEB_PACKAGE}'`)
   );
 }
 
@@ -38,17 +38,19 @@ function isAbsentOptionalWebPackage(thrown: unknown): boolean {
 export async function listRouteLocaleKeysForTypeGeneration(
   appRoot = process.cwd(),
 ): Promise<readonly string[]> {
-  const projectRequire = createRequire(resolve(appRoot, "package.json"));
+  // Published web entries are import-only. Resolve with ESM conditions from
+  // the consuming project; require.resolve rejects those installed exports.
+  const projectUrl = pathToFileURL(resolve(appRoot, "package.json"));
 
   try {
-    projectRequire.resolve(WEB_PACKAGE);
+    moduleResolve(WEB_PACKAGE, projectUrl);
   } catch (thrown) {
     if (isAbsentOptionalWebPackage(thrown)) return [];
     throw thrown;
   }
 
-  const buildModulePath = projectRequire.resolve(WEB_BUILD_PACKAGE);
-  const buildModule = (await import(pathToFileURL(buildModulePath).href)) as RouteLocaleBuildModule;
+  const buildModuleUrl = moduleResolve(WEB_BUILD_PACKAGE, projectUrl);
+  const buildModule = (await import(buildModuleUrl.href)) as RouteLocaleBuildModule;
 
   if (typeof buildModule.listRouteLocaleKeys !== "function") {
     throw new Error(

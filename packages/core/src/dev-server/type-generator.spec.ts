@@ -60,13 +60,17 @@ describe("TypeGenerator — translation key discovery over all app source", () =
       JSON.stringify({
         name: "@warlock.js/web",
         type: "module",
-        exports: { ".": "./index.mjs", "./build": "./build.mjs" },
+        // Match pkgist's published ESM-only export map, not source-only defaults.
+        exports: {
+          ".": { import: { types: "./index.d.mts", default: "./index.mjs" } },
+          "./build": { import: { types: "./build.d.mts", default: "./build.mjs" } },
+        },
       }),
       "utf-8",
     );
     await fs.writeFile(
       path.join(tempRoot, "node_modules/@warlock.js/web/index.mjs"),
-      "export {};",
+      'throw new Error("Type generation must not execute the web root entry");',
       "utf-8",
     );
     await fs.writeFile(
@@ -186,7 +190,10 @@ describe("TypeGenerator — translation key discovery over all app source", () =
       JSON.stringify({
         name: "@warlock.js/web",
         type: "module",
-        exports: { ".": "./index.mjs", "./build": "./build.mjs" },
+        exports: {
+          ".": { import: "./index.mjs", require: "./wrong-condition.cjs" },
+          "./build": { import: "./build.mjs", require: "./wrong-condition.cjs" },
+        },
       }),
       "utf-8",
     );
@@ -208,6 +215,22 @@ describe("TypeGenerator — translation key discovery over all app source", () =
   });
 
   it("surfaces installed web build resolution and export failures", async () => {
+    const brokenRootProject = path.join(tempRoot, "broken-web-root");
+    const brokenRootPackage = path.join(brokenRootProject, "node_modules/@warlock.js/web");
+    await fs.mkdir(brokenRootPackage, { recursive: true });
+    await fs.writeFile(
+      path.join(brokenRootPackage, "package.json"),
+      JSON.stringify({
+        name: "@warlock.js/web",
+        type: "module",
+        exports: { ".": { import: "./missing.mjs" } },
+      }),
+      "utf-8",
+    );
+    await expect(listRouteLocaleKeysForTypeGeneration(brokenRootProject)).rejects.toThrow(
+      /Cannot find module/u,
+    );
+
     const missingBuildProject = path.join(tempRoot, "missing-web-build");
     const missingBuildPackage = path.join(missingBuildProject, "node_modules/@warlock.js/web");
     await fs.mkdir(missingBuildPackage, { recursive: true });
