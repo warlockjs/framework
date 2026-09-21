@@ -34,45 +34,42 @@ import {
   uppercaseMutator,
   urlDecodeMutator,
   urlEncodeMutator,
-} from "../mutators";
+} from "../mutators/string-mutators";
+import { alphaNumericRule, alphaRule, isNumericRule } from "../rules/string/alpha";
+import { isCreditCardRule } from "../rules/string/credit-card";
+import { emailRule } from "../rules/string/email";
+import { cuidRule, nanoidRule, ulidRule, uuidRule } from "../rules/string/id-formats";
+import { ip4Rule, ip6Rule, ipRule } from "../rules/string/ip";
 import {
-  alphaNumericRule,
-  alphaRule,
-  betweenLengthRule,
-  colorRule,
   containsRule,
-  cuidRule,
-  darkColorRule,
-  emailRule,
   endsWithRule,
-  hexColorRule,
-  hslColorRule,
-  ip4Rule,
-  ip6Rule,
-  ipRule,
-  isCreditCardRule,
-  isNumericRule,
+  notContainsRule,
+  startsWithRule,
+} from "../rules/string/string-comparison";
+import { patternRule } from "../rules/string/pattern";
+import { strongPasswordRule } from "../rules/string/strong-password-rule";
+import { urlRule } from "../rules/string/url";
+import { withoutWhitespaceRule } from "../rules/string/without-whitespace";
+import type { UUIDVersion } from "../rules/string/id-formats";
+import {
+  betweenLengthRule,
   lengthRule,
-  lightColorRule,
   maxLengthRule,
   maxWordsRule,
   minLengthRule,
   minWordsRule,
-  nanoidRule,
-  notContainsRule,
-  patternRule,
+  wordsRule,
+} from "../rules/length";
+import {
+  colorRule,
+  darkColorRule,
+  hexColorRule,
+  hslColorRule,
+  lightColorRule,
   rgbColorRule,
   rgbaColorRule,
-  startsWithRule,
-  stringRule,
-  strongPasswordRule,
-  ulidRule,
-  urlRule,
-  uuidRule,
-  withoutWhitespaceRule,
-  wordsRule,
-  type UUIDVersion,
-} from "../rules";
+} from "../rules/color";
+import { stringRule } from "../rules/common/type-rules";
 import { PrimitiveValidator } from "./primitive-validator";
 import { applyNullable, getRuleOptions } from "../standard-schema/json-schema";
 import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
@@ -567,20 +564,22 @@ export class StringValidator extends PrimitiveValidator {
     }
 
     // format hints
-    if (getRuleOptions(this.rules, "email") !== undefined ||
-        this.rules.some(r => r.name === "email")) {
+    if (
+      getRuleOptions(this.rules, "email") !== undefined ||
+      this.rules.some((r) => r.name === "email")
+    ) {
       schema.format = "email";
-    } else if (this.rules.some(r => r.name === "url")) {
+    } else if (this.rules.some((r) => r.name === "url")) {
       schema.format = "uri";
-    } else if (this.rules.some(r => r.name === "ip")) {
+    } else if (this.rules.some((r) => r.name === "ip")) {
       schema.format = "ipv4";
-    } else if (this.rules.some(r => r.name === "ip4")) {
+    } else if (this.rules.some((r) => r.name === "ip4")) {
       schema.format = "ipv4";
-    } else if (this.rules.some(r => r.name === "ip6")) {
+    } else if (this.rules.some((r) => r.name === "ip6")) {
       schema.format = "ipv6";
-    } else if (this.rules.some(r => r.name === "uuid")) {
+    } else if (this.rules.some((r) => r.name === "uuid")) {
       schema.format = "uuid";
-    } else if (this.rules.some(r => r.name === "hexColor")) {
+    } else if (this.rules.some((r) => r.name === "hexColor")) {
       schema.format = "color";
     }
 
@@ -591,7 +590,7 @@ export class StringValidator extends PrimitiveValidator {
       if (cuidOpts) {
         schema.pattern = cuidOpts.version === 1 ? "^c[a-z0-9]{24,}$" : "^[a-z][a-z0-9]{23}$";
       }
-      if (this.rules.some(r => r.name === "ulid")) {
+      if (this.rules.some((r) => r.name === "ulid")) {
         schema.pattern = "^[0-9A-HJKMNP-TV-Z]{26}$";
       }
       const nanoidOpts = getRuleOptions(this.rules, "nanoid");

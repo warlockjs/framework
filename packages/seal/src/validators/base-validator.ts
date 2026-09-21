@@ -1,6 +1,6 @@
 import { clone } from "@mongez/reinforcements";
 import { validate } from "../factory/validate";
-import { VALID_RULE, invalidRule } from "../helpers";
+import { VALID_RULE, invalidRule } from "../helpers/validation-helpers";
 import { isEmptyValue } from "../helpers/is-empty-value";
 import { requiredRule as defaultRequiredRule } from "../rules/core/required";
 import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
@@ -40,8 +40,7 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
    * See `.catch()` for semantics and the v1 scope (leaf-only).
    */
   protected catchValue:
-    | any
-    | ((errors: ValidationResult["errors"], originalInput: any) => any | Promise<any>);
+    any | ((errors: ValidationResult["errors"], originalInput: any) => any | Promise<any>);
   protected hasCatch = false;
 
   /**
@@ -626,8 +625,7 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
    */
   public catch(
     fallback:
-      | any
-      | ((errors: ValidationResult["errors"], originalInput: any) => any | Promise<any>),
+      any | ((errors: ValidationResult["errors"], originalInput: any) => any | Promise<any>),
   ): this & { hasCatch: true } {
     const instance = this.instance;
 

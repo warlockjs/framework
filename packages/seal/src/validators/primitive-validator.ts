@@ -1,4 +1,4 @@
-import { allowedValuesRule, enumRule, inRule, notAllowedValuesRule } from "../rules";
+import { allowedValuesRule, enumRule, inRule, notAllowedValuesRule } from "../rules/common/enum";
 import { BaseValidator } from "./base-validator";
 
 /**

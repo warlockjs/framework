@@ -1,4 +1,6 @@
 import type { SealConfig } from "../config";
+import { object } from "../object";
+import { string } from "../string";
 import type { StandardSchemaV1 } from "../standard-schema/types";
 import type { Schema, SchemaContext, ValidationResult } from "../types";
 import type { Infer } from "../types/inference-types";
@@ -41,9 +43,7 @@ import { validate as validateFunction } from "./validate";
  */
 export const v: ValidatorV = {
   /** Create an object validator */
-  object: <T extends Schema>(schema: T, errorMessage?: string) =>
-    new ObjectValidator<T>(schema, errorMessage) as ObjectValidator<T> &
-      StandardSchemaV1<Infer<ObjectValidator<T>>>,
+  object,
 
   /** Create an any validator */
   any: () => new AnyValidator() as AnyValidator & StandardSchemaV1<any>,
@@ -80,8 +80,7 @@ export const v: ValidatorV = {
    */
   literal: <T extends readonly [string | number | boolean, ...(string | number | boolean)[]]>(
     ...values: T
-  ) =>
-    new LiteralValidator<T>(values) as LiteralValidator<T> & StandardSchemaV1<T[number]>,
+  ) => new LiteralValidator<T>(values) as LiteralValidator<T> & StandardSchemaV1<T[number]>,
 
   /**
    * Create an instanceof validator — value must be `instanceof` the constructor
@@ -92,8 +91,7 @@ export const v: ValidatorV = {
    * v.instanceof(MyClass)     // type: MyClass
    */
   instanceof: <T>(ctor: new (...args: any[]) => T, errorMessage?: string) =>
-    new InstanceOfValidator<T>(ctor, errorMessage) as InstanceOfValidator<T> &
-      StandardSchemaV1<T>,
+    new InstanceOfValidator<T>(ctor, errorMessage) as InstanceOfValidator<T> & StandardSchemaV1<T>,
 
   /**
    * Create a lazy validator — defers resolution of the inner validator until
@@ -111,8 +109,7 @@ export const v: ValidatorV = {
     new LazyValidator(thunk) as LazyValidator<T> & StandardSchemaV1<Infer<T>>,
 
   /** Create a string validator */
-  string: (errorMessage?: string) =>
-    new StringValidator(errorMessage) as StringValidator & StandardSchemaV1<string>,
+  string,
 
   /** Create an email validator */
   email: (emailErrorMessage?: string, errorMessage?: string) =>
@@ -179,10 +176,7 @@ export const v: ValidatorV = {
    * // type T = Infer<typeof notif>;
    * // → { type: "email", email: string } | { type: "sms", phone: string }
    */
-  discriminatedUnion: <
-    K extends string,
-    Branches extends ReadonlyArray<ObjectValidator<any>>,
-  >(
+  discriminatedUnion: <K extends string, Branches extends ReadonlyArray<ObjectValidator<any>>>(
     discriminator: K,
     validators: Branches,
   ) =>
@@ -253,9 +247,7 @@ export interface ValidatorV {
     ctor: new (...args: any[]) => T,
     errorMessage?: string,
   ) => InstanceOfValidator<T> & StandardSchemaV1<T>;
-  lazy: <T extends BaseValidator>(
-    thunk: () => T,
-  ) => LazyValidator<T> & StandardSchemaV1<Infer<T>>;
+  lazy: <T extends BaseValidator>(thunk: () => T) => LazyValidator<T> & StandardSchemaV1<Infer<T>>;
   string: (errorMessage?: string) => StringValidator & StandardSchemaV1<string>;
   email: (errorMessage?: string) => StringValidator & StandardSchemaV1<string>;
   enum: {
@@ -273,17 +265,12 @@ export interface ValidatorV {
   int: (errorMessage?: string) => IntValidator & StandardSchemaV1<number>;
   float: (errorMessage?: string) => FloatValidator & StandardSchemaV1<number>;
   boolean: (errorMessage?: string) => BooleanValidator & StandardSchemaV1<boolean>;
-  scalar: (
-    errorMessage?: string,
-  ) => ScalarValidator & StandardSchemaV1<string | number | boolean>;
+  scalar: (errorMessage?: string) => ScalarValidator & StandardSchemaV1<string | number | boolean>;
   union: <T extends BaseValidator[]>(
     validators: T,
     errorMessage?: string,
   ) => UnionValidator & StandardSchemaV1<Infer<T[number]>>;
-  discriminatedUnion: <
-    K extends string,
-    Branches extends ReadonlyArray<ObjectValidator<any>>,
-  >(
+  discriminatedUnion: <K extends string, Branches extends ReadonlyArray<ObjectValidator<any>>>(
     discriminator: K,
     validators: Branches,
   ) => DiscriminatedUnionValidator<K, Branches> & StandardSchemaV1<Infer<Branches[number]>>;

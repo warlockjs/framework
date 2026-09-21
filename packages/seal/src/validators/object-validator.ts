@@ -1,15 +1,13 @@
 import { except } from "@mongez/reinforcements";
 import { isPlainObject } from "@mongez/supportive-is";
-import { setKeyPath } from "../helpers";
-import { objectTrimMutator, stripUnknownMutator } from "../mutators";
-import { objectRule, unknownKeyRule } from "../rules";
+import { setKeyPath } from "../helpers/path-helpers";
+import { objectTrimMutator, stripUnknownMutator } from "../mutators/object-mutators";
+import { objectRule } from "../rules/common/type-rules";
+import { unknownKeyRule } from "../rules/common/unknown-key";
 import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 import { applyNullable, wrapNullableStrict } from "../standard-schema/json-schema";
 import type { Schema, SchemaContext, ValidationResult } from "../types";
-import type {
-  InferInputObjectShape,
-  InferOutputObjectShape,
-} from "../types/inference-types";
+import type { InferInputObjectShape, InferOutputObjectShape } from "../types/inference-types";
 import { BaseValidator } from "./base-validator";
 import { ComputedValidator } from "./computed-validator";
 
@@ -455,7 +453,6 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
     const computedFields = this.getComputedFields();
 
     const computedPromises = Object.entries(computedFields).map(async ([key, validator]) => {
-
       const childContext: SchemaContext = {
         ...context,
         parent: validatedData,
