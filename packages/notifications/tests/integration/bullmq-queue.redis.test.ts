@@ -4,6 +4,7 @@
  * 127.0.0.1:6390) — same convention `@warlock.js/queue`'s own specs use.
  */
 import { randomUUID } from "node:crypto";
+import { performance } from "node:perf_hooks";
 import {
   bullmqQueue,
   defineNotification,
@@ -68,7 +69,7 @@ describe("bullmqQueue (notifications → @warlock.js/queue → channel.send)", (
       name: "mail",
       route: (notifiable) => notifiable.get("email") as string | undefined,
       async send({ payload, route }) {
-        deliveries.push({ payload, route, at: Date.now() });
+        deliveries.push({ payload, route, at: performance.now() });
       },
     };
 
@@ -91,14 +92,19 @@ describe("bullmqQueue (notifications → @warlock.js/queue → channel.send)", (
 
   it("delivers a `.queue()` notification with `delay` only after the delay elapses", async () => {
     await startWorkers();
-    const queuedAt = Date.now();
+    const queuedAt = performance.now();
     await welcome.queue(recipient(1, "ada@example.com"), { name: "Ada" }, { delay: "1s" });
 
     await sleep(500);
-    expect(deliveries).toHaveLength(0);
+    // A requested sleep is no upper bound when the event loop is delayed.
+    expect(deliveries.filter(({ at }) => at - queuedAt < 950)).toHaveLength(0);
 
     await waitFor(() => deliveries.length === 1);
-    expect(deliveries[0]).toMatchObject({ payload: { subject: "Hi Ada" }, route: "ada@example.com" });
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries[0]).toMatchObject({
+      payload: { subject: "Hi Ada" },
+      route: "ada@example.com",
+    });
     expect(deliveries[0]!.at - queuedAt).toBeGreaterThanOrEqual(950);
   });
 });
