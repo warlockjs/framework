@@ -1,6 +1,7 @@
 import config from "@mongez/config";
 import Fastify, { type FastifyInstance } from "fastify";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -29,13 +30,16 @@ async function loadSharp(): Promise<SharpModule | undefined> {
   }
 }
 
-const sharp = await loadSharp();
-
-if (!sharp) {
-  console.warn(
-    "[uploaded-file.controller.spec] sharp is not installed in core's dev dependencies; the image-generation specs are skipped.",
-  );
-}
+const requireSharp = createRequire(path.join(process.cwd(), "package.json"));
+const sharpAvailable = (() => {
+  try {
+    requireSharp.resolve("sharp");
+    return true;
+  } catch {
+    return false;
+  }
+})();
+let sharp: SharpModule | undefined;
 
 const SECRET = "TOP-SECRET-OUTSIDE-THE-STORAGE-ROOT";
 
@@ -83,6 +87,14 @@ function get(url: string, headers: Record<string, string> = {}) {
 }
 
 beforeAll(async () => {
+  sharp = await loadSharp();
+  if (sharpAvailable && !sharp) throw new Error("sharp resolved but could not be loaded");
+  if (!sharp) {
+    console.warn(
+      "[uploaded-file.controller.spec] sharp is not installed in core's dev dependencies; the image-generation specs are skipped.",
+    );
+  }
+
   workspace = fs.mkdtempSync(path.join(os.tmpdir(), "warlock-uploads-"));
   storageRoot = path.join(workspace, "storage");
   outsideDirectory = path.join(workspace, "outside");
@@ -254,7 +266,7 @@ describe("uploadedFileController — query allowlist", () => {
   });
 });
 
-describe.skipIf(!sharp)("uploadedFileController — originals", () => {
+describe.skipIf(!sharpAvailable)("uploadedFileController — originals", () => {
   it("serves the original bytes with the long cache when there is no query", async () => {
     const bytes = await makeImage("jpeg");
     fs.writeFileSync(path.join(storageRoot, "original.jpg"), bytes);
@@ -311,7 +323,7 @@ describe("uploadedFileController — content sniffing (security)", () => {
     expect(result.headers["content-disposition"]).toContain("attachment");
   });
 
-  it.skipIf(!sharp)(
+  it.skipIf(!sharpAvailable)(
     "serves a png original inline, with its image content type and nosniff",
     async () => {
       fs.writeFileSync(path.join(storageRoot, "real.png"), await makeImage("png"));
@@ -325,7 +337,7 @@ describe("uploadedFileController — content sniffing (security)", () => {
     },
   );
 
-  it.skipIf(!sharp)(
+  it.skipIf(!sharpAvailable)(
     "serves jpeg-magic bytes named .html as an attachment, sandboxed, never as text/html",
     async () => {
       fs.writeFileSync(path.join(storageRoot, "polyglot.html"), await makeImage("jpeg"));
@@ -340,7 +352,7 @@ describe("uploadedFileController — content sniffing (security)", () => {
     },
   );
 
-  it.skipIf(!sharp)(
+  it.skipIf(!sharpAvailable)(
     "serves png-magic bytes named .jpg as an attachment (raster/extension mismatch)",
     async () => {
       fs.writeFileSync(path.join(storageRoot, "mismatch.jpg"), await makeImage("png"));
@@ -353,7 +365,7 @@ describe("uploadedFileController — content sniffing (security)", () => {
     },
   );
 
-  it.skipIf(!sharp)("carries nosniff on variant responses too", async () => {
+  it.skipIf(!sharpAvailable)("carries nosniff on variant responses too", async () => {
     fs.writeFileSync(path.join(storageRoot, "hero-nosniff.jpg"), await makeImage("jpeg", 64, 64));
 
     const result = await get("/uploads/hero-nosniff.jpg?variant=thumb");
@@ -363,7 +375,7 @@ describe("uploadedFileController — content sniffing (security)", () => {
   });
 });
 
-describe.skipIf(!sharp)("uploadedFileController — source checks", () => {
+describe.skipIf(!sharpAvailable)("uploadedFileController — source checks", () => {
   it("returns 404 for a variant of a missing source", async () => {
     const result = await get("/uploads/nothing.jpg?variant=thumb");
 
@@ -452,7 +464,7 @@ describe.skipIf(!sharp)("uploadedFileController — source checks", () => {
   });
 });
 
-describe.skipIf(!sharp)("uploadedFileController — variants", () => {
+describe.skipIf(!sharpAvailable)("uploadedFileController — variants", () => {
   const source = () => path.join(storageRoot, "hero.jpg");
 
   beforeEach(async () => {
@@ -508,8 +520,12 @@ describe.skipIf(!sharp)("uploadedFileController — variants", () => {
     expect(results.map((result) => result.statusCode)).toEqual(Array(10).fill(200));
     expect(save).toHaveBeenCalledTimes(1);
 
+    const first = results[0];
+    expect(first, "expected a first single-flight response").toBeDefined();
+    if (first === undefined) throw new Error("expected a first single-flight response");
+
     for (const result of results) {
-      expect(Buffer.compare(result.rawPayload, results[0].rawPayload)).toBe(0);
+      expect(Buffer.compare(result.rawPayload, first.rawPayload)).toBe(0);
     }
   });
 

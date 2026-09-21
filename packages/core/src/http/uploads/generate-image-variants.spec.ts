@@ -1,6 +1,7 @@
 import config from "@mongez/config";
 import Fastify, { type FastifyInstance } from "fastify";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -32,18 +33,28 @@ async function loadSharp(): Promise<SharpModule | undefined> {
   }
 }
 
-const sharp = await loadSharp();
-
-if (!sharp) {
-  console.warn(
-    "[generate-image-variants.spec] sharp is not installed in core's dev dependencies; specs are skipped.",
-  );
-}
+const requireSharp = createRequire(path.join(process.cwd(), "package.json"));
+const sharpAvailable = (() => {
+  try {
+    requireSharp.resolve("sharp");
+    return true;
+  } catch {
+    return false;
+  }
+})();
+let sharp: SharpModule | undefined;
 
 let workspace: string;
 let storageRoot: string;
 let cacheDirectory: string;
 let app: FastifyInstance;
+
+function requiredVariant<T>(variants: Record<string, T>, name: string): T {
+  const variant = variants[name];
+  expect(variant, `expected generated ${name} variant`).toBeDefined();
+  if (variant === undefined) throw new Error(`expected generated ${name} variant`);
+  return variant;
+}
 
 function imagesConfig(overrides: Partial<UploadsImagesConfigurations> = {}): void {
   config.set("uploads", {
@@ -75,6 +86,14 @@ function get(url: string, headers: Record<string, string> = {}) {
 }
 
 beforeAll(async () => {
+  sharp = await loadSharp();
+  if (sharpAvailable && !sharp) throw new Error("sharp resolved but could not be loaded");
+  if (!sharp) {
+    console.warn(
+      "[generate-image-variants.spec] sharp is not installed in core's dev dependencies; specs are skipped.",
+    );
+  }
+
   workspace = fs.mkdtempSync(path.join(os.tmpdir(), "warlock-ingest-"));
   storageRoot = path.join(workspace, "storage");
   cacheDirectory = path.join(storageRoot, ".cache", "image-variants");
@@ -119,7 +138,7 @@ afterEach(() => {
   }
 });
 
-describe.skipIf(!sharp)("generateImageVariants — cache parity with the route", () => {
+describe.skipIf(!sharpAvailable)("generateImageVariants — cache parity with the route", () => {
   it("writes derivatives the route then serves from cache, without generating again", async () => {
     fs.writeFileSync(path.join(storageRoot, "hero.jpg"), await makeImage("jpeg", 64, 64));
 
@@ -152,7 +171,7 @@ describe.skipIf(!sharp)("generateImageVariants — cache parity with the route",
   });
 });
 
-describe.skipIf(!sharp)("generateImageVariants — descriptor shape", () => {
+describe.skipIf(!sharpAvailable)("generateImageVariants — descriptor shape", () => {
   it("returns a descriptor matching web's ImageDescriptor field for field", async () => {
     fs.writeFileSync(path.join(storageRoot, "shape.jpg"), await makeImage("jpeg", 64, 64));
 
@@ -189,20 +208,22 @@ describe.skipIf(!sharp)("generateImageVariants — descriptor shape", () => {
 
     const descriptor = await generateImageVariants("wide.jpg", { variants: ["thumb"] });
 
-    expect(descriptor.variants.thumb.width).toBe(32);
-    expect(descriptor.variants.thumb.height).toBe(16);
+    const thumb = requiredVariant(descriptor.variants, "thumb");
+    expect(thumb.width).toBe(32);
+    expect(thumb.height).toBe(16);
   });
 });
 
-describe.skipIf(!sharp)("generateImageVariants — enlargement", () => {
+describe.skipIf(!sharpAvailable)("generateImageVariants — enlargement", () => {
   it("never enlarges a source narrower than the variant by default", async () => {
     imagesConfig({ variants: { thumb: { width: 320 } } });
     fs.writeFileSync(path.join(storageRoot, "small.jpg"), await makeImage("jpeg", 100, 100));
 
     const descriptor = await generateImageVariants("small.jpg", { variants: ["thumb"] });
 
-    expect(descriptor.variants.thumb.width).toBe(100);
-    expect(descriptor.variants.thumb.height).toBe(100);
+    const thumb = requiredVariant(descriptor.variants, "thumb");
+    expect(thumb.width).toBe(100);
+    expect(thumb.height).toBe(100);
   });
 
   it("upscales when the variant opts in with enlarge: true", async () => {
@@ -211,8 +232,9 @@ describe.skipIf(!sharp)("generateImageVariants — enlargement", () => {
 
     const descriptor = await generateImageVariants("small2.jpg", { variants: ["thumb"] });
 
-    expect(descriptor.variants.thumb.width).toBe(320);
-    expect(descriptor.variants.thumb.height).toBe(320);
+    const thumb = requiredVariant(descriptor.variants, "thumb");
+    expect(thumb.width).toBe(320);
+    expect(thumb.height).toBe(320);
   });
 
   it("reports the actual output dimensions, read from the derivative, for a small source", async () => {
@@ -223,12 +245,13 @@ describe.skipIf(!sharp)("generateImageVariants — enlargement", () => {
 
     expect(descriptor.width).toBe(100);
     expect(descriptor.height).toBe(100);
-    expect(descriptor.variants.thumb.width).toBe(100);
-    expect(descriptor.variants.thumb.height).toBe(100);
+    const thumb = requiredVariant(descriptor.variants, "thumb");
+    expect(thumb.width).toBe(100);
+    expect(thumb.height).toBe(100);
   });
 });
 
-describe.skipIf(!sharp)("generateImageVariants — variants filter", () => {
+describe.skipIf(!sharpAvailable)("generateImageVariants — variants filter", () => {
   it("only generates the requested variants", async () => {
     fs.writeFileSync(path.join(storageRoot, "filtered.jpg"), await makeImage("jpeg", 64, 64));
 
@@ -246,14 +269,12 @@ describe.skipIf(!sharp)("generateImageVariants — variants filter", () => {
   });
 });
 
-describe.skipIf(!sharp)("generateImageVariants — server misconfiguration", () => {
+describe.skipIf(!sharpAvailable)("generateImageVariants — server misconfiguration", () => {
   it("throws ImageVariantsConfigError, not a plain Error, when there is no local storage root", async () => {
     const rootSpy = vi.spyOn(storage, "root").mockImplementation(() => ".");
 
     try {
-      await expect(generateImageVariants("whatever.jpg")).rejects.toThrow(
-        ImageVariantsConfigError,
-      );
+      await expect(generateImageVariants("whatever.jpg")).rejects.toThrow(ImageVariantsConfigError);
     } finally {
       rootSpy.mockImplementation((appended?: string) => path.join(storageRoot, appended ?? ""));
     }
@@ -263,9 +284,7 @@ describe.skipIf(!sharp)("generateImageVariants — server misconfiguration", () 
     config.set("uploads", {});
 
     try {
-      await expect(generateImageVariants("whatever.jpg")).rejects.toThrow(
-        ImageVariantsConfigError,
-      );
+      await expect(generateImageVariants("whatever.jpg")).rejects.toThrow(ImageVariantsConfigError);
 
       try {
         await generateImageVariants("whatever.jpg");
@@ -278,7 +297,7 @@ describe.skipIf(!sharp)("generateImageVariants — server misconfiguration", () 
   });
 });
 
-describe.skipIf(!sharp)("generateImageVariants — source guards", () => {
+describe.skipIf(!sharpAvailable)("generateImageVariants — source guards", () => {
   it("rejects a traversal path", async () => {
     fs.writeFileSync(path.join(workspace, "sibling.txt"), "TOP-SECRET");
 

@@ -10,6 +10,16 @@ function resolve(images: unknown) {
   return resolveImageVariantsConfig(images as UploadsImagesConfigurations, root);
 }
 
+function requiredVariant(
+  config: NonNullable<ReturnType<typeof resolveImageVariantsConfig>>,
+  name: string,
+) {
+  const variant = config.variants[name];
+  expect(variant, `expected resolved ${name} variant`).toBeDefined();
+  if (variant === undefined) throw new Error(`expected resolved ${name} variant`);
+  return variant;
+}
+
 describe("resolveImageVariantsConfig", () => {
   it("returns undefined when no images config exists", () => {
     expect(resolve(undefined)).toBeUndefined();
@@ -50,7 +60,9 @@ describe("resolveImageVariantsConfig", () => {
   it("defaults enlarge to false when omitted", () => {
     const resolved = resolve({ variants: { thumb: { width: 320 } } });
 
-    expect(resolved?.variants.thumb.enlarge).toBe(false);
+    expect(resolved).toBeDefined();
+    if (resolved === undefined) throw new Error("expected resolved image variants config");
+    expect(requiredVariant(resolved, "thumb").enlarge).toBe(false);
   });
 
   it.each([

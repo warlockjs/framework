@@ -43,6 +43,8 @@ function isGroupedTranslationsCall(node: ts.Node): node is ts.CallExpression {
 function collectFromCall(call: ts.CallExpression, keys: Set<string>): void {
   const [first, second] = call.arguments;
 
+  if (first === undefined) return;
+
   if (second !== undefined) {
     if (ts.isStringLiteral(first) && ts.isObjectLiteralExpression(second)) {
       collectLeaves(second, first.text, keys);
@@ -50,7 +52,7 @@ function collectFromCall(call: ts.CallExpression, keys: Set<string>): void {
     return;
   }
 
-  if (first !== undefined && ts.isObjectLiteralExpression(first)) {
+  if (ts.isObjectLiteralExpression(first)) {
     for (const property of first.properties) {
       if (!ts.isPropertyAssignment(property)) continue;
 

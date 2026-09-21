@@ -1,4 +1,5 @@
 import config from "@mongez/config";
+import type { FastifyRequest } from "fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UnknownLocaleError } from "../errors/unknown-locale-error";
 import { Request } from "./request";
@@ -40,7 +41,7 @@ function makeFastifyShaped(cookies: Record<string, string>) {
     params: {},
     headers: {},
     cookies,
-  } as never;
+  } as FastifyRequest;
 }
 
 describe("response.setLocale / request.locale — shared cookie name", () => {
