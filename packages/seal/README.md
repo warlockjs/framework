@@ -18,6 +18,28 @@ yarn add @warlock.js/seal
 pnpm add @warlock.js/seal
 ```
 
+## Granular object and string entry points
+
+When a module only needs object and string schemas, import those factories from
+their dedicated entry points instead of the complete `v` factory:
+
+```typescript
+import { object } from "@warlock.js/seal/object";
+import { string } from "@warlock.js/seal/string";
+
+const commentSchema = object({
+  comment: string().trim().required().minLength(3),
+});
+
+const result = await commentSchema["~standard"].validate({
+  comment: "  Hello  ",
+});
+```
+
+`object` and `string` create the same schema classes with their chain methods
+and Standard Schema bridge. Use the package-root `v` factory when the schema
+also needs other factories.
+
 ## 🚀 Quick Start
 
 ```typescript

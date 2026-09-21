@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Granular `@warlock.js/seal/object` and `@warlock.js/seal/string` entry points with the `object` and `string` factories for schemas that do not need the complete `v` factory.
 - `redactValue` option on `v.validate(schema, data, options)`: when set, the `:value` placeholder renders that string instead of the submitted input, both in the attributes handed to `translateRule` and in author `errorMessage` templates. It does not cover a custom rule that concatenates raw input into its own message text. Unset keeps the current behaviour. Per-call options replace the global config, so pass `{ ...getSealConfig(), redactValue }` to keep your translators.
 
 ## 5.13.0 - 2026-09-17
