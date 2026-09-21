@@ -33,7 +33,7 @@
  * `core` cannot depend on `web`, the dependency runs the other way):
  * - method is POST/PUT/PATCH/DELETE, AND
  * - the `Cookie` header carries any cookie other than the framework's own
- *   `locale` cookie (a header that fails to parse cleanly counts as
+ *   `locale` cookies (legacy plus the browser preference; a header that fails to parse cleanly counts as
  *   carrying one — fail closed), AND
  * - the route is not exempted via `{ csrf: false }` (`RouteOptions.csrf`,
  *   `../router/types.ts`) — a narrow, per-route, explicitly "dangerous" opt
@@ -42,7 +42,7 @@
  * A header-only API request (`Authorization: Bearer …`, no `Cookie` header
  * at all) never reaches the cookie check above and is entirely unaffected.
  */
-import { LOCALE_COOKIE_NAME } from "../config/locale-configuration";
+import { LOCALE_COOKIE_NAME, LOCALE_PREFERENCE_COOKIE_NAME } from "../config/locale-configuration";
 import { HttpErrorCodes } from "./error-codes";
 import { resolveCsrfOriginVerdict } from "./csrf-origin-policy";
 import type { Request } from "./request";
@@ -94,7 +94,7 @@ function parseCookieNamesStrict(rawHeader: string): Set<string> | undefined {
 
 /**
  * Whether the request carries a `Cookie` header naming anything other than
- * the framework's `locale` cookie.
+ * the framework's locale cookies.
  *
  * - No `Cookie` header at all ⇒ `false` — nothing to guard on.
  * - A header that fails to parse cleanly ⇒ `true` — fails CLOSED.
@@ -116,7 +116,7 @@ function carriesNonLocaleCookie(request: Request): boolean {
   if (names === undefined || names.size === 0) return true;
 
   for (const name of names) {
-    if (name !== LOCALE_COOKIE_NAME) return true;
+    if (name !== LOCALE_COOKIE_NAME && name !== LOCALE_PREFERENCE_COOKIE_NAME) return true;
   }
 
   return false;

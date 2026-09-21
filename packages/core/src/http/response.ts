@@ -15,7 +15,11 @@ import path from "path";
 import type React from "react";
 import { type ReactNode } from "react";
 import { Application } from "../application/application";
-import { LOCALE_COOKIE_NAME, resolveLocaleConfiguration } from "../config/locale-configuration";
+import {
+  LOCALE_COOKIE_NAME,
+  LOCALE_PREFERENCE_COOKIE_NAME,
+  resolveLocaleConfiguration,
+} from "../config/locale-configuration";
 import { UnknownLocaleError } from "../errors/unknown-locale-error";
 import type { Route } from "../router";
 import { StorageFile } from "../storage";
@@ -1056,6 +1060,16 @@ export class Response {
     if (localeCodes !== undefined && !localeCodes.includes(locale)) {
       throw new UnknownLocaleError(locale, localeCodes);
     }
+
+    // A controller's explicit server-side choice is authoritative. The
+    // preference cookie is host-only by contract, so clearing it must never
+    // inherit an application's configured cookie Domain.
+    this.baseResponse.clearCookie(LOCALE_PREFERENCE_COOKIE_NAME, {
+      path: "/",
+      sameSite: "lax",
+      httpOnly: false,
+      domain: undefined,
+    });
 
     return this.cookie(LOCALE_COOKIE_NAME, locale, { raw: true });
   }

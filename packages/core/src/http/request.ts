@@ -11,7 +11,11 @@ import { randomBytes } from "node:crypto";
 import { type IncomingHttpHeaders } from "node:http2";
 import { Application } from "../application/application";
 import { config } from "../config/config-getter";
-import { LOCALE_COOKIE_NAME, resolveLocaleConfiguration } from "../config/locale-configuration";
+import {
+  LOCALE_COOKIE_NAME,
+  LOCALE_PREFERENCE_COOKIE_NAME,
+  resolveLocaleConfiguration,
+} from "../config/locale-configuration";
 import type { Middleware, Route } from "../router";
 import { validateAll } from "../validation/validateAll";
 import { CookieJarUnavailableError, RequestUserMovedError } from "./errors";
@@ -352,6 +356,7 @@ export class Request<RequestValidation = any> {
   protected resolveLocale(): string {
     const candidate = [
       this.query["locale"],
+      this.cookies[LOCALE_PREFERENCE_COOKIE_NAME],
       this.cookies[LOCALE_COOKIE_NAME],
       this.header("locale"),
     ].find((value) => typeof value === "string" && value.length > 0);

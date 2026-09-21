@@ -24,11 +24,12 @@ import { Response } from "./response";
 
 function createResponse() {
   const setCookie = vi.fn();
+  const clearCookie = vi.fn();
   const response = new Response();
 
-  response.setResponse({ setCookie, raw: { once: vi.fn() } } as never);
+  response.setResponse({ setCookie, clearCookie, raw: { once: vi.fn() } } as never);
 
-  return { response, setCookie };
+  return { response, setCookie, clearCookie };
 }
 
 /** What `Request` expects `setRequest`'s argument to look like. */
@@ -49,6 +50,7 @@ describe("response.setLocale / request.locale — shared cookie name", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    config.set("http.cookies.options", {});
   });
 
   it("round-trips through the REAL writer and the REAL reader — the drift control", () => {
@@ -95,8 +97,48 @@ describe("response.setLocale / request.locale — shared cookie name", () => {
     expect(setCookie.mock.calls[0][1]).toBe("ar");
   });
 
+  it("clears the host-only JS preference before writing the authoritative locale cookie", () => {
+    const { response, clearCookie, setCookie } = createResponse();
+    config.set("http.cookies.options", { domain: ".example.test" });
+
+    response.setLocale("ar");
+
+    expect(clearCookie).toHaveBeenCalledWith("warlock.locale-preference", {
+      path: "/",
+      sameSite: "lax",
+      httpOnly: false,
+      domain: undefined,
+    });
+    expect(clearCookie.mock.invocationCallOrder[0]).toBeLessThan(
+      setCookie.mock.invocationCallOrder[0] ?? Infinity,
+    );
+  });
+
+  it("resolves query, preference, legacy cookie, then header in that order", () => {
+    const preferenceOnly = new Request().setRequest({
+      ...makeFastifyShaped({ "warlock.locale-preference": "ar", locale: "en" }),
+      headers: { locale: "en" },
+    } as never);
+    const queryWins = new Request().setRequest({
+      ...makeFastifyShaped({ "warlock.locale-preference": "ar", locale: "en" }),
+      query: { locale: "en" },
+      headers: { locale: "ar" },
+    } as never);
+
+    expect(preferenceOnly.locale).toBe("ar");
+    expect(queryWins.locale).toBe("en");
+  });
+
+  it("keeps preference values behind the configured locale allow-list", () => {
+    const request = new Request().setRequest(
+      makeFastifyShaped({ "warlock.locale-preference": "fr", locale: "ar" }),
+    );
+
+    expect(request.locale).toBe("en");
+  });
+
   it("throws UnknownLocaleError, naming what was given and what is configured, for a locale outside app.localeCodes", () => {
-    const { response } = createResponse();
+    const { response, clearCookie } = createResponse();
 
     expect(() => response.setLocale("fr")).toThrowError(UnknownLocaleError);
 
@@ -109,6 +151,7 @@ describe("response.setLocale / request.locale — shared cookie name", () => {
       expect((error as Error).message).toContain("en");
       expect((error as Error).message).toContain("ar");
     }
+    expect(clearCookie).not.toHaveBeenCalled();
   });
 
   it("passes any locale through when the app declares no app.localeCodes allow-list", () => {

@@ -9,6 +9,13 @@
  */
 export const LOCALE_COOKIE_NAME = "locale";
 
+/**
+ * A client-readable, host-only locale preference. It is deliberately separate
+ * from `LOCALE_COOKIE_NAME`: the latter remains the server-authoritative
+ * HttpOnly locale cookie.
+ */
+export const LOCALE_PREFERENCE_COOKIE_NAME = "warlock.locale-preference";
+
 export type LocaleConfiguration = {
   defaultLocaleCode: string;
   /**

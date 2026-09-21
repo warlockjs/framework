@@ -98,9 +98,7 @@ describe("runDefaultCsrfGuard — default core CSRF-Origin guard", () => {
     const result = await runDefaultCsrfGuard(request, response, translate, logRejection);
 
     expect(result).toBeInstanceOf(Response);
-    expect(forbidden).toHaveBeenCalledWith(
-      expect.objectContaining({ errorCode: "EC006" }),
-    );
+    expect(forbidden).toHaveBeenCalledWith(expect.objectContaining({ errorCode: "EC006" }));
     expect(logRejection).toHaveBeenCalledWith("origin-mismatch");
   });
 
@@ -115,9 +113,7 @@ describe("runDefaultCsrfGuard — default core CSRF-Origin guard", () => {
     const result = await runDefaultCsrfGuard(request, response, translate, vi.fn());
 
     expect(result).toBeInstanceOf(Response);
-    expect(forbidden).toHaveBeenCalledWith(
-      expect.objectContaining({ errorCode: "EC006" }),
-    );
+    expect(forbidden).toHaveBeenCalledWith(expect.objectContaining({ errorCode: "EC006" }));
   });
 
   it("allows a same-origin token-cookie POST", async () => {
@@ -164,6 +160,26 @@ describe("runDefaultCsrfGuard — default core CSRF-Origin guard", () => {
     expect(forbidden).not.toHaveBeenCalled();
   });
 
+  it("leaves both framework locale cookies exempt, but still guards a mixed header", async () => {
+    const preferenceOnly = createRequest({
+      method: "POST",
+      cookieHeader: "locale=en; warlock.locale-preference=ar",
+      origin: "https://evil.example.com",
+    });
+    const mixed = createRequest({
+      method: "POST",
+      cookieHeader: "warlock.locale-preference=ar; token=abc123",
+      origin: "https://evil.example.com",
+    });
+
+    expect(
+      await runDefaultCsrfGuard(preferenceOnly, createResponse(), translate, vi.fn()),
+    ).toBeUndefined();
+    expect(await runDefaultCsrfGuard(mixed, createResponse(), translate, vi.fn())).toBeInstanceOf(
+      Response,
+    );
+  });
+
   it("leaves an explicitly exempt route (`{ csrf: false }`) unaffected", async () => {
     const request = createRequest({
       method: "POST",
@@ -194,9 +210,7 @@ describe("runDefaultCsrfGuard — default core CSRF-Origin guard", () => {
       const result = await runDefaultCsrfGuard(request, response, translate, vi.fn());
 
       expect(result).toBeInstanceOf(Response);
-      expect(forbidden).toHaveBeenCalledWith(
-        expect.objectContaining({ errorCode: "EC006" }),
-      );
+      expect(forbidden).toHaveBeenCalledWith(expect.objectContaining({ errorCode: "EC006" }));
     },
   );
 
@@ -226,9 +240,7 @@ describe("runDefaultCsrfGuard — default core CSRF-Origin guard", () => {
     const result = await runDefaultCsrfGuard(request, response, translate, vi.fn());
 
     expect(result).toBeInstanceOf(Response);
-    expect(forbidden).toHaveBeenCalledWith(
-      expect.objectContaining({ errorCode: "EC006" }),
-    );
+    expect(forbidden).toHaveBeenCalledWith(expect.objectContaining({ errorCode: "EC006" }));
   });
 
   it("a malformed Cookie header fails CLOSED even when Origin would otherwise be allowed", async () => {
