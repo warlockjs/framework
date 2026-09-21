@@ -6929,6 +6929,22 @@ GET /products/42?locale=ar
 - [`create-module/SKILL.md`](../create-module/SKILL.md) — the `utils/locales.ts` file is part of the generated module scaffold.
 - [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — `utils/locales.ts` is auto-loaded; the suffix is mandatory.
 
+## Route-owned web translations (5.17)
+
+`locales.json` applies only to descendant pages on its physical `src/web` ancestor chain. Its optional `$group` overrides the namespace; otherwise the physical directory supplies it, omitting `(group)` and `[param]` segments. Root `src/web/locales.json` has no implicit prefix. Nested objects flatten to dotted keys, and all duplicate flattened key ownership is rejected, including matching ancestor/child declarations.
+
+```json
+{
+  "$group": "account",
+  "title": { "en": "Account", "ar": "Arabic account" },
+  "actions": { "save": { "en": "Save", "ar": "Arabic save" } }
+}
+```
+
+This produces `account.title` and `account.actions.save`. Keep every leaf complete for the configured locale list. The page pipeline selects an immutable snapshot for its route source and locale. `useTrans()`, `request.t()`, and `request.trans()` use that snapshot; a missing scoped key returns the key itself. With no route-locales manifest, the existing global `@mongez/localization` registry remains the legacy fallback path.
+
+When a route-locales snapshot applies, `request.t()`, `request.trans()`, and `request.transFrom(locale, key, placeholders?)` resolve through it; without one, they retain the existing global-registry behavior. The underlying `transFromKeywords(locale, keywords, key, placeholders?, converter?)` is supplied by `@mongez/localization` 3.5.0. Error pages rebind to their own snapshot, while framework fallback uses the app/root snapshot. Development HMR add/edit/delete publishes a new snapshot, and the snapshot revision keeps page-cache entries from reusing old JSON. Generated `.warlock` typings contain the flattened route keys; do not maintain a second handwritten key union.
+
 
 ## use-middleware  `@warlock.js/core/use-middleware/SKILL.md`
 
