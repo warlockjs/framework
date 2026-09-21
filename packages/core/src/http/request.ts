@@ -350,13 +350,25 @@ export class Request<RequestValidation = any> {
   }
 
   /**
-   * Resolve the first present Mode B source. Unsupported values fail closed to
-   * the configured default instead of widening the application's locale set.
+   * Resolve the first present Mode B source, skipping unsupported browser
+   * preferences. Other unsupported values resolve to the configured default.
    */
   protected resolveLocale(): string {
+    const { localeCodes } = resolveLocaleConfiguration(
+      config.key("app.localeCode"),
+      config.key("app.localeCodes"),
+    );
+    const preference = this.cookies[LOCALE_PREFERENCE_COOKIE_NAME];
+    // A stale browser preference must not hide the server's legacy cookie or
+    // header after an application removes a supported locale.
+    const supportedPreference =
+      typeof preference === "string" &&
+      (localeCodes === undefined || localeCodes.includes(preference))
+        ? preference
+        : undefined;
     const candidate = [
       this.query["locale"],
-      this.cookies[LOCALE_PREFERENCE_COOKIE_NAME],
+      supportedPreference,
       this.cookies[LOCALE_COOKIE_NAME],
       this.header("locale"),
     ].find((value) => typeof value === "string" && value.length > 0);

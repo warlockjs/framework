@@ -129,9 +129,26 @@ describe("response.setLocale / request.locale — shared cookie name", () => {
     expect(queryWins.locale).toBe("en");
   });
 
-  it("keeps preference values behind the configured locale allow-list", () => {
+  it("ignores an unsupported preference and retains the legacy cookie", () => {
     const request = new Request().setRequest(
       makeFastifyShaped({ "warlock.locale-preference": "fr", locale: "ar" }),
+    );
+
+    expect(request.locale).toBe("ar");
+  });
+
+  it("falls through an unsupported preference to the header when no legacy cookie exists", () => {
+    const request = new Request().setRequest({
+      ...makeFastifyShaped({ "warlock.locale-preference": "fr" }),
+      headers: { locale: "ar" },
+    } as never);
+
+    expect(request.locale).toBe("ar");
+  });
+
+  it("uses the configured default when an unsupported preference has no fallback", () => {
+    const request = new Request().setRequest(
+      makeFastifyShaped({ "warlock.locale-preference": "fr" }),
     );
 
     expect(request.locale).toBe("en");
