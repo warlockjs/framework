@@ -3,10 +3,11 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConnectorLifecyclePhase, type Connector } from "../connectors/types";
+import { ProductionBuilder } from "./production-builder";
 
 /**
  * Records the exact esbuild call arguments so the delete-vs-copy fix can be
- * asserted on the bundling side too. `bundle()` is still mocked out here —
+ * asserted on the bundling side too. Esbuild is fully mocked here —
  * this spec is about what {@link ConnectorBuildContext.options} looks like
  * to `emit` hooks, not about exercising esbuild itself.
  */
@@ -60,10 +61,7 @@ vi.mock("../warlock-config/warlock-config.manager", () => ({
  * contribution passed in — the runtime lifecycle methods are never called by
  * `warlock build`, which only drains `build.generate` / `build.emit`.
  */
-function fixtureConnector(
-  name: string,
-  build: Connector["build"],
-): Connector {
+function fixtureConnector(name: string, build: Connector["build"]): Connector {
   return {
     name,
     priority: 1,
@@ -114,45 +112,35 @@ describe("ProductionBuilder", () => {
     await fs.rm(tempRoot, { recursive: true, force: true }).catch(() => undefined);
   });
 
-  // 60s, against core's 10s default: `builder.build()` below runs a real
-  // esbuild build (transform pipeline + bundling), measured at ~9s standalone
-  // and prone to tip past 10s under load, which timed the case out (not a
-  // wrong answer) rather than the code being slow. Scoped to this test only,
-  // matching the convention in `tests/unit/mail/mailer-pool.test.ts`.
-  it(
-    "hands the emit contribution the same outFile/entryPath/singleBundle/esmShim/banner the build was configured with",
-    async () => {
-      const seen: {
-        outFile?: string;
-        entryPath?: string;
-        singleBundle?: boolean;
-        esmShim?: boolean;
-        banner?: Record<string, string>;
-      } = {};
+  it("hands the emit contribution the same outFile/entryPath/singleBundle/esmShim/banner the build was configured with", async () => {
+    const seen: {
+      outFile?: string;
+      entryPath?: string;
+      singleBundle?: boolean;
+      esmShim?: boolean;
+      banner?: Record<string, string>;
+    } = {};
 
-      mockConnectors = [
-        fixtureConnector("fixture-emit-recorder", {
-          emit(context) {
-            seen.outFile = context.options.outFile;
-            seen.entryPath = context.options.entryPath;
-            seen.singleBundle = context.options.singleBundle;
-            seen.esmShim = context.options.esmShim;
-            seen.banner = context.options.banner;
-          },
-        }),
-      ];
+    mockConnectors = [
+      fixtureConnector("fixture-emit-recorder", {
+        emit(context) {
+          seen.outFile = context.options.outFile;
+          seen.entryPath = context.options.entryPath;
+          seen.singleBundle = context.options.singleBundle;
+          seen.esmShim = context.options.esmShim;
+          seen.banner = context.options.banner;
+        },
+      }),
+    ];
 
-      const { ProductionBuilder } = await import("./production-builder");
-      const builder = new ProductionBuilder();
+    const builder = new ProductionBuilder();
 
-      await builder.build();
+    await builder.build();
 
-      expect(seen.outFile).toBe("app.js");
-      expect(seen.entryPath).toBe(path.resolve(tempRoot, "dist", "app.js"));
-      expect(seen.singleBundle).toBe(true);
-      expect(seen.esmShim).toBe(false);
-      expect(seen.banner).toEqual({ js: "/* fixture banner */" });
-    },
-    60_000,
-  );
+    expect(seen.outFile).toBe("app.js");
+    expect(seen.entryPath).toBe(path.resolve(tempRoot, "dist", "app.js"));
+    expect(seen.singleBundle).toBe(true);
+    expect(seen.esmShim).toBe(false);
+    expect(seen.banner).toEqual({ js: "/* fixture banner */" });
+  }, 60_000);
 });

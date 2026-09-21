@@ -172,13 +172,14 @@ describe("web starter stubs", () => {
     expect(webHomePageStub).toContain('http.post<{ message: string }>("/api/contact", values)');
     expect(webHomePageStub).toContain("schema={contactSchema}");
     expect(webHomePageStub).toContain("result.error.isValidationError");
-    expect(webHomePageStub).toContain("aria-pressed={locale === \"ar\"}");
+    expect(webHomePageStub).toContain('aria-pressed={locale === "ar"}');
   });
 
   it("keeps universal registration behind a stable Fast Refresh boundary", () => {
     expect(webHomePageStub).toContain(
-      'export const route = { path: "/", name: "index" } as const;',
+      'export const config = {\n  route: { path: "/", name: "index" },\n  metadata: { title: "Home" },\n} as const satisfies PageConfig;',
     );
+    expect(webHomePageStub).not.toContain("export const route =");
     expect(webHomePageStub).toContain('export { register } from "./index.register";');
     expect(webHomePageStub).not.toContain("export function register() {");
     expect(webHomePageStub).not.toContain('extend("en", {');
@@ -195,14 +196,14 @@ describe("web starter stubs", () => {
 
   it("generates a validated Warlock API controller and route", () => {
     expect(webContactControllerStub).toContain('from "@warlock.js/seal"');
-    expect(webContactControllerStub).toContain("contactController.validation = { schema: contactSchema }");
+    expect(webContactControllerStub).toContain(
+      "contactController.validation = { schema: contactSchema }",
+    );
     expect(webContactRoutesStub).toContain('router.post("/api/contact", contactController)');
   });
 
   it("maps Core's `errors: Array<{input,error}>` validation shape onto form.setErrors, with a message fallback", () => {
-    expect(webHomePageStub).toContain(
-      "errors?: Array<{ input: string; error: string }>;",
-    );
+    expect(webHomePageStub).toContain("errors?: Array<{ input: string; error: string }>;");
     expect(webHomePageStub).toContain(
       "(body.errors ?? []).map(({ input, error }) => [input, error])",
     );

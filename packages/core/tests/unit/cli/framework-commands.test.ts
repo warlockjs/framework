@@ -17,11 +17,11 @@ const optionNames = (command: { commandOptions: { name: string }[] }) =>
   command.commandOptions.map((option) => option.name);
 
 describe("migrateCommand definition", () => {
-  it("declares its name and database preload plan", () => {
+  it("declares its name and database/storage preload plan", () => {
     expect(migrateCommand.name).toBe("migrate");
     expect(migrateCommand.commandPreload).toEqual({
       config: ["database", "log"],
-      connectors: ["database", "logger"],
+      connectors: ["database", "logger", "storage"],
     });
   });
 
@@ -59,19 +59,17 @@ describe("migrateCommand definition", () => {
 });
 
 describe("seedCommand definition", () => {
-  it("plans a full bootstrap with the database/cache/logger connectors", () => {
+  it("plans a full bootstrap with database/cache/logger/storage connectors", () => {
     expect(seedCommand.name).toBe("seed");
     expect(seedCommand.commandPreload).toMatchObject({
       bootstrap: true,
       config: true,
-      connectors: ["database", "cache", "logger"],
+      connectors: ["database", "cache", "logger", "storage"],
     });
   });
 
   it("carries a defaultValue on the transaction option", () => {
-    const transaction = seedCommand.commandOptions.find(
-      (option) => option.name === "transaction",
-    );
+    const transaction = seedCommand.commandOptions.find((option) => option.name === "transaction");
 
     expect(transaction?.defaultValue).toBe(true);
     expect(transaction?.alias).toBe("t");
