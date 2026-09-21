@@ -180,8 +180,8 @@ positional layout may provide only a static sitemap default; descendants use
 the nearest layout default unless their own page config supplies a value. A
 layout cannot supply dynamic URLs. Layout metadata is likewise limited to a
 static `metadata.robots` default. Put site-wide `robots.txt` and sitemap
-settings in `src/config/web.ts`; `root.tsx` accepts middleware only and does
-not contribute metadata or sitemap inheritance.
+settings in `src/config/web.ts`; `root.tsx` accepts `middleware` and the static
+`strictMode` flag and does not contribute metadata or sitemap inheritance.
 
 ## Large sites
 

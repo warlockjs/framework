@@ -65,6 +65,21 @@ are refused.
 Two pages that resolve to the same effective path or name fail discovery and
 name both files, instead of leaving one page silently unreachable.
 
+## Resolve a named URL
+
+Use `href()` to interpolate a name from the published route table:
+
+```ts
+import { href } from "@warlock.js/web";
+
+const productUrl = href("products.show", { id: "42" });
+```
+
+`href()` accepts a string name. `href("products.shoow", { id: "42" })`
+compiles, then throws at runtime with the known route names after the route
+table is published. Generated route-name and parameter types are not available
+in 5.17.
+
 ## Cache public pages explicitly
 
 Page documents and their `x-warlock-data` representations are `no-store` by

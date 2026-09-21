@@ -42,7 +42,8 @@ Layouts can also provide inherited crawl defaults with
 `metadata: { robots: "noindex" }` or `sitemap: false` inside this same
 `LayoutConfig`. They cannot set page metadata, a page cache policy, validation,
 or a sitemap URL supplier. A root module may export a `config satisfies
-RootConfig`, but its only policy is `middleware`.
+RootConfig` for application middleware and `strictMode`; it owns the flag even
+though only the tree beneath `#vessel` hydrates in the browser.
 
 ## Page middleware return values
 
