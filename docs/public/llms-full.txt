@@ -7135,7 +7135,7 @@ router.get("/analytics/summary", summaryController, {
 
 ### Tag-based invalidation
 
-Give it `tags` — a static list, or a function of the request — to evict the entry early with `cache.tags([...]).invalidate()` (`@warlock.js/cache`), instead of waiting out `ttl`. Mirrors `route.cache.tags` on `@warlock.js/web`'s page cache, so an API response and a page can share the same tag and be invalidated together:
+Give it `tags` — a static list, or a function of the request — to evict the entry early with `cache.tags([...]).invalidate()` (`@warlock.js/cache`), instead of waiting out `ttl`. Mirrors `config.cache.tags` on `@warlock.js/web`'s page cache, so an API response and a page can share the same tag and be invalidated together:
 
 ```ts
 import { middleware } from "@warlock.js/core";
