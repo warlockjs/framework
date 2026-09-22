@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/ai-panoptic",
-  "version": "5.17.0",
+  "version": "5.17.1",
   "type": "module",
   "description": "Observability collector + exporters for @warlock.js/ai",
   "main": "./src/index.ts",
