@@ -124,6 +124,324 @@
   ],
   "releases": [
     {
+      "version": "5.17.0",
+      "id": "v5-17-0",
+      "date": "September 22, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong><code>@warlock.js/web</code> moves page, layout, and root server policy into one direct <code>config</code> export (BREAKING)</strong>: <code>PageConfig</code>, <code>LayoutConfig</code>, and <code>RootConfig</code> keep route/cache/prefix/strict-mode policy together while loaders, registration, named error boundaries, and components remain separate. Web adds route-scoped <code>locales.json</code> translations, typed keys, <code>useChangeLocaleCode()</code>, and locale-aware navigation, sitemap, and robots behavior; new scaffolds enable root <code>strictMode</code>. <code>@warlock.js/core</code> and Web require <code>@mongez/localization</code> 3.5.0 for scoped translation lookup. Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>web</code>, <code>sitemap</code> rows); Hasan authorised the release on 2026-09-21: \"Go with your rec\".",
+      "matrix": "subset",
+      "matrixRows": ["web", "sitemap"],
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 26,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 24
+            },
+            {
+              "type": "Security",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Locale switches under the default URL strategy use a provisional data request: a failed or superseded navigation cannot persist its locale, including on page-cache hits. The successful current navigation commits a host-only locale preference with its tree. Invalid preferences fall through to the legacy locale cookie and normal locale resolution; an explicit <code>response.setLocale()</code> clears the preference before setting its authoritative cookie."
+            },
+            {
+              "type": "Fixed",
+              "html": "Page-cache keys include the route translation snapshot revision. If a request's final locale snapshot differs from the one used for lookup, the response is not stored under the earlier key."
+            },
+            {
+              "type": "Fixed",
+              "html": "A client disconnecting mid-stream no longer logs an SSR render error or reaches <code>web.errors.report()</code>. The stream now aborts with a recognisable reason instead of none, so it stops being mistaken for a genuine render failure."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>changeLocaleCode()</code> now corrects <code>document.documentElement</code>'s <code>lang</code>/<code>dir</code> itself, synchronously, before its returned promise resolves — under an active <code>web.localeRouting.strategy</code> (the <code>pushState</code> path) as well as the <code>?locale=</code> path. Before, only <code>NavigationRoot</code>'s own effect did this correction, on React's next commit, which runs after <code>changeLocaleCode()</code> had already resolved; a caller reading <code>document.documentElement</code> right after <code>await changeLocaleCode(\"ar\")</code> could still see the stale locale's <code>lang</code>/<code>dir</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>robots.txt</code> now covers every locale-prefixed URL under an active <code>web.localeRouting.strategy</code>. Before, a rule such as <code>Disallow: /admin</code> left <code>/ar/admin</code> crawlable, because only the bare path was written. Every <code>allow</code>/<code>disallow</code> rule that starts with <code>/</code> — other than bare <code>/</code>, and never a rule containing <code>*</code> or <code>$</code> — now also emits its prefixed variant for each prefixed locale code, deduped, next to the original. Strategy <code>\"none\"</code> (the default) is unchanged."
+            },
+            {
+              "type": "Fixed",
+              "html": "The <code>pageAuth</code> login redirect now carries the request's locale prefix under an active <code>web.localeRouting.strategy</code>. Before, an anonymous request to <code>/ar/admin</code> redirected to <code>/login?returnUrl=%2Far%2Fadmin</code> — <code>returnUrl</code> correctly pointed back at the locale-prefixed page, but the login screen itself dropped the locale. It now redirects to <code>/ar/login?returnUrl=%2Far%2Fadmin</code>. Left unchanged when <code>auth.pageAuth.loginPath</code> is absolute or already locale-prefixed. (<code>@warlock.js/auth</code>; see its own changelog.)"
+            },
+            {
+              "type": "Fixed",
+              "html": "Page-cache invalidation now always reaches the stored pages. Entries and their tag index used to go through your app's cache <code>globalPrefix</code>. Apps that derived it from the request (the scaffold used <code>Origin</code>) stored pages on GET under one prefix and invalidated them on POST under another, so nothing was evicted. The page cache now uses its own <code>warlock.page.&lt;deployment&gt;</code> namespace, with the Host still part of every key. Invalidation from a background job, with no request, works too."
+            },
+            {
+              "type": "Fixed",
+              "html": "A page loader that returns <code>notFound()</code> now renders your <code>404.page.tsx</code>, with status 404 and noindex, instead of an empty body. Client navigation to such a URL gets the same page."
+            },
+            {
+              "type": "Fixed",
+              "html": "A page or layout middleware that already sent its reply (a redirect, <code>pageAuth</code>, <code>forbidden()</code>) is no longer sent a second time. Before, every guarded redirect logged a false \"already-sent\" error."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>changeLocaleCode()</code> and client navigation install the translations that come with the page data. Before, any translation group registered only on the server (every app's auth and validation messages) made the switch abort in development and render raw keys in production."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>@warlock.js/web/sitemap</code>: corrected the 5.16.0 entry below — <code>warlock build</code> never generates the sitemap. When <code>web.sitemap</code> is enabled, generation happens at runtime boot (<code>web.sitemap.regenerate.onBoot</code>) or when the app calls <code>regenerateSitemap()</code>, never at build time."
+            },
+            {
+              "type": "Fixed",
+              "html": "A detected crawler's inlined deferred value reached <code>use()</code> as a raw value instead of a promise, so every page reading it threw \"An unsupported type was passed to use()\" and crawlers got skeletons instead of content. Inline mode now passes an already-fulfilled thenable that <code>use()</code> reads synchronously; the key still stays in the hydration payload with its <code>__WARLOCK_DEFER__</code> settlement chunk for JS-capable crawlers. The data-request wire is unaffected. Corrected the 5.12.0 <code>web.streaming.crawlers</code> entry below, which claimed crawlers get the resolved document _instead of_ deferred chunks — the settlement scripts are retained for JS hydration; only non-JS indexing needs nothing beyond the inlined HTML."
+            },
+            {
+              "type": "Fixed",
+              "html": "Crawler documents no longer carry a pending Suspense boundary for deferred sections far down a long page. React outlines a completed boundary (fallback in the HTML, content in a hidden segment swapped in by script) once the page passes about 12.8 KB. Renders that wait for everything to be ready now inline every completed boundary, so non-JS indexers see the content."
+            },
+            {
+              "type": "Fixed",
+              "html": "Authenticated requests never get a public <code>Cache-Control</code>. A request that used authenticated state (including through <code>authMiddleware</code> on a page or layout) is sent <code>private, no-store</code>, even on a route that opted into <code>config.cache.public</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "In production, the <code>:value</code> placeholder in a page-validation issue message now renders <code>…</code> instead of the submitted value, in your translations and in author <code>errorMessage</code> templates alike. Before, a translation such as the starter's <code>enum</code> message (\"given value :value\") put the raw query or param value into the error page and the hydration payload. A custom rule that concatenates raw input into its own message text, without <code>:value</code>, is not covered and stays your responsibility."
+            },
+            {
+              "type": "Fixed",
+              "html": "In production, the sitemap is built from the page manifest. Before, a production build could generate it without the pages' own <code>sitemap</code> exports."
+            },
+            {
+              "type": "Fixed",
+              "html": "A page's <code>sitemap</code> export is stripped from the client bundle in every named-export form, including re-exports (<code>export { x as sitemap } from \"…\"</code>, <code>export { sitemap } from \"…\"</code>). A bare <code>export * from</code> in a page module is refused with a clear error, because its export set can't be checked."
+            },
+            {
+              "type": "Fixed",
+              "html": "Page <code>validation</code> may declare only <code>params</code> or only <code>query</code>. Before, a page that declared one of them failed every request with <code>unknownKeys</code>. Validation now also runs after the app and layout loaders and before the page loader. A layout redirect still wins, and a validation 400 renders your error page inside layouts that received their data."
+            },
+            {
+              "type": "Fixed",
+              "html": "In production, a page validation 400 gives <code>error.page.tsx</code> a clear message and <code>error.errors</code> as <code>{ input, type, error }</code> entries. In production, the <code>:value</code> placeholder in page-validation messages renders <code>…</code> instead of the submitted value. A custom rule or translation that builds its message from raw input without <code>:value</code> isn't covered, so keep submitted values out of custom message text. Other unexpected errors keep the generic message and <code>errorCode</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Locale URL routing (<code>web.localeRouting.strategy</code>) now actually reaches the browser in a production build. Before, the browser only ever learned the routing strategy from <code>virtual:warlock/pages</code>, resolved at BUILD time — wrong whenever the app config wasn't loaded at build time, or differs per environment — so a production bundle could hydrate with <code>{ strategy: \"none\" }</code> while the server was actively locale-routing, silently disabling <code>&lt;Link&gt;</code> prefixing and <code>changeLocaleCode()</code>. The server document now carries the runtime routing table it actually resolved, as a <code>&lt;meta name=\"warlock-locale-routing\"&gt;</code> tag rendered by <code>&lt;Head/&gt;</code>; the hydration entry reads it before mount and falls back to the build-time value only when the meta is absent or malformed."
+            },
+            {
+              "type": "Fixed",
+              "html": "A client (link-click) navigation to a <code>cache: { serverCache: true }</code> route whose loader calls <code>defer()</code> no longer throws \"An unsupported type was passed to use()\" (minified React error #438), with the page's deferred sections (e.g. \"Read next\", comments) never rendering. A <code>serverCache</code> route's JSON data representation never streams — the deferred value is awaited and put on the wire already resolved — but the page component still reads it with <code>use()</code>, unconditionally. The wire now keeps marking that key <code>deferred</code> even though its value is inlined, on both the MISS that stores the entry and every HIT that replays it, and the client wraps the resolved value in an already-fulfilled thenable before handing it to the page — the same tracked shape <code>use()</code> reads synchronously that the crawler inline-mode fix (above) introduced for the document. The NDJSON streaming representation is unchanged."
+            },
+            {
+              "type": "Fixed",
+              "html": "The client-side scroll-position map (and its <code>sessionStorage</code> mirror) no longer grows without bound for the life of a tab. Both are now capped at 50 entries with LRU eviction — a save or a restore touches an entry, making it most-recently-used — so a long-lived SPA session (a dashboard or admin tool left open across many client navigations over hours/days) can no longer grow the map, or the JSON blob re-serialized to <code>sessionStorage</code> on every navigation, without limit. An old, uncapped <code>sessionStorage</code> value still reads back fine and is trimmed down to the cap on the next save."
+            },
+            {
+              "type": "Fixed",
+              "html": "A core <code>@warlock.js/core</code> <code>HttpError</code> (<code>ResourceNotFoundError</code>, <code>ForbiddenError</code>, <code>BadRequestError</code>, <code>ConflictError</code>, …) thrown in a loader now resolves to its own status instead of a generic 500: a resolved 404 renders your <code>404.page.tsx</code> exactly like a loader's own <code>notFound()</code>, and any other 4xx renders <code>error.page.tsx</code> with that status and its real message, without reaching <code>web.errors.report()</code>. A resolved 5xx still gets the generic production message and is still reported."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>invalidatePageCache()</code> in <code>warlock dev</code> now actually evicts the page it targets. In dev, <code>@warlock.js/web</code> loads as two separate module graphs — tsx/Node for HTTP routes and installers, Vite's SSR module runner for the page/layout render path — each with its own module registry, so the page cache's memoized driver instance used to be two different in-memory stores: a route's <code>invalidatePageCache([\"post:1\"])</code> evicted the tsx graph's store while the renderer kept reading its own, still-populated one, and the page stayed a HIT until its <code>ttl</code>/<code>maxAge</code> expired. The resolved store/driver instance, and the memoized <code>@warlock.js/cache</code> import and its one-time in-process-driver warning, now live on a <code>Symbol.for(\"warlock.web.pageCache...\")</code> <code>globalThis</code> slot, the same pattern <code>route-table.ts</code> already uses for <code>href()</code>, so every graph resolves the SAME instance. Production, which runs one module graph, is unaffected."
+            },
+            {
+              "type": "Security",
+              "html": "The server-side page cache's pre-lookup bypass previously only recognized an <code>Authorization</code> header or the cookie named by <code>auth.cookie.name</code> (default <code>access_token</code>). An app whose session cookie used a different name (e.g. <code>token</code>) could have a signed-in visitor's render STORED, and the next anonymous visitor's request HIT it, receiving the signed-in visitor's data. Any request whose <code>Cookie</code> header carries a cookie other than the framework locale cookie or a validated locale-preference cookie now bypasses cache lookup and is never stored, regardless of <code>auth.cookie.name</code>. The same rule forces <code>Cache-Control: private, no-store</code> on a <code>config.cache.public</code> route that has no <code>serverCache</code>, where it previously could be <code>public</code>. A malformed or empty <code>Cookie</code> header (<code>Cookie: </code>, <code>Cookie: ;;;</code>, <code>Cookie: garbage-no-equals</code>) fails closed the same way. Purge any page-cache and CDN entries stored by an earlier version after upgrading — see Upgrading, above."
+            },
+            {
+              "type": "Security",
+              "html": "React's own inline scripts — the <code>$RC</code>/<code>$RS</code> boundary-reveal/segment scripts Fizz streams to swap a completed Suspense boundary's placeholder into place — now carry the request's CSP nonce, on every render path that can stream (the ordinary flush-early path, the crawler/<code>waitForAll</code> path, and error-document escalation). Before, an app with <code>http.csp.enabled</code> and a streaming or <code>defer()</code>-ing page had these scripts blocked under a strict <code>script-src 'nonce-...'</code> policy (no <code>'unsafe-inline'</code>), leaving the deferred section's fallback on screen forever instead of being swapped for the real content."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 11,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Fixed",
+              "n": 5
+            },
+            {
+              "type": "Security",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Standalone <code>warlock generate.typings</code> includes route <code>locales.json</code> keys, honoring <code>$group</code> and existing literal translation registrations. The optional Web build helper is resolved from the application's installed package using ESM export conditions, without executing application configuration or the Web root entry."
+            },
+            {
+              "type": "Added",
+              "html": "<code>uploadedFileController</code>, a ready-made handler for <code>router.get(\"/uploads/*\", uploadedFileController)</code> that serves local uploads safely. The request path must resolve inside the storage root, symlinks included, and never into the variant cache. Anything else gets the same 404 as a missing file, so the route cannot be used to probe for files. Originals are sent with a one-year cache."
+            },
+            {
+              "type": "Added",
+              "html": "<code>generateImageVariants(relativePath, options?)</code>, an opt-in ingest-time counterpart to <code>uploadedFileController</code>: call it right after an upload is saved to render every configured <code>uploads.images</code> variant (optionally <code>options.variants</code> to limit which ones) up front. It shares the route's normalized config, cache key and derivative path, so <code>GET /uploads/&lt;path&gt;?variant=&lt;name&gt;</code> is served from cache on its first request, and its source guards and error statuses match the route. It returns a plain, serializable descriptor (<code>{ src, width, height, variants, formats? }</code>) matching web's <code>ImageDescriptor</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Bounded on-demand image variants, configured under <code>uploads.images</code>: <code>?variant=&lt;name&gt;</code> renders a variant named in <code>uploads.images.variants</code> (width and height from 1 to 8192, quality from 1 to 100, <code>fit</code> of <code>cover</code>, <code>contain</code> or <code>inside</code>), and <code>&amp;format=</code> picks an output format from the <code>formats</code> allowlist (<code>webp</code>, <code>avif</code>). Any other query key, a repeated key, an unknown variant or a format that is not allowed returns 400. Only jpeg, png, webp and avif sources are resized, detected by their magic bytes, never their extension. gif and svg return 415. <code>maxSourceBytes</code> (default 25 MB) and <code>maxSourcePixels</code> (default 40,000,000) cap the source, and a larger one returns 413. Each derivative is cached on disk under a sha256 of the source path, size, mtime, variant and format, and it is written atomically. Concurrent requests for the same derivative generate it once. It is served with <code>Cache-Control: public, max-age=31536000, immutable</code> and an ETag that answers 304. Rewriting the source changes the key, so the next request renders a new derivative. An invalid <code>uploads.images</code> config throws <code>ImageVariantsConfigError</code> the first time a variant is requested. The variant path needs <code>sharp</code>, but originals are served without it."
+            },
+            {
+              "type": "Fixed",
+              "html": "Request translation helpers follow the request's current locale; Web can supply its immutable route-scoped resolver for <code>request.t()</code>, <code>request.trans()</code>, and explicit <code>request.transFrom(locale, key, placeholders?)</code>. Without that resolver, all retain their global-registry behavior."
+            },
+            {
+              "type": "Fixed",
+              "html": "Locale preference resolution validates the host-only preference before falling through to the legacy cookie, header, and default. <code>response.setLocale()</code> clears the preference before writing its authoritative locale cookie. Provisional Web navigation requests do not persist a locale before the browser commits a successful current navigation."
+            },
+            {
+              "type": "Fixed",
+              "html": "Image variants (<code>uploadedFileController</code> and <code>generateImageVariants</code>) no longer enlarge a source smaller than the variant's target width or height. A variant is now rendered with sharp's <code>withoutEnlargement: true</code> by default, so a 100px source requested at <code>{ width: 320 }</code> stays 100px wide instead of being upscaled. Opt in per variant with <code>enlarge: true</code> in <code>ImageVariantDefinition</code> (a non-boolean value throws <code>ImageVariantsConfigError</code>); the effective flag is part of the normalized variant and its cache key, so flipping it regenerates the derivative. <code>generateImageVariants</code>' descriptor now reports the actual rendered width and height, read from the derivative it wrote, not the requested size."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>generateImageVariants</code> now throws <code>ImageVariantsConfigError</code> — not a plain <code>Error</code> (no storage root) or <code>HttpError(400)</code> (<code>uploads.images</code> not configured) — for both server misconfiguration states, matching how a bad <code>uploads.images</code> value is already reported; input-derived failures (traversal, missing file, bad format, size limits, unknown variant name) still throw <code>HttpError</code>. <code>uploadedFileController</code>'s own responses for these requests are unchanged."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock seed</code> (and <code>warlock migrate</code>, for data migrations) now preload the <code>storage</code> connector, and <code>Storage</code>/<code>ScopedStorage</code> throw a named <code>StorageNotInitializedError</code> — pointing at <code>src/config/storage.ts</code> and a custom command's <code>preload.connectors</code> — instead of a bare <code>TypeError: Cannot read properties of null (reading 'name')</code> when <code>activeDriver</code> is read before storage has been initialized in the process."
+            },
+            {
+              "type": "Security",
+              "html": "<code>uploadedFileController</code> no longer serves an upload original inline unless its bytes sniff as jpeg, png, webp or avif AND its extension names that same image type (<code>.jpg</code>/<code>.jpeg</code> for jpeg, <code>.png</code> for png, <code>.webp</code> for webp, <code>.avif</code> for avif) — never sniffed bytes alone, and never the extension alone. An inline response always carries the SNIFFED format's <code>Content-Type</code> set explicitly, not an extension-derived guess from <code>sendFile</code>. This closes two stored-XSS holes, sniffed-bytes vs. extension mismatched in each direction: an svg (or any other non-raster file) named <code>.png</code>/<code>.jpg</code> still downloads instead of rendering as its extension's type, and raster bytes named with a non-image or different-image extension — e.g. jpeg magic bytes saved as <code>x.html</code> — also download instead of being served under that extension's advertised type (<code>text/html</code>, previously inherited from <code>sendFile</code>). Every other original — svg, html, xml, text, pdf, unknown, any raster/extension mismatch either way — is sent with <code>Content-Disposition: attachment</code>, <code>Content-Security-Policy: sandbox</code>, and its extension-derived <code>Content-Type</code>, except the svg/html/xml family, which is downgraded to <code>application/octet-stream</code>. Every uploads response — originals and variants — now also carries <code>X-Content-Type-Options: nosniff</code>."
+            },
+            {
+              "type": "Security",
+              "html": "A default CSRF-Origin guard (card 8a752ab2) now runs at the earliest HTTP seam, before route middleware and any app handler, for every unsafe-method (<code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code>) request that carries a <code>Cookie</code> header naming anything other than the framework locale cookie or a validated locale-preference cookie (a malformed <code>Cookie</code> header counts as carrying one — fails closed). It requires <code>Origin</code> — or, absent that, <code>Referer</code> — to name the request's own origin or an entry in <code>auth.csrf.allowedOrigins</code>, rejecting with <code>403</code> otherwise. Before this, that check only ran inside <code>authMiddleware(\"cookie:*\")</code>, so a cookie-authenticated write reached through any other path (e.g. an app-owned optional-auth pattern reading its own <code>token</code> cookie) was never checked. A header-only API request (no <code>Cookie</code> header, e.g. <code>Authorization: Bearer</code>) is unaffected, and a route can opt out with <code>{ csrf: false }</code> (<code>RouteOptions.csrf</code>) — documented as dangerous, for third-party callbacks and machine-to-machine routes only."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>pnpm typecheck:template</code> runs <code>tsc --noEmit</code> on <code>templates/warlock/src/</code> against this checkout's own <code>@warlock.js/*</code> source (via <code>tsconfig.template-check.json</code>), catching a template import that no longer exists in the framework — the class of bug that let a removed-but-still-used import pass all 291 tests. Enforced on every run by <code>specs/template-typecheck.spec.ts</code>, complementing the slower registry-install <code>typecheck:scaffold</code> gate."
+            },
+            {
+              "type": "Added",
+              "html": "The scaffolded <code>src/config/http.ts</code> now sets <code>trustProxy: false</code> explicitly, with a comment on when/how to enable it behind a proxy or load balancer, and ships a commented-out, nonce-based <code>csp</code> starter block so both are discoverable instead of silently absent."
+            },
+            {
+              "type": "Changed",
+              "html": "Web scaffold pages use the 5.17 <code>config</code> export with <code>PageConfig</code>, keeping loaders and components as separate exports. New apps depend on <code>@mongez/localization:^3.5.0</code> for scoped route translations."
+            },
+            {
+              "type": "Changed",
+              "html": "New Web scaffolds set <code>strictMode: true</code> in <code>src/web/root.tsx</code>'s <code>RootConfig</code>, so the hydrated page, layout, and navigation tree receives React's development Strict Mode checks. Existing applications keep the framework default of <code>false</code> until they opt in."
+            },
+            {
+              "type": "Changed",
+              "html": "The CLI's source formatting check is part of <code>test</code>. Interactive project naming and preset selection preserve the entered name when Customize advances to package-manager selection."
+            },
+            {
+              "type": "Fixed",
+              "html": "The scaffolded <code>src/config/cache.ts</code> namespaced every cache key by <code>request.originDomain || request.header(\"domain\") || request.input(\"domain\")</code>. A browser GET carries no <code>Origin</code> while a CSRF-protected POST does, so the same visitor resolved two different prefixes and a write could never invalidate what a read had cached — repository caches and page-cache tags went silently stale (verified live on a real app). None of those three inputs are server-validated either, so any visitor could pick <code>?domain=anything</code> or a <code>domain</code> header to land in an arbitrary namespace and grow the in-memory store without bound. <code>globalPrefix</code> is now a fixed, app-owned string derived from <code>APP_NAME</code>, with no request data read at all. <strong>Existing projects should apply the same change</strong> to <code>src/config/cache.ts</code>:"
+            },
+            {
+              "type": "Security",
+              "html": "<strong>BREAKING:</strong> the scaffolded <code>GET /uploads/*</code> route resized images to any <code>?w=&amp;h=</code> a client sent. This was a denial-of-service vector, because every new size forced a full decode and resize and nothing was cached. The route also resolved the path without a containment check. The generated <code>src/app/uploads/controllers/fetch-uploaded-file.controller.ts</code> is gone. <code>src/app/uploads/routes.ts</code> now mounts core's <code>uploadedFileController</code>, which keeps the request inside the storage root and only renders the named variants the app declares. <code>?w=</code> and <code>?h=</code> now return 400. <strong>Existing projects should apply the same change:</strong>"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "The <code>pageAuth</code> login redirect now carries the request's locale prefix when <code>@warlock.js/web</code>'s <code>web.localeRouting.strategy</code> is active. Before, an anonymous request to a locale-prefixed page (e.g. <code>/ar/admin</code>) always redirected to the bare <code>auth.pageAuth.loginPath</code> (e.g. <code>/login?returnUrl=%2Far%2Fadmin</code>), dropping the locale even though <code>returnUrl</code> kept it. It now redirects to the locale-prefixed login path (<code>/ar/login?returnUrl=%2Far%2Fadmin</code>) — reading <code>web.localeRouting.strategy</code> / <code>app.localeCodes</code> / <code>app.localeCode</code> from config directly (<code>auth</code> has no dependency on <code>web</code>, in either direction). Left unchanged when <code>loginPath</code> is absolute (<code>http…</code>) or already locale-prefixed."
+            },
+            {
+              "type": "Security",
+              "html": "The CSRF Origin/Referer check <code>authMiddleware(\"cookie:*\")</code> runs (<code>assertCsrfOriginAllowed</code>) now delegates its same-origin/<code>auth.csrf.allowedOrigins</code> comparison to <code>@warlock.js/core</code>'s <code>resolveCsrfOriginVerdict</code>, shared with core's new default CSRF-Origin guard (card 8a752ab2, see <code>@warlock.js/core</code>'s 5.17.0 changelog) so the two checks can never drift apart. Behaviour is unchanged for routes already using <code>authMiddleware(\"cookie:*\")</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>where(field, undefined)</code> / <code>where(field, operator, undefined)</code> / <code>where({ field: undefined })</code> (and the <code>orWhere</code> equivalents, on both the Postgres and MongoDB query builders) now throw <code>UndefinedWhereValueError</code> instead of silently reaching the driver. A bound <code>undefined</code> used to bind as <code>= NULL</code> (SQL) / \"field missing\" (MongoDB) — a comparison that never matches but never fails either, hiding call sites that forgot to guard a value that turned out to be missing (card 62e0e781: a blog author lookup ran <code>User.find(post.authorId)</code> with an undefined id under load). Pass <code>null</code> to match NULL explicitly; guard the call site to skip the query when there's no value."
+            },
+            {
+              "type": "Fixed",
+              "html": "Postgres pool leaks (card ba1193b4): <code>beginTransaction()</code> now releases its client on every path, including when <code>BEGIN</code>, <code>COMMIT</code> or <code>ROLLBACK</code> throws. A failed <code>COMMIT</code>/<code>ROLLBACK</code> discards the client (<code>release(error)</code>) instead of recycling one left in an unknown transaction state, and <code>transaction()</code> no longer issues <code>ROLLBACK</code> after a failed <code>COMMIT</code>. The pool also gets an <code>error</code> listener (an idle client dropped by the server no longer crashes the process), <code>keepAlive</code>, and a 10s connect timeout."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Granular <code>@warlock.js/seal/object</code> and <code>@warlock.js/seal/string</code> entry points with the <code>object</code> and <code>string</code> factories for schemas that do not need the complete <code>v</code> factory."
+            },
+            {
+              "type": "Added",
+              "html": "<code>redactValue</code> option on <code>v.validate(schema, data, options)</code>: when set, the <code>:value</code> placeholder renders that string instead of the submitted input, both in the attributes handed to <code>translateRule</code> and in author <code>errorMessage</code> templates. It does not cover a custom rule that concatenates raw input into its own message text. Unset keeps the current behaviour. Per-call options replace the global config, so pass <code>{ ...getSealConfig(), redactValue }</code> to keep your translators."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.16.0",
       "id": "v5-16-0",
       "date": "September 18, 2026",
@@ -177,7 +495,7 @@
         {
           "name": "@warlock.js/web",
           "slug": "web",
-          "total": 12,
+          "total": 13,
           "counts": [
             {
               "type": "Added",
@@ -189,13 +507,13 @@
             },
             {
               "type": "Fixed",
-              "n": 5
+              "n": 6
             }
           ],
           "items": [
             {
               "type": "Added",
-              "html": "<code>@warlock.js/web/sitemap</code>: <code>sitemap.xml</code> and <code>robots.txt</code> for web apps. Configure them under <code>web.sitemap</code> and <code>web.robots</code> in <code>src/config/web.ts</code>. Pages control their own listing with <code>export const sitemap</code> (<code>false</code>, static options, or a function that supplies URLs for dynamic routes). Locales expand into hreflang alternates, and web switches to a sharded <code>SitemapIndex</code> above 50,000 URLs. The sitemap is generated at <code>warlock build</code>, at boot, or when the app calls <code>regenerateSitemap()</code>, and never while serving a request."
+              "html": "<code>@warlock.js/web/sitemap</code>: <code>sitemap.xml</code> and <code>robots.txt</code> for web apps. Configure them under <code>web.sitemap</code> and <code>web.robots</code> in <code>src/config/web.ts</code>. Pages control their own listing with <code>export const sitemap</code> (<code>false</code>, static options, or a function that supplies URLs for dynamic routes). Locales expand into hreflang alternates, and web switches to a sharded <code>SitemapIndex</code> above 50,000 URLs. The sitemap is generated at runtime boot (<code>web.sitemap.regenerate.onBoot</code>) or when the app calls <code>regenerateSitemap()</code> — never at <code>warlock build</code> and never while serving a request. See 5.17.0."
             },
             {
               "type": "Added",
@@ -240,6 +558,10 @@
             {
               "type": "Fixed",
               "html": "In development, page discovery for unmatched requests is cached until a page file changes."
+            },
+            {
+              "type": "Fixed",
+              "html": "Production hashed assets (<code>/assets/*.js</code>, <code>.css</code>, …) are now served precompressed instead of raw: <code>warlock build</code> writes <code>.br</code>/<code>.gz</code> siblings for eligible text assets ≥1KB, and <code>warlock start</code> negotiates <code>Accept-Encoding</code> (brotli, then gzip, then identity) via <code>@fastify/static</code>'s <code>preCompressed</code> option, with <code>Vary: Accept-Encoding</code> on every response."
             }
           ]
         },
@@ -348,13 +670,7 @@
       "isUnreleased": false,
       "summaryHtml": "<strong>New package: <code>@warlock.js/sitemap</code></strong> — the thirtieth family member, and the first added since the family settled. Runtime <code>sitemap.xml</code> generation from the page registry, installed with <code>warlock add sitemap</code>, with <strong>zero runtime dependencies</strong>. It is usable three ways: standalone in any Node app, in an API-only Warlock app through <code>sitemapConnector({ entries })</code>, and in a Warlock web app from the page registry. A dynamic route that cannot be enumerated is omitted <strong>and named in a development diagnostic</strong> rather than silently dropped, and an enabled sitemap with no configured origin refuses to boot instead of serving absolute URLs built from a guessed host. Two silent failures are fixed in <code>@warlock.js/web</code> and <code>@warlock.js/core</code>: <code>useTrans()</code> returned the raw key after hydration — server HTML was correct, the post-hydration DOM was not, and the translated value never reached <code>dist/client</code> at all — so the hydration payload gains a seventh required key, <code>translations</code>, carrying only the active locale; and <code>request.cookie()</code> now throws <code>CookieJarUnavailableError</code> when <code>@fastify/cookie</code> is absent instead of returning <code>undefined</code>, which was indistinguishable from \"no such cookie\" and surfaced as a permanent unexplained 401. <code>@warlock.js/core</code> adds <code>app.publicUrl</code> with a <code>PUBLIC_APP_URL</code> fallback. <strong>BREAKING:</strong> <code>@warlock.js/queue/notifications</code> is removed (deprecated in 5.14 — use <code>bullmqQueue()</code> from <code>@warlock.js/notifications</code>), and <code>listRoutablePages</code> moved to the <code>@warlock.js/web/build</code> subpath. <code>@warlock.js/cache</code> finally declares a <code>test</code> script, so its 525 tests run in the release gate for the first time. Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>sitemap</code>, <code>queue</code>, <code>bull-board</code> rows) against the staged candidate, authorised by Hasan on 2026-09-18: \"You could run the matrix if you feel it is important to this release\".",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "web",
-        "sitemap",
-        "queue",
-        "bull-board"
-      ],
+      "matrixRows": ["baseline", "web", "sitemap", "queue", "bull-board"],
       "mode": "detail",
       "packages": [
         {
@@ -525,14 +841,7 @@
       "isUnreleased": false,
       "summaryHtml": "<code>@warlock.js/web</code> renames the hydration mount from <code>#root</code> to <code>#vessel</code> (BREAKING) — <code>#root</code> collided with embeds and third-party widgets — and hardens the client-build secret scan to refuse EVERY reference to the global <code>process</code>, aliases included (BREAKING for <code>typeof process</code> feature detection). Dev SSR now externalises every installed <code>@warlock.js/*</code> package by rule instead of a hand-maintained list, closing the dual-module-instance class that split framework singletons. A cached page sends one <code>Vary</code> value on both its HTML and data representations. <code>@warlock.js/queue</code> gains a config-driven bull-board dashboard (<code>warlock add bull-board</code>) that refuses to mount unguarded in production, and <code>find(id)</code> no longer returns a finished job with a null result. <code>@warlock.js/notifications</code> takes over the BullMQ integration as <code>bullmqQueue()</code>, a lazy optional-peer driver; <code>@warlock.js/queue/notifications</code> is deprecated for one release. <code>@warlock.js/core</code> adds <code>middleware.cache({ tags })</code> so <code>invalidateTags()</code> clears cached API responses, verifies the esbuild native binary before <code>warlock dev</code> starts, and fixes a <code>devServer.timings</code> watcher phase that always reported 0ms. Lockstep release across all 29 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>queue</code>, <code>bull-board</code>, <code>auth-google</code>, <code>auth-passkeys</code> rows) against the staged candidate, authorised by Hasan on 2026-09-17: \"Go ahead plz\".",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "web",
-        "queue",
-        "bull-board",
-        "auth-google",
-        "auth-passkeys"
-      ],
+      "matrixRows": ["baseline", "web", "queue", "bull-board", "auth-google", "auth-passkeys"],
       "mode": "detail",
       "packages": [
         {
@@ -705,14 +1014,7 @@
       "isUnreleased": false,
       "summaryHtml": "<code>@warlock.js/queue</code> ships as a new package (durable BullMQ + Redis background jobs, <code>defineJob</code>, <code>queueConnector()</code>, a bull-board dashboard and a notifications dispatcher). <code>@warlock.js/auth</code> adds email verification, password reset, and login with Google, passkeys and phone OTP, with account linking via a new <code>provider_accounts</code> table. <code>@warlock.js/access</code> makes ABAC <code>strictPolicies</code> deny-by-default (BREAKING) to close a fail-open IDOR path. <code>@warlock.js/web</code> fixes a Host-header cache-poisoning gap in the server page cache key (BREAKING) and a stale-Suspense-fallback replay on cache HIT, and adds <code>linkStylesheetsFor</code> for lazily-imported per-tenant themes. <code>@warlock.js/core</code> adds <code>warlock add queue</code>/<code>warlock add auth-google</code>/<code>warlock add auth-passkeys</code> installers and typed translation-key generation, and drops its dependency on <code>@warlock.js/auth</code>. Lockstep release across all 28 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>queue</code>, <code>access</code>, <code>auth-google</code>, <code>auth-passkeys</code> rows) against the staged candidate, authorised by Hasan on 2026-09-16: \"You've my approval for whatever decision you may need to take in this release.\"",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "web",
-        "queue",
-        "access",
-        "auth-google",
-        "auth-passkeys"
-      ],
+      "matrixRows": ["baseline", "web", "queue", "access", "auth-google", "auth-passkeys"],
       "mode": "detail",
       "packages": [
         {
@@ -1239,10 +1541,7 @@
       "isUnreleased": false,
       "summaryHtml": "<strong>The authenticated user moves from <code>request.user</code> to <code>request.locals.user</code></strong> (BREAKING, <code>@warlock.js/core</code> / <code>@warlock.js/auth</code> / <code>@warlock.js/access</code>), <code>@warlock.js/auth</code> adds a CSRF Origin check for cookie-authenticated writes plus <code>setAuthCookie()</code> / <code>clearAuthCookie()</code>, and <code>@warlock.js/web</code> ships an opt-in server-side page cache, <code>defer()</code>-ed streaming data with crawler-aware inlining, scroll restoration and locale-direction (RTL) support. <code>@warlock.js/core</code> adds opt-in request tracing and a CSP header; <code>create-warlock</code> scaffolds non-interactively by default and fixes a fresh-scaffold <code>npm run seed</code> failure. Lockstep release across all 28 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code> rows) against the staged candidate, authorised by Hasan on 2026-09-16: \"Yes do it please, don't release before completing all mising points and make sure you have covered everything in the tasks board.\"",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "web"
-      ],
+      "matrixRows": ["baseline", "web"],
       "mode": "detail",
       "packages": [
         {
@@ -1294,7 +1593,7 @@
             },
             {
               "type": "Added",
-              "html": "<code>web.streaming.crawlers</code> — a detected crawler's full-document request now receives the fully resolved document instead of the streamed shell plus deferred chunks: every <code>defer()</code>-ed value is awaited and inlined before the first byte, and a rejection renders the ordinary error boundary with its real status. Detection is case-insensitive against a documented built-in user-agent list (googlebot, bingbot, yandex, duckduckbot, baiduspider, slurp, applebot, facebookexternalhit, twitterbot, linkedinbot, discordbot, slackbot, telegrambot, whatsapp, embedly, pinterest); set <code>crawlers: false</code> to disable detection, or <code>crawlers: { userAgents, detect }</code> to customise it — <code>detect</code> wins outright when given. A page that uses <code>defer()</code> now sends <code>Vary: User-Agent</code> on its document response; a page that never defers is unaffected. See the <code>stream-deferred-data</code> skill's \"Crawlers\" section."
+              "html": "<code>web.streaming.crawlers</code> — a detected crawler's full-document request now gets every <code>defer()</code>-ed value awaited and inlined in the HTML before the first byte, so indexing needs nothing else; a rejection renders the ordinary error boundary with its real status. The document still carries the normal <code>__WARLOCK_DEFER__</code> settlement scripts so a JS-capable crawler hydrates <code>use(data.key)</code> through the existing registry same as any other visitor. Detection is case-insensitive against a documented built-in user-agent list (googlebot, bingbot, yandex, duckduckbot, baiduspider, slurp, applebot, facebookexternalhit, twitterbot, linkedinbot, discordbot, slackbot, telegrambot, whatsapp, embedly, pinterest); set <code>crawlers: false</code> to disable detection, or <code>crawlers: { userAgents, detect }</code> to customise it — <code>detect</code> wins outright when given. A page that uses <code>defer()</code> now sends <code>Vary: User-Agent</code> on its document response; a page that never defers is unaffected. See the <code>stream-deferred-data</code> skill's \"Crawlers\" section."
             },
             {
               "type": "Added",
@@ -4780,7 +5079,7 @@
             },
             {
               "type": "Added",
-              "html": "Typed links: <code>href(name, params, query)</code>; an unknown route name is a compile error."
+              "html": "Named links: <code>href(name, params, query)</code> validates the published route table at runtime; an unknown route name throws."
             },
             {
               "type": "Added",
