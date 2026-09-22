@@ -1,0 +1,79 @@
+---
+title: Client navigation
+slug: v/latest/web/essentials/client-navigation
+description: Navigate, refresh, and show router-owned pending state without a document reload.
+sidebar:
+  order: 13
+  label: Client navigation
+---
+
+`<Link>` keeps progressive enhancement: before hydration it is an anchor, and
+after hydration a plain in-app click fetches page data and swaps the page tree.
+Use `navigateTo()` for a path, `href()` to resolve a named route, and `refresh()`
+to fetch the current App, Layout, and Page loaders again without pushing history.
+
+## Show pending navigation state
+
+`useIsNavigating()` returns the router's current boolean state. It is `true`
+through a client navigation, `refresh()`, or a locale change, and `false` during
+SSR. A component mounted after a transition starts reads the current state
+immediately; there is no delay. When a newer transition supersedes an earlier
+one, completion of the earlier work cannot clear the newer pending state.
+
+Use it for a pending indicator, not a percent-complete claim:
+
+```tsx title="src/web/components/navigation-progress.tsx"
+import { useIsNavigating } from "@warlock.js/web";
+import "./navigation-progress.css";
+
+export function NavigationProgress() {
+  const isNavigating = useIsNavigating();
+
+  return (
+    <div
+      aria-hidden={!isNavigating}
+      aria-label="Loading next page"
+      className={isNavigating ? "navigation-progress navigation-progress--active" : "navigation-progress"}
+    />
+  );
+}
+```
+
+```css title="src/web/components/navigation-progress.css"
+.navigation-progress {
+  position: fixed;
+  inset: 0 0 auto;
+  height: 3px;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.navigation-progress--active {
+  transform: scaleX(0.7);
+  transition: transform 160ms ease-out;
+}
+```
+
+The boolean means that router work is active. It does not expose network or
+rendering percentage, so do not turn it into a numeric progress meter.
+
+## Events remain for analytics
+
+`routerEvents` remains available for analytics and post-navigation observation.
+Use `useIsNavigating()` for reactive UI state; do not infer pending state from
+events, because an event callback can miss a transition that began before the
+component subscribed.
+
+## Programmatic navigation
+
+```tsx
+import { href, navigateTo, refresh } from "@warlock.js/web";
+
+const productUrl = href("products.details", { id: "42" });
+navigateTo(productUrl);
+await refresh();
+```
+
+`navigateTo()` accepts a path, not a route name. `href()` resolves named routes
+through the server-published route table. `refresh()` leaves history unchanged
+and resolves `false` when fresh data did not reach the screen.

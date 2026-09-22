@@ -24,14 +24,14 @@ export const loader = (async ({ request }) => {
   };
 }) satisfies PageLoader;
 
-export const config = {
+export const config: PageConfig<typeof loader> = {
   route: { path: "/products/:id", name: "products.show" },
   cache: { public: true, maxAge: 60 },
   metadata: ({ data }) => ({
     title: data.product.name,
     description: `Details for ${data.product.name}`,
   }),
-} satisfies PageConfig<typeof loader>;
+};
 
 export default function ProductPage({ data }: PageProps<typeof loader>) {
   return <h1>{data.product.name}</h1>;
@@ -62,12 +62,12 @@ keys can skip `query`:
 import { v } from "@warlock.js/seal";
 import type { PageConfig } from "@warlock.js/web";
 
-export const config = {
+export const config: PageConfig = {
   validation: {
     params: v.object({ id: v.int().coerce() }),
     query: v.object({ tab: v.string().optional() }).stripUnknown(),
   },
-} satisfies PageConfig;
+};
 ```
 
 `request.params` and `request.query` arrive as strings, so a numeric field
@@ -178,9 +178,66 @@ export default {
 
 ## Metadata behavior
 
-`config.metadata` can be a static object or a function of resolved loader data. It
-supports `title`, `description`, `keywords`, `canonical`, `robots`, `openGraph`,
-and `twitter`.
+`config.metadata` can be a static object or a function of resolved loader data.
+Pages, layouts, and `root.tsx` all use that same shape. It supports `title`,
+`description`, `keywords`, `canonical`, `robots`, `openGraph`, and `twitter`.
+
+Use an explicit config type annotation. A title can be a string, a default and
+template pair, or an absolute title that no ancestor may format:
+
+```tsx title="src/web/root.tsx"
+import type { RootConfig } from "@warlock.js/web";
+
+export const config: RootConfig = {
+  metadata: { title: { default: "Acme", template: "%s | Acme" } },
+  strictMode: true,
+};
+```
+
+```tsx title="src/web/account/layout.tsx"
+import type { LayoutConfig } from "@warlock.js/web";
+
+export const config: LayoutConfig = {
+  metadata: { robots: "noindex" },
+};
+```
+
+```tsx title="src/web/account/profile.page.tsx"
+import type { PageConfig } from "@warlock.js/web";
+
+export const config: PageConfig = {
+  metadata: { title: { absolute: "Your profile" } },
+};
+```
+
+Metadata callbacks run only during server-side metadata resolution, after their
+own loader succeeds. They receive readonly `{ data, shared, child? }`; `child`
+is the already-resolved descendant metadata chain. Metadata-less layouts are
+skipped, while the page leaf is represented even when it contributes no
+metadata. The resolver visits page, inner layout, outer layout, then root once;
+each callback sees its own loader data. A callback returns that level's complete
+metadata: its explicit fields override `child`, and fields it omits do not carry
+forward. Spread `child` when the callback should retain descendant fields:
+
+```tsx title="src/web/account/layout.tsx"
+import type { LayoutConfig } from "@warlock.js/web";
+
+export const config: LayoutConfig = {
+  metadata: ({ data, child }) => ({
+    ...child,
+    title: `${data.accountName} | ${child?.title ?? "Account"}`,
+  }),
+};
+```
+
+The callback may override a child title. An absolute child title remains
+authoritative. Static metadata defaults still merge with child metadata;
+`openGraph` and `twitter` merge field by field, arrays replace rather than
+merge, and the nearest title template formats a title once. A fallback from the
+same level is not formatted.
+
+When a title is supplied, the resolved browser/SSR output has a string `title`;
+template and absolute title objects are author input only.
 
 Metadata does not run after a loader failure. Warlock substitutes
 `{ title: "Something went wrong", robots: "noindex" }`, so a metadata

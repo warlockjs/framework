@@ -31,19 +31,19 @@ first:
 ```tsx title="src/web/products/layout.tsx"
 import type { LayoutConfig, LayoutProps } from "@warlock.js/web";
 
-export const config = { prefix: "/store" } satisfies LayoutConfig;
+export const config: LayoutConfig = { prefix: "/store" };
 
 export default function StoreLayout({ children }: LayoutProps) {
   return <section className="store-shell">{children}</section>;
 }
 ```
 
-Layouts can also provide inherited crawl defaults with
-`metadata: { robots: "noindex" }` or `sitemap: false` inside this same
-`LayoutConfig`. They cannot set page metadata, a page cache policy, validation,
-or a sitemap URL supplier. A root module may export a `config satisfies
-RootConfig` for application middleware and `strictMode`; it owns the flag even
-though only the tree beneath `#vessel` hydrates in the browser.
+Layouts can also provide inherited metadata (including `robots`) and
+`sitemap: false` inside this same `LayoutConfig`. They cannot set a page route,
+cache policy, validation, or a sitemap URL supplier. A root module may export
+`config: RootConfig` for application middleware, `strictMode`, and metadata;
+it owns the flag even though only the tree beneath `#vessel` hydrates in the
+browser.
 
 ## Page middleware return values
 
@@ -72,7 +72,7 @@ decides what happens next:
 ```tsx title="src/web/account/layout.tsx"
 import type { LayoutConfig } from "@warlock.js/web";
 
-export const config = {
+export const config: LayoutConfig = {
   middleware: [
     ({ request, response }) => {
       if (!request.locals.user) {
@@ -81,7 +81,7 @@ export const config = {
       }
     },
   ],
-} satisfies LayoutConfig;
+};
 ```
 
 Before this fix, a middleware that returned a value without writing the reply
