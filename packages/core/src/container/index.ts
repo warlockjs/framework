@@ -7,6 +7,13 @@ import {
   getRegisteredContainerInstances,
   registerContainerInstance,
 } from "./container-instance-registry";
+import type { DevelopmentModelModules } from "./development-model-modules";
+
+export type {
+  DevelopmentModelModuleEntry,
+  DevelopmentModelModules,
+  DevelopmentModelModuleState,
+} from "./development-model-modules";
 
 const containerMap: Map<string, any> = new Map();
 
@@ -21,6 +28,7 @@ export type ContainerTypes = {
   "http.baseUrl": string;
   socket: Server;
   "database.source": DataSource;
+  "development.modelModules": DevelopmentModelModules;
 };
 
 type ContainerKeys = keyof ContainerTypes | (string & {});

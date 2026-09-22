@@ -2,6 +2,7 @@ import { pathToFileURL } from "node:url";
 import { router } from "../router/router";
 import { devLogError, formatModuleNotFoundError } from "./dev-logger";
 import type { CleanupFunction, FileManager } from "./file-manager";
+import { getDevelopmentModelModuleRegistry } from "./model-module-registry";
 import type { SpecialFileType, SpecialFilesCollector } from "./special-files-collector";
 
 declare global {
@@ -40,7 +41,12 @@ const SPECIAL_TYPES: readonly SpecialFileType[] = ["locale", "event", "main", "r
 export class ModuleLoader {
   private readonly loadedModules = new Map<string, unknown>();
 
-  constructor(private readonly specialFilesCollector: SpecialFilesCollector) {}
+  public constructor(private readonly specialFilesCollector: SpecialFilesCollector) {
+    // Web creates its Vite bridge after Core's development orchestration has
+    // constructed ModuleLoader. Create the carrier now so a zero-model app can
+    // subscribe before a model is added later through HMR.
+    getDevelopmentModelModuleRegistry();
+  }
 
   /**
    * Eagerly load every special file at boot, in the canonical order so
@@ -93,6 +99,9 @@ export class ModuleLoader {
         const module = (await import(fileUrl)) as Record<string, unknown>;
         this.loadedModules.set(file.absolutePath, module);
         this.registerCleanup(file, module);
+        if (type === "model") {
+          getDevelopmentModelModuleRegistry().publish(file.absolutePath, fileUrl, module);
+        }
         return module as T;
       };
 
@@ -168,6 +177,10 @@ export class ModuleLoader {
    */
   public cleanupDeletedModule(file: FileManager): void {
     this.loadedModules.delete(file.absolutePath);
+
+    if (file.type === "model") {
+      getDevelopmentModelModuleRegistry().remove(file.absolutePath);
+    }
 
     if (file.type === "route") {
       router.removeRoutesBySourceFile(file.relativePath);
