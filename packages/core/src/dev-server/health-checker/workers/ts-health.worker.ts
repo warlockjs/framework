@@ -10,6 +10,7 @@
  * - Sends: { type: 'results' | 'initialized' | 'error', ... }
  */
 import ts from "typescript";
+import path from "node:path";
 import { parentPort, workerData } from "worker_threads";
 
 /**
@@ -97,6 +98,9 @@ class TypeScriptHealthWorker {
    */
   private fileContents = new Map<string, string>();
 
+  /** Source paths removed since the tsconfig was parsed. */
+  private deletedRootPaths = new Set<string>();
+
   /**
    * Whether the worker is initialized
    */
@@ -163,11 +167,12 @@ class TypeScriptHealthWorker {
     // Update in-memory file cache
     for (const file of files) {
       this.fileContents.set(file.path, file.content);
+      this.deletedRootPaths.delete(this.getPathIdentity(file.path));
     }
 
     // Create or update the program (incremental)
     this.program = ts.createProgram(
-      Array.from(this.fileContents.keys()),
+      this.getProgramRootNames(),
       this.parsedConfig.options,
       this.createCompilerHost(),
       this.program || undefined, // Pass old program for incremental compilation
@@ -190,12 +195,13 @@ class TypeScriptHealthWorker {
   public handleFileChanges(files: SerializedFile[]): void {
     for (const file of files) {
       this.fileContents.set(file.path, file.content);
+      this.deletedRootPaths.delete(this.getPathIdentity(file.path));
     }
 
     // Recreate program with new file contents
     if (this.parsedConfig && this.program) {
       this.program = ts.createProgram(
-        Array.from(this.fileContents.keys()),
+        this.getProgramRootNames(),
         this.parsedConfig.options,
         this.createCompilerHost(),
         this.program || undefined,
@@ -210,16 +216,23 @@ class TypeScriptHealthWorker {
     let hasChanges = false;
 
     for (const file of files) {
-      if (this.fileContents.has(file.path)) {
-        this.fileContents.delete(file.path);
+      const identity = this.getPathIdentity(file.path);
+      const cachedPath = Array.from(this.fileContents.keys()).find(
+        (candidate) => this.getPathIdentity(candidate) === identity,
+      );
+
+      if (cachedPath) {
+        this.fileContents.delete(cachedPath);
         hasChanges = true;
       }
+      if (!this.deletedRootPaths.has(identity)) hasChanges = true;
+      this.deletedRootPaths.add(identity);
     }
 
     // Recreate program without deleted files
     if (hasChanges && this.parsedConfig) {
       this.program = ts.createProgram(
-        Array.from(this.fileContents.keys()),
+        this.getProgramRootNames(),
         this.parsedConfig.options,
         this.createCompilerHost(),
         this.program || undefined,
@@ -333,6 +346,27 @@ class TypeScriptHealthWorker {
         return defaultHost.fileExists(fileName);
       },
     };
+  }
+
+  /** Keep tsconfig-selected declarations in every incremental program. */
+  private getProgramRootNames(): string[] {
+    const configuredRoots = this.parsedConfig?.fileNames || [];
+
+    const rootsByIdentity = new Map<string, string>();
+
+    for (const filePath of [...configuredRoots, ...this.fileContents.keys()]) {
+      const identity = this.getPathIdentity(filePath);
+      if (!this.deletedRootPaths.has(identity)) rootsByIdentity.set(identity, filePath);
+    }
+
+    return [...rootsByIdentity.values()];
+  }
+
+  /** Compare equivalent Windows path spellings as one TypeScript root. */
+  private getPathIdentity(filePath: string): string {
+    const normalized = path.normalize(path.resolve(filePath));
+
+    return ts.sys.useCaseSensitiveFileNames ? normalized : normalized.toLowerCase();
   }
 }
 

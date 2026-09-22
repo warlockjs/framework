@@ -44,6 +44,16 @@ export class TypescriptHealthChecker
     return ext.endsWith(".ts") || ext.endsWith(".tsx");
   }
 
+  /** Preserve files selected by tsconfig when source updates rebuild the program. */
+  private getProgramRootNames(files: FileManager[]): string[] {
+    return [
+      ...new Set([
+        ...(this.parsedConfig?.fileNames || []),
+        ...files.map((file) => file.absolutePath),
+      ]),
+    ];
+  }
+
   /**
    * Extract line and column from diagnostic location
    */
@@ -209,7 +219,7 @@ export class TypescriptHealthChecker
     }
 
     this.program = ts.createProgram(
-      files.map((file) => file.absolutePath),
+      this.getProgramRootNames(files),
       {
         ...this.parsedConfig.options,
         incremental: true,

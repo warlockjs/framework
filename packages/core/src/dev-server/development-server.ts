@@ -114,7 +114,7 @@ export class DevelopmentServer {
         this.options.generateTypings ?? devServerConfig?.generateTypings ?? true;
       const healthCheckers = this.options.healthCheckers ?? devServerConfig?.healthCheckers ?? true;
 
-      if (generateTypings) typeGenerator.executeGenerateAllCommand();
+      if (generateTypings) await typeGenerator.executeGenerateAllCommand();
 
       if (healthCheckers) {
         filesOrchestrator.startCheckingHealth(healthCheckers === true ? undefined : healthCheckers);

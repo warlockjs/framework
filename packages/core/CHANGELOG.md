@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.17.1 - 2026-09-22
+
+### Fixed
+
+- `@warlock.js/web` fixes page projection to resolve import references by lexical binding after server configuration is removed. A component-local `t = useTrans()` no longer retains an unrelated metadata-only Core import in the client view.
+- Development startup now completes initial typings generation before it starts health checking, so the checker receives the generated declaration roots. Health checking remains background work and does not delay connector readiness.
+- The health checker preserves declaration roots already included by the project's tsconfig.
+
 ## 5.17.0 - 2026-09-21
 
 ### Security

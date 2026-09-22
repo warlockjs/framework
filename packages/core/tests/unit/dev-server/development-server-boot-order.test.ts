@@ -15,6 +15,9 @@ const startPhase = vi.hoisted(() => vi.fn(async () => undefined));
 const runStartupValidators = vi.hoisted(() => vi.fn(async () => undefined));
 const markBooted = vi.hoisted(() => vi.fn());
 const printReadyBlock = vi.hoisted(() => vi.fn());
+const startCheckingHealth = vi.hoisted(() => vi.fn(async () => undefined));
+const shutdown = vi.hoisted(() => vi.fn(async () => undefined));
+const executeGenerateAllCommand = vi.hoisted(() => vi.fn(async () => undefined));
 
 vi.mock("@mongez/events", () => ({ default: { on: vi.fn(), emit: vi.fn() } }));
 
@@ -36,7 +39,7 @@ vi.mock("../../../src/connectors/connectors-manager", () => ({
   // `list` is read by the ready block after boot, to decide whether a web/SSR
   // surface shares the port. Empty here: this test is about ORDER, and an
   // API-only app is the smaller of the two shapes.
-  connectorsManager: { startPhase, list: vi.fn(() => []) },
+  connectorsManager: { startPhase, shutdown, list: vi.fn(() => []) },
 }));
 
 vi.mock("../../../src/warlock-config", () => ({
@@ -66,7 +69,7 @@ vi.mock("../../../src/dev-server/files-orchestrator", () => ({
     bumpVersion: vi.fn(),
     flushVersionBumps: vi.fn(async () => undefined),
     files: new Map(),
-    startCheckingHealth: vi.fn(async () => undefined),
+    startCheckingHealth,
   },
 }));
 
@@ -86,7 +89,7 @@ vi.mock("../../../src/dev-server/shortcuts", () => ({
 
 vi.mock("../../../src/dev-server/type-generator", () => ({
   typeGenerator: {
-    executeGenerateAllCommand: vi.fn(),
+    executeGenerateAllCommand,
     executeTypingsGenerator: vi.fn(),
   },
 }));
@@ -142,5 +145,42 @@ describe("DevelopmentServer.start() — D7 boot-order wiring", () => {
 
     expect(startPhase).not.toHaveBeenCalledWith(ConnectorLifecyclePhase.Late);
     expect(markBooted).not.toHaveBeenCalled();
+  });
+
+  it("waits for initial typings generation before starting health checks", async () => {
+    let releaseGeneration!: () => void;
+    executeGenerateAllCommand.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (releaseGeneration = resolve)),
+    );
+
+    const server = new DevelopmentServer({ healthCheckers: true });
+    const start = server.start();
+
+    await vi.waitFor(() => expect(executeGenerateAllCommand).toHaveBeenCalledOnce());
+    expect(startCheckingHealth).not.toHaveBeenCalled();
+
+    releaseGeneration();
+    await start;
+
+    expect(startCheckingHealth).toHaveBeenCalledOnce();
+  });
+
+  it("starts health checks when initial typings generation is disabled", async () => {
+    const server = new DevelopmentServer({ generateTypings: false, healthCheckers: true });
+
+    await server.start();
+
+    expect(executeGenerateAllCommand).not.toHaveBeenCalled();
+    expect(startCheckingHealth).toHaveBeenCalledOnce();
+  });
+
+  it("uses the existing startup failure and shutdown path when initial generation rejects", async () => {
+    executeGenerateAllCommand.mockRejectedValueOnce(new Error("typings generation failed"));
+
+    const server = new DevelopmentServer({ healthCheckers: true });
+
+    await expect(server.start()).rejects.toThrow("typings generation failed");
+    expect(startCheckingHealth).not.toHaveBeenCalled();
+    expect(shutdown).toHaveBeenCalledOnce();
   });
 });
