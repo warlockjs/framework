@@ -1,4 +1,10 @@
 {
+  "5.17.1": {
+    "publishedAt": "2026-09-22T18:54:57.324Z",
+    "matrix": "none",
+    "summary": "`@warlock.js/core` now completes initial typings generation before background health checking and preserves configured declaration roots; `@warlock.js/web` fixes development page projection with binding-aware import liveness. Public APIs are unchanged. Lockstep release across all 30 packages. Generator matrix scope: `none`; additional release tests were waived by the owner.",
+    "featured": ["@warlock.js/core", "@warlock.js/web"]
+  },
   "5.17.0": {
     "publishedAt": "2026-09-22T14:02:10.179Z",
     "matrix": "subset",
