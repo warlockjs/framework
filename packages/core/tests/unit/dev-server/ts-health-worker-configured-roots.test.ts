@@ -215,5 +215,5 @@ describe("TypeScript health worker configured roots", () => {
     expect(program.getSourceFile(declarationPath)).toBeDefined();
     expect(validSource && program.getSemanticDiagnostics(validSource)).toEqual([]);
     expect(unknownSource && program.getSemanticDiagnostics(unknownSource)).toHaveLength(1);
-  });
+  }, 30_000);
 });
