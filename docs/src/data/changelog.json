@@ -124,6 +124,68 @@
   ],
   "releases": [
     {
+      "version": "5.18.0",
+      "id": "v5-18-0",
+      "date": "September 23, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<code>@warlock.js/web</code> adds shared root/layout/page metadata with consistent SSR and client-navigation titles, plus <code>useIsNavigating()</code> for router-owned pending state. Development SSR reuses Core-owned models and their reload/removal notifications; initial sitemap generation now waits for database initialization so <code>warlock doctor</code> remains registration-only. Lockstep release across all 30 packages. Generator matrix scope: <code>none</code>; required release checks completed.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Pages, layouts, and <code>root.tsx</code> now share typed static or server-only callback metadata. Titles accept a string, <code>{ default?, template? }</code>, or <code>{ absolute }</code>; resolution produces the same string title for SSR and client navigation while composing metadata from page through layouts to root."
+            },
+            {
+              "type": "Added",
+              "html": "<code>useIsNavigating()</code> exposes router-owned pending state for client navigation, refreshes, and locale changes. It is safe during SSR and replaces event-based guesses for reactive loading indicators."
+            },
+            {
+              "type": "Fixed",
+              "html": "Development SSR reuses models already loaded by Core, including their named and default exports. Core reload and removal notifications invalidate the corresponding SSR modules while client import checks remain in place."
+            },
+            {
+              "type": "Fixed",
+              "html": "Initial sitemap generation now runs during connector startup, after database initialization. Registration-only commands such as <code>warlock doctor</code> register sitemap routes without invoking suppliers that require a database connection."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Development model loading now shares model ownership and reload notifications with Web's SSR adapter, allowing pages to reuse the same model constructors as Core instead of registering a second copy."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.17.1",
       "id": "v5-17-1",
       "date": "September 22, 2026",
@@ -184,10 +246,7 @@
       "isUnreleased": false,
       "summaryHtml": "<strong><code>@warlock.js/web</code> moves page, layout, and root server policy into one direct <code>config</code> export (BREAKING)</strong>: <code>PageConfig</code>, <code>LayoutConfig</code>, and <code>RootConfig</code> keep route/cache/prefix/strict-mode policy together while loaders, registration, named error boundaries, and components remain separate. Web adds route-scoped <code>locales.json</code> translations, typed keys, <code>useChangeLocaleCode()</code>, and locale-aware navigation, sitemap, and robots behavior; new scaffolds enable root <code>strictMode</code>. <code>@warlock.js/core</code> and Web require <code>@mongez/localization</code> 3.5.0 for scoped translation lookup. Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>web</code>, <code>sitemap</code> rows); Hasan authorised the release on 2026-09-21: \"Go with your rec\".",
       "matrix": "subset",
-      "matrixRows": [
-        "web",
-        "sitemap"
-      ],
+      "matrixRows": ["web", "sitemap"],
       "mode": "detail",
       "packages": [
         {
@@ -727,13 +786,7 @@
       "isUnreleased": false,
       "summaryHtml": "<strong>New package: <code>@warlock.js/sitemap</code></strong> — the thirtieth family member, and the first added since the family settled. Runtime <code>sitemap.xml</code> generation from the page registry, installed with <code>warlock add sitemap</code>, with <strong>zero runtime dependencies</strong>. It is usable three ways: standalone in any Node app, in an API-only Warlock app through <code>sitemapConnector({ entries })</code>, and in a Warlock web app from the page registry. A dynamic route that cannot be enumerated is omitted <strong>and named in a development diagnostic</strong> rather than silently dropped, and an enabled sitemap with no configured origin refuses to boot instead of serving absolute URLs built from a guessed host. Two silent failures are fixed in <code>@warlock.js/web</code> and <code>@warlock.js/core</code>: <code>useTrans()</code> returned the raw key after hydration — server HTML was correct, the post-hydration DOM was not, and the translated value never reached <code>dist/client</code> at all — so the hydration payload gains a seventh required key, <code>translations</code>, carrying only the active locale; and <code>request.cookie()</code> now throws <code>CookieJarUnavailableError</code> when <code>@fastify/cookie</code> is absent instead of returning <code>undefined</code>, which was indistinguishable from \"no such cookie\" and surfaced as a permanent unexplained 401. <code>@warlock.js/core</code> adds <code>app.publicUrl</code> with a <code>PUBLIC_APP_URL</code> fallback. <strong>BREAKING:</strong> <code>@warlock.js/queue/notifications</code> is removed (deprecated in 5.14 — use <code>bullmqQueue()</code> from <code>@warlock.js/notifications</code>), and <code>listRoutablePages</code> moved to the <code>@warlock.js/web/build</code> subpath. <code>@warlock.js/cache</code> finally declares a <code>test</code> script, so its 525 tests run in the release gate for the first time. Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>sitemap</code>, <code>queue</code>, <code>bull-board</code> rows) against the staged candidate, authorised by Hasan on 2026-09-18: \"You could run the matrix if you feel it is important to this release\".",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "web",
-        "sitemap",
-        "queue",
-        "bull-board"
-      ],
+      "matrixRows": ["baseline", "web", "sitemap", "queue", "bull-board"],
       "mode": "detail",
       "packages": [
         {
@@ -904,14 +957,7 @@
       "isUnreleased": false,
       "summaryHtml": "<code>@warlock.js/web</code> renames the hydration mount from <code>#root</code> to <code>#vessel</code> (BREAKING) — <code>#root</code> collided with embeds and third-party widgets — and hardens the client-build secret scan to refuse EVERY reference to the global <code>process</code>, aliases included (BREAKING for <code>typeof process</code> feature detection). Dev SSR now externalises every installed <code>@warlock.js/*</code> package by rule instead of a hand-maintained list, closing the dual-module-instance class that split framework singletons. A cached page sends one <code>Vary</code> value on both its HTML and data representations. <code>@warlock.js/queue</code> gains a config-driven bull-board dashboard (<code>warlock add bull-board</code>) that refuses to mount unguarded in production, and <code>find(id)</code> no longer returns a finished job with a null result. <code>@warlock.js/notifications</code> takes over the BullMQ integration as <code>bullmqQueue()</code>, a lazy optional-peer driver; <code>@warlock.js/queue/notifications</code> is deprecated for one release. <code>@warlock.js/core</code> adds <code>middleware.cache({ tags })</code> so <code>invalidateTags()</code> clears cached API responses, verifies the esbuild native binary before <code>warlock dev</code> starts, and fixes a <code>devServer.timings</code> watcher phase that always reported 0ms. Lockstep release across all 29 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>queue</code>, <code>bull-board</code>, <code>auth-google</code>, <code>auth-passkeys</code> rows) against the staged candidate, authorised by Hasan on 2026-09-17: \"Go ahead plz\".",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "web",
-        "queue",
-        "bull-board",
-        "auth-google",
-        "auth-passkeys"
-      ],
+      "matrixRows": ["baseline", "web", "queue", "bull-board", "auth-google", "auth-passkeys"],
       "mode": "detail",
       "packages": [
         {
@@ -1084,14 +1130,7 @@
       "isUnreleased": false,
       "summaryHtml": "<code>@warlock.js/queue</code> ships as a new package (durable BullMQ + Redis background jobs, <code>defineJob</code>, <code>queueConnector()</code>, a bull-board dashboard and a notifications dispatcher). <code>@warlock.js/auth</code> adds email verification, password reset, and login with Google, passkeys and phone OTP, with account linking via a new <code>provider_accounts</code> table. <code>@warlock.js/access</code> makes ABAC <code>strictPolicies</code> deny-by-default (BREAKING) to close a fail-open IDOR path. <code>@warlock.js/web</code> fixes a Host-header cache-poisoning gap in the server page cache key (BREAKING) and a stale-Suspense-fallback replay on cache HIT, and adds <code>linkStylesheetsFor</code> for lazily-imported per-tenant themes. <code>@warlock.js/core</code> adds <code>warlock add queue</code>/<code>warlock add auth-google</code>/<code>warlock add auth-passkeys</code> installers and typed translation-key generation, and drops its dependency on <code>@warlock.js/auth</code>. Lockstep release across all 28 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>queue</code>, <code>access</code>, <code>auth-google</code>, <code>auth-passkeys</code> rows) against the staged candidate, authorised by Hasan on 2026-09-16: \"You've my approval for whatever decision you may need to take in this release.\"",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "web",
-        "queue",
-        "access",
-        "auth-google",
-        "auth-passkeys"
-      ],
+      "matrixRows": ["baseline", "web", "queue", "access", "auth-google", "auth-passkeys"],
       "mode": "detail",
       "packages": [
         {
@@ -1618,10 +1657,7 @@
       "isUnreleased": false,
       "summaryHtml": "<strong>The authenticated user moves from <code>request.user</code> to <code>request.locals.user</code></strong> (BREAKING, <code>@warlock.js/core</code> / <code>@warlock.js/auth</code> / <code>@warlock.js/access</code>), <code>@warlock.js/auth</code> adds a CSRF Origin check for cookie-authenticated writes plus <code>setAuthCookie()</code> / <code>clearAuthCookie()</code>, and <code>@warlock.js/web</code> ships an opt-in server-side page cache, <code>defer()</code>-ed streaming data with crawler-aware inlining, scroll restoration and locale-direction (RTL) support. <code>@warlock.js/core</code> adds opt-in request tracing and a CSP header; <code>create-warlock</code> scaffolds non-interactively by default and fixes a fresh-scaffold <code>npm run seed</code> failure. Lockstep release across all 28 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code> rows) against the staged candidate, authorised by Hasan on 2026-09-16: \"Yes do it please, don't release before completing all mising points and make sure you have covered everything in the tasks board.\"",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "web"
-      ],
+      "matrixRows": ["baseline", "web"],
       "mode": "detail",
       "packages": [
         {

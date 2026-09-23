@@ -1,4 +1,10 @@
 {
+  "5.18.0": {
+    "publishedAt": "2026-09-23T00:37:57.178Z",
+    "matrix": "none",
+    "summary": "`@warlock.js/web` adds shared root/layout/page metadata with consistent SSR and client-navigation titles, plus `useIsNavigating()` for router-owned pending state. Development SSR reuses Core-owned models and their reload/removal notifications; initial sitemap generation now waits for database initialization so `warlock doctor` remains registration-only. Lockstep release across all 30 packages. Generator matrix scope: `none`; required release checks completed.",
+    "featured": ["@warlock.js/web", "@warlock.js/core"]
+  },
   "5.17.1": {
     "publishedAt": "2026-09-22T18:54:57.324Z",
     "matrix": "none",
