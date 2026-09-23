@@ -1,6 +1,6 @@
 ---
 name: define-jobs
-description: 'Define and dispatch background jobs with `@warlock.js/queue`: `defineJob({ name, queue?, attempts?, backoff?, removeOnComplete?, removeOnFail?, handle(payload, ctx) })` returns a typed job; `job.dispatch(payload, { delay, priority, jobId, attempts, backoff })`; the handler context (`id`, `attempt`, `maxAttempts`, `progress()`, `log()`); reading a job with `job.find(id)`. Triggers: `defineJob`, `.dispatch(`, `ctx.progress`, `JobContext`, `DispatchOptions`, `backoff`, `attempts`, `priority`, `jobId`; "run this in the background", "retry with backoff", "delay a job", "job progress", "idempotent dispatch". Skip: config and workers — `@warlock.js/queue/configure-queue/SKILL.md`; failed jobs — `@warlock.js/queue/manage-failed-jobs/SKILL.md`.'
+description: "Define and dispatch jobs in @warlock.js/queue; use when you need to define jobs."
 ---
 
 # Define and dispatch jobs

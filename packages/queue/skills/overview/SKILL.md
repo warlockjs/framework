@@ -1,6 +1,6 @@
 ---
 name: overview
-description: 'Front door for `@warlock.js/queue` — durable background jobs for Warlock apps on BullMQ + Redis (Redis is required): `defineJob` + `.dispatch()`, retries/backoff, delay, priority, progress, failed-job listing/retry, in-process workers started by `queueConnector()` with graceful shutdown, a BullMQ backend for notifications `.queue()`, and an optional bull-board dashboard. TRIGGER when: importing from `@warlock.js/queue`; "background job", "job queue", "run this later", "retry failed jobs", "BullMQ in Warlock", "worker process". Skip: in-memory batching inside one process — that is core''s `Queue` class (`@warlock.js/core`); cron-style schedules — `@warlock.js/scheduler/overview/SKILL.md`; a known task — load `configure-queue`, `define-jobs`, `manage-failed-jobs` or `queue-notifications`.'
+description: "@warlock.js/queue overview for orientation and choosing the focused skill for the task."
 ---
 
 # `@warlock.js/queue` — overview

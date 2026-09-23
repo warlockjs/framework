@@ -1,6 +1,6 @@
 ---
 name: queue-notifications
-description: 'Send `@warlock.js/notifications` `.queue()` deliveries through BullMQ with `bullmqQueue({ queue?, attempts?, backoff? })` from `@warlock.js/notifications` — put it in the `queue` slot of `src/config/notifications.ts`; the queue workers deliver. Honours `SendOptions.delay` (number = seconds, or "10m"), retries a failing `channel.send`, and fails at once for a channel missing from the worker config. Triggers: `bullmqQueue`, `NotificationConfig.queue`, `QueuePackageNotInstalledError`; "queue notifications with BullMQ", "retry notification delivery", "delayed notification". Skip: the herald backend — `@warlock.js/notifications/queue-notifications/SKILL.md`.'
+description: "Queue notifications with BullMQ in @warlock.js/queue; use when you need to queue notifications."
 ---
 
 # Queue notifications with BullMQ

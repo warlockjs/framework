@@ -1,6 +1,6 @@
 ---
 name: configure-queue
-description: 'Configure `@warlock.js/queue`: the declarative `src/config/queue.ts` (`QueueConfig` — `connection`, `prefix`, `defaultQueue`, `defaultJobOptions`, `workers: { enabled, concurrency, shutdownTimeout }`), registering `queueConnector()` in `warlock.config.ts > connectors`, running a dispatch-only process, and graceful shutdown. Programmatic `setQueueConfig` / `startWorkers` / `closeQueue` for scripts and tests. Triggers: `QueueConfig`, `queueConnector`, `setQueueConfig`, `startWorkers`, `closeQueue`, `workers.enabled`, `shutdownTimeout`; "configure the queue", "connect BullMQ to Redis", "disable workers in the web process", "graceful shutdown of jobs". Skip: writing jobs — `@warlock.js/queue/define-jobs/SKILL.md`.'
+description: "Configure the queue in @warlock.js/queue; use when you need to configure queue."
 ---
 
 # Configure the queue
