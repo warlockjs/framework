@@ -1,6 +1,6 @@
 ---
 name: use-the-fs-facade
-description: 'Use the ergonomic `fs` shorthand facade in `@warlock.js/fs` — `fs.files.*` (file ops), `fs.dirs.*` (directory ops), and lazy `fs.file(path)` / `fs.dir(path)` handles (`File` / `Directory`), plus `fs.exists(path)`. Async-only (delegates to the `*Async` primitives). Adds ops the flat primitives lack: `append`/`prepend`/`appendLine`/`appendJsonLine`, `size`/`isEmpty`/`count`, `ensure`(ensureFile)/`touch`/`empty`(emptyDir), EXDEV-safe `move`, `walk` + recursive `list*`, `readLines`, `edit`/`editJson`/`mergeJson`/`ensureJson`, `getJson({ schema })` (any Standard Schema — seal/zod/valibot), `checksumMatches`, directory `hash`, handle path helpers (`name`/`extension`/`basename`/`parent`/child `file`/`dir`). TRIGGER when: code uses `fs.files.`/`fs.dirs.`/`fs.file(`/`fs.dir(`; user wants a "read-modify-write"/patch a file or JSON, "merge into a config json", "list files recursively", "walk a directory", "get-or-create a json", "append a log line/NDJSON", "directory size/fingerprint", "File/Directory object"; user asks the ergonomic/OO way to do fs. Skip: sync/one-shot code — use the bare primitives (`getFile`/`putFile`/…) via `read-and-write-files` / `manage-directories`; path sandboxing/uploads — that is the storage layer, not fs.'
+description: "@warlock.js/fs — the fs shorthand facade in @warlock.js/fs; use when you need to use the fs facade."
 ---
 
 # `@warlock.js/fs` — the `fs` shorthand facade

@@ -1,6 +1,6 @@
 ---
 name: write-atomically
-description: 'Atomic file writes via atomicWriteAsync(path, content) — writes to a uniquely-named sibling temp + rename onto target so readers see old or complete new content, never half-written; the rename retries transient Windows locks with backoff and throws a named AtomicWriteError on exhaustion. Triggers: `atomicWriteAsync`, `atomicWriteJsonAsync`, `AtomicWriteError`; "atomic file write", "write config file safely with concurrent readers", "manifest written by build step", "state file across runs", "avoid half-written files", "EPERM/EBUSY on rename", "atomic write fails intermittently on Windows"; typical import `import { atomicWriteAsync, atomicWriteJsonAsync, AtomicWriteError } from "@warlock.js/fs"`. Skip: plain writes — `@warlock.js/fs/read-and-write-files/SKILL.md`; read-modify-write locking — `@warlock.js/cache/use-cache-lock/SKILL.md`; competing libs `write-file-atomic`, `steno`, `fs-extra` `outputFile`.'
+description: "Atomic file writes in @warlock.js/fs; use when you need to write atomically."
 ---
 
 # Atomic file writes

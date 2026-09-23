@@ -1,6 +1,6 @@
 ---
 name: overview
-description: 'Front-door orientation for `@warlock.js/fs` — filesystem primitives (read/write/JSON, dirs, copy/rename/delete, atomic writes, hashing, existence + stats). Two-suffix convention: `*Async` returns Promise, bare name is sync. Single canonical name per operation — no aliases. TRIGGER when: code imports anything from `@warlock.js/fs`; user asks "what does @warlock.js/fs do", "is fs the right package for X", "list all fs helpers", "fs sync vs async convention"; package.json adds `@warlock.js/fs`; user is choosing between fs vs `node:fs/promises`/`fs-extra`/`graceful-fs`. Skip: specific task already known — load the matching task skill directly (`@warlock.js/fs/read-and-write-files/SKILL.md`, `@warlock.js/fs/manage-directories/SKILL.md`, `@warlock.js/fs/write-atomically/SKILL.md`, `@warlock.js/fs/hash-files/SKILL.md`), or the ergonomic async facade (`fs.files.*` / `fs.dirs.*` / `fs.file()` / `fs.dir()`) — `@warlock.js/fs/use-the-fs-facade/SKILL.md`; the user is using plain `node:fs` and not touching fs imports.'
+description: "@warlock.js/fs overview for orientation and choosing the focused skill for the task."
 ---
 
 # `@warlock.js/fs` — overview
