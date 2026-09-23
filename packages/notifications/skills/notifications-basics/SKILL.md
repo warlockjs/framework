@@ -1,6 +1,6 @@
 ---
 name: notifications-basics
-description: 'Front-door for `@warlock.js/notifications` — what the package is, when to reach for it, and the four moving parts (channel registry, defineNotification, notify, inApp). Multi-channel dispatch: define once, fire anywhere. Recipients are cascade `Model` instances; payloads are typed per channel via a declaration-merge `NotificationChannels` registry; reusable definitions go through `defineNotification`; ad-hoc per-channel sends go through the `notify.<channel>` proxy; the in-app database channel is read via the `inApp` facade. Phase 1 ships `mail` + `database`; bridges-backed channels (whatsapp/telegram/push/slack) arrive in Phase 2. Triggers: `defineNotification`, `notify.<channel>`, `inApp.configure`, `setNotificationConfig`, `NotificationConfig`, `NotificationChannels`; "send a notification", "in-app notifications", "what channels can I use", "what is `@warlock.js/notifications`", "where do I start"; typical import `import { defineNotification, notify, inApp } from "@warlock.js/notifications"`. Skip: configuring channels in `config/notifications.ts` — `@warlock.js/notifications/configure-notifications/SKILL.md`; building a multi-channel definition — `@warlock.js/notifications/define-notification/SKILL.md`; reading in-app rows — `@warlock.js/notifications/use-in-app/SKILL.md`.'
+description: "Start here for @warlock.js/notifications channels, notification definitions, delivery, and application setup."
 ---
 
 # `@warlock.js/notifications` — basics
