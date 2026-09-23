@@ -8,7 +8,7 @@
 
 ---
 name: setup-xai
-description: 'Wire @warlock.js/ai-xai — new XaiSDK({apiKey, baseURL?, provider?, pricing?}) for xAI Grok, .model({name, vision?, reasoning?, structuredOutput?}) for a ModelContract, .embedder({name, dimensions?}) and .image({name, pricing?}) delegated to the OpenAI-compatible adapter. Thin wrapper over OpenAISDK: uses the xAI OpenAI-compatible endpoint (https://api.x.ai/v1) and injects xAI''s own vision/reasoning inference so Grok names resolve to the right capabilities. Triggers: `XaiSDK`, `grok`, `grok-4`, `grok-3`, `grok-3-mini`, `grok-2-vision`, `.model`, `x.ai`, `api.x.ai`, `XAI_API_KEY`, `reasoning_effort` on Grok, "wire xai/grok into a warlock agent", "configure grok-4", "use grok reasoning effort", "send an image to grok-4 / grok-2-vision"; typical import `import { XaiSDK } from "@warlock.js/ai-xai"`. Skip: agent wiring — `@warlock.js/ai/run-ai-agent/SKILL.md`; the underlying OpenAI-compatible adapter and its full capability/streaming/error surface — `@warlock.js/ai-openai/skills/setup-openai/SKILL.md`; adapter comparison — `@warlock.js/ai/pick-ai-provider/SKILL.md`; competing adapters `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `openai` SDK pointed at x.ai by hand.'
+description: "@warlock.js/ai-xai in @warlock.js/ai-xai; use when you need to set up xai."
 ---
 
 # `@warlock.js/ai-xai`
