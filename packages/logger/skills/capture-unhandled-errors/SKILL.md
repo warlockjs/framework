@@ -1,6 +1,6 @@
 ---
 name: capture-unhandled-errors
-description: 'captureAnyUnhandledRejection() installs process.on(''unhandledRejection'') → log.error and process.on(''uncaughtException'') → log.fatal + process.exit(1) so process-level failures land in your channels and a fatal crash is never silently swallowed into exit 0. Triggers: `captureAnyUnhandledRejection`, `exitOnUncaughtException`, `unhandledRejection`, `uncaughtException`, `log.error`, `log.fatal`; "log unhandled promise rejections", "catch uncaught exceptions to a file", "record crashes before exit", "server exits 0 with no error", "silent exit / production server stopped", "global error handler with logger"; typical import `import { captureAnyUnhandledRejection, log } from "@warlock.js/logger"`. Skip: flushing — `@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`; filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; competing `Sentry.init`, `@sentry/node`; native `process.on(''unhandledRejection'')`.'
+description: "Error capture — routing Node's unhandled errors through the logger in @warlock.js/logger; use when you need to capture unhandled errors."
 ---
 
 # Error capture — routing Node's unhandled errors through the logger

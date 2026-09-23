@@ -1,6 +1,6 @@
 ---
 name: logger-basics
-description: 'Start with @warlock.js/logger — the log singleton, six levels (debug / info / warn / error / success / fatal), channel fan-out, foundations. Triggers: `log`, `Logger`, `log.info`, `log.error`, `log.fatal`, `log.debug`, `log.warn`, `log.success`, `ConsoleLog`, `FileLog`, `JSONFileLog`; "how do I log in node", "warlock logger basics", "which logger skill do I need"; typical import `import { log, ConsoleLog, FileLog } from "@warlock.js/logger"`. Skip: channel picks — `@warlock.js/logger/pick-log-channel/SKILL.md`; setup — `@warlock.js/logger/configure-logger/SKILL.md`; competing libs `winston`, `pino`, `bunyan`, `log4js`, `signale`; native `console.log`.'
+description: "Start here for @warlock.js/logger channels, structured entries, transports, and application logging setup."
 ---
 
 # Log with channels

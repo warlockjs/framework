@@ -1,6 +1,6 @@
 ---
 name: use-log-helpers
-description: 'Two DX shortcuts on every Logger — log.assert(condition, module, action, message, context?) logs an error when condition is falsy (free on the happy path), log.timer(module, action) returns an end-function emitting an info entry with measured duration. Triggers: `log.assert`, `log.timer`, `durationMs`; "assert an invariant via logger", "measure how long an operation took", "time a request", "log operation duration"; typical import `import { log } from "@warlock.js/logger"`. Skip: basics — `@warlock.js/logger/logger-basics/SKILL.md`; filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; competing `console.assert`, `console.time`, `console.timeEnd`, `perf_hooks.performance.now`.'
+description: "Helpers — assert, timer in @warlock.js/logger; use when you need to use log helpers."
 ---
 
 # Helpers — `assert`, `timer`

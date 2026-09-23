@@ -1,6 +1,6 @@
 ---
 name: ship-logs-to-sentry
-description: 'Forward log entries to Sentry with the SentryLog channel — error/warn become events (captureException/captureMessage), every other level a breadcrumb (no quota). @sentry/node is an OPTIONAL peer, lazily imported. Triggers: `SentryLog`, `@sentry/node`, `eventLevels`, `flushTimeout`, `Sentry.flush`, `captureException`, `addBreadcrumb`, `withScope`; "send logs to Sentry", "report errors to Sentry", "Sentry log channel", "Sentry breadcrumbs from logs", "log channel for Sentry"; typical import `import { SentryLog } from "@warlock.js/logger"`. Skip: file/console channels — `@warlock.js/logger/pick-log-channel/SKILL.md`; custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; graceful-shutdown flushing — `@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`; Slack alerting recipe.'
+description: "Ship logs to Sentry — the SentryLog channel in @warlock.js/logger; use when you need to ship logs to sentry."
 ---
 
 # Ship logs to Sentry — the `SentryLog` channel
