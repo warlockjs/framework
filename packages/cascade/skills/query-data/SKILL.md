@@ -1,6 +1,6 @@
 ---
 name: query-data
-description: 'Query records via the model — `.where(field, value)` / `.where(field, op, value)`, `.find(id)` / `.first` / `.all`, `.orderBy`, `.count` / `.exists`, `.lean()` plain-object reads, plus `.whereIn` / `.whereBetween` / `.whereLike` / `.pluck` / `.firstOrFail` / scopes via `addScope`. Covers filter safety: `where()` rejects `$`-prefixed keys (`UnsafeFilterError`), `whereRaw()` string form rejects `$where`/`$function`/`$accumulator` (`UnsafeRawExpressionError`), and `whereLike`/`whereStartsWith`/`whereEndsWith`/`whereSearch` match string arguments literally (pass a `RegExp` for pattern semantics). Triggers: `.where`, `.find`, `.first`, `.firstOrFail`, `.all`, `.get`, `.orderBy`, `.exists`, `.whereIn`, `.whereBetween`, `.whereLike`, `.whereRaw`, `.lean`, `UnsupportedLeanOperationError`, `addScope`, `escapeRegex`, `likePatternToRegexSource`, `UnsafeFilterError`, `UnsafeRawExpressionError`; "filter by status", "find by id", "fetch active users", "check existence", "search box query", "is where() safe from injection"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: pagination — `@warlock.js/cascade/paginate-results/SKILL.md`; aggregates — `@warlock.js/cascade/aggregate-data/SKILL.md`.'
+description: "Query data in @warlock.js/cascade; use when you need to query data."
 ---
 
 # Query data

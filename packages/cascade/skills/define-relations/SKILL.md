@@ -1,6 +1,6 @@
 ---
 name: define-relations
-description: 'Define and query relations — `@BelongsTo` / `@HasMany` / `@BelongsToMany`, `.with("relation")` eager loading, `.whereHas(relation, cb)` filter-by-related, `setRelation` on save, `.joinWith` for SQL joins, `loadRelation`, `lazy(() => Model)`. Triggers: `@BelongsTo`, `@HasMany`, `@BelongsToMany`, `.with`, `.whereHas`, `setRelation`, `.joinWith`, `lazy`; "define a relation", "avoid N+1", "eager load posts", "filter parents by child"; typical import `import { BelongsTo, HasMany, BelongsToMany } from "@warlock.js/cascade"`. Skip: model basics — `@warlock.js/cascade/define-model/SKILL.md`; competing libs `mongoose populate`, `prisma include`, `typeorm relations`.'
+description: "Define and query relations in @warlock.js/cascade; use when you need to define relations."
 ---
 
 # Define and query relations

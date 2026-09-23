@@ -1,6 +1,6 @@
 ---
 name: aggregate-data
-description: 'Compute aggregates over a query — scalar `.count()` / `.sum(field)` / `.avg` / `.min` / `.max`, plus grouped rollups via the two-arg `.groupBy(fields, { alias: $agg.* })`, portable date-bucketing via `.groupByDate(col, unit, aggregates?)`, the `$agg` helpers (including expression-aware `$agg.sum($expr.mul("price","quantity"))` / `$agg.sumRaw`), and `.having(alias, op, value)` on computed aggregates, plus MongoDB pipeline stages `.unwind(field, options?)` / `.addFields(fields)` / pipeline-form `join()` (`UnsupportedQueryOperationError` on Postgres). Triggers: `.unwind`, `.addFields`, `.joinRaw`, `.raw`, `$unwind`, `$lookup`, `.count`, `.sum`, `.avg`, `.min`, `.max`, `.groupBy`, `.groupByDate`, `.having`, `$agg`, `$agg.sum`, `$agg.sumRaw`, `$agg.count`, `$expr`, `$expr.mul`, `$expr.col`, `$expr.lit`; "monthly revenue report", "revenue per month", "X per category", "group by status", "sum price times quantity", "dashboard rollup"; typical import `import { Model, $agg, $expr } from "@warlock.js/cascade"`. Skip: row queries — `@warlock.js/cascade/query-data/SKILL.md`; cached aggregates — `@warlock.js/cache/use-cached-hof/SKILL.md`; competing tools raw SQL `GROUP BY`, `mongoose aggregate`, `prisma` `groupBy`.'
+description: "Use aggregates and groupBy in @warlock.js/cascade; use when you need to aggregate data."
 ---
 
 # Use aggregates and groupBy

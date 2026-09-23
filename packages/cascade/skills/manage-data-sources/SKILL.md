@@ -1,6 +1,6 @@
 ---
 name: manage-data-sources
-description: 'Configure multiple databases — register each via `connectToDatabase({ name, driver, database, isDefault })`, assign a model with `static dataSource = "name"`, route a migration with `dataSource` on the migration class, inspect via `dataSourceRegistry.get(name)` / `getAllDataSources()`. The first (or `isDefault: true`) source is the default. Triggers: `connectToDatabase`, `dataSourceRegistry`, `dataSourceRegistry.get`, `getAllDataSources`, `static dataSource`; "multi-database app", "per-tenant DB", "analytics on separate DB"; typical import `import { connectToDatabase, dataSourceRegistry } from "@warlock.js/cascade"`. Skip: per-source migrations — `@warlock.js/cascade/write-migration/SKILL.md`; transaction scope — `@warlock.js/cascade/manage-transactions/SKILL.md`; competing patterns `mongoose.createConnection`, `typeorm` `DataSource`, `prisma` multi-schema.'
+description: "Manage data sources in @warlock.js/cascade; use when you need to manage data sources."
 ---
 
 # Manage data sources

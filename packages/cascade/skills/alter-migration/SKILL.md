@@ -1,6 +1,6 @@
 ---
 name: alter-migration
-description: 'Evolve an existing table with `Migration.alter(Model, schema, options?)` — add/drop/rename/modify columns; add/drop regular, unique, expression, full-text, geo, vector, and TTL indexes; add/drop foreign keys and CHECK constraints; write rollbacks with class-form methods in `down()`. Triggers: "alter a table", "add a column to existing table", "drop a column", "rename a column", "add an index", "drop a unique constraint", "change a column type", `Migration.alter`, `dropUnique`, `addIndex`, `addForeign`. Skip: creating a brand-new table — `@warlock.js/cascade/write-migration/SKILL.md`.'
+description: "Alter a migration in @warlock.js/cascade; use when you need to alter migration."
 ---
 
 # Alter a migration

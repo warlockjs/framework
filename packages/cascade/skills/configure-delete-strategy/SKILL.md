@@ -1,6 +1,6 @@
 ---
 name: configure-delete-strategy
-description: 'Pick the delete behavior — `permanent` (hard delete), `soft` (set `deletedAt`, keep the row), `trash` (move to a separate table). Configure via `static deleteStrategy` or `.destroy({ strategy })`; restore via static `Model.restore(id)` / `Model.restoreAll()`. Triggers: `static deleteStrategy`, `.destroy`, `Model.restore`, `Model.restoreAll`, `deletedAtColumn`, `trashTable`; "soft delete users", "restore a deleted record", "GDPR hard delete"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: lifecycle events — `@warlock.js/cascade/subscribe-to-model-events/SKILL.md`; competing libs `mongoose-delete`, `typeorm softRemove`, `sequelize` paranoid.'
+description: "Use delete strategies in @warlock.js/cascade; use when you need to configure delete strategy."
 ---
 
 # Use delete strategies

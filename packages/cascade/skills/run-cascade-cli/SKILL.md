@@ -1,6 +1,6 @@
 ---
 name: run-cascade-cli
-description: 'Cascade''s standalone `cascade` binary + the Operations API it wraps — `cascade migrate` / `migrate:list` / `migrate:rollback` / `migrate:export-sql`, and `runMigrations` / `rollbackMigrations` / `freshMigrate` / `exportMigrationsSQL` / `listExecutedMigrations` / `createDatabase` / `dropAllTables` / `migrationRunner`. Triggers: `cascade migrate`, `migrate:list`, `migrate:rollback`, `migrate:export-sql`, `runMigrations`, `rollbackMigrations`, `freshMigrate`, `exportMigrationsSQL`, `listExecutedMigrations`, `migrationRunner`; "run migrations in deploy/CI", "reset DB for tests", "programmatic migration", "foreign key constraint cannot be implemented", `CASCADE_PRIMARY_KEY`; typical import `import { runMigrations, migrationRunner } from "@warlock.js/cascade"`. Skip: writing migration files — `@warlock.js/cascade/write-migration/SKILL.md`; competing tools `knex migrate:latest`, `prisma migrate deploy`, `typeorm migration:run`.'
+description: "Run the cascade CLI / Operations API in @warlock.js/cascade; use when you need to run cascade cli."
 ---
 
 # Run the cascade CLI / Operations API

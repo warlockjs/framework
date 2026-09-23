@@ -1,6 +1,6 @@
 ---
 name: paginate-results
-description: 'Paginate query results — `.paginate({page, limit, filter?})` for offset (returns `data` + `pagination` total/page/limit/pages), `.cursorPaginate({limit, cursor})` for very large datasets, `.chunk(size, callback)` for streaming. Triggers: `.paginate`, `.cursorPaginate`, `.chunk`, `nextCursor`, `hasMore`, `pagination.total`; "paginate the list", "infinite scroll / load more", "stream a large table", "page 2 of users"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: filter chain — `@warlock.js/cascade/query-data/SKILL.md`; eager loading on pages — `@warlock.js/cascade/define-relations/SKILL.md`; competing libs `mongoose-paginate-v2`, `prisma` cursor, `typeorm-pagination`.'
+description: "Paginate results in @warlock.js/cascade; use when you need to paginate results."
 ---
 
 # Paginate results

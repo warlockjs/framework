@@ -1,6 +1,6 @@
 ---
 name: cascade-basics
-description: 'Start with @warlock.js/cascade ORM — model-first for MongoDB and Postgres, one schema (seal) does triple duty (type / validator / DB shape), model is the query entry point. Triggers: `Model`, `RegisterModel`, `connectToDatabase`, `Infer`, `v.object`; "which cascade skill do I need", "set up the ORM", "define my first model", "model-first ORM"; typical import `import { Model, RegisterModel } from "@warlock.js/cascade"`. Skip: schema vocabulary — `@warlock.js/seal/seal-basics/SKILL.md`; competing libs `mongoose`, `prisma`, `typeorm`, `drizzle`, `sequelize`, `mongodb` driver, `knex`.'
+description: "Start here for @warlock.js/cascade models, data sources, migrations, and query workflows."
 ---
 
 # Cascade basics
