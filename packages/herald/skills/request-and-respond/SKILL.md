@@ -1,6 +1,6 @@
 ---
 name: request-and-respond
-description: 'Synchronous-style RPC over the message bus — channel.request<R>(payload, {timeout}) waits for a reply, channel.respond(handler) registers the responder, ctx.reply(response) sends the answer. Triggers: `channel.request`, `channel.respond`, `ctx.reply`, `timeout`, `correlationId`, `headers.correlationId`; "RPC over message bus", "request-response across services", "wait for a reply", "internal service-to-service call instead of HTTP"; typical import `import { herald } from "@warlock.js/herald"`. Skip: setup — `@warlock.js/herald/herald-basics/SKILL.md`; fire-and-forget — `@warlock.js/herald/publish-message/SKILL.md`; consumer ctx flow — `@warlock.js/herald/consume-message/SKILL.md`; competing libs `amqplib` RPC, `nats` request/reply; NestJS `ClientProxy.send`; gRPC; HTTP.'
+description: "Request-response over the bus in @warlock.js/herald; use when you need to request and respond."
 ---
 
 # Request-response over the bus

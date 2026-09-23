@@ -1,6 +1,6 @@
 ---
 name: consume-message
-description: 'Subscribe to a channel via .subscribe(handler, options?) — handler receives (message, ctx). Control flow via ctx.ack / ctx.nack(requeue?) / ctx.reject / ctx.retry(delayMs). Configure prefetch, retry policy, dead-letter, consumer groups. Triggers: `subscribe`, `ctx.ack`, `ctx.nack`, `ctx.reject`, `ctx.retry`, `prefetch`, `group`, `retry`, `deadLetter`, `@Consumable`, `EventConsumer`, `defineConsumer`, `autoAck`; "consume messages from a queue", "implement a worker", "background queue processor", "set up retry and dead-letter", "class-based event consumer"; typical import `import { herald, Consumable, EventConsumer } from "@warlock.js/herald"`. Skip: setup — `@warlock.js/herald/herald-basics/SKILL.md`; producing — `@warlock.js/herald/publish-message/SKILL.md`; RPC reply — `@warlock.js/herald/request-and-respond/SKILL.md`; competing libs `amqplib`, `bullmq`, `kafkajs`; NestJS `@MessagePattern` / `@EventPattern`.'
+description: "Consume messages in @warlock.js/herald; use when you need to consume message."
 ---
 
 # Consume messages

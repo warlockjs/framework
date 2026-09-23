@@ -1,6 +1,6 @@
 ---
 name: herald-basics
-description: 'Start with @warlock.js/herald — connectToBroker config, herald() factory, channel concept, multi-broker support. Triggers: `connectToBroker`, `herald`, `channel`, `isDefault`, `autoAck`; "set up herald", "wire connectToBroker at boot", "configure multiple brokers", "notifications + analytics + events"; typical import `import { connectToBroker, herald } from "@warlock.js/herald"`. Skip: publishing — `@warlock.js/herald/publish-message/SKILL.md`; consuming — `@warlock.js/herald/consume-message/SKILL.md`; RPC — `@warlock.js/herald/request-and-respond/SKILL.md`; competing libs `amqplib`, `kafkajs`, `bullmq`, `nats`; NestJS messaging; native `EventEmitter`.'
+description: "Start here for @warlock.js/herald event publishing, consumers, request-response messaging, and configuration."
 ---
 
 # Herald basics
