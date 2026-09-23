@@ -1387,8 +1387,8 @@ Author a plugin to add validator methods (`.slug`, `.postalCode`, …) — the `
 
 ## See also
 
-- [`@warlock.js/cascade`](../../cascade/skills/overview/SKILL.md) — uses seal schemas as `Model.schema`.
-- [`@warlock.js/core`](../../core/skills/overview/SKILL.md) — re-exports `v` (aliased) and adds framework validators in `core/v`.
+- [`@warlock.js/cascade`](../../../cascade/skills/cascade-basics/SKILL.md) — uses seal schemas as `Model.schema`.
+- [`@warlock.js/core`](../../../core/skills/validate-input/SKILL.md) — re-exports `v` (aliased) and adds framework validators in `core/v`.
 - [`mongez-agent-kit-authoring-skills`](../../../../domains/shared/skills/) (load via agent-kit sync) — how this becomes `.claude/skills/warlock-js-seal-overview/`.
 
 
