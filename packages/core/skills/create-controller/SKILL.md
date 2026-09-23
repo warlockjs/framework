@@ -1,6 +1,6 @@
 ---
 name: create-controller
-description: 'Author HTTP controllers in @warlock.js/core — RequestHandler signature, validated input via seal schemas, response helpers, attaching metadata. Controllers are thin functions; business logic moves to services or use-cases. Triggers: `RequestHandler`, `Request<TSchema>`, `GuardedRequestHandler`, `request.validated`, `request.input`, `controller.validation`, `response.success`, `response.successCreate`; "write a controller", "attach a schema to a handler", "thin controller pattern", "guarded request type"; typical import `import { type RequestHandler } from "@warlock.js/core"`. Skip: response helper menu — `@warlock.js/core/send-response/SKILL.md`; schema authoring — `@warlock.js/core/validate-input/SKILL.md`; URL wiring — `@warlock.js/core/register-route/SKILL.md`; competing patterns: `express` middleware functions, `@nestjs/common` `@Controller`/`@Get` decorators.'
+description: "Warlock — create a controller in @warlock.js/core; use when you need to create controller."
 ---
 
 # Warlock — create a controller

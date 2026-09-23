@@ -1,6 +1,6 @@
 ---
 name: register-route
-description: 'Register HTTP routes via @warlock.js/core''s router — single routes, prefix groups, middleware-guarded blocks, and RESTful resource chains. Routes always live in `src/app/<module>/routes.ts`. Triggers: `router.get`, `router.post`, `router.prefix`, `router.group`, `router.route`, `guarded`; "add a route", "wire a controller to a URL", "group routes by prefix", "register a RESTful resource"; typical import `import { router } from "@warlock.js/core"`. Skip: handler shape — `@warlock.js/core/create-controller/SKILL.md`; CRUD chain details — `@warlock.js/core/build-restful/SKILL.md`; middleware authoring — `@warlock.js/core/write-middleware/SKILL.md`; competing libs `express`, `fastify`, `koa`, `@nestjs/common`.'
+description: "Warlock — register a route in @warlock.js/core; use when you need to register route."
 ---
 
 # Warlock — register a route
@@ -15,6 +15,19 @@ import { listProductsController } from "./controllers/list-products.controller";
 
 router.get("/products", listProductsController);
 ```
+
+## Named API metadata for browser forms
+
+Give a browser-submitted API route a stable `name`. Web publishes only its
+name, path, and method to `useSubmitForm`; controllers, middleware, schemas,
+and source paths never reach the browser.
+
+```ts
+router.post("/orders/:id", createOrderController, { name: "orders.create" });
+```
+
+Use a concrete HTTP verb for browser forms. `router.any()` is represented as
+`all` metadata and requires callers to choose an explicit path and method.
 
 That's the entire contract for a simple route. `router` is a singleton; method calls register routes synchronously. The handler is a plain function (controllers are typed as `RequestHandler` — see [create-controller](../create-controller/SKILL.md)).
 

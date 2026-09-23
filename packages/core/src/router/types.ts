@@ -214,6 +214,13 @@ export interface RouteOptions {
 export type RequestMethod =
   "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "OPTIONS" | "HEAD" | "all";
 
+/** Browser-safe snapshot metadata for a named application API route. */
+export type NamedApiRoute = Readonly<{
+  name: string;
+  path: string;
+  method: RequestMethod;
+}>;
+
 /**
  * Route Object
  */

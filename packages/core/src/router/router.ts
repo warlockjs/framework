@@ -23,6 +23,7 @@ import { routeNameMethodSuffix } from "./route-name-method-suffix";
 import type {
   GroupedRoutesOptions,
   HttpContext,
+  NamedApiRoute,
   RequestHandler,
   RequestHandlerType,
   RequestHandlerValidation,
@@ -857,6 +858,20 @@ export class Router {
    */
   public list() {
     return this.routes;
+  }
+
+  /**
+   * Return fresh browser-safe snapshots of named, non-page routes.
+   *
+   * Names are the registered names, including method suffixes. `all` stays
+   * intact as route metadata; consumers decide whether their use supports it.
+   */
+  public getNamedApiRoutes(): readonly NamedApiRoute[] {
+    return Object.freeze(
+      this.routes
+        .filter((route) => !route.isPage && typeof route.name === "string" && route.name.length > 0)
+        .map((route) => Object.freeze({ name: route.name!, path: route.path, method: route.method })),
+    );
   }
 
   /**

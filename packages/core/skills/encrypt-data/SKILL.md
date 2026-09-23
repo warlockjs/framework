@@ -1,6 +1,6 @@
 ---
 name: encrypt-data
-description: 'Reversible AES-256-GCM `encrypt` / `decrypt` for secrets you need to read back; one-way HMAC-SHA256 `hmacHash` for deterministic fingerprints (lookup/dedup of encrypted columns). Keys come from `src/config/encryption.ts`. Triggers: `encrypt`, `decrypt`, `hmacHash`, `EncryptionConfigurations`, `APP_ENCRYPTION_KEY`, `APP_HMAC_KEY`; "store an API key reversibly", "fingerprint an encrypted column for lookup", "AES-256-GCM secret", "HMAC-SHA256 dedup key"; typical import `import { encrypt, decrypt, hmacHash } from "@warlock.js/core"`. Skip: password hashing — `@warlock.js/core/hash-password/SKILL.md`; config wiring — `@warlock.js/core/configure-app/SKILL.md`; competing libs Node `crypto` direct, `crypto-js`, `libsodium-wrappers`.'
+description: "Warlock — encrypt and fingerprint in @warlock.js/core; use when you need to encrypt data."
 ---
 
 # Warlock — encrypt and fingerprint

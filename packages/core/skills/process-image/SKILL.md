@@ -1,6 +1,6 @@
 ---
 name: process-image
-description: 'Transform images with the `Image` class — resize, crop, rotate, format, quality, watermark, blur, etc. — using a deferred pipeline that runs only at `save()` / `toBuffer()` / `toBase64()` / `toDataUrl()` time. Requires sharp via `warlock add image`. Triggers: `Image`, `Image.fromFile`, `Image.fromBuffer`, `Image.fromUrl`, `.resize`, `.crop`, `.watermark`, `.toBuffer`, `.toDataUrl`, `.apply`; "resize an image", "generate a thumbnail", "watermark a product photo", "build an image pipeline"; typical import `import { Image } from "@warlock.js/core"`. Skip: multipart upload entry — `@warlock.js/core/upload-file/SKILL.md`; storage persistence — `@warlock.js/core/store-file/SKILL.md`; competing libs `sharp` direct, `jimp`, `imagemagick`, `gm`.'
+description: "Warlock — process an image in @warlock.js/core; use when you need to process image."
 ---
 
 # Warlock — process an image

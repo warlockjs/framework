@@ -1,6 +1,6 @@
 ---
 name: build-restful
-description: 'Generate standard CRUD endpoints — via `router.route(path).list().show().create().update().destroy()` chain or the `Restful` base class. Pick the chain by default; reach for `Restful` when you want repository-bound defaults. Triggers: `router.route`, `Restful`, `router.restfulResource`, `RouteResource`, `.crud`, `.nest`, `beforeCreate`, `onCreate`; "build a CRUD API", "register list/show/create/update/destroy", "repository-bound default handlers", "override a single REST action"; typical import `import { router, Restful } from "@warlock.js/core"`. Skip: wider router surface — `@warlock.js/core/register-route/SKILL.md`; per-action controllers — `@warlock.js/core/create-controller/SKILL.md`; wire mapping — `@warlock.js/core/define-resource/SKILL.md`; competing pattern: hand-rolled controllers, `@nestjs/swagger` decorator-driven CRUD.'
+description: "Warlock — build a RESTful resource in @warlock.js/core; use when you need to build restful."
 ---
 
 # Warlock — build a RESTful resource

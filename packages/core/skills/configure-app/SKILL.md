@@ -1,6 +1,6 @@
 ---
 name: configure-app
-description: 'Configure a Warlock app — the two layers (`warlock.config.ts` for framework-level wiring, `src/config/*.ts` for subsystems), `.env` + `env()`, the `config()` getter for runtime reads, and `app.publicUrl`/`PUBLIC_APP_URL` (the app''s public origin). Triggers: `defineConfig`, `config.get`, `config.key`, `env`, `ConfigRegistry`, `HttpConfigurations`, `AppConfigurations`, `publicUrl`, `PUBLIC_APP_URL`, `getPublicUrl`; "add a new config file", "warlock.config.ts vs src/config", "read env values", "runtime config lookup", "app public origin/URL"; typical import `import { defineConfig, config, env } from "@warlock.js/core"`. Skip: cache driver registration — `@warlock.js/cache/cache-basics/SKILL.md`; mail config — `@warlock.js/core/send-mail/SKILL.md`; storage config — `@warlock.js/core/store-file/SKILL.md`; sitemap refusal on a missing origin — `@warlock.js/web/generate-sitemap/SKILL.md`; competing libs `dotenv` direct, `convict`, `node-config`.'
+description: "Warlock — configure the app in @warlock.js/core; use when you need to configure app."
 ---
 
 # Warlock — configure the app

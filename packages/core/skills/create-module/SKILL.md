@@ -1,6 +1,6 @@
 ---
 name: create-module
-description: 'Scaffold a new feature module under `src/app/<name>/` via `warlock generate.module` and the follow-up generators for controllers, models, repositories, resources, and validation schemas. Triggers: `warlock generate.module`, `generate.controller`, `generate.service`, `generate.model`, `generate.repository`, `generate.resource`, `generate.migration`, `--minimal`, `gen.m`; "scaffold a new module", "create CRUD bootstrap", "add a controller to a module", "generate a model"; typical CLI `npx warlock generate.module <name>`. Skip: framework-wide layout rules — `@warlock.js/core/warlock-conventions/SKILL.md`; routes file shape — `@warlock.js/core/register-route/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing tooling: `@nestjs/cli`, `hygen`, hand-rolled folder layouts.'
+description: "Warlock — create a module in @warlock.js/core; use when you need to create module."
 ---
 
 # Warlock — create a module

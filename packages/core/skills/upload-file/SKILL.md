@@ -1,6 +1,6 @@
 ---
 name: upload-file
-description: 'Handle multipart file uploads — read via `request.file()` or `request.validated()`, validate with `v.file()`, save via `UploadedFile.save()` or the storage layer, transform images inline. Triggers: `UploadedFile`, `request.file`, `v.file`, `.save`, `.saveAs`, `.resize`, `.format`, `.quality`, `.image`, `.mimeType`, `.maxSize`; "accept a file upload", "validate file size and mime", "save to S3 or local disk", "resize an uploaded image on save"; typical import `import type { UploadedFile, RequestHandler } from "@warlock.js/core"`. Skip: storage drivers + presigned URLs — `@warlock.js/core/store-file/SKILL.md`; image-only transforms — `@warlock.js/core/process-image/SKILL.md`; schema rules — `@warlock.js/core/validate-input/SKILL.md`; competing libs `multer`, `formidable`, `busboy`.'
+description: "Warlock — upload a file in @warlock.js/core; use when you need to upload file."
 ---
 
 # Warlock — upload a file

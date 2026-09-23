@@ -1,6 +1,6 @@
 ---
 name: store-file
-description: 'Read/write/delete files via the `storage` singleton — disks, drivers (local/S3/R2/DO Spaces), `storage.use(name)`, `StorageFile` handles, presigned URLs. Triggers: `storage.put`, `storage.get`, `storage.use`, `StorageFile`, `storageConfigurations`, `getPresignedUrl`, `getPresignedUploadUrl`; "save an uploaded file", "switch between local and S3", "generate a presigned URL", "read file metadata"; typical import `import { storage } from "@warlock.js/core"`. Skip: multipart parsing + image chain — `@warlock.js/core/upload-file/SKILL.md`; image transforms — `@warlock.js/core/process-image/SKILL.md`; storage config shape — `@warlock.js/core/configure-app/SKILL.md`; competing libs `@aws-sdk/client-s3`, `multer`, `formidable`.'
+description: "Warlock — store a file in @warlock.js/core; use when you need to store file."
 ---
 
 # Warlock — store a file

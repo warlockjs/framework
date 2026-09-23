@@ -1,6 +1,6 @@
 ---
 name: health-checks
-description: 'Built-in liveness (`/health`) and readiness (`/ready`) endpoints plus graceful HTTP request draining for zero-downtime deploys — the `health` registry (`health.addCheck`/`removeCheck`), the `http.health.*` and `http.gracefulShutdown.*` config, and how readiness ties into `Application.isShuttingDown`. Triggers: `health`, `health.addCheck`, `health.removeCheck`, `HealthCheck`, `/health`, `/ready`, `http.health`, `http.gracefulShutdown`, `forceCloseConnections`, "liveness probe", "readiness probe", "graceful shutdown", "drain in-flight requests", "zero-downtime deploy", "kubernetes health check", "503 until ready"; typical import `import { health } from "@warlock.js/core"`. Skip: the `Application.onShutdown` / `onceBooted` lifecycle hooks — `@warlock.js/core/use-app-context/SKILL.md`; maintenance-mode 503s — `@warlock.js/core/use-middleware/SKILL.md`; connector lifecycle — `@warlock.js/core/add-connector/SKILL.md`; competing libs `@fastify/under-pressure`, `terminus`, hand-rolled `/health` controllers.'
+description: "Warlock — health checks & graceful shutdown in @warlock.js/core; use when you need to health checks."
 ---
 
 # Warlock — health checks & graceful shutdown

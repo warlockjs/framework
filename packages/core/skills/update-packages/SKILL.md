@@ -1,6 +1,6 @@
 ---
 name: update-packages
-description: 'Keep a project current with `warlock update` — bump every `@warlock.js/*` dependency in package.json to its latest published version (range operator preserved), then run the lockfile-detected package manager install. Also covers the `warlock dev` update notice, its `u` update-and-restart keyboard shortcut, and the `devServer.checkForUpdates` toggle. Triggers: `warlock update`, `--no-install`, `--dry-run`, `--check`, `checkForUpdates`, `fetchLatestVersion`, `isNewerVersion`; "update warlock packages", "upgrade the framework", "is there a new warlock version", "update notice in the dev server", "press u to update", "dev server keyboard shortcut", "update check offline", "bump @warlock.js/* to latest"; typical CLI `warlock update`. Skip: dev/build/start runtime — `@warlock.js/core/run-app/SKILL.md`; writing a custom command — `@warlock.js/core/write-cli-command/SKILL.md`; installing a NEW feature package (auth, mail, storage) — that is `warlock add`; releasing/publishing the framework — workspace release tooling, not this command.'
+description: "Warlock — update the framework in @warlock.js/core; use when you need to update packages."
 ---
 
 # Warlock — update the framework

@@ -1,6 +1,6 @@
 ---
 name: write-seeder
-description: 'Author a seed file under `src/app/<module>/seeds/<name>.ts` using the `seeder()` factory — `name`, `dependsOn`, `once`, `order`, `batchSize`, `run({ track, now, batchSize })`. Auto-discovered by `warlock seed`; tracked in a `seeds` table; per-record refs in `seed_records` so `warlock seed --drop` can undo a seed. Triggers: `seeder`, `Seeder`, `SeedResult`, `SeedContext`, `SeedClock`, `track`, `now`, `batchSize`, `SeedersManager`, `warlock seed`, `--fresh`, `--drop`, `--list`, `--path`; "seed default roles", "undo a seed", "one-time data migration", "auto-discovered seeds", "order seeds by dependency", "deterministic seed timestamps", "inject a seed clock"; typical import `import { seeder } from "@warlock.js/core"`. Skip: module folder layout — `@warlock.js/core/create-module/SKILL.md`; repository CRUD — `@warlock.js/core/use-repository/SKILL.md`; CLI flags — `@warlock.js/core/write-cli-command/SKILL.md`; competing patterns: hand-rolled `node scripts/seed.js`, `typeorm-seeding`.'
+description: "Warlock — write a seeder in @warlock.js/core; use when you need to write seeder."
 ---
 
 # Warlock — write a seeder

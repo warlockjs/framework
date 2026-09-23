@@ -1,6 +1,6 @@
 ---
 name: request-tracing
-description: 'Vendor-neutral request tracing hooks (`http.tracing`) — observe request start/end and named phase spans (`route.match`, `middleware`, `validation`, `handler`, `response.write`) without adopting an OTel/vendor dependency in `core`. Covers the `TracingHooks` shape, trace id derivation from an inbound W3C `traceparent` vs `request.id`, that a throwing hook is caught and reported once (never breaks the request), and zero overhead when disabled. Triggers: `http.tracing`, `TracingHooks`, `onRequestStart`, `onRequestEnd`, `onPhase`, `traceparent`, `traceId`, `dispatchPhase`, "instrument requests", "trace a request", "slow phase logging", "APM / OTel bridge for Warlock". Skip: request-id header echo/inheritance (`X-Request-Id`) — `@warlock.js/core/use-middleware/SKILL.md`; app-level structured logging — `@warlock.js/logger/logger-basics/SKILL.md`; competing libs `@opentelemetry/api` direct instrumentation, `express-request-id`, hand-rolled `X-Trace-Id` middleware.'
+description: "Warlock — request tracing hooks in @warlock.js/core; use when you need to request tracing."
 ---
 
 # Warlock — request tracing hooks

@@ -1,6 +1,6 @@
 ---
 name: retry-operation
-description: 'Wrap a flaky operation with `retry(fn, options)` — now provided by `@mongez/reinforcements` (not `@warlock.js/core`). `attempts` total tries, `delay` + `backoff` (linear/exponential/fn), `maxDelay`, `jitter`, `shouldRetry` to bail on permanent errors, `signal` to cancel, plus `retryable()` to pre-bind options. Triggers: `retry`, `retryable`, `RetryOptions`, `attempts`, `backoff`, `jitter`, `maxDelay`, `shouldRetry`, `signal`; "retry a flaky API call", "handle transient errors", "exponential backoff with jitter", "wrap an external request"; typical import `import { retry } from "@mongez/reinforcements"`. Skip: timing the retried op — `@warlock.js/core/benchmark-code/SKILL.md`; use-case-level `retry` option — `@warlock.js/core/write-use-case/SKILL.md`; competing libs `p-retry`, `async-retry`, `cockatiel`.'
+description: "Warlock — retry an operation in @warlock.js/core; use when you need to retry operation."
 ---
 
 # Warlock — retry an operation

@@ -1,6 +1,6 @@
 ---
 name: warlock-routes
-description: 'Run `warlock routes` — a read-only command that lists the registered HTTP routes as a verb-colored table (method / path / name / action / middleware-count / source), a sibling of `warlock doctor`. Filter with `--method` / `--path` / `--name`, or emit normalized rows as JSON with `--json`. Also covers `warlock routes:diff`, which compares live page routes against the last `warlock build`''s route snapshot and exits non-zero on drift. Triggers: `warlock routes`, `routesCommand`, `warlock routes:diff`, `routesDiffCommand`, "list my routes", "show all routes", "route table", "what endpoints does my app expose", "dump routes as JSON", "which routes have middleware", "route map for CI", "did my page routes drift from the last build"; run as `npx warlock routes` / `npx warlock routes:diff`. Skip: read-only health/preflight checks — `@warlock.js/core/warlock-doctor/SKILL.md`; defining/naming/grouping routes — `@warlock.js/core/register-route/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; competing tools `nest`/`express` route listers, `php artisan route:list`.'
+description: "Warlock — warlock routes in @warlock.js/core; use when you need to warlock routes."
 ---
 
 # Warlock — `warlock routes`

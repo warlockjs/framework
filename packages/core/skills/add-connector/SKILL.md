@@ -1,6 +1,6 @@
 ---
 name: add-connector
-description: 'Extend Warlock with a `BaseConnector` subclass and register its instance in `warlock.config.ts > connectors`. Covers runtime lifecycle (`boot`, `start`, `shutdown`, priority, phase, watched files) and the optional static `build.generate` / `build.emit` contribution used by `warlock build`. Triggers: `BaseConnector`, `connectors`, `ConnectorLifecyclePhase`, `ConnectorBuildContribution`, `build.generate`, `build.emit`; "add a queue worker", "wire a subsystem into bootstrap", "contribute files to warlock build", "control startup ordering", "graceful shutdown hook". Skip: app context accessors — `@warlock.js/core/use-app-context/SKILL.md`; general config shape — `@warlock.js/core/configure-app/SKILL.md`; competing pattern: hand-rolled process signal blocks, NestJS lifecycle hooks.'
+description: "Warlock — add a connector in @warlock.js/core; use when you need to add connector."
 ---
 
 # Warlock — add a connector

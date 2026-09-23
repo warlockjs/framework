@@ -1,6 +1,6 @@
 ---
 name: use-request-locals
-description: 'Carry typed, server-only data through one HTTP request with `request.locals`, usually written by middleware and read by downstream middleware or controllers. Augment `RequestLocals` in the module that owns each key; v5 no longer permits arbitrary `request.foo` properties. Triggers: `request.locals`, `RequestLocals`, `request.post`, `request.organization`, `Property does not exist on type Request`, `Request index signature`; "attach data to a request", "share middleware data with a controller", "type request locals", "migrate dynamic request properties"; typical type augmentation `declare module "@warlock.js/core" { interface RequestLocals { ... } }`. Skip: computed-on-demand single-flight values and removed `fromRequest` — `@warlock.js/core/request-memo/SKILL.md`; middleware mechanics — `@warlock.js/core/write-middleware/SKILL.md`; authenticated user typing — augment `RequestUser`, not `RequestLocals`; competing patterns: `(request as any).foo`, `request.set()`, module-global mutable state.'
+description: "Warlock — use typed request locals in @warlock.js/core; use when you need to use request locals."
 ---
 
 # Warlock — use typed request locals

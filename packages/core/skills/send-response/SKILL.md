@@ -1,6 +1,6 @@
 ---
 name: send-response
-description: 'Send HTTP responses via @warlock.js/core''s Response helpers — success/error variants, status helpers, redirects, files, streams, and SSE. Picking the right helper carries the HTTP semantic without manual status codes. Triggers: `response.success`, `response.successCreate`, `response.notFound`, `response.forbidden`, `response.badRequest`, `response.sendFile`, `response.stream`, `response.sse`, `response.replay`, `ResourceNotFoundError`, `ForbiddenError`, `request.cookie`, `request.hasCookie`, `CookieJarUnavailableError`; "return a 201 from a controller", "send a file", "stream Server-Sent Events", "throw HTTP-shaped errors from services"; typical import `import type { RequestHandler, Response } from "@warlock.js/core"`. Skip: controller shape — `@warlock.js/core/create-controller/SKILL.md`; route registration — `@warlock.js/core/register-route/SKILL.md`; competing patterns: hand-rolled status codes via `reply.code(404).send(...)`, raw Fastify reply.'
+description: "Warlock — send a response in @warlock.js/core; use when you need to send response."
 ---
 
 # Warlock — send a response

@@ -1,5 +1,11 @@
 import { colors } from "@mongez/copper";
-import { fileExistsAsync, getJsonFileAsync, putFileAsync, putJsonFileAsync } from "@warlock.js/fs";
+import {
+  fileExistsAsync,
+  getFileAsync,
+  getJsonFileAsync,
+  putFileAsync,
+  putJsonFileAsync,
+} from "@warlock.js/fs";
 import { execSync } from "node:child_process";
 import type { CommandActionData } from "../commands/types";
 import {
@@ -11,6 +17,7 @@ import {
 import { rootPath, srcPath } from "../utils";
 import { getWarlockVersion } from "../utils/framework-vesion";
 import { featuresMap } from "./features";
+import { mergePnpmSharpApproval } from "./pnpm-build-approvals";
 
 export { featuresMap };
 export type { FeatureDefinition } from "./features";
@@ -87,9 +94,7 @@ export async function addCommandAction(options: CommandActionData) {
       // `allowedFeatures` is derived from this same map, so this resolves.
       if (definition === undefined) continue;
 
-      console.log(
-        `- ${colors.yellowBright(feature)}: ${colors.green(definition.description)}`,
-      );
+      console.log(`- ${colors.yellowBright(feature)}: ${colors.green(definition.description)}`);
     }
 
     process.exit(0);
@@ -154,6 +159,15 @@ export async function addCommandAction(options: CommandActionData) {
   if (noInstall) {
     await recordDependencies(dependencies, devDependencies);
   } else {
+    const resolvedPackageManager =
+      (packageManager as PackageManager | undefined) ?? (await detectPackageManager());
+    if (resolvedPackageManager === "pnpm" && dependencies.sharp !== undefined) {
+      const workspacePath = rootPath("pnpm-workspace.yaml");
+      const current = (await fileExistsAsync(workspacePath))
+        ? await getFileAsync(workspacePath)
+        : "";
+      await putFileAsync(workspacePath, mergePnpmSharpApproval(current));
+    }
     await installDependencies(
       packageManager as PackageManager | undefined,
       dependencies,

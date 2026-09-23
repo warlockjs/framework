@@ -1,6 +1,6 @@
 ---
 name: test-http
-description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `stopHttpTestServer`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core/tests"`. Skip: pure unit tests — `@warlock.js/core/test-service/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing libs `supertest`, `light-my-request`, `nock`.'
+description: "Warlock — HTTP integration tests in @warlock.js/core; use when you need to test http."
 ---
 
 # Warlock — HTTP integration tests

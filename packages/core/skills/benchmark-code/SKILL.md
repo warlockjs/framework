@@ -1,6 +1,6 @@
 ---
 name: benchmark-code
-description: 'Wrap a function with `measure(name, fn, options?)` to time it and classify the latency — onComplete/onError/onFinish hooks, `latencyRange` thresholds, `BenchmarkProfiler` for percentiles, `BenchmarkSnapshots` for raw captures. Triggers: `measure`, `BenchmarkProfiler`, `BenchmarkSnapshots`, `BenchmarkChannel`, `ConsoleChannel`, `latencyRange`, `shouldBenchmarkError`; "time this operation", "profile a slow service", "emit p50/p95/p99 metrics", "classify latency against thresholds"; typical import `import { measure, BenchmarkProfiler } from "@warlock.js/core"`. Skip: retry composition — `@warlock.js/core/retry-operation/SKILL.md`; benchmark config wiring — `@warlock.js/core/configure-app/SKILL.md`; competing libs `prom-client`, `pino`, `perf_hooks`, `console.time`.'
+description: "Warlock — benchmark code in @warlock.js/core; use when you need to benchmark code."
 ---
 
 # Warlock — benchmark code

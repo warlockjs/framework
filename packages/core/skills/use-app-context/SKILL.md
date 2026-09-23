@@ -1,6 +1,6 @@
 ---
 name: use-app-context
-description: 'Read app-wide context — the `Application` static class (env, version, uptime, runtime strategy, boot lifecycle) plus the `app` runtime accessor (live Fastify, socket.io, router, database via the DI container). Triggers: `Application.isProduction`, `Application.environment`, `Application.runtimeStrategy`, `Application.uptime`, `Application.version`, `Application.onceBooted`, `Application.whenBooted`, `Application.isBooted`, `Application.onShutdown`, `Application.isShuttingDown`, `app.http`, `app.socket`, `app.database`, `app.router`; "branch on environment", "reach the live Fastify instance", "framework version in health endpoint", "dev vs production runtime check", "run code once the app is fully booted", "after all connectors started", "app booted hook", "run cleanup before shutdown", "graceful shutdown hook"; typical import `import { Application, app } from "@warlock.js/core"`. Skip: path helpers — `@warlock.js/core/resolve-path/SKILL.md`; connector start order — `@warlock.js/core/add-connector/SKILL.md`; competing patterns: bare `process.env.NODE_ENV`, ad-hoc Fastify imports.'
+description: "Warlock — use the application context in @warlock.js/core; use when you need to use app context."
 ---
 
 # Warlock — use the application context
