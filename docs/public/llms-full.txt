@@ -14621,8 +14621,8 @@ Author a plugin to add validator methods (`.slug`, `.postalCode`, …) — the `
 
 ## See also
 
-- [`@warlock.js/cascade`](../../cascade/skills/overview/SKILL.md) — uses seal schemas as `Model.schema`.
-- [`@warlock.js/core`](../../core/skills/overview/SKILL.md) — re-exports `v` (aliased) and adds framework validators in `core/v`.
+- [`@warlock.js/cascade`](../../../cascade/skills/cascade-basics/SKILL.md) — uses seal schemas as `Model.schema`.
+- [`@warlock.js/core`](../../../core/skills/validate-input/SKILL.md) — re-exports `v` (aliased) and adds framework validators in `core/v`.
 - [`mongez-agent-kit-authoring-skills`](../../../../domains/shared/skills/) (load via agent-kit sync) — how this becomes `.claude/skills/warlock-js-seal-overview/`.
 
 
@@ -25814,7 +25814,9 @@ export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
 ```
 
 Every export has one owner. Duplicate `config`, `loader`, or `register` exports
-fail; `register()` remains browser-safe and runs on server and client.
+fail; `register()` remains browser-safe and runs on server and client. A
+type-only loader import is sufficient in development and production: it retains
+the framework-projected `register()` hook without a UI runtime import of setup.
 
 ```tsx title="src/web/products/product-details.page.tsx"
 import type { PageConfig, PageLoader, PageProps } from "@warlock.js/web";

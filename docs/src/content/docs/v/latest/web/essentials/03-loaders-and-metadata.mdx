@@ -31,6 +31,10 @@ export default function Products({ data }: PageProps<typeof loader>) {
 }
 ```
 
+That type-only loader import is sufficient in development and production. It
+retains the framework-projected `register()` hook without adding a runtime UI
+import of setup.
+
 An export belongs to exactly one member of the pair. Duplicate `config`,
 `loader`, or `register` exports fail rather than receiving precedence. Setup
 files are optional and `warlock dev` detects their add/edit/delete changes.
