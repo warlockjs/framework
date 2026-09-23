@@ -3,7 +3,7 @@ title: Create Warlock
 description: The official project scaffolder — one command spins up a complete, configured Warlock app in a couple of minutes.
 ---
 
-`create-warlock` is the official project scaffolder. One command and, at most, one question later (API-only or full-stack web) you have a complete, configured Warlock project that boots. Prefer the old style? `--interactive` restores the full long-form wizard.
+`create-warlock` is the official project scaffolder. One command and a short setup flow later you have a complete, configured Warlock project that boots: choose API-only or full-stack web, then a database unless a database flag already supplied it. Prefer the old style? `--interactive` restores the full long-form wizard.
 
 Migrating an existing app? Start with the [v5 migration guide](/v/latest/core/upgrade-to-v5/#create-warlock).
 
@@ -12,7 +12,7 @@ pnpm create warlock my-app
 cd my-app
 ```
 
-With a terminal, that command asks for the project name (if you didn't pass one) plus the one structural question — API-only or full-stack web. Everything else — package manager, database driver (or **None**, to skip it), optional features, git, JWT secrets — takes a sensible default, printed as a summary after scaffolding, with the flag to change each one. See [Headless / non-interactive mode](#headless--non-interactive-mode) below for scripting it fully, or `--interactive` for the old question-by-question flow.
+With a terminal, that command asks for the project name (if you did not pass one), API-only or full-stack web, and a database unless `--db` or `--no-db` already supplied it. The database selector offers MongoDB and PostgreSQL, shows MySQL as disabled, and includes **None** for a database-free app. Everything else — package manager, optional features, git, JWT secrets — takes a sensible default, printed as a summary after scaffolding, with the flag to change each one. See [Headless / non-interactive mode](#headless--non-interactive-mode) below for scripting it fully, or `--interactive` for the question-by-question flow.
 
 What lands is a ready-to-run app: the `src/app` (one folder per feature) + `src/config` (one file per subsystem) layout, a `warlock.config.ts`, decorators already enabled in `tsconfig.json`, and a dev server you start with `pnpm dev`.
 
@@ -20,7 +20,7 @@ What lands is a ready-to-run app: the `src/app` (one folder per feature) + `src/
 
 `create-warlock` is fully headless: every prompt has a flag that answers it, `--yes` takes the default for anything you leave unset, and it works with **no terminal at all** — CI, a script, an agent. There are three modes:
 
-1. **Default (a TTY, no `--yes`, no `--interactive`)** — asks the project name (if not already given) plus **at most one** structural question: API-only or full-stack web (`--stack`). That's the only choice that changes the generated app's shape; everything else below is a flag with a sensible default, never a prompt.
+1. **Default (a TTY, no `--yes`, no `--interactive`)** — asks the project name (if not already given), API-only or full-stack web (`--stack`), then a database unless `--db` or `--no-db` already supplied it. The stack is the only choice that changes the generated app's shape.
 2. **`--yes` (or no TTY at all)** — fully headless. Every answer comes from a flag or its default; nothing is ever prompted, and stdin is never read.
 3. **`--interactive` (alias `--customize`)** — the full long-form wizard, one prompt at a time: project name, package manager, database driver, features, AI providers, git, JWT.
 
@@ -43,7 +43,7 @@ The first positional argument (or `--name`) is the project name. Value flags acc
 | Flag | Takes value | Default | Purpose |
 | --- | --- | --- | --- |
 | `<positional>` / `--name` | yes | — (required) | Project name + target directory |
-| `--stack` | yes | `api` | `api` or `web` — the one structural question; `web` seeds the `web` feature by default |
+| `--stack` | yes | `api` | `api` or `web` — the structural choice; `web` seeds the `web` feature by default |
 | `--db` / `--no-db` | yes / no | `mongodb` | Database driver — `mongodb`, `postgres`, or `none` (`--no-db` is shorthand for `--db=none`) |
 | `--pm` | yes | inferred (`npm_config_user_agent` or the system) | Package manager — must be `npm` / `yarn` / `pnpm` / `bun`; any other value is rejected before scaffolding starts |
 | `--features` | yes (CSV) | none, or `["web"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys |
@@ -69,6 +69,15 @@ A project name is required and no terminal is available to ask for one. Pass it 
 the first argument or --name=<name>. Non-interactive flags: --yes, --pm=<npm|yarn|pnpm>,
 --db=<driver>|--no-db, --features=<list>, --ai=<list>, --git|--no-git, --jwt|--no-jwt.
 ```
+
+### AI choice in Customize
+
+AI remains optional in the long-form wizard. Press Enter with no AI selections
+to skip it. The AI multiselect also places **None** last; choosing it alone has
+the same result. **None** cannot be combined with an AI provider or capability
+package, so the wizard shows a warning and returns to the AI selector with
+the non-**None** selections retained for correction. Headless `--ai` flags are
+unchanged.
 
 ### Exit codes
 
