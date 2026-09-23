@@ -1,6 +1,6 @@
 ---
 name: overview
-description: 'Front-door orientation for `@warlock.js/context` — typed AsyncLocalStorage wrappers for sharing data (user, tenant, trace, request) across async calls without thread-through. Extend `Context<TStore>` for a single context; use `contextManager` to orchestrate several at once. TRIGGER when: code imports anything from `@warlock.js/context`; user asks "what does @warlock.js/context do", "AsyncLocalStorage but typed", "share user/tenant across async without thread-through", "compare context vs cls-hooked / nest-context"; package.json adds `@warlock.js/context`. Skip: specific task already known — load the matching task skill directly (`@warlock.js/context/define-context/SKILL.md`, `@warlock.js/context/orchestrate-contexts/SKILL.md`); plain `AsyncLocalStorage` usage with no `Context<>` wrapper; React Context (this package is server-side / Node-only).'
+description: "@warlock.js/context overview for orientation and choosing the focused skill for the task."
 ---
 
 # `@warlock.js/context` — overview
