@@ -6,31 +6,72 @@ sidebar:
   label: "Protect routes"
 ---
 
-`authMiddleware(allowedUserType: string | string[], tokenFrom?)` returns a Warlock middleware. Attach it to routes or route groups. `allowedUserType` is **required** — there is no optional/anonymous mode. A request without a valid access token is always rejected with `401`; routes that should be public simply omit the middleware.
+`authMiddleware` returns a Warlock middleware. It has typed/default hard-gate forms plus an object form for one credential source, optional resolution, and a page-local redirect. Legacy `authMiddleware(userType, "cookie:name")` remains supported.
 
-Sessions are not bearer-token-only: `tokenFrom` selects where the credential is read from — the default `"header"` reads `Authorization: Bearer <token>`, and `` `cookie:${name}` `` reads a named cookie instead, for browser clients that can't stash a token in JS-readable storage. See [Cookie-sourced credentials](#cookie-sourced-credentials) below.
+Use `{ source: "header" }` (the default) or `{ source: "cookie", key: "access_token" }` to select one credential source.
 
-## The two modes
+## Common forms
+
+Middleware belongs in the route `options.middleware` array.
 
 ```ts
-import { authMiddleware } from "@warlock.js/auth";
-import { router } from "@warlock.js/core";
+router.get("/account", accountController, {
+  middleware: [authMiddleware()], // configured default user type
+});
 
-// Mode 1 — required, any user type
-//   401s if no valid token. Empty array = "any logged-in user."
-router.get("/account", accountController, { middleware: [authMiddleware([])] });
+router.get("/admin", adminController, {
+  middleware: [authMiddleware("admin")],
+});
 
-// Mode 2 — required, specific user types
-//   401s if no token, or if the token's user type isn't in the allowed list.
-router.get("/admin", adminController, { middleware: [authMiddleware("admin")] });
-router.get("/back-office", backOfficeController, {
-  middleware: [authMiddleware(["admin", "staff"])],
+router.get("/feed", feedController, {
+  middleware: [authMiddleware({ source: "cookie", key: "access_token", optional: true })],
+});
+
+router.get("/profile", profileController, {
+  middleware: [authMiddleware("user", {
+    source: "cookie",
+    key: "access_token",
+    redirect: { to: "/login", returnUrlParam: "return_to" },
+  })],
 });
 ```
 
-Middleware is attached through the route's `options.middleware` array — the third argument — not as a positional argument.
+`authMiddleware()` uses `auth.defaultUserType`; with several configured user
+classes and no default, it throws during setup instead of guessing. `optional:
+true` permits anonymous continuation only. A presented credential is still
+fully verified and hydrates `request.locals.user` when valid. The legacy
+`authMiddleware("user", "cookie:access_token")` form remains valid.
+## Automatic cookie renewal
 
-The user-type slug must match a key in `config.auth.userType.<slug>` — see [Customize user type](./customize-user-type.md).
+Opt in on a route with one allowed user type and both cookie descriptors:
+
+```ts
+router.get("/account", accountController, {
+  middleware: [authMiddleware("user", {
+    source: "cookie",
+    key: "access_token",
+    refresh: { source: "cookie", key: "refresh_token", overlapMs: 5000 },
+    redirect: { to: "/login", returnUrlParam: "return_to" },
+  })],
+});
+```
+
+Missing or expired access credentials can be renewed once before the handler
+runs. Both replacement cookies are written using the configured cookie policy;
+the handler and mutations are never replayed. Run the additive `authMigrations`
+before enabling renewal.
+
+Concurrent requests presenting the same refresh token may receive its exact
+immediate active successor during a bounded duplicate window: five seconds by
+default, clamped to zero through ten seconds. A later rotated successor is never
+substituted. Outside that window, old-token reuse revokes the family. The public
+`authService.refreshTokens()` API retains strict replay handling. Family logout
+invalidates the persisted credentials even if an older response later sets a
+cookie; arbitrary out-of-order cookie delivery across generations is not solved
+by this mechanism.
+
+The local `redirect` applies only to page-route authentication failures. API
+requests retain status responses; authenticated disallowed user types get 403.
 
 ## What the middleware does on success
 
@@ -47,9 +88,9 @@ The user is loaded via `Model.find(decoded.id)` against the model class register
 
 | Error code                     | When                                                                           |
 | ------------------------------ | ------------------------------------------------------------------------------ |
-| `MissingAccessToken` (`EC001`) | No `Authorization` header                                                      |
+| `MissingAccessToken` (`EC001`) | No credential at the configured source (401)                                   |
 | `InvalidAccessToken` (`EC002`) | Token doesn't verify — signature, expired, doesn't match the DB row, user gone |
-| `Unauthorized` (`EC003`)       | Token valid but user-type isn't in the allowed list                            |
+| `Unauthorized` (`EC003`)       | Token valid but user-type isn't in the allowed list (403)                      |
 
 The response shape (via `response.unauthorized`):
 
@@ -74,23 +115,7 @@ const accountController: RequestHandler = async ({ request, response }) => {
 };
 ```
 
-Because the middleware always requires a valid token, `request.locals.user` is guaranteed inside any gated controller (the middleware would have 401'd otherwise). The `!` is safe here.
-
-A public route that wants _soft_ personalization simply omits the middleware and reads the token itself:
-
-```ts
-import type { RequestHandler } from "@warlock.js/core";
-
-const feedController: RequestHandler = async ({ request, response }) => {
-  const token = request.authorizationValue;
-
-  if (token) {
-    return response.success({ feed: await personalizedFeed(token) });
-  }
-
-  return response.success({ feed: await publicFeed() });
-};
-```
+In a hard-gated controller, `request.locals.user` is guaranteed. With `optional: true`, check it before using it. 
 
 ## Route-group protection
 
@@ -110,12 +135,22 @@ Every route inside the group is gated — the group's `middleware` array applies
 
 ```ts
 router.get("/account", accountController, {
-  middleware: [authMiddleware([], "cookie:access_token")],
+  middleware: [authMiddleware({ source: "cookie", key: "access_token" })],
 });
 ```
 
 Nothing writes that cookie for you implicitly — pair it with `authService.setAuthCookie` / `clearAuthCookie` in your login/logout controllers (see [Handle login and logout](./handle-login-and-logout.md#cookie-based-sessions--setauthcookie--clearauthcookie)). Upgrading never starts a bearer-only app emitting `Set-Cookie` on its own.
 
+## Automatic cookie renewal
+
+The 5.19 `refresh` descriptor is opt-in and is being reconciled with the final
+durable coordinator. Its release contract is narrow: only an exact immediately
+active successor pair may be reused during the configured duplicate window
+(default five seconds, range zero through ten). The strict legacy
+`authService.refreshTokens` path remains unchanged. A tolerated duplicate is a
+security tradeoff, not general replay acceptance; later old-token reuse revokes
+the family, and family logout invalidates late cookies. It does not solve
+arbitrary out-of-order HTTP cookie delivery.
 ## CSRF Origin check for cookie auth
 
 **New in 5.12.** A cookie-sourced credential can be silently replayed cross-site by a browser (a same-site `GET` redirect chain, or a client that ignores `SameSite`) in a way a header token cannot — nothing but your own JS can attach an `Authorization` header, but a browser attaches cookies automatically. To close that gap, `authMiddleware` automatically runs a CSRF Origin check whenever **both** are true:

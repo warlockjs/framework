@@ -8,7 +8,7 @@
 
 ---
 name: setup-deepseek
-description: 'Wire @warlock.js/ai-deepseek — new DeepSeekSDK({apiKey, baseURL?, provider?, pricing?}) for DeepSeek''s OpenAI-compatible API, .model({name, reasoning?, vision?, structuredOutput?, responseFormat?}) for ModelContract. Thin wrapper over @warlock.js/ai-openai''s OpenAISDK pinned to https://api.deepseek.com with provider "deepseek"; injects DeepSeek-specific reasoning/vision inference + built-in pricing. Models: deepseek-chat (non-thinking), deepseek-reasoner (thinking/reasoning), deepseek-v4-flash, deepseek-v4-pro. Triggers: `DeepSeekSDK`, `deepseek-chat`, `deepseek-reasoner`, `deepseek-v4`, `api.deepseek.com`, `DEEPSEEK_API_KEY`, reasoning effort on deepseek; "wire deepseek into a warlock agent", "use deepseek-reasoner", "configure deepseek-chat", "route a warlock agent through deepseek". Skip: OpenAI/Azure/OpenRouter — `@warlock.js/ai-openai`; agent wiring — `@warlock.js/ai/run-ai-agent/SKILL.md`; adapter comparison — `@warlock.js/ai/pick-ai-provider/SKILL.md`; raw deepseek HTTP / the `openai` SDK directly. Typical import `import { DeepSeekSDK } from "@warlock.js/ai-deepseek"`.'
+description: "@warlock.js/ai-deepseek in @warlock.js/ai-deepseek; use when you need to set up deepseek."
 ---
 
 # `@warlock.js/ai-deepseek`

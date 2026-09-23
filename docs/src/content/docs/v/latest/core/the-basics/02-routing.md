@@ -285,3 +285,17 @@ Combine with prefix and group as needed.
 ## Next
 
 Continue to **[Controllers](./03-controllers.md)** to see how a handler reads inputs and shapes responses.
+## Named API route metadata
+
+Name an API route when a browser form needs to address it by a stable contract:
+
+```ts
+router.post("/orders/:id", createOrderController, { name: "orders.create" });
+```
+
+`router.getNamedApiRoutes()` returns fresh, frozen snapshots of registered named
+API routes. Each snapshot is `{ name, path, method }`. It excludes page routes,
+handlers, middleware, schemas, and source paths, so adapters can publish route
+metadata to a browser without exposing server implementation details. A route
+registered with `router.any()` retains method `"all"`; a browser caller must
+choose an explicit request method rather than guessing one.

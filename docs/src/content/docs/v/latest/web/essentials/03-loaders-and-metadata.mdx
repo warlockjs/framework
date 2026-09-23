@@ -11,6 +11,30 @@ A page loader is its server-side controller. It can use the Warlock request
 context, DI, guards, and response controls, then return serializable data to the
 React component.
 
+## Optional setup modules
+
+Pair `products.page.tsx` with `products.setup.ts` to keep server policy and
+loaders beside, but outside, the UI component. `layout.setup.ts`,
+`root.setup.ts`, and `error.setup.ts` follow the same rule. The framework
+composes the pair on the server and projects only browser-safe `register()`
+code for the client.
+
+The UI must not value-import setup. It can retain inferred loader data with a
+type-only import:
+
+```tsx title="src/web/products.page.tsx"
+import type { loader } from "./products.setup";
+import type { PageProps } from "@warlock.js/web";
+
+export default function Products({ data }: PageProps<typeof loader>) {
+  return <h1>{data.products.length}</h1>;
+}
+```
+
+An export belongs to exactly one member of the pair. Duplicate `config`,
+`loader`, or `register` exports fail rather than receiving precedence. Setup
+files are optional and `warlock dev` detects their add/edit/delete changes.
+
 ## Type loader data into the page
 
 ```tsx title="src/web/products/[id].page.tsx"

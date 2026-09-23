@@ -27,7 +27,7 @@ type TokenPair = {
 
 **Signing key:** `config.auth.jwt.secret`.
 
-**Persistence:** one row in `access_tokens` per issued token. Columns: `token`, `user_id`, `user_type`, `is_active`, `last_access`.
+**Persistence:** one row in `access_tokens` per issued token. Columns: `token`, `user_id`, `user_type`, optional `family_id`, `expires_at`.
 
 **Verification path:** `authMiddleware` runs `jwt.verify(token)` then looks the token string up in `access_tokens`. Both must pass.
 
@@ -54,7 +54,7 @@ refresh (B)        → family X, token C  (B.revoked_at set)
 refresh (A again)  → A is already revoked → revoke EVERY token in family X
 ```
 
-The fourth step is the replay defense. Someone presenting an already-revoked token has either:
+The fourth step is the replay defense. In 5.19 a durable `auth_token_families` row records the family revision and revocation state; revoking a family also removes its associated access-token rows. Pre-upgrade access rows have no family association, so the revoke path conservatively removes only unassociated rows for that same user and user type. Someone presenting an already-revoked token has either:
 
 - A buggy client retrying with the old token (unusual but harmless to revoke the family — they'll re-login).
 - A leaked token where the legit user already refreshed and the attacker now tries the old one.
@@ -124,7 +124,7 @@ Schedule it via `@warlock.js/scheduler` or run the bundled CLI on cron — see [
 | `authService.removeRefreshToken(user, token)` | Deletes one `refresh_tokens` row outright (hard delete; rare — use `revoke()` for the audit trail). |
 | `authService.removeAllAccessTokens(user)` | Deletes every `access_tokens` row for this user. |
 | `authService.revokeAllTokens(user)` | Revokes every active refresh token + deletes every access token. Emits `token.revoked` per row, `logout.all` once. |
-| `authService.revokeTokenFamily(familyId)` | Revokes every refresh token sharing the given family. Emits `token.familyRevoked`. |
+| `authService.revokeTokenFamily(familyId)` | Atomically marks the durable family revoked, revokes its refresh rows, and removes associated access rows (plus conservative same-user/type legacy access rows). Emits `token.familyRevoked`. |
 
 ## Related
 

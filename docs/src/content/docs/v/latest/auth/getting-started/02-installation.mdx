@@ -32,7 +32,7 @@ Auth is coupled to `@warlock.js/core` — you're already inside a Warlock projec
 
 ## Register migrations + CLI commands
 
-`@warlock.js/auth` ships two Cascade migrations (one per token table) and two CLI commands. Wire them in `warlock.config.ts`:
+`@warlock.js/auth` ships the token, family-association, and provider Cascade migrations and two CLI commands. Wire them in `warlock.config.ts`:
 
 ```ts title="warlock.config.ts"
 import {
@@ -55,7 +55,7 @@ export default defineConfig({
 });
 ```
 
-`authMigrations` is an array — `[AccessTokenMigration, RefreshTokenMigration]`. If you already have a `migrations` array, spread them in: `migrations: [...mine, ...authMigrations]`.
+`authMigrations` is an array of package migrations, including additive 5.19 token-family migrations. If you already have a `migrations` array, spread them in: `migrations: [...mine, ...authMigrations]`.
 
 ## Generate the JWT secret
 

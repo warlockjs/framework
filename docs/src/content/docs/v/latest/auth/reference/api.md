@@ -35,7 +35,7 @@ Source: `@warlock.js/auth/src/models/auth.model.ts`.
 class AccessToken extends Model
 ```
 
-Cascade model backing the `access_tokens` table. Columns: `token`, `user_id`, `user_type`, `is_active`, `last_access`.
+Cascade model backing the `access_tokens` table. Columns: `token`, `user_id`, `user_type`, optional `family_id`, `expires_at`.
 
 Source: `@warlock.js/auth/src/models/access-token/access-token.model.ts`.
 
@@ -55,13 +55,29 @@ Cascade model backing `refresh_tokens`. The instance getters drive validation; `
 
 Source: `@warlock.js/auth/src/models/refresh-token/refresh-token.model.ts`.
 
+### `AuthTokenFamily`
+
+```ts
+class AuthTokenFamily extends Model
+```
+
+Durable authority for one refresh-token lineage: `family_id`, `user_id`,
+`user_type`, `revision`, and `revoked_at`. It coordinates family-wide revocation;
+applications use `authService.revokeTokenFamily` rather than mutating it.
+
+Source: `@warlock.js/auth/src/models/auth-token-family/auth-token-family.model.ts`.
 ### `authMigrations`
 
 ```ts
 const authMigrations: Migration[];
 ```
 
-The migrations array — `[AccessTokenMigration, RefreshTokenMigration]`. Spread into your `defineConfig({ database: { migrations: [...] } })`.
+The complete migrations array for access tokens, refresh tokens, durable token
+families, one-time tokens, provider accounts, and passkeys. It includes additive
+access-family and refresh-successor migrations for existing installations.
+Spread `authMigrations` into `defineConfig({ database: { migrations: [...] } })`
+and run pending migrations on upgrade; retain the identities of migrations
+already applied.
 
 Source: `@warlock.js/auth/src/models/index.ts`.
 
@@ -159,27 +175,21 @@ Source: `@warlock.js/auth/src/services/generate-jwt-secret.ts`.
 ### `authMiddleware`
 
 ```ts
-function authMiddleware(
-  allowedUserType: string | string[],
-  tokenFrom?: "header" | `cookie:${string}`, // default: "header"
-): Middleware;
+function authMiddleware(): Middleware;
+function authMiddleware(options: AuthMiddlewareOptions): Middleware;
+function authMiddleware(userType: string | string[], options?: AuthMiddlewareOptions): Middleware;
+function authMiddleware(userType: string | string[], tokenFrom?: "header" | `cookie:${string}`): Middleware;
 ```
 
-Route gate. `allowedUserType` is required and a valid token is always required (no anonymous mode). Empty array = any authenticated user. String / array = restricted to the listed user types. Public routes omit the middleware.
+No-argument middleware uses `auth.defaultUserType` (or the sole configured user
+class); ambiguous configuration throws. The object form uses `{ source:
+"header" | "cookie", key?, optional?, refresh?, redirect? }`. `optional: true`
+continues anonymously for absent or invalid credentials, while a valid one is
+still resolved. `redirect` applies only to page routes; APIs keep `401`.
 
-`tokenFrom` selects the credential source: the default `"header"` reads `Authorization: Bearer <token>`; `` `cookie:${name}` `` reads a named cookie instead (pair it with `authService.setAuthCookie`/`clearAuthCookie` — see [Handle login and logout](../guides/handle-login-and-logout.md#cookie-based-sessions--setauthcookie--clearauthcookie)).
-
-```ts
-router.get("/account",    accountController, { middleware: [authMiddleware([])] });
-router.get("/admin",      adminController,   { middleware: [authMiddleware("admin")] });
-router.get("/staff-area", staffController,   { middleware: [authMiddleware(["staff", "admin"])] });
-router.get("/browser-account", browserController, { middleware: [authMiddleware([], "cookie:access_token")] });
-```
-
-**New in 5.12** — a `cookie:`-sourced credential on an unsafe method (`POST`/`PUT`/`PATCH`/`DELETE`) is additionally subject to the CSRF Origin check; see [Protect routes → CSRF Origin check](../guides/protect-routes.md#csrf-origin-check-for-cookie-auth).
-
-Source: `@warlock.js/auth/src/middleware/auth.middleware.ts`.
-
+`refresh` is reserved for the 5.19 automatic-renewal coordinator. Its final
+runtime behavior must be reconciled with the shipped implementation before this
+reference is published. Legacy string overloads remain supported.
 ## Commands
 
 ### `registerJWTSecretGeneratorCommand`

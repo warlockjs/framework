@@ -23,7 +23,17 @@ const refresh = await authService.createRefreshToken(user, deviceInfo);
 const pair = await authService.createTokenPair(user, deviceInfo);
 ```
 
-`createTokenPair` respects `config.auth.jwt.refresh.enabled`. If refresh is disabled, the returned `TokenPair` has `refreshToken: undefined`.
+`createTokenPair` respects `config.auth.refreshToken.enabled`. If refresh is disabled, the returned `TokenPair` has `refreshToken: undefined`.
+
+Run the additive `authMigrations` when upgrading to 5.19. Refresh and family
+revocation coordinate through durable family revisions and serializable Cascade
+transactions; transaction setup errors propagate instead of falling back to
+uncoordinated writes. MongoDB requires a transaction-capable topology.
+
+Owned transactions retry serialization conflicts at most three times and emit
+their notifications after commit. An application-owned transaction is joined
+without internal retries; its caller owns rollback, retries, and external side
+effects. Notifications in that case still precede the outer commit.
 
 The instance-method form is equivalent:
 

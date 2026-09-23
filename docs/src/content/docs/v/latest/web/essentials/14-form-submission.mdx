@@ -1,0 +1,33 @@
+---
+title: Form submission
+description: Submit @mongez/react-form data through named Warlock API routes.
+sidebar:
+  order: 14
+---
+
+`useSubmitForm` connects an existing `@mongez/react-form` form to the app's configured HTTP client. Install its optional peers and import it from the form subpath:
+
+```tsx
+import { Form } from "@mongez/react-form";
+import { useSubmitForm } from "@warlock.js/web/form";
+
+export default function CreateOrder() {
+  const createOrder = useSubmitForm({
+    route: "orders.create",
+    params: { customerId: "42" },
+    onSuccess: result => console.log(result.data),
+  });
+
+  return <Form onSubmit={createOrder.submit}>{/* controls */}</Form>;
+}
+```
+
+It needs `@mongez/http:^3.5.0` and `@mongez/react-form:^4.0.0`. By default it uses the configured `http` singleton, preserving its base URL, interceptors, authentication, and error handling. Pass `client` when a different configured `Http` instance is required.
+
+Pass exactly one of `route` or `path`. A named route uses its server-declared method; a direct `path` defaults to `POST` and accepts `method`. Use `params` for path segments and `query` for URL parameters. GET and HEAD send form values as query data; other requests send native `FormData`.
+
+The hook returns `submit`, `data`, `error`, `response`, `isLoading`, `formErrors`, `reset`, and `cancel`. Data, error, and response begin as `null`; loading begins as `false` and form errors as an empty array. Lifecycle callbacks receive the full `HttpResult`. `beforeSubmit` may return `false` to cancel before a request. Duplicate calls share the pending promise; cancellation and unmount prevent stale state updates. `reset()` clears results and errors assigned by the hook without clearing form values or cancelling an active request.
+
+Validation field mapping is enabled by default. Matching fields receive server errors, while unknown field names and general errors are collected in `formErrors`. Disable it with `mapFieldErrors: false`, or supply a mapper returning field-message pairs.
+
+Named route metadata deliberately contains only name, path, and method. A route registered with `all` has no safe browser verb; use a direct path with an explicit method.
