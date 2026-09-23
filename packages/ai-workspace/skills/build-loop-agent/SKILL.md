@@ -1,6 +1,6 @@
 ---
 name: build-loop-agent
-description: 'Wire a @warlock.js/ai-workspace into a coding agent that closes the read → edit → run-tests loop on its own. Triggers: `ws.tools.all()`, `ai.agent({ tools: ws.tools.all() })`, `maxTrips`, `run_tests`, `run_shell`, ''agent that fixes a failing test'', ''make the suite green'', ''coding agent that edits a repo'', ''build-loop agent'', ''self-correcting agent'', ''read-only code reviewer'', ''scaffold then hand off to an agent'', ''share one workspace across a supervisor'', ''least-privilege agent tools'', ''errors as tool data''; typical wiring `const ws = ai.workspace({ cwd, shell }); ai.agent({ model, tools: ws.tools.all(), maxTrips })`. Skip: constructing the workspace / its policy / direct methods / readonly / scope — `@warlock.js/ai-workspace/use-a-workspace/SKILL.md`; the agent loop / maxTrips / events themselves — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
+description: "Build a build-loop agent — read → edit → run tests, until green in @warlock.js/ai-workspace; use when you need to build loop agent."
 ---
 
 # Build a build-loop agent — read → edit → run tests, until green
