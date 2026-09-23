@@ -1,6 +1,6 @@
 ---
 name: extend-seal-with-plugins
-description: 'Author a custom seal plugin to add validator methods (`.slug`, `.postalCode`, etc) — `SealPlugin` shape, `registerPlugin` lifecycle, TS prototype augmentation. Triggers: `SealPlugin`, `registerPlugin`, `unregisterPlugin`, `hasPlugin`, `getInstalledPlugins`, `StringValidator`, `NumberValidator`, `DateValidator`, `BaseValidator`, `install`, `uninstall`; "how do I add a custom validator method", "write a seal plugin", "extend v.string with .slug", "module augmentation for seal"; typical import `import { StringValidator, registerPlugin, type SealPlugin } from "@warlock.js/seal"`. Skip: built-in primitives — `@warlock.js/seal/pick-seal-primitive/SKILL.md`; bridge typing — `@warlock.js/seal/bridge-standard-schema/SKILL.md`; competing `zod` `.refine`/`.transform`.'
+description: "Extend seal with plugins in @warlock.js/seal; use when you need to extend seal with plugins."
 ---
 
 # Extend seal with plugins

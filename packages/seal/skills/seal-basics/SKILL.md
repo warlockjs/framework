@@ -1,6 +1,6 @@
 ---
 name: seal-basics
-description: 'Start with @warlock.js/seal — the `v` factory, `validate(schema, data)`, and `Infer<typeof schema>`. Triggers: `v`, `validate`, `Infer`, `Infer.Input`, `Infer.Output`, `v.object`, `v.lazy`, `v.discriminatedUnion`, `v.computed`, `v.managed`, `ValidationResult`; "how do I start with seal", "what is the v factory", "validate a schema in warlock", "Infer.Input vs Infer.Output"; typical import `import { v, validate, type Infer } from "@warlock.js/seal"`. Skip: primitive picking — `@warlock.js/seal/pick-seal-primitive/SKILL.md`; modifiers — `@warlock.js/seal/compose-seal-modifiers/SKILL.md`; competing libs `zod`, `valibot`, `yup`, `joi`, `ajv`.'
+description: "Start here for @warlock.js/seal schemas, validation, parsing, and typed structural contracts."
 ---
 
 # Validate with seal

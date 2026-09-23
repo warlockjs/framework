@@ -1,6 +1,6 @@
 ---
 name: overview
-description: 'Front-door orientation for `@warlock.js/seal` — framework-agnostic, type-safe validation. The `v` factory builds schemas, `validate(schema, data)` runs them, `Infer<typeof schema>` extracts the type. Primitives, structural shapes (object/array/record/tuple/union/discriminatedUnion/lazy), modifiers, mutators, a plugin system, JSON-Schema export, and a Standard Schema bridge. TRIGGER when: code imports `v`, `validate`, or `Infer` from `@warlock.js/seal`; user asks "what does @warlock.js/seal do", "validation library for Warlock", "compare seal with zod / yup / valibot", "infer a type from a schema", "JSON schema from a validator", "Standard Schema interop"; package.json adds `@warlock.js/seal`. Skip: specific task already known — load the matching task skill directly (`seal-basics`, `pick-seal-primitive`, `define-structural-shape`, `compose-seal-modifiers`, `handle-seal-errors`, `generate-json-schema`, `bridge-standard-schema`, `extend-seal-with-plugins`); framework-specific validators (FileValidator, database rules) live in `@warlock.js/core/v`, not here.'
+description: "@warlock.js/seal overview for orientation and choosing the focused skill for the task."
 ---
 
 # `@warlock.js/seal` — overview

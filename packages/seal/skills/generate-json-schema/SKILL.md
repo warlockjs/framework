@@ -1,6 +1,6 @@
 ---
 name: generate-json-schema
-description: 'Generate JSON Schema via `schema.toJsonSchema(target)` — `draft-2020-12` / `draft-07` / `openapi-3.0` / `openai-strict`. Triggers: `toJsonSchema`, `JsonSchemaTarget`, `draft-2020-12`, `draft-07`, `openapi-3.0`, `openai-strict`, `response_format`, `additionalProperties`, `nullable`; "how do I generate JSON Schema from seal", "OpenAI structured outputs from schema", "OpenAPI 3.0 nullable", "json_schema strict mode"; typical import `import { v } from "@warlock.js/seal"`. Skip: foundations — `@warlock.js/seal/seal-basics/SKILL.md`; bridge typing — `@warlock.js/seal/bridge-standard-schema/SKILL.md`; competing libs `zod-to-json-schema`, `ajv`, `@anatine/zod-openapi`.'
+description: "JSON Schema generation in @warlock.js/seal; use when you need to generate json schema."
 ---
 
 # JSON Schema generation
