@@ -1,4 +1,10 @@
 {
+  "5.19.0": {
+    "publishedAt": "2026-09-23T18:07:30.092Z",
+    "matrix": "none",
+    "summary": "`@warlock.js/auth` makes refresh/logout token families durable across concurrent requests; `@warlock.js/web` adds optional paired setup modules and `useSubmitForm()` for named API routes. Core exposes named API metadata, skills document the new supported flows, and Create Warlock approves only the selected image feature's Sharp native build while reporting JWT generation skipped after a failed install. Lockstep release across all 30 packages. Generator matrix scope: `none`.",
+    "featured": ["@warlock.js/auth", "@warlock.js/web", "@warlock.js/core", "create-warlock"]
+  },
   "5.18.0": {
     "publishedAt": "2026-09-23T00:37:57.178Z",
     "matrix": "none",

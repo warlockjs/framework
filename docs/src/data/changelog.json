@@ -124,6 +124,584 @@
   ],
   "releases": [
     {
+      "version": "5.19.0",
+      "id": "v5-19-0",
+      "date": "September 23, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<code>@warlock.js/auth</code> makes refresh/logout token families durable across concurrent requests; <code>@warlock.js/web</code> adds optional paired setup modules and <code>useSubmitForm()</code> for named API routes. Core exposes named API metadata, skills document the new supported flows, and Create Warlock approves only the selected image feature's Sharp native build while reporting JWT generation skipped after a failed install. Lockstep release across all 30 packages. Generator matrix scope: <code>none</code>.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>authMiddleware()</code> now uses <code>auth.defaultUserType</code> (or the sole configured user type), and the object overload accepts <code>{ source, key, optional, refresh, redirect }</code>. A page-local <code>redirect</code> changes only page-route authentication failures; APIs retain <code>401</code>. Legacy <code>authMiddleware(userType, \"header\" | \"cookie:name\")</code> calls remain supported."
+            },
+            {
+              "type": "Added",
+              "html": "Durable token families: token pairs associate access and refresh rows with <code>AuthTokenFamily</code>; family revoke atomically stamps the family, revokes its refresh rows, and removes its associated access rows. During the additive upgrade, unassociated legacy access rows are revoked conservatively only for the same user and type. Register <code>authMigrations</code> and run pending migrations."
+            },
+            {
+              "type": "Added",
+              "html": "Automatic cookie renewal is opt-in through the middleware <code>refresh</code> descriptor. The finalized coordinator permits only an exact, immediately active successor pair during a bounded duplicate window (default five seconds; configurable from zero through ten seconds). It does not broaden legacy <code>authService.refreshTokens</code> replay behavior. A duplicate within that window is tolerated deliberately; after it, old-token reuse remains a replay and revokes the family. Family logout makes late cookies unusable. This does not claim to solve arbitrary out-of-order HTTP cookie delivery."
+            },
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            },
+            {
+              "type": "Fixed",
+              "html": "Refresh attempts emit token notifications after their owned transaction commits, discarding notifications from rolled-back retries."
+            },
+            {
+              "type": "Fixed",
+              "html": "Issuing into an explicitly reused token family now shares its durable revocation boundary, preventing credentials from being written after concurrent logout."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Optional paired <code>*.setup.ts</code> modules for pages, layouts, root, and the error boundary. Server setup composes with the UI component, projects safe <code>register()</code> behavior to both runtimes, preserves type-only loader inference, rejects duplicate exports, and is watched during development."
+            },
+            {
+              "type": "Added",
+              "html": "<code>useSubmitForm</code> from the optional <code>@warlock.js/web/form</code> entry submits an existing <code>@mongez/react-form</code> through the configured HTTP singleton or an injected client. It resolves named API route metadata before hydration, supports direct paths, FormData, cancellation, lifecycle callbacks, and validation-error mapping without exposing server handlers or policy."
+            },
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>router.getNamedApiRoutes()</code> returns fresh frozen browser-safe snapshots of registered named API routes (<code>name</code>, <code>path</code>, <code>method</code>). It excludes pages, handlers, middleware, schemas, and source paths; <code>all</code> remains visible as metadata so a browser consumer can require an explicit request method."
+            },
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            },
+            {
+              "type": "Changed",
+              "html": "The default Web starter now keeps root, page, and not-found server exports in paired <code>*.setup.ts</code> modules. Components remain presentation-only and import the home loader type-only, while the setup module retains the universal localization <code>register()</code> projection."
+            },
+            {
+              "type": "Changed",
+              "html": "PNPM image scaffolds approve only Sharp's required native build in the generated <code>pnpm-workspace.yaml</code> before installing the selected feature. An existing explicit denial is preserved. If selected feature dependencies fail to install, JWT generation is reported as skipped instead of retrying through the package manager."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/sitemap",
+          "slug": "sitemap",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Refined package skill-discovery descriptions and regenerated the llms projections."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.18.0",
       "id": "v5-18-0",
       "date": "September 23, 2026",
