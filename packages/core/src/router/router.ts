@@ -897,12 +897,24 @@ export class Router {
 
     this.eventListeners.beforeScan?.forEach((callback) => callback(this, server));
 
+    // Fastify automatically exposes HEAD for every GET route. When an app
+    // declares its own HEAD route at the same path, suppress only that GET
+    // route's implicit registration so the explicit handler owns HEAD,
+    // regardless of declaration order.
+    const explicitHeadPaths = new Set(
+      this.routes
+        .filter((route) => route.method.toLowerCase() === "head")
+        .map((route) => route.path),
+    );
+
     this.routes.forEach((route) => {
       const requestMethod = route.method.toLowerCase();
       const requestMethodFunction = server[requestMethod].bind(server);
 
       const options = {
         ...route.serverOptions,
+        ...(requestMethod === "get" &&
+          explicitHeadPaths.has(route.path) && { exposeHeadRoute: false }),
         config: {
           ...route.serverOptions?.config,
           ...(route.rateLimit && { rateLimit: route.rateLimit }),

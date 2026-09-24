@@ -17,6 +17,53 @@ afterEach(async () => {
 });
 
 describe("HTTP routing — dispatch", () => {
+  it("dispatches an explicit HEAD route after its GET route", async () => {
+    harness = await bootHarness((router) => {
+      router.get("/sitemap.xml", ({ response }) =>
+        response.header("x-route-handler", "get").success({ source: "get" }),
+      );
+      router.head("/sitemap.xml", ({ response }) =>
+        response.header("x-route-handler", "head").success({ source: "head" }),
+      );
+    });
+
+    const get = await harness.inject({ method: "GET", url: "/sitemap.xml" });
+    const head = await harness.inject({ method: "HEAD", url: "/sitemap.xml" });
+
+    expect(get.headers["x-route-handler"]).toBe("get");
+    expect(head.headers["x-route-handler"]).toBe("head");
+  });
+
+  it("dispatches an explicit HEAD route before its GET route", async () => {
+    harness = await bootHarness((router) => {
+      router.head("/sitemap.xml", ({ response }) =>
+        response.header("x-route-handler", "head").success({ source: "head" }),
+      );
+      router.get("/sitemap.xml", ({ response }) =>
+        response.header("x-route-handler", "get").success({ source: "get" }),
+      );
+    });
+
+    const get = await harness.inject({ method: "GET", url: "/sitemap.xml" });
+    const head = await harness.inject({ method: "HEAD", url: "/sitemap.xml" });
+
+    expect(get.headers["x-route-handler"]).toBe("get");
+    expect(head.headers["x-route-handler"]).toBe("head");
+  });
+
+  it("keeps Fastify's implicit HEAD route for a GET-only path", async () => {
+    harness = await bootHarness((router) => {
+      router.get("/get-only", ({ response }) =>
+        response.header("x-route-handler", "get").success(),
+      );
+    });
+
+    const head = await harness.inject({ method: "HEAD", url: "/get-only" });
+
+    expect(head.statusCode).toBe(200);
+    expect(head.headers["x-route-handler"]).toBe("get");
+  });
+
   it("routes a GET to the matching controller and returns its body", async () => {
     harness = await bootHarness((router) => {
       router.get("/ping", ({ response }) => {
