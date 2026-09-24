@@ -192,6 +192,8 @@ Creates `models/<name>/<name>.model.ts` plus an index file and an initial migrat
 | `--table <name>`      | Override the table name. Defaults to the snake-plural of the entity.         |
 | `--timestamps [bool]` | Include `createdAt` / `updatedAt` columns in the migration. Default `true`.  |
 
+Since 5.21 the migration file is named `<timestamp>-<name>.migration.ts`, the same scheme as `generate.migration`.
+
 The model name is singularized — `generate.model products/products` writes `product.model.ts` for the `Product` class.
 
 ### `generate.repository <module>/<name>`

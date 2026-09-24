@@ -59,6 +59,8 @@ metadata, not a scheduler.
 
 ## Page entries and invalidation
 
+Since 5.21 the sitemap reads page `.setup` modules too, so `config.sitemap` and entries declared there apply.
+
 Static pages are included unless a page or layout sets `config.sitemap: false`.
 Dynamic routes need concrete entries:
 

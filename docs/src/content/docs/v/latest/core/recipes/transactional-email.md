@@ -68,7 +68,7 @@ MAIL_FROM_NAME="Acme Support"
 MAIL_FROM_ADDRESS=support@acme.com
 ```
 
-`secure: true` is for port 465 (implicit TLS). For 587 you want `secure: false` plus `tls: true` (STARTTLS upgrade). Sticking the wrong combination on a port that doesn't speak it is the most common "why am I getting `wrong version number`" cause.
+*(Changed in 5.21: when `secure` is omitted it now defaults from the port — 465 → `true`, everything else `false`.)* `secure: true` is for port 465 (implicit TLS). For 587 you want `secure: false` plus `tls: true` (STARTTLS upgrade). Sticking the wrong combination on a port that doesn't speak it is the most common "why am I getting `wrong version number`" cause.
 
 The framework's mail connector picks this up in startup, calls `setMailConfigurations(...)` under the hood, and gracefully shuts down the SMTP pool on process exit. You don't import or call any of that yourself.
 

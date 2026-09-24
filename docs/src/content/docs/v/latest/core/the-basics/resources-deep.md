@@ -68,6 +68,8 @@ export class ProductResource extends Resource {
 }
 ```
 
+> **Changed in 5.21:** `@RegisterResource()` is optional — class resources work without it.
+
 The `@RegisterResource()` decorator normalizes the schema once at definition time (converts string cast types to pre-built `ResourceFieldBuilder` instances). Skip the decorator and you get per-call normalization — slower for big payloads.
 
 Both forms produce the same runtime behaviour. Pick the shorthand unless you need overridable `boot`/`extend` methods.

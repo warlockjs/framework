@@ -146,4 +146,6 @@ Continue to **[Querying](./02-querying.md)** for the read story — filtering, o
 - **Lifecycle hooks** (`beforeSave`, `afterDestroy`, etc.): [Events & hooks guide](../architecture-concepts/events-and-hooks.md)
 - **Bulk inserts** — `Model.createMany(rows, options?)` with chunking and a native multi-row `bulk` path: [Bulk inserts guide](../digging-deeper/bulk-inserts.md)
 - **Bulk updates and deletes** — `Model.delete(filter)` and query-builder mass mutations
+
+> **Changed in 5.21:** static `Model.delete()` with no filter now throws instead of wiping the table. Pass an explicit filter, or call `Model.deleteAll()` when you really mean every row. Static delete/update also honour global scopes.
 - **Dirty tracking** — knowing which fields changed before save: [Dirty tracking guide](../architecture-concepts/dirty-tracking.md)

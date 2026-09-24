@@ -311,6 +311,8 @@ v.string().unique(User, {
 
 ### `exists(model, options?)`
 
+> **Changed in 5.21:** without `column`, `exists()` checks the related model's primary key.
+
 Inverse — the value MUST already exist in the table. Common for foreign-key fields:
 
 ```ts

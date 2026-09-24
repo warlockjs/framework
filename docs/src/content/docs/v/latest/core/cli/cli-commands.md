@@ -510,7 +510,7 @@ No flags. Bootstraps app code so routes and connectors are registered for intros
 
 ### `routes`
 
-List the registered HTTP routes as a verb-colored table — method, path, name, controller action, middleware count, and source file. Read-only and connector-free, like `doctor`.
+List the registered HTTP routes (since 5.21 including the app's own routes) as a verb-colored table — method, path, name, controller action, middleware count, and source file. Read-only and connector-free, like `doctor`.
 
 ```bash
 warlock routes                 # the table

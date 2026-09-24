@@ -57,6 +57,8 @@ export class ProductResource extends Resource {
 }
 ```
 
+> **Changed in 5.21:** `@RegisterResource()` is optional — class resources work without it.
+
 The `@RegisterResource()` decorator normalizes the schema once at definition time — the runtime path stays fast. `defineResource()` does the same normalization for you, no decorator needed.
 
 ## Where it lives

@@ -155,7 +155,7 @@ export const userSchema = v.object({
 What each does:
 
 - **`.unique(Model | "ModelName", options?)`** — fails validation if a record on `Model` already has the value you're trying to save. By default it checks the column with the same name as the field being validated; override with `{ column: "..." }`.
-- **`.exists(Model | "ModelName", options?)`** — fails validation if no record on `Model` has the value. The mirror of `unique` — useful for foreign-key-style checks at the validation layer (catch the bad reference before the insert blows up). Defaults to looking up by the related model's primary key; override with `{ column: "slug" }` to point at a different unique column.
+- **`.exists(Model | "ModelName", options?)`** — fails validation if no record on `Model` has the value. The mirror of `unique` — useful for foreign-key-style checks at the validation layer (catch the bad reference before the insert blows up). Defaults to looking up by the related model's primary key; override with `{ column: "slug" }` to point at a different unique column. *(Changed in 5.21: the default is the related model's primary key, which may not be `id`.)*
 
 Both rules accept the **registered model name** (`"User"`, `"Organization"`) or the **model class directly** (`User`, `Organization`). Use the string form when you'd hit a circular import otherwise; use the class form when the import is clean.
 

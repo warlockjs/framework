@@ -396,6 +396,8 @@ class ProductsRestful extends Restful<Product> {
 }
 ```
 
+> **Changed in 5.21:** Restful persists **validated data only** (unvalidated body keys are no longer saved), runs this `middleware` slot on writes as well as reads, surfaces database errors, and respects patch hooks that refuse.
+
 Middleware here runs from the action handler itself (via `callMiddleware`). Route-level middleware on `router.restfulResource(...)` runs first; this runs after.
 
 ## When to prefer each

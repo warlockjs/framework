@@ -52,6 +52,15 @@ const httpConfigurations: HttpConfigurations = {
 export default httpConfigurations;
 ```
 
+> **Changed in 5.21:** multipart uploads now have default limits — 10 MB per file, 10 files and 100 fields per request. Exceeding any of them returns **413**. Tune them with `fileUploadLimit` (per-file bytes) and the `http.multipart` keys `files`, `fields` and `fieldSize`:
+>
+> ```ts
+> const httpConfigurations: HttpConfigurations = {
+>   fileUploadLimit: 20 * 1024 * 1024,
+>   multipart: { files: 20, fields: 200 },
+> };
+> ```
+
 This is a Fastify plugin limit — the multipart parser rejects bodies that exceed it before the request ever hits a controller. Set it generously above your largest expected file, then validate stricter limits in the schema per-field.
 
 ## Reading files from the request

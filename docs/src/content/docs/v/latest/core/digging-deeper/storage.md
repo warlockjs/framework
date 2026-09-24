@@ -123,6 +123,8 @@ console.log(file.path); // "uploads/photo.jpg"
 console.log(file.hash); // sha256:abc123...
 ```
 
+> **Changed in 5.21:** `storage.put(string, location)` always stores the string as *content*. To upload a file that already exists on local disk, use `storage.putFromPath(localPath, location)`. Code that passed a local path to `put()` must switch to `putFromPath()`. Cloud `list()` prefixes now end in `/`.
+
 That's the entire surface for the common case. `storage.put(...)` writes to the default driver and returns a `StorageFile`. Persist `file.path` to your DB and you can rebuild a `StorageFile` later with `storage.file(path)`.
 
 `storage` is the lowercase singleton — there is no `Storage.disk()` static API. Don't construct it yourself; the framework wires it on boot.
@@ -152,6 +154,9 @@ await storage.putFromUrl("https://example.com/image.jpg", "uploads/image.jpg");
 
 // From a base64 data URL — MIME extracted from the prefix automatically
 await storage.putFromBase64("data:image/png;base64,iVBORw0KGgo...", "uploads/photo.png");
+
+// From a local file on disk (put(string) stores the string itself, not the file)
+await storage.putFromPath("/tmp/report.pdf", "uploads/report.pdf");
 
 // From a multipart UploadedFile — pull from `request.file()` / `request.validated()`
 await storage.put(request.file("avatar"), `avatars/${userId}.jpg`);

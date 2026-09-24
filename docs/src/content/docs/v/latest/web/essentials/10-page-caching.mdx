@@ -100,8 +100,9 @@ consent banner) always gets a fresh render. Anonymous traffic without cookies
   shared one entry — a host-routed multi-tenant app could serve tenant B the
   document and `shared` payload the cache stored for tenant A. Existing
   entries are simply re-keyed; `tags` still invalidate them.
-- The path is normalised: lower-cased, trailing slash stripped (except the
-  root `/`).
+- The path is normalised: trailing slash stripped (except the root `/`). The
+  path keeps its case, so `/About` and `/about` are separate entries.
+  (Changed in 5.21: earlier versions lower-cased the path.)
 - The query string is re-serialized with its keys sorted, so `?a=1&b=2` and
   `?b=2&a=1` resolve to the same entry.
 - `locale` is the resolved locale for the request.
@@ -112,6 +113,14 @@ consent banner) always gets a fresh render. Anonymous traffic without cookies
   defer.
 - `"|vary=" + varyBy` is appended only when the route declares
   `cache.varyBy(request)` (see above).
+
+## Changed in 5.21
+
+- With CSP enabled, the `html` variant is **not cached**: a cached document
+  would replay a stale nonce. The `json` variant is still cached.
+- A cache-backend outage (redis down, for example) is treated as a miss: the
+  page renders uncached and a throttled warning is logged. It never returns a
+  500. Store writes are fire-and-forget.
 
 ## Where entries live: the page-cache namespace
 

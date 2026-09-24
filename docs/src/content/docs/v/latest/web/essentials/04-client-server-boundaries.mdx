@@ -81,6 +81,8 @@ export default function HomePage() {
 }
 ```
 
+Since 5.21, `import.meta.env.PUBLIC_*` also works in server bundles (SSR), so server and client render the same value.
+
 Vite's built-ins (`MODE`, `DEV`, `PROD`, `BASE_URL`, and `SSR`) are also
 allowed. These values are fixed when the bundle is built; they cannot vary per
 request or deployment. Loader data remains the correct channel for anything

@@ -210,6 +210,8 @@ The interesting ones:
 
 > **`sortBy` / `sortDirection` are not honored.** The `RepositoryOptions` type still carries them, but `applyOptionsToQuery` only reads `orderBy` — passing `sortBy`/`sortDirection` does nothing. Use `orderBy` for all ordering. Likewise, there is no working `purgeCache` option: invalidation is driven by model events (see [Caching](#caching)), so a `purgeCache` flag on the options object is inert.
 
+> **Changed in 5.21:** `list(request.all())` no longer lets the client pick any sort or page size. A client-supplied sort or page size is honoured only when it is whitelisted by the repository; anything else falls back to the repository defaults. Options passed from application code (`list({ orderBy, limit })`) are unchanged.
+
 `orderBy` has three forms:
 
 ```ts

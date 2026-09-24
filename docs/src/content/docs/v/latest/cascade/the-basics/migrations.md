@@ -408,10 +408,12 @@ The data-source-wide default lives in the `migrations.transactional` connection 
 
 ## Ordering and the timestamp prefix
 
+> **Changed in 5.21:** migrations run in **authored order** — there is no global phase sort any more. `transactional: false` and a migration's own `dataSource` are honoured. The description below is the pre-5.21 behaviour.
+
 Cascade pools the SQL from every pending migration and sorts it **globally**, by three keys in order:
 
 1. **Phase** — the dependency-safe DDL order, derived from each statement: extensions and types first, then `CREATE TABLE`, then `ADD COLUMN`, then foreign keys, then drops and alters. A `CREATE TABLE` from a newer migration still runs before an older migration's `ALTER`.
-2. **`createdAt`** — extracted from the filename's timestamp prefix (`MM-DD-YYYY_HH-MM-SS-name.migration.ts`).
+2. **`createdAt`** — extracted from the filename's timestamp prefix (`MM-DD-YYYY_HH-MM-SS-name.migration.ts`; files from `generate.model` use `<timestamp>-name.migration.ts`).
 3. **Migration name** — alphabetical, and only when the timestamps can't decide.
 
 Because phase wins, ordering between migrations matters most for statements that share a phase — two migrations altering the same table, for example.

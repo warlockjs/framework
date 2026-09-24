@@ -39,3 +39,7 @@ The hook returns `submit`, `data`, `error`, `response`, `isLoading`, `formErrors
 Validation field mapping is enabled by default. Matching fields receive server errors, while unknown field names and general errors are collected in `formErrors`. Disable it with `mapFieldErrors: false`, or supply a mapper returning field-message pairs.
 
 Named route metadata deliberately contains only name, path, and method. A route registered with `all` has no safe browser verb; use a direct path with an explicit method.
+
+## Prefetch cache (5.21)
+
+The client prefetch cache is cleared on refresh, on locale change and after form submits. `clearPrefetchCache()` is exported from `@warlock.js/web` if you need to clear it yourself after a mutation made outside a form.

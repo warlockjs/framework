@@ -64,6 +64,8 @@ await connectToDatabase({
 });
 ```
 
+> **Changed in 5.21:** `connectToDatabase` makes only the **first** registered source the default, unless you pass `isDefault` explicitly on a later one.
+
 The first call with `isDefault: true` wins as the registry's default. Subsequent calls don't dethrone it unless you pass `isDefault: true` again — keep it explicit so the precedence is obvious in code review.
 
 ## Routing a model — `static dataSource`

@@ -71,6 +71,8 @@ export const loadOrganization: Middleware = async ({ request, response }) => {
 
 `request.organization = organization;` works because `Request` has an index signature for ad-hoc extension. Downstream controllers can read `request.organization` (cast it if you care about strict types).
 
+> **Changed in 5.21:** the `http.middleware.all`, `only` and `except` config keys now actually apply. Before, they were accepted and ignored.
+
 ## Where to attach middleware
 
 Three places, ordered from most-specific to least:

@@ -62,6 +62,8 @@ const fingerprint = hmacHash("sk-proj-12345");
 
 ## Configuration
 
+> **Changed in 5.21:** a non-hex or too-short `hmacKey` now fails at boot instead of silently weakening the fingerprints. Generate it as 32 random bytes in hex (64 characters), as below.
+
 `src/config/encryption.ts` holds the keys. Generate them once with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` and put them in `.env`.
 
 ```ts title="src/config/encryption.ts"
