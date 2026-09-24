@@ -4,6 +4,7 @@ import { createServer as createHttpServer } from "http";
 import { createServer as createHttpsServer } from "https";
 import type { Server } from "socket.io";
 import { container } from "../container";
+import { environment } from "../utils/environment";
 import { BaseConnector } from "./base-connector";
 import { ConnectorLifecyclePhase, type ConnectorName, ConnectorPriority } from "./types";
 
@@ -23,6 +24,9 @@ Or manually:
   pnpm add socket.io
   yarn add socket.io
 `.trim();
+
+const SINGLE_SERVER_WARNING =
+  "socket: no adapter configured — broadcasts only reach clients connected to this server. Use @socket.io/redis-adapter (socket.adapter) behind a load balancer, with sticky sessions for the polling transport.";
 
 /**
  * Socket Connector
@@ -103,6 +107,12 @@ export class SocketConnector extends BaseConnector {
       destroyUpgrade: false,
       ...socketConfig.options,
     });
+
+    if (socketConfig.adapter) {
+      this.socket.adapter((await socketConfig.adapter(this.socket)) as never);
+    } else if (environment() === "production" && !socketConfig.silenceSingleServerWarning) {
+      log.warn("socket", "adapter", SINGLE_SERVER_WARNING);
+    }
 
     container.set("socket", this.socket);
   }

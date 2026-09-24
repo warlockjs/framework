@@ -2,6 +2,7 @@ import type { CookieSerializeOptions } from "@fastify/cookie";
 import type { FastifyCorsOptions } from "@fastify/cors";
 import type React from "react";
 import type { Middleware } from "../router";
+import type { HttpRateLimitConfig } from "./build-rate-limit-options";
 import type { CspConfig } from "./csp";
 import type { Response } from "./response";
 import type { HttpTracingConfig } from "./tracing/tracing.type";
@@ -255,20 +256,7 @@ export interface HttpConfigurations {
   /**
    * Rate limit
    */
-  rateLimit?: {
-    /**
-     * max number of connections during windowMs milliseconds before sending a 429 response
-     *
-     * @default 60
-     */
-    max?: number;
-    /**
-     * how long to keep records of requests in memory
-     *
-     * @default 60 * 1000
-     */
-    duration?: number;
-  };
+  rateLimit?: HttpRateLimitConfig;
   /**
    * Request id (correlation) settings.
    *

@@ -1,4 +1,8 @@
+import config from "@mongez/config";
+import { log } from "@warlock.js/logger";
 import { storage } from "../storage";
+import { environment } from "../utils/environment";
+import { localStorageWarning } from "./single-server-warnings";
 import { loadS3 } from "../storage/drivers/cloud-driver";
 import { BaseConnector } from "./base-connector";
 import { ConnectorLifecyclePhase, ConnectorPriority } from "./types";
@@ -36,6 +40,14 @@ export class StorageConnector extends BaseConnector {
   public async start(): Promise<void> {
     await loadS3();
     await storage.init();
+
+    const warning = localStorageWarning(
+      config.get("storage.default", "local"),
+      environment(),
+      config.get("storage.silenceSingleServerWarning") === true,
+    );
+
+    if (warning) log.warn("storage", "single-server", warning);
 
     this.active = true;
   }

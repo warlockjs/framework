@@ -58,9 +58,10 @@ function pruneExpired(now: number) {
  * 429. Use this for endpoints that need a tighter cap than the global default:
  * login, OTP request, password reset, expensive search, AI completions.
  *
- * The counter lives in-process. With `N` replicas the effective cap is
- * `N × max`. For genuinely shared limits, configure `@fastify/rate-limit`'s
- * Redis store via `http.rateLimit` instead.
+ * The counter of THIS middleware always lives in-process. With `N` replicas
+ * its effective cap is `N × max`. The global limit can be shared across
+ * replicas by setting `http.rateLimit.redis` (an ioredis instance); that
+ * does not affect this per-route middleware.
  *
  * Sets `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` on
  * every response; adds `Retry-After` (seconds) on a 429.

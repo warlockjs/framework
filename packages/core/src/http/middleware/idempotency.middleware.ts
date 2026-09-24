@@ -16,6 +16,11 @@ export type IdempotencyOptions = {
    */
   ttl?: number;
   /**
+   * TTL in seconds of the in-flight reservation held while the handler runs.
+   * Falls back to `http.idempotency.reservationTtl`, then `60`.
+   */
+  reservationTtl?: number;
+  /**
    * Header name carrying the client's key. Falls back to
    * `http.idempotency.headerName`, then `"Idempotency-Key"`.
    */
@@ -38,6 +43,11 @@ type CachedResponse = {
   body: unknown;
   bodyHash: string;
   contentType?: string;
+};
+
+type InFlightReservation = {
+  state: "in-flight";
+  startedAt: number;
 };
 
 const DEFAULT_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
@@ -78,6 +88,8 @@ export function idempotencyMiddleware(options: IdempotencyOptions = {}): Middlew
       options.headerName || config.get("http.idempotency.headerName", "Idempotency-Key");
     const methods = options.methods || config.get("http.idempotency.methods", DEFAULT_METHODS);
     const ttl = options.ttl || config.get("http.idempotency.ttl", 86400);
+    const reservationTtl =
+      options.reservationTtl || config.get("http.idempotency.reservationTtl", 60);
     const driverName = options.driver || config.get("http.idempotency.driver");
 
     if (!methods.includes(request.method.toUpperCase())) return;
@@ -97,9 +109,28 @@ export function idempotencyMiddleware(options: IdempotencyOptions = {}): Middlew
     const cacheKey = buildIdempotencyCacheKey(request, idempotencyKey);
     const bodyHash = hashBody(request.body);
 
-    const cached = (await cacheDriver.get(cacheKey)) as CachedResponse | null;
+    // Reserve the key atomically before the handler runs, so concurrent
+    // requests with the same key can't both execute it.
+    const reservation = (await cacheDriver.set(
+      cacheKey,
+      { state: "in-flight", startedAt: Date.now() } satisfies InFlightReservation,
+      { onConflict: "create", ttl: reservationTtl },
+    )) as { wasSet: boolean; existing?: CachedResponse | InFlightReservation } | undefined;
 
-    if (cached) {
+    if (reservation && !reservation.wasSet) {
+      const existing = reservation.existing;
+
+      if (!existing || (existing as InFlightReservation).state === "in-flight") {
+        response.header("Retry-After", "1");
+
+        return response.conflict({
+          error: "A request with this Idempotency-Key is already in progress",
+          errorCode: HttpErrorCodes.IdempotencyKeyConflict,
+        });
+      }
+
+      const cached = existing as CachedResponse;
+
       if (cached.bodyHash !== bodyHash) {
         return response.unprocessableEntity({
           error: t("http.idempotencyKeyConflict"),
@@ -119,7 +150,14 @@ export function idempotencyMiddleware(options: IdempotencyOptions = {}): Middlew
     response.onSent((sentResponse: Response) => {
       // Don't cache server errors — clients should be able to retry past a 5xx.
       // 4xx are deterministic outcomes of the request, so caching is fine.
-      if (sentResponse.statusCode >= 500) return;
+      // Free the reservation so a retry can run.
+      if (sentResponse.statusCode >= 500) {
+        cacheDriver.remove(cacheKey).catch((error: unknown) => {
+          log.error("idempotency-middleware", "remove", error);
+        });
+
+        return;
+      }
 
       const sentContentType = sentResponse.contentType;
 

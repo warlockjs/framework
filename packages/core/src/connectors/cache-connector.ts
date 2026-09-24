@@ -1,7 +1,10 @@
 import config from "@mongez/config";
 import { cache } from "@warlock.js/cache";
 import type { CacheDriver } from "@warlock.js/cache";
+import { log } from "@warlock.js/logger";
+import { environment } from "../utils/environment";
 import { BaseConnector } from "./base-connector";
+import { memoryCacheWarning } from "./single-server-warnings";
 import { ConnectorLifecyclePhase, ConnectorPriority } from "./types";
 
 /**
@@ -29,6 +32,15 @@ export class CacheConnector extends BaseConnector {
     cache.setCacheConfigurations(cacheConfig);
 
     await cache.init();
+
+    const warning = memoryCacheWarning(
+      cache.currentDriver?.name ?? cacheConfig.default,
+      cache.currentDriver?.constructor?.name,
+      environment(),
+      config.get("cache.silenceSingleServerWarning") === true,
+    );
+
+    if (warning) log.warn("cache", "single-server", warning);
 
     this.active = true;
   }

@@ -3,17 +3,17 @@ import config from "@mongez/config";
 import type { FastifyRequest } from "fastify";
 import { rootPath } from "../utils";
 import { buildCorsOptions } from "./build-cors-options";
+import { buildRateLimitOptions } from "./build-rate-limit-options";
 import { parseUrlencodedBody } from "./parse-urlencoded-body";
 import type { FastifyInstance } from "./server";
 
 export async function registerHttpPlugins(server: FastifyInstance) {
   // 👇🏻 register rate-limit plugin
-  server.register(import("@fastify/rate-limit"), {
-    // max requests per time window
-    max: config.get("http.rateLimit.max", 60),
-    // maximum time that is will allow max requests
-    timeWindow: config.get("http.rateLimit.duration", 60 * 1000),
-  });
+  const rateLimitOptions = buildRateLimitOptions(config.get("http.rateLimit"));
+
+  if (rateLimitOptions) {
+    server.register(import("@fastify/rate-limit"), rateLimitOptions);
+  }
 
   // 👇🏻 register cors plugin
   server.register(import("@fastify/cors"), buildCorsOptions());
