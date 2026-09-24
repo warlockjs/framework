@@ -1,6 +1,6 @@
 ---
 name: expose-as-mcp-server
-description: "Expose tools AS an MCP server (Direction B) in @warlock.js/ai-tools; use when you need to expose as mcp server."
+description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a raw ToolContract[]) AS a Model Context Protocol (MCP) server other clients consume (Direction B) with `ai.mcp.serve(source, options)`. Triggers: `ai.mcp.serve(`, `serve(`, `createServeHandler`, `McpServer`, `McpServeOptions`, `McpServeSource`, `McpServeTransport`, `server.start()`, `server.stop()`, `schemaTarget`, `draft-2020-12`, `extractJsonSchema`, `tools/list`, `tools/call`, `{ type: "stdio" }`, `{ type: "http"; port }`; ''expose my agent as an MCP server'', ''publish my tools to Cursor/Claude Desktop'', ''make my warlock workspace an MCP server'', ''serve my ToolContract[] over MCP'', ''let other MCP clients call my agent''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: CONSUMING an external MCP server (the reverse direction) — `@warlock.js/ai-tools/connect-mcp-server/SKILL.md`; the built-in web/HTTP/calc/date tools — `@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`.'
 ---
 
 # Expose tools AS an MCP server (Direction B)

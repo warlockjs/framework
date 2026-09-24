@@ -1,6 +1,6 @@
 ---
 name: connect-mcp-server
-description: "Connect to an external MCP server (Direction A) in @warlock.js/ai-tools; use when you need to connect mcp server."
+description: 'Connect a @warlock.js/ai agent to an external Model Context Protocol (MCP) server and adapt its tools as native agent tools (Direction A) with `ai.mcp(server)`. Triggers: `ai.mcp(`, `ai.mcp.serve` (the other direction), `mcp(`, `McpClient`, `McpClientOptions`, `McpTransport`, `client.tools()`, `client.close()`, `namePrefix`, `filter`, `McpTransportError`, `{ type: "stdio" }`, `{ type: "http" }`, `tools/list`, `tools/call`, `jsonSchemaToStandard`, `@modelcontextprotocol/sdk`, `ajv`; ''consume an MCP server'', ''use an external MCP server''s tools in my agent'', ''connect to the GitHub/Slack/Filesystem MCP server'', ''adapt MCP tools as agent tools'', ''bridge my agent to the MCP ecosystem'', ''run an MCP server over stdio/http''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: exposing YOUR agent/tools AS an MCP server (the reverse direction) — `@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`; the built-in web/HTTP/calc/date tools — `@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`.'
 ---
 
 # Connect to an external MCP server (Direction A)
