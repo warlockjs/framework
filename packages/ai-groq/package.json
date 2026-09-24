@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/ai-groq",
-  "version": "5.19.1",
+  "version": "5.20.0",
   "type": "module",
   "description": "Groq adapter for @warlock.js/ai (OpenAI-compatible, thin wrapper over @warlock.js/ai-openai)",
   "main": "./src/index.ts",
