@@ -1,6 +1,6 @@
 ---
 name: evaluate-system-prompt
-description: "Evaluate a trace's system prompt from the dashboard in @warlock.js/ai-panoptic; use when you need to evaluate system prompt."
+description: 'Grade a single trace''s LAST captured system prompt from the dashboard drawer — the dashboard''s only write-capable feature, config-gated via `DashboardOptions.evaluate` (`ai.config({ panoptic: { dashboard: { evaluate: { model, instructions } } } })`). Triggers: `evaluate`, `EvaluateConfig`, `EvaluateVerdict`, `evaluateSystemPrompt`, `extractLastSystemPrompt`, `findSpanById`, "Evaluate system prompt" button, `POST .../spans/:spanId/evaluate`, grading a prompt from a real trace, judging a captured system prompt, per-run instructions override, judge model factory; ''evaluate this trace''s prompt'', ''grade the system prompt from the dashboard'', ''judge a captured run'', ''score a live system prompt''. Skip: grading raw prompt TEXT you already have in code (no trace involved) — `@warlock.js/ai`''s `ai.prompts().validate({ criteria })`, the same judge machinery this wraps; a DATASET of test cases run through an agent — `@warlock.js/ai`''s `ai.dataset` + `agent.eval`; viewing/filtering/grouping traces without grading them — `@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`; capturing the content this feature reads — `@warlock.js/ai-panoptic/export-traces/SKILL.md` (`captureContent`).'
 ---
 
 # Evaluate a trace's system prompt from the dashboard

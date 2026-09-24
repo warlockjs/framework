@@ -1,6 +1,6 @@
 ---
 name: export-traces
-description: "Export traces — the sink end of Panoptic in @warlock.js/ai-panoptic; use when you need to export traces."
+description: 'Send @warlock.js/ai-panoptic traces to an observability backend via pluggable exporters, including capturing prompt/response content onto spans. Triggers: `consoleExporter`, `fileExporter`, `otelExporter`, `langfuseExporter`, `ExporterContract`, `ContentCaptureOptions`, `captureContent`, `redactContent`, `fullHistory`, `ContentRedactor`, `toGenAiAttributes`, `walkSpans`, `totalCostUsd`, `GEN_AI_ATTRIBUTES`, `WARLOCK_ATTRIBUTES`, `reportToTrace`, `reportToSpan`, `extractSpanAttributes`, `normalizeError`, `formatSpanLine`, `createPanopticMiddleware`; ''export AI traces to OpenTelemetry'', ''send traces to Langfuse'', ''log traces to console / a file'', ''capture the full prompt/conversation onto a span'', ''gen_ai semantic conventions'', ''write a custom exporter''; typical import `import { otelExporter, langfuseExporter, consoleExporter, fileExporter } from "@warlock.js/ai-panoptic"`. Skip: wiring the subscriber/collector into a run — `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`; the core report shape — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
 ---
 
 # Export traces — the sink end of Panoptic
