@@ -6,6 +6,6 @@
 
 ## Skills
 
-- [connect-mcp-server](@warlock.js/ai-tools/connect-mcp-server/SKILL.md): Connect to an external MCP server (Direction A) in @warlock.js/ai-tools; use when you need to connect mcp server.
-- [expose-as-mcp-server](@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md): Expose tools AS an MCP server (Direction B) in @warlock.js/ai-tools; use when you need to expose as mcp server.
-- [use-web-and-http-tools](@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md): Use the web + HTTP tool belt in @warlock.js/ai-tools; use when you need to use web and http tools.
+- [connect-mcp-server](@warlock.js/ai-tools/connect-mcp-server/SKILL.md): (no description)
+- [expose-as-mcp-server](@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md): (no description)
+- [use-web-and-http-tools](@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md): (no description)
