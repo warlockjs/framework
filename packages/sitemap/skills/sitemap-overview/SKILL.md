@@ -1,6 +1,6 @@
 ---
 name: sitemap-overview
-description: "@warlock.js/sitemap — overview in @warlock.js/sitemap; use when you need to sitemap overview."
+description: 'Front-door orientation for `@warlock.js/sitemap` — the framework-blind `Sitemap` builder class (`new Sitemap({ baseUrl, changefreq, priority, lastmod })`, `add`/`addMany`/`declareRoute`, `size`/`entries()`/`routes()`/`duplicates()`, sync `toXML()`, `saveTo()`), the constructor-time `baseUrl` validation and `InvalidBaseUrlError`, entry validation and `InvalidSitemapEntryError`, the keyed-by-path silent last-write-wins rule and how `duplicates()` makes it visible, the `count: 0` route diagnostic that `declareRoute()` exists to make possible, `hreflang` alternates via `xhtml:link`, and the 50,000-URL / 50MB protocol ceiling that separates this bounded builder from the streaming writer. TRIGGER when: code imports anything from `@warlock.js/sitemap`; user asks "what does @warlock.js/sitemap do", "how do I generate a sitemap", "how do I add a URL to the sitemap", "why is my dynamic route missing from sitemap.xml", "sitemap changefreq/priority", "sitemap hreflang", "sitemap baseUrl", "InvalidBaseUrlError", "sitemap without Warlock", "sitemap in Express"; package.json adds `@warlock.js/sitemap`; user is scaffolding `warlock add sitemap`. Skip: user wants to PARSE or fetch a remote sitemap — this package only generates one; the Warlock page-registry discovery, locale expansion, the `/sitemap.xml` route and `robots.txt` live in `@warlock.js/web`, not here.'
 ---
 
 # `@warlock.js/sitemap` — overview
