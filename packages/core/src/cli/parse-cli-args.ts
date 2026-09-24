@@ -70,6 +70,24 @@ function collectBooleanKeys(schema: CliOptionSchema[]): Set<string> {
 }
 
 /**
+ * Collect the declared aliases longer than one character (`-st`, `-rs`, `-pm`).
+ *
+ * A cluster equal to one of these is that alias, not a bundle of single-letter
+ * flags, so it has to be matched before the bundle split.
+ */
+function collectMultiCharAliases(schema: CliOptionSchema[]): Set<string> {
+  const aliases = new Set<string>();
+
+  for (const option of schema) {
+    if (option.alias && option.alias.length > 1) {
+      aliases.add(option.alias);
+    }
+  }
+
+  return aliases;
+}
+
+/**
  * Turn the value written after `=` into a real boolean, or throw.
  */
 function toBoolean(optionToken: string, value: string): boolean {
@@ -120,6 +138,7 @@ export function parseCliArgs(argv: string[], schema: CliOptionSchema[] = []): Pa
   const args: string[] = [];
   const options: Record<string, string | boolean> = {};
   const booleanKeys = collectBooleanKeys(schema);
+  const multiCharAliases = collectMultiCharAliases(schema);
 
   // Parse arguments starting from index 3 (or 2 if first arg was an option)
   const startIndex = isFirstArgOption ? 2 : 3;
@@ -176,8 +195,8 @@ export function parseCliArgs(argv: string[], schema: CliOptionSchema[] = []): Pa
         const key = toCamelCase(rawKey);
         const value = flags.slice(equalIndex + 1);
         options[key] = booleanKeys.has(key) ? toBoolean(`-${rawKey}`, value) : value;
-      } else if (flags.length === 1) {
-        // Single flag: -f
+      } else if (flags.length === 1 || multiCharAliases.has(flags)) {
+        // Single flag: -f, or a declared multi-character alias: -st
         const key = toCamelCase(flags);
         const nextArg = argv[i + 1];
 

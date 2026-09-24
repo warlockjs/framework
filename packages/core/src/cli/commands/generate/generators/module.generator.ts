@@ -23,7 +23,13 @@ import {
 } from "../templates/stubs";
 import { pluralName, singularName } from "../utils/name-parser";
 import { moduleExists } from "../utils/path-resolver";
-import { ensureDirectoryAsync, putFileAsync, setDryRun } from "../utils/writer";
+import {
+  ensureDirectoryAsync,
+  putFileAsync,
+  reportSkippedFiles,
+  setDryRun,
+  setSkipExisting,
+} from "../utils/writer";
 import { createMigrationFile } from "./migration.generator";
 
 export async function generateModule(data: CommandActionData): Promise<void> {
@@ -40,6 +46,8 @@ export async function generateModule(data: CommandActionData): Promise<void> {
   const name = pluralName(moduleName);
   const force = data.options.force || data.options.f;
   setDryRun(Boolean(data.options.dryRun));
+  // --force only creates what is missing; replacing edited files needs --overwrite too
+  setSkipExisting(!data.options.overwrite);
 
   // Full CRUD is the default; --minimal (-m) opts down to a bare skeleton.
   const minimal = data.options.minimal || data.options.m;
@@ -98,7 +106,7 @@ groupedTranslations("${name.camel}", {
   // Example:
   // welcome: {
   //   en: "Welcome",
-  //   ar: "Ù…Ø±Ø­Ø¨Ø§",
+  //   ar: "مرحبا",
   // },
 });
 `;
@@ -208,23 +216,25 @@ groupedTranslations("${name.camel}", {
     await createMigrationFile(name.kebab, entity.kebab);
   }
 
-  console.log(colors.cyan(`\nâœ¨ Module "${name.kebab}" generated successfully!`));
+  reportSkippedFiles();
+
+  console.log(colors.cyan(`\n✨ Module "${name.kebab}" generated successfully!`));
 
   if (withCrud) {
-    console.log(colors.gray(`\nðŸ“¦ CRUD scaffold created with:`));
+    console.log(colors.gray(`\n📦 CRUD scaffold created with:`));
     console.log(colors.gray(`  - List, Get, Create, Update & Delete controllers`));
     console.log(colors.gray(`  - Repository`));
     console.log(colors.gray(`  - Validation schemas in schema/`));
     console.log(colors.gray(`  - Model with resource`));
     console.log(colors.gray(`  - Routes configured`));
     console.log(colors.gray(`\nNext steps:`));
+    const entity = singularName(moduleName);
     console.log(
-      colors.gray(`  1. Update model schema in models/${name.kebab}/${name.kebab}.model.ts`),
+      colors.gray(
+        `  1. Update model schema in models/${entity.kebab}/${entity.kebab}.model.ts`,
+      ),
     );
     console.log(colors.gray(`  2. Update schema rules in schema/*.schema.ts`));
-    console.log(
-      colors.gray(`  3. Create migration: warlock generate.model ${name.kebab}/${name.kebab}`),
-    );
   } else {
     console.log(colors.gray(`\nNext steps:`));
     console.log(colors.gray(`  1. Define routes in ${name.kebab}/routes.ts`));

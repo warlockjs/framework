@@ -10,7 +10,7 @@ const DEFAULT_ALGORITHM = "aes-256-gcm";
 /**
  * Get the encryption key from config, validated as a 32-byte hex string.
  */
-function getEncryptionKey(): Buffer {
+function getEncryptionKey(keyBytes: number): Buffer {
   const key = config.key<EncryptionConfigurations["key"]>("encryption.key");
 
   if (!key) {
@@ -21,9 +21,10 @@ function getEncryptionKey(): Buffer {
 
   const buffer = Buffer.from(key, "hex");
 
-  if (buffer.length !== 32) {
+  if (buffer.length !== keyBytes) {
+    // Never include the key itself: this message reaches logs and error pages.
     throw new Error(
-      `Encryption key must be exactly 32 bytes (64 hex characters). Got ${buffer.length} bytes for key ${key}.`,
+      `Encryption key must be exactly ${keyBytes} bytes (${keyBytes * 2} hex characters). Got ${buffer.length} bytes.`,
     );
   }
 
@@ -31,13 +32,31 @@ function getEncryptionKey(): Buffer {
 }
 
 /**
+ * Supported algorithms (the format assumes GCM: 16-byte IV + auth tag)
+ * mapped to their required key size in bytes.
+ */
+const ALGORITHM_KEY_BYTES: Record<string, number> = {
+  "aes-128-gcm": 16,
+  "aes-192-gcm": 24,
+  "aes-256-gcm": 32,
+};
+
+/**
  * Get the configured encryption algorithm, defaults to aes-256-gcm.
  */
 function getAlgorithm(): string {
-  return config.key<EncryptionConfigurations["algorithm"]>(
+  const algorithm = config.key<EncryptionConfigurations["algorithm"]>(
     "encryption.algorithm",
     DEFAULT_ALGORITHM,
   )!;
+
+  if (!(algorithm in ALGORITHM_KEY_BYTES)) {
+    throw new Error(
+      `Unsupported encryption algorithm '${algorithm}'. Supported: ${Object.keys(ALGORITHM_KEY_BYTES).join(", ")}.`,
+    );
+  }
+
+  return algorithm;
 }
 
 /**
@@ -53,8 +72,8 @@ function getAlgorithm(): string {
 export function encrypt(plainText: string): string {
   if (!plainText) return plainText;
 
-  const keyBuffer = getEncryptionKey();
   const algorithm = getAlgorithm();
+  const keyBuffer = getEncryptionKey(ALGORITHM_KEY_BYTES[algorithm]!);
 
   try {
     // IV must be unique per encryption. 16 bytes is standard for AES.
@@ -86,8 +105,8 @@ export function encrypt(plainText: string): string {
 export function decrypt(cipherText: string): string {
   if (!cipherText) return cipherText;
 
-  const keyBuffer = getEncryptionKey();
   const algorithm = getAlgorithm();
+  const keyBuffer = getEncryptionKey(ALGORITHM_KEY_BYTES[algorithm]!);
 
   try {
     const parts = cipherText.split(":");

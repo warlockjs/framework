@@ -50,7 +50,7 @@ describe("migrateCommand definition", () => {
 
   it("keeps the comma-less --pending-only flag (no alias)", () => {
     const pendingOnly = migrateCommand.commandOptions.find(
-      (option) => option.name === "pending-only",
+      (option) => option.name === "pendingOnly",
     );
 
     expect(pendingOnly).toBeDefined();
@@ -100,19 +100,19 @@ describe("routesCommand definition", () => {
 });
 
 describe("addCommand definition", () => {
-  it("parses a comma-less two-form option to the first token only (no alias)", () => {
-    // "--package-manager -pm" has no comma, so only the long form is read and
-    // the name is NOT camelCased by the option parser.
+  it('parses "--package-manager, -pm" into a camelCase name plus the pm alias', () => {
+    // The declaration now uses a comma (wave 2, C4:B6), so `-pm` is a real alias
+    // and the name is camelCased (C4:B5).
     const packageManager = addCommand.commandOptions.find(
-      (option) => option.name === "package-manager",
+      (option) => option.name === "packageManager",
     );
 
     expect(packageManager).toBeDefined();
-    expect(packageManager?.alias).toBe("");
+    expect(packageManager?.alias).toBe("pm");
   });
 
-  it("keeps the kebab-case name for --no-install", () => {
-    expect(optionNames(addCommand)).toContain("no-install");
+  it("exposes --no-install as noInstall", () => {
+    expect(optionNames(addCommand)).toContain("noInstall");
   });
 });
 
@@ -123,7 +123,7 @@ describe("generate command family definition", () => {
   });
 
   it("registers --force and --dry-run on the master command", () => {
-    expect(optionNames(generateCommand)).toEqual(expect.arrayContaining(["force", "dry-run"]));
+    expect(optionNames(generateCommand)).toEqual(expect.arrayContaining(["force", "dryRun"]));
   });
 
   it("exposes generate.module with its minimal flag", () => {

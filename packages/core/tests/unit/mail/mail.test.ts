@@ -253,7 +253,8 @@ describe("sendMail — composed nodemailer message (production, transport mocked
     const message = sentMessages[0];
 
     expect(message.to).toEqual(["user@example.com"]);
-    expect(message.from).toBe('"App" <noreply@app.com>');
+    // Address objects are passed through; nodemailer quotes/encodes them safely.
+    expect(message.from).toEqual({ name: "App", address: "noreply@app.com" });
     expect(message.subject).toBe("Composed");
     expect(message.html).toBe("<h1>Hello</h1>");
   });

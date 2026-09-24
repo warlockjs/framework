@@ -1,10 +1,13 @@
+import { createRequire } from "node:module";
 import type { OnLoadArgs, OnResolveArgs, PluginBuild } from "esbuild";
+
+const esmRequire = createRequire(import.meta.url);
 
 export const nativeNodeModulesPlugin = {
   name: "native-node-modules",
   setup(build: PluginBuild) {
     build.onResolve({ filter: /\.node$/, namespace: "file" }, (args: OnResolveArgs) => ({
-      path: require.resolve(args.path, { paths: [args.resolveDir] }),
+      path: esmRequire.resolve(args.path, { paths: [args.resolveDir] }),
       namespace: "node-file",
     }));
 

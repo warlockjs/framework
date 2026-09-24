@@ -549,6 +549,17 @@ async function tryResolveWithExtensions(basePath: string): Promise<string | null
   // If the path already has a VALID code file extension, check if it exists
   const ext = path.extname(normalizedBase);
   if (ext && validExtensions.has(ext)) {
+    // NodeNext style: `./x.js` is written, `x.ts`/`x.tsx` is on disk. The
+    // loader rewrites it the same way (own-resolver `probeFile`), and a
+    // co-located source wins over the literal .js.
+    if ([".js", ".jsx", ".mjs", ".cjs"].includes(ext)) {
+      const stem = normalizedBase.slice(0, -ext.length);
+      for (const sourceExt of [".ts", ".tsx"]) {
+        if (await cachedFileExists(stem + sourceExt)) {
+          return stem + sourceExt;
+        }
+      }
+    }
     if (await cachedFileExists(normalizedBase)) {
       return normalizedBase;
     }

@@ -16,6 +16,7 @@ import type {
   StorageFileInfo,
 } from "../types";
 import { getMimeType } from "../utils/mime";
+import { StorageCapabilityError } from "../utils/storage-capability-error";
 
 // ============================================================
 // Lazy-loaded S3 SDK Types
@@ -161,6 +162,31 @@ export abstract class CloudDriver<
     backoffMultiplier: number;
   };
 
+  /**
+   * How object visibility is applied: per-object ACLs (default), bucket
+   * policy (no per-object ACL is sent), or unsupported ("none").
+   * Buckets with ACLs disabled (S3 BucketOwnerEnforced, R2) need
+   * "policy" or "none".
+   */
+  protected get visibilityMode(): "acl" | "policy" | "none" {
+    return (this.options as { visibilityMode?: "acl" | "policy" | "none" }).visibilityMode ?? "acl";
+  }
+
+  /**
+   * Resolve the ACL to send on a put for the requested visibility.
+   *
+   * @throws {StorageCapabilityError} When public is requested but the driver has no visibility support
+   */
+  protected resolveAcl(visibility?: FileVisibility): "public-read" | undefined {
+    if (visibility !== "public") return undefined;
+
+    if (this.visibilityMode === "none") {
+      throw new StorageCapabilityError("public visibility", this.name);
+    }
+
+    return this.visibilityMode === "acl" ? "public-read" : undefined;
+  }
+
   public constructor(public options: TOptions) {
     // The async loadS3() may not have resolved yet on the first synchronous
     // construction. When the flag is still indeterminate, probe synchronously
@@ -173,14 +199,31 @@ export abstract class CloudDriver<
       throw new Error(S3_INSTALL_INSTRUCTIONS);
     }
 
+    // Any remaining option is an S3ClientConfig option (forcePathStyle,
+    // requestHandler, maxAttempts, ...) and is passed through to the SDK.
+    const {
+      bucket: _bucket,
+      accessKeyId,
+      secretAccessKey,
+      endpoint: _endpoint,
+      prefix: _prefix,
+      urlPrefix: _urlPrefix,
+      retry: _retry,
+      accountId: _accountId,
+      publicDomain: _publicDomain,
+      driver: _driver,
+      visibilityMode: _visibilityMode,
+      ...clientOptions
+    } = this.options as TOptions & Record<string, unknown>;
+
     this.client = new S3Client.S3Client({
+      ...clientOptions,
       region: this.options.region!,
-      credentials: {
-        accessKeyId: this.options.accessKeyId!,
-        secretAccessKey: this.options.secretAccessKey!,
-      },
+      // Without static keys the SDK default provider chain applies
+      // (IAM role, ECS task role, IRSA, SSO profile).
+      ...(accessKeyId && secretAccessKey && { credentials: { accessKeyId, secretAccessKey } }),
       ...(this.getEndpoint() && { endpoint: this.getEndpoint() }),
-    });
+    } as import("@aws-sdk/client-s3").S3ClientConfig);
 
     // Initialize retry configuration
     this.retryConfig = {
@@ -270,16 +313,19 @@ export abstract class CloudDriver<
   ): Promise<T> {
     const { maxRetries, initialDelayMs, backoffMultiplier, maxDelayMs } = this.retryConfig;
 
-    let lastError: Error | undefined;
+    let lastError: unknown;
 
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
+    // maxRetries counts retries, not attempts: 0 means a single attempt
+    const attempts = maxRetries + 1;
+
+    for (let attempt = 0; attempt < attempts; attempt++) {
       try {
         return await operation();
       } catch (error) {
-        lastError = error as Error;
+        lastError = error;
 
         // Don't retry on the last attempt
-        if (attempt === maxRetries - 1) {
+        if (attempt === attempts - 1) {
           break;
         }
 
@@ -296,7 +342,8 @@ export abstract class CloudDriver<
       }
     }
 
-    throw new Error(`${operationName} failed after ${maxRetries} attempts: ${lastError?.message}`);
+    // Rethrow the original error so name/$metadata survive
+    throw lastError;
   }
 
   /**
@@ -374,7 +421,7 @@ export abstract class CloudDriver<
         CacheControl: options?.cacheControl,
         ContentDisposition: options?.contentDisposition,
         Metadata: options?.metadata,
-        ACL: options?.visibility === "public" ? "public-read" : undefined,
+        ACL: this.resolveAcl(options?.visibility),
       });
 
       const result = await this.client.send(command);
@@ -425,7 +472,7 @@ export abstract class CloudDriver<
         CacheControl: options?.cacheControl,
         ContentDisposition: options?.contentDisposition,
         Metadata: options?.metadata,
-        ACL: options?.visibility === "public" ? "public-read" : undefined,
+        ACL: this.resolveAcl(options?.visibility),
         IfNoneMatch: "*",
       });
 
@@ -472,7 +519,9 @@ export abstract class CloudDriver<
     location: string,
     options?: PutOptions,
   ): Promise<CloudStorageFileData> {
-    return this.withRetry(async () => {
+    // Not wrapped in withRetry: a retry would replay an already-consumed
+    // stream, and lib-storage already retries individual parts.
+    {
       const { Upload } = S3Storage;
 
       // Apply storage prefix
@@ -490,7 +539,7 @@ export abstract class CloudDriver<
           CacheControl: options?.cacheControl,
           ContentDisposition: options?.contentDisposition,
           Metadata: options?.metadata,
-          ACL: options?.visibility === "public" ? "public-read" : undefined,
+          ACL: this.resolveAcl(options?.visibility),
         },
       });
 
@@ -511,7 +560,7 @@ export abstract class CloudDriver<
         etag: result.ETag,
         versionId: result.VersionId,
       };
-    }, "putStream");
+    }
   }
 
   /**
@@ -714,8 +763,19 @@ export abstract class CloudDriver<
 
       await this.client.send(command);
       return true;
-    } catch {
-      return false;
+    } catch (error) {
+      // Only a definite "not found" means absent; credential/network/5xx
+      // errors must surface, otherwise `if (!exists) put()` overwrites.
+      const { name, $metadata } = (error ?? {}) as {
+        name?: string;
+        $metadata?: { httpStatusCode?: number };
+      };
+
+      if (name === "NotFound" || name === "NoSuchKey" || $metadata?.httpStatusCode === 404) {
+        return false;
+      }
+
+      throw error;
     }
   }
 
@@ -827,11 +887,23 @@ export abstract class CloudDriver<
   // ============================================================
 
   /**
+   * Build a URL-encoded CopySource ("bucket/key") as the SDK requires
+   */
+  protected copySource(key: string): string {
+    const encodedKey = key.split("/").map(encodeURIComponent).join("/");
+
+    return `${this.options.bucket}/${encodedKey}`;
+  }
+
+  /**
    * Copy file to a new location
    */
   public async copy(from: string, to: string): Promise<CloudStorageFileData> {
     return this.withRetry(async () => {
       const { CopyObjectCommand, HeadObjectCommand } = S3Client;
+
+      // CopyObject drops the ACL, so a public source would silently become private
+      const visibility = await this.getVisibility(from).catch(() => "private" as const);
 
       // Apply storage prefix to both paths
       from = this.applyPrefix(from);
@@ -839,8 +911,9 @@ export abstract class CloudDriver<
 
       const command = new CopyObjectCommand({
         Bucket: this.options.bucket,
-        CopySource: `${this.options.bucket}/${from}`,
+        CopySource: this.copySource(from),
         Key: to,
+        ...(this.visibilityMode === "acl" && visibility === "public" && { ACL: "public-read" as const }),
       });
 
       const result = await this.client.send(command);
@@ -963,7 +1036,7 @@ export abstract class CloudDriver<
 
       const command = new CopyObjectCommand({
         Bucket: this.options.bucket,
-        CopySource: `${this.options.bucket}/${location}`,
+        CopySource: this.copySource(location),
         Key: location,
         StorageClass: storageClass as any,
         MetadataDirective: "COPY",
@@ -977,6 +1050,10 @@ export abstract class CloudDriver<
    * Set file visibility (public or private)
    */
   public async setVisibility(location: string, visibility: FileVisibility): Promise<void> {
+    if (this.visibilityMode !== "acl") {
+      throw new StorageCapabilityError("setVisibility", this.name);
+    }
+
     return this.withRetry(async () => {
       const { PutObjectAclCommand } = S3Client;
 

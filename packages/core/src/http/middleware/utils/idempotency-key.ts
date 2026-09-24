@@ -75,5 +75,10 @@ export function buildIdempotencyCacheKey(request: Request, idempotencyKey: strin
   const locals = request.locals as Record<string, unknown>;
   const userId = readUserId(locals.user) || request.detectIp() || "unknown";
 
-  return `idem:${userType}:${userId}:${idempotencyKey}`;
+  // scope by endpoint so one key reused on another route/method never replays
+  // that other endpoint's response
+  const method = (request.route?.method || request.method || "").toUpperCase();
+  const routePath = request.route?.path || "";
+
+  return `idem:${userType}:${userId}:${method}:${routePath}:${idempotencyKey}`;
 }

@@ -43,7 +43,8 @@ function text(value: unknown): string | undefined {
 
 /**
  * The database driver's package. `driver` is a closed union in cascade
- * (`mongodb | postgres | mysql`), so an unrecognised value means the config is
+ * (`mongodb | postgres | mysql`) and mysql is not implemented by cascade, so it
+ * has no peer to report; an unrecognised value means the config is
  * wrong in a way this check is not the right one to report.
  */
 function databasePeer(): RequiredPeer | undefined {
@@ -54,9 +55,7 @@ function databasePeer(): RequiredPeer | undefined {
       ? "mongodb"
       : driver === "postgres"
         ? "pg"
-        : driver === "mysql"
-          ? "mysql2"
-          : undefined;
+        : undefined;
 
   return packageName
     ? { package: packageName, because: `database.driver = "${driver}"` }

@@ -124,6 +124,8 @@ export async function runEmitContributions(
  * - `external` concatenates and dedupes — it is a set of package names, and
  *   under `singleBundle` each contributor adds its own optional peers.
  * - `loader` merges per extension, for the same reason as `define`.
+ * - `plugins` concatenate in contribution order. They are constructed inside
+ *   a hook, so this does not reopen the closed-contribution constraint.
  */
 export function mergeEsbuildPatches(
   base: ConnectorEsbuildPatch,
@@ -141,6 +143,10 @@ export function mergeEsbuildPatches(
 
   if (base.loader || patch.loader) {
     merged.loader = { ...base.loader, ...patch.loader };
+  }
+
+  if (base.plugins || patch.plugins) {
+    merged.plugins = [...(base.plugins ?? []), ...(patch.plugins ?? [])];
   }
 
   return merged;

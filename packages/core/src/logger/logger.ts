@@ -9,7 +9,17 @@ export function setLogConfigurations(options: LogConfigurations) {
 
   const env = environment();
 
-  const envChannels = options[env as "development" | "production"]?.channels;
+  const envOptions = options[env as "development" | "test" | "production"];
+
+  // the environment flag wins over the top-level flag
+  const enabled = envOptions?.enabled ?? options.enabled ?? true;
+
+  if (!enabled) {
+    log.configure({ channels: [] });
+    return;
+  }
+
+  const envChannels = envOptions?.channels;
   const defaultChannels = options.channels;
 
   if (defaultChannels) {

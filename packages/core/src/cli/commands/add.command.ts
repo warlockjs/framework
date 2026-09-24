@@ -7,7 +7,7 @@ export const addCommand = command({
   action: addCommandAction,
   options: [
     {
-      text: "--package-manager -pm",
+      text: "--package-manager, -pm",
       description: "Package manager to use, if not passed, it will be detected automatically",
     },
     {

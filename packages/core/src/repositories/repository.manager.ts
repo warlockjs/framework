@@ -191,7 +191,9 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
       this.eventsCallbacks.push(
         ...this.adapter.registerEvents((source: any) => {
           // this.clearCache({ id: source.id });
-          this.clearCache();
+          this.clearCache().catch(error => {
+            console.error("[Repository] cache invalidation failed", error);
+          });
         }),
       );
     } catch (error) {
@@ -595,6 +597,10 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     ) as TypedRepositoryOptions<F>;
     const paginationMode = opts.paginationMode || "pages";
 
+    if (opts.paginate === false) {
+      return { data: await this.all(opts as any) } as any;
+    }
+
     // applyOptionsToQuery handles cursor phase 1 (WHERE + ORDER BY) internally
     // when paginationMode === "cursor", ensuring the cursor column is always
     // the primary sort key before any other options are applied.
@@ -718,7 +724,11 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * (spread + forward) satisfies the typed public API without per-call casts.
    */
   protected prepareOptions(options?: TypedRepositoryOptions<F>): TypedRepositoryOptions<F> {
-    return { ...(this.defaultOptions || {}), ...(options || {}) } as TypedRepositoryOptions<F>;
+    return {
+      ...((config.get("repository.defaultOptions") as object) || {}),
+      ...(this.defaultOptions || {}),
+      ...(options || {}),
+    } as TypedRepositoryOptions<F>;
   }
 
   /**
@@ -888,7 +898,14 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
       const direction = options.direction ?? "next";
 
       if (options.cursor) {
-        query.where(cursorColumn, direction === "next" ? ">" : "<", options.cursor);
+        query.where(
+          cursorColumn,
+          direction === "next" ? ">" : "<",
+          // A cursor from the query string is a string; numeric ids never match it on Mongo.
+          typeof options.cursor === "string" && /^-?\d+(\.\d+)?$/.test(options.cursor.trim())
+            ? Number(options.cursor)
+            : options.cursor,
+        );
       }
 
       query.orderBy(cursorColumn, direction === "next" ? "asc" : "desc");
@@ -1339,7 +1356,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
 
     // Bypass + refresh the cache when purgeCache is requested.
     if (!opts.purgeCache) {
-      const cachedCount = await this.cacheDriver.get(cacheKey);
+      const cachedCount = await this.safeCacheGet(cacheKey);
 
       // Treat BOTH null and undefined as a cache miss: every shipped cache
       // driver returns `null` (not `undefined`) on a miss, so checking only
@@ -1680,7 +1697,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     }
 
     const cacheKey = this.cacheKey(`${column}.${value}`, cacheKeyOptions);
-    const cachedData = await this.cacheDriver.get(cacheKey);
+    const cachedData = await this.safeCacheGet(cacheKey);
 
     if (cachedData) {
       return this.adapter.deserializeModel(cachedData);
@@ -1711,7 +1728,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
 
     // Bypass + refresh the cache when purgeCache is requested.
     if (!opts.purgeCache) {
-      const cachedData = await this.cacheDriver.get<T[]>(cacheKey);
+      const cachedData = await this.safeCacheGet<T[]>(cacheKey);
 
       if (cachedData) {
         return cachedData.map((record) => this.adapter.deserializeModel(record));
@@ -1760,7 +1777,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
 
     // Bypass + refresh the cache when purgeCache is requested.
     if (!opts.purgeCache) {
-      const cachedData = await this.cacheDriver.get(cacheKey);
+      const cachedData = await this.safeCacheGet(cacheKey);
 
       if (cachedData) {
         return {
@@ -1848,8 +1865,19 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     await this.clearCache();
     this.cleanuEvents();
 
-    if (this.cacheDriver) {
-      await this.cacheDriver.flush();
+    // Namespace-only (clearCache above): never flush() the shared store, it
+    // holds sessions, throttle counters and other repositories' entries.
+  }
+
+  /**
+   * Cache read that treats a driver failure (e.g. Redis down) as a miss.
+   */
+  private async safeCacheGet<V = any>(key: string): Promise<V | null | undefined> {
+    try {
+      return await this.cacheDriver.get<V>(key);
+    } catch (error) {
+      console.error("[Repository] cache read failed, treating as miss", error);
+      return null;
     }
   }
 

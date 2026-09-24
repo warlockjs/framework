@@ -23,7 +23,10 @@ export class Queue<T> {
   private readonly executeInParallel: boolean;
 
   /** The batch size for processing items. */
-  private readonly batchSize: number;
+  private readonly batchSize?: number;
+
+  /** Called when the execute function rejects. */
+  private readonly onError: (error: unknown) => void;
 
   /** Whether the current queue is busy executing */
   private isExecuting = false;
@@ -40,9 +43,11 @@ export class Queue<T> {
     executeFn: (items: T[]) => Promise<void>,
     executeInParallel: boolean = true,
     executeEvery: number = 5000,
-    batchSize: number,
+    batchSize?: number,
     maxSize?: number,
+    onError: (error: unknown) => void = (error) => console.error("Queue execution failed", error),
   ) {
+    this.onError = onError;
     this.executeFn = executeFn;
     this.maxSize = maxSize;
     this.interval = executeEvery;
@@ -59,10 +64,10 @@ export class Queue<T> {
   public enqueue(item: T): void {
     this.items.push(item);
     if (this.maxSize && this.items.length >= this.maxSize) {
-      this.execute();
+      void this.execute();
     }
 
-    if (!this.timer) {
+    if (!this.timer && !this.isExecuting) {
       this.startTimer();
     }
   }
@@ -73,14 +78,15 @@ export class Queue<T> {
   private startTimer(): void {
     this.timer = setInterval(() => {
       if (this.items.length > 0) {
-        this.execute();
+        void this.execute();
       }
     }, this.interval);
+    this.timer.unref?.();
   }
 
   /**
-   * Executes the function with the current items in the queue.
-   * Processes items in batches and resets the timer.
+   * Executes the function with the queued items until the queue is drained.
+   * Rejections from the execute function are passed to `onError`.
    */
   private async execute(): Promise<void> {
     if (this.timer) {
@@ -88,22 +94,32 @@ export class Queue<T> {
       this.timer = null;
     }
 
+    // the running drain loop will pick up newly enqueued items
+    if (this.isExecuting) return;
+
     this.isExecuting = true;
 
-    // Now there are couple scenarios:
-    // 1. Batch size has value, we need to check if its going to be executed in parallel or sequentially
-    // 2. Batch size is not provided, we will execute all items in a single call
-    if (this.batchSize) {
-      const itemsToProcess = this.items.splice(0, this.batchSize);
-      if (this.executeInParallel) {
-        await Promise.all(itemsToProcess.map((item) => this.executeFn([item])));
-      } else {
-        for (const item of itemsToProcess) {
-          await this.executeFn([item]);
+    try {
+      while (this.items.length > 0) {
+        // Without a batch size, all items go in a single call
+        const batch = this.items.splice(0, this.batchSize || this.items.length);
+
+        try {
+          if (!this.batchSize) {
+            await this.executeFn(batch);
+          } else if (this.executeInParallel) {
+            await Promise.all(batch.map((item) => this.executeFn([item])));
+          } else {
+            for (const item of batch) {
+              await this.executeFn([item]);
+            }
+          }
+        } catch (error) {
+          this.onError(error);
         }
       }
+    } finally {
+      this.isExecuting = false;
     }
-
-    this.isExecuting = false;
   }
 }

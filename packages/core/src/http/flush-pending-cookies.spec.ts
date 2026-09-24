@@ -45,3 +45,29 @@ describe("flushPendingCookies", () => {
     await app.close();
   });
 });
+
+describe("flushPendingCookies fail-loud", () => {
+  it("throws, naming the plugin version, when setCookie exists but the parked symbol is gone", async () => {
+    const reply = { setCookie: () => undefined } as never;
+
+    expect(() => flushPendingCookies(reply)).toThrow(/@fastify\/cookie.*internal cookie storage changed/);
+    expect(() => flushPendingCookies(reply)).toThrow(/@fastify\/cookie@\d+\./);
+  });
+
+  it("does nothing when the cookie plugin is not registered", async () => {
+    const app = Fastify();
+
+    app.get("/", (request, reply) => {
+      expect(() => flushPendingCookies(reply)).not.toThrow();
+
+      return reply.send("plain");
+    });
+
+    const response = await app.inject({ method: "GET", url: "/" });
+
+    expect(response.body).toBe("plain");
+    expect(response.headers["set-cookie"]).toBeUndefined();
+
+    await app.close();
+  });
+});

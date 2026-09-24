@@ -32,8 +32,8 @@ describe("parseColumnDsl", () => {
     expect(parseColumnDsl("file:binary")[0].helper).toBe("blobCol");
   });
 
-  it("falls back to the raw type when it is unmapped", () => {
-    expect(parseColumnDsl("loc:point")[0].helper).toBe("point");
+  it("rejects an unmapped type instead of emitting a non-existent helper", () => {
+    expect(() => parseColumnDsl("loc:point")).toThrow(/Unknown column type "point"/);
   });
 
   it("renders trailing segments as modifier call strings", () => {

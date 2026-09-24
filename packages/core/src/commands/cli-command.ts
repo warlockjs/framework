@@ -1,3 +1,4 @@
+import { toCamelCase } from "@mongez/reinforcements";
 import type {
   CLICommandAction,
   CLICommandOption,
@@ -218,10 +219,12 @@ export class CLICommand {
       throw new Error("Help option is not allowed, it's reserved for displaying command help");
     }
 
+    // The parser emits camelCase keys, so the resolved name must match them.
     return {
       ...option,
-      name,
-      alias,
+      name: toCamelCase(name),
+      // Short flags are case-sensitive (`-L` vs `-l`); only kebab aliases fold.
+      alias: alias.includes("-") ? toCamelCase(alias) : alias,
     };
   }
 

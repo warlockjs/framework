@@ -3,6 +3,7 @@ import { devLogError } from "./dev-logger";
 import type { DevelopmentServer } from "./development-server";
 import { restartDevServer } from "./restart-dev-server";
 import { devServerShortcuts } from "./shortcuts";
+import { QUIT_EXIT_CODE } from "./supervisor";
 
 /**
  * Arm the dev server's standing keyboard shortcuts and print the one-line
@@ -67,7 +68,7 @@ async function quit(devServer: DevelopmentServer): Promise<void> {
     process.exit(0);
   } catch (error) {
     devLogError(`Shutdown failed: ${(error as Error).message}`);
-    process.exit(1);
+    process.exit(QUIT_EXIT_CODE);
   }
 }
 

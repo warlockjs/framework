@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { configKeyFromPath } from "../config/config-key-from-path";
 import {
+  isCodeFile,
   isConfigFile,
   isEventFile,
   isLocaleFile,
@@ -36,5 +37,16 @@ describe("special file patterns", () => {
     [isConfigFile, "src/config/mail/smtp.ts", true],
   ])("%p %s -> %s", (predicate, path, expected) => {
     expect(predicate(path)).toBe(expected);
+  });
+});
+
+describe("isCodeFile", () => {
+  it.each([
+    ["src/app/a.ts", true],
+    ["src/app/a.mjs", true],
+    ["fixtures/seed.sql", false],
+    ["src/data/config.json", false],
+  ])("%s -> %s", (path, expected) => {
+    expect(isCodeFile(path)).toBe(expected);
   });
 });

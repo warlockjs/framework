@@ -181,6 +181,6 @@ describe("idempotencyMiddleware", () => {
     // never stored, and the reservation is removed so a retry can run.
     expect(cacheStore.set).toHaveBeenCalledTimes(1);
     expect(cacheStore.set.mock.calls[0][2]).toMatchObject({ onConflict: "create" });
-    expect(cacheStore.remove).toHaveBeenCalledWith("idem:anonymous:127.0.0.1:01J9XZQ-ABC");
+    expect(cacheStore.remove).toHaveBeenCalledWith("idem:anonymous:127.0.0.1:POST::01J9XZQ-ABC");
   });
 });

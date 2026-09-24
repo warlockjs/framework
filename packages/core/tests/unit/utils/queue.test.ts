@@ -54,7 +54,7 @@ describe("Queue", () => {
     expect(calls).toEqual([[1], [2], [3]]);
   });
 
-  it("only drains up to batchSize per flush", async () => {
+  it("drains in batchSize chunks until empty", async () => {
     const calls: number[][] = [];
 
     const queue = new Queue<number>(
@@ -64,7 +64,7 @@ describe("Queue", () => {
       false,
       5000,
       2, // batchSize 2
-      4, // maxSize 4 -> flush, but only the first 2 are processed
+      4, // maxSize 4 -> flush; batches of 2 keep draining until empty
     );
 
     queue.enqueue(1);
@@ -72,9 +72,10 @@ describe("Queue", () => {
     queue.enqueue(3);
     queue.enqueue(4);
 
-    await vi.waitFor(() => expect(calls.length).toBe(2));
+    await vi.waitFor(() => expect(calls.length).toBe(4));
 
-    expect(calls).toEqual([[1], [2]]);
+    // Items beyond the first batch are not stranded.
+    expect(calls).toEqual([[1], [2], [3], [4]]);
   });
 
   it("flushes on the interval timer when maxSize is never reached", async () => {

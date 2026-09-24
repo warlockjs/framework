@@ -48,8 +48,16 @@ export type CsrfOriginVerdict =
  * function does not need its own proxy-trust logic on top of that.
  */
 export function ownOrigin(request: Request): string {
+  // Fastify's `host` keeps the port and honours `X-Forwarded-Host` under
+  // `trustProxy`, so a proxy that rewrites `Host` does not break the match.
+  const fastifyHost = request.baseRequest?.host;
   const hostHeader = request.header("host");
-  const host = typeof hostHeader === "string" && hostHeader ? hostHeader : request.hostname;
+  const host =
+    typeof fastifyHost === "string" && fastifyHost
+      ? fastifyHost
+      : typeof hostHeader === "string" && hostHeader
+        ? hostHeader
+        : request.hostname;
 
   return `${request.protocol}://${host}`;
 }
@@ -90,7 +98,9 @@ export function isAllowedCsrfOrigin(origin: string, request: Request): boolean {
 
   const allowedOrigins: string[] = config.get("auth.csrf.allowedOrigins", []);
 
-  return allowedOrigins.includes(origin);
+  const normalized = normalizeOrigin(origin);
+
+  return allowedOrigins.some(allowed => normalizeOrigin(allowed) === normalized);
 }
 
 /**

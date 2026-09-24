@@ -9,6 +9,9 @@ import type {
 } from "../../contracts";
 import { CascadeQueryBuilder } from "./cascade-query-builder";
 
+/** Records loaded and written per `updateMany` batch. */
+export const UPDATE_MANY_BATCH_SIZE = 500;
+
 /**
  * Cascade adapter for Cascade-Next ORM
  * Implements RepositoryAdapterContract for @warlock.js/cascade
@@ -121,7 +124,12 @@ export class CascadeAdapter<T extends Model<any>> implements RepositoryAdapterCo
    * {@inheritDoc RepositoryAdapterContract.delete}
    */
   public async delete(id: any): Promise<void> {
-    await this.model.delete({ id });
+    // Load + destroy so events, delete strategy and repository-cache clearing apply.
+    const record = id instanceof Model ? id : await this.model.find(id);
+
+    if (!record) return;
+
+    await record.destroy();
   }
 
   // ============================================================================
@@ -139,15 +147,29 @@ export class CascadeAdapter<T extends Model<any>> implements RepositoryAdapterCo
       query.where(filter);
     }
 
-    // Get matching records
-    const records = await query.get();
+    let updated = 0;
 
-    // Update each record
-    for (const record of records) {
-      await this.update(record.id, data);
-    }
+    // Process in batches instead of loading the whole result set; each batch
+    // is written inside a transaction when the model's driver offers one.
+    await query.chunk(UPDATE_MANY_BATCH_SIZE, async (records) => {
+      const writeBatch = async () => {
+        for (const record of records) {
+          await record.save({ merge: data });
+        }
+      };
 
-    return records.length;
+      const runInTransaction = (this.model as any).transaction;
+
+      if (typeof runInTransaction === "function") {
+        await runInTransaction.call(this.model, writeBatch);
+      } else {
+        await writeBatch();
+      }
+
+      updated += records.length;
+    });
+
+    return updated;
   }
 
   /**

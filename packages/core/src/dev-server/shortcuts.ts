@@ -167,7 +167,7 @@ export class DevServerShortcuts {
       return;
     }
 
-    if (key.ctrl && (key.name === "c" || key.name === "d")) {
+    if ((key.ctrl && (key.name === "c" || key.name === "d")) || key.sequence === "\u0003") {
       this.release();
       this.onInterrupt();
       return;
@@ -197,12 +197,15 @@ export class DevServerShortcuts {
 
 /** Re-raise the interrupt the terminal would have sent outside raw mode. */
 function raiseInterrupt(): void {
-  process.kill(process.pid, "SIGINT");
+  // `process.kill(pid, "SIGINT")` is TerminateProcess on Windows, skipping the
+  // graceful shutdown; emitting runs the registered handlers on every OS.
+  process.emit("SIGINT");
 }
 
 /** The keypress shape emitted by `readline.emitKeypressEvents`. */
 type KeypressEvent = {
   name?: string;
+  sequence?: string;
   ctrl?: boolean;
   meta?: boolean;
   shift?: boolean;

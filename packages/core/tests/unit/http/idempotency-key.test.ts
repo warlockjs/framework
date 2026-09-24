@@ -105,14 +105,14 @@ describe("buildIdempotencyCacheKey", () => {
     });
 
     expect(buildIdempotencyCacheKey(request, "01J9XZQ-ABC")).toBe(
-      "idem:client:123:01J9XZQ-ABC",
+      "idem:client:123:::01J9XZQ-ABC",
     );
   });
 
   it("falls back to anonymous + client IP when unauthenticated", () => {
     const request = makeRequest({ ip: "203.0.113.9" });
 
-    expect(buildIdempotencyCacheKey(request, "KEY")).toBe("idem:anonymous:203.0.113.9:KEY");
+    expect(buildIdempotencyCacheKey(request, "KEY")).toBe("idem:anonymous:203.0.113.9:::KEY");
   });
 
   it("ignores X-Forwarded-For for the anonymous scope unless http.trustProxy is set", () => {
@@ -121,7 +121,7 @@ describe("buildIdempotencyCacheKey", () => {
       ip: "10.0.0.1",
     });
 
-    expect(buildIdempotencyCacheKey(request, "KEY")).toBe("idem:anonymous:10.0.0.1:KEY");
+    expect(buildIdempotencyCacheKey(request, "KEY")).toBe("idem:anonymous:10.0.0.1:::KEY");
   });
 
   describe("with http.trustProxy enabled", () => {
@@ -146,7 +146,7 @@ describe("buildIdempotencyCacheKey", () => {
         ip: "10.0.0.1",
       });
 
-      expect(buildIdempotencyCacheKey(request, "KEY")).toBe("idem:anonymous:198.51.100.7:KEY");
+      expect(buildIdempotencyCacheKey(request, "KEY")).toBe("idem:anonymous:198.51.100.7:::KEY");
     });
   });
 });

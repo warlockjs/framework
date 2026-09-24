@@ -55,5 +55,5 @@ export async function generateService(data: CommandActionData): Promise<void> {
 
   await putFileAsync(servicePath, serviceContent);
 
-  console.log(colors.cyan(`\nâœ¨ Service "${name.camel}" generated successfully!`));
+  console.log(colors.cyan(`\n✨ Service "${name.camel}" generated successfully!`));
 }

@@ -244,6 +244,11 @@ export class ResourceFieldBuilder {
    * Transform date value
    */
   protected transformDate(value: string | Date, locale?: string) {
+    // Bad data ("" or garbage) must not throw and turn the response into a 500
+    if (!dayjs((value as any)?.iso || value).isValid()) {
+      return this.isNullable ? null : undefined;
+    }
+
     if (typeof this.dateOptionsInput === "string") {
       if (this.dateOptionsInput === "format") {
         return dayjs(value).format(this.dateFormat);

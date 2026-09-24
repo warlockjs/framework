@@ -1,3 +1,4 @@
+import config from "@mongez/config";
 import { Application } from "../application";
 import { log } from "@warlock.js/logger";
 import { AccessConnector } from "./access-connector";
@@ -13,6 +14,11 @@ import { SocketConnector } from "./socket-connector";
 import { StorageConnector } from "./storage.connector";
 import { ConnectorLifecyclePhase } from "./types";
 import type { Connector, ConnectorName } from "./types";
+
+/**
+ * Overall shutdown budget in ms. Override via `app.shutdownTimeout`.
+ */
+const DEFAULT_SHUTDOWN_TIMEOUT = 10_000;
 
 export class ConnectorsManager {
   /**
@@ -164,40 +170,64 @@ export class ConnectorsManager {
     // still up, so cleanup hooks can use them. Idempotent + error-isolated.
     await Application.runShutdownHooks();
 
-    // Shut down connectors in reverse priority order. Copy the list first —
-    // `reverse()` mutates in place, so reversing the live array would corrupt
-    // the order on a second shutdown pass.
-    for (const connector of [...this.connectors].reverse()) {
-      try {
-        await connector.shutdown();
-      } catch (error) {
-        try {
-          // Awaited deliberately: the caller (`shutdownOnProcessKill`) calls
-          // `process.exit(0)` as soon as this resolves, so an un-awaited log is
-          // a log that never happens.
-          await log.error("connectors", "shutdown", error as Error, { connector: connector.name });
-        } catch {
-          // Reporting a failure must never become a worse failure than the one
-          // being reported. `Logger.log()` fans out to channels without
-          // isolating them, so a channel that throws synchronously rejects this
-          // call — and this call sits INSIDE the catch, so that rejection
-          // escapes `shutdown()` entirely: the remaining connectors are never
-          // torn down and `process.exit(0)` never runs, leaving the process
-          // alive on the handles they still hold.
-          //
-          // Swallowed rather than re-reported: the only channel we could report
-          // it through is the one that just threw.
-        }
+    // HTTP stops accepting and drains in-flight requests FIRST, while storage,
+    // socket, etc. are still up; then the rest go in reverse priority. Copy the
+    // list first — `reverse()` mutates in place, so reversing the live array
+    // would corrupt the order on a second shutdown pass.
+    const reversed = [...this.connectors].reverse();
+    const ordered = [
+      ...reversed.filter((connector) => connector.name === "http"),
+      ...reversed.filter((connector) => connector.name !== "http"),
+    ];
+
+    const timeout = config.get("app.shutdownTimeout", DEFAULT_SHUTDOWN_TIMEOUT);
+    let current: string | undefined;
+
+    const timer = setTimeout(() => {
+      // Sync write: the process exits right after, so an async log would be lost.
+      console.error(
+        `Shutdown timed out after ${timeout}ms; connector still shutting down: ${current ?? "none"}`,
+      );
+      process.exit(1);
+    }, timeout);
+    timer.unref?.();
+
+    try {
+      for (const connector of ordered) {
+        current = connector.name;
+        await this.shutdownOne(connector);
       }
+      current = undefined;
+    } finally {
+      clearTimeout(timer);
     }
 
     // `Logger.log()` hands each entry to `channel.log()` without awaiting it, so
     // awaiting the calls above is not enough on its own — a buffered or async
     // channel (file, Sentry) still loses the entry when the process exits.
-    // Drained once here rather than per failure: shutdown is exactly when
-    // buffered logs must reach their destination, and re-draining every channel
-    // once per failed connector buys nothing.
     await log.flush();
+  }
+
+  /**
+   * Shut one connector down, isolating and reporting its failure.
+   */
+  private async shutdownOne(connector: Connector): Promise<void> {
+    try {
+      await connector.shutdown();
+    } catch (error) {
+      try {
+        // Awaited deliberately: the caller (`shutdownOnProcessKill`) calls
+        // `process.exit(0)` as soon as this resolves, so an un-awaited log is
+        // a log that never happens.
+        await log.error("connectors", "shutdown", error as Error, { connector: connector.name });
+      } catch {
+        // Reporting a failure must never become a worse failure than the one
+        // being reported: a channel that throws synchronously rejects this call
+        // INSIDE the catch, which would abort the remaining teardown. Swallowed
+        // rather than re-reported: the only channel we could report it through
+        // is the one that just threw.
+      }
+    }
   }
 
   /**

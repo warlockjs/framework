@@ -91,6 +91,12 @@ export const generateModuleCommand = command({
       type: "boolean",
     },
     {
+      text: "--overwrite",
+      description:
+        "With --force, also replace existing files that differ from the generated output (default: skip and list them)",
+      type: "boolean",
+    },
+    {
       text: "--dry-run",
       description: "Preview the files that would be generated without writing anything",
       type: "boolean",
@@ -162,6 +168,12 @@ export const generateModelCommand = command({
       type: "boolean",
     },
     {
+      text: "--overwrite",
+      description:
+        "With --force, also replace existing files that differ from the generated output (default: skip and list them)",
+      type: "boolean",
+    },
+    {
       text: "--dry-run",
       description: "Preview the files that would be generated without writing anything",
       type: "boolean",
@@ -169,6 +181,11 @@ export const generateModelCommand = command({
     {
       text: "--timestamps [bool]",
       description: "Include timestamps in migration (default: true)",
+      type: "boolean",
+    },
+    {
+      text: "--no-timestamps",
+      description: "Disable timestamps (same as --timestamps false)",
       type: "boolean",
     },
   ],
@@ -243,6 +260,11 @@ export const generateMigrationCommand = command({
     {
       text: "--timestamps [bool]",
       description: "Include timestamps (default: true)",
+      type: "boolean",
+    },
+    {
+      text: "--no-timestamps",
+      description: "Disable timestamps (same as --timestamps false)",
       type: "boolean",
     },
   ],

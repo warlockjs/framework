@@ -3,7 +3,7 @@ import { isBootPreconditionError } from "./boot-precondition-error";
 import { devLogError, devServeLog } from "./dev-logger";
 import { DevelopmentServer } from "./development-server";
 import { registerDevShortcuts } from "./register-dev-shortcuts";
-import { BOOT_PRECONDITION_EXIT_CODE } from "./supervisor";
+import { BOOT_PRECONDITION_EXIT_CODE, QUIT_EXIT_CODE } from "./supervisor";
 
 let handlersRegistered = false;
 
@@ -51,7 +51,7 @@ export async function startDevelopmentServer(
   try {
     await devServer.start();
   } catch (error) {
-    devLogError(`Failed to start Development Server: ${(error as Error).message}`);
+    // `DevelopmentServer.start()` already logged the failure once.
     await safeShutdown(devServer);
 
     // A boot-precondition failure (busy port, rejected validator, ...) has
@@ -82,7 +82,7 @@ function registerShutdownHandlers(devServer: DevelopmentServer): void {
   const onSignal = (signal: NodeJS.Signals) => async () => {
     devServeLog(colors.yellow(`📡 Received ${signal}`));
     const ok = await safeShutdown(devServer);
-    process.exit(ok ? 0 : 1);
+    process.exit(ok ? 0 : QUIT_EXIT_CODE);
   };
 
   process.on("SIGINT", onSignal("SIGINT"));

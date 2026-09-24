@@ -134,7 +134,10 @@ export abstract class Restful<T extends Model> implements RouteResource {
         return beforeSave;
       }
 
-      const record = await this.repository.create(this.payload("create", request));
+      // Save the model the hooks received, so their changes are not discarded
+      await model.save(this.payload("create", request));
+
+      const record = model;
 
       const createOutput = await this.onCreate(request, response, record);
 
@@ -158,9 +161,8 @@ export abstract class Restful<T extends Model> implements RouteResource {
     } catch (error: Error | any) {
       log.error("restful", "create", error);
 
-      return response.badRequest({
-        error: error.message,
-      });
+      // let the request error handler decide the status; never leak DB messages as 400
+      throw error;
     }
   }
 
@@ -293,9 +295,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
     } catch (error: Error | any) {
       log.error("restful", "delete", error);
 
-      return response.badRequest({
-        error: error.message,
-      });
+      throw error;
     }
   }
 
@@ -316,7 +316,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
         perform: (query: QueryBuilderContract<T>) =>
           query.whereIn(
             "id",
-            ids.map((id) => parseInt(id)),
+            ids.map((id) => (/^\d+$/.test(String(id)) ? Number(id) : id)),
           ),
       });
 
@@ -341,9 +341,8 @@ export abstract class Restful<T extends Model> implements RouteResource {
       });
     } catch (error: Error | any) {
       log.error("restful", "bulkDelete", error);
-      return response.badRequest({
-        error: error.message,
-      });
+
+      throw error;
     }
   }
 

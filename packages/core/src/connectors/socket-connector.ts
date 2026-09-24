@@ -57,6 +57,22 @@ export class SocketConnector extends BaseConnector {
   protected ownsRawServer = false;
 
   /**
+   * The shared server socket.io attached to, kept for the detach.
+   */
+  protected sharedServer?: any;
+
+  /**
+   * Listener changes socket.io/engine.io made on the shared server at attach:
+   * the listeners they added, and the ones they removed (engine.io lifts the
+   * existing `request` listeners into its own wrapper). Undone on detach so
+   * repeated dev restarts don't stack engines on Fastify's server.
+   */
+  protected attachedListeners: {
+    added: Array<[string, (...args: any[]) => void]>;
+    removed: Array<[string, (...args: any[]) => void]>;
+  } = { added: [], removed: [] };
+
+  /**
    * Boot the connector
    */
   public async boot() {
@@ -84,12 +100,21 @@ export class SocketConnector extends BaseConnector {
       server = fastify.server;
       this.ownsRawServer = false;
     } else {
-      server = socketConfig.ssl ? createHttpsServer() : createHttpServer();
+      server = socketConfig.ssl
+        ? createHttpsServer({ key: socketConfig.ssl.key, cert: socketConfig.ssl.cert })
+        : createHttpServer();
+      // Without a handler, EADDRINUSE is an unhandled 'error' event that crashes
+      // the process with no context.
+      server.on("error", (error: Error) => {
+        log.error("socket", "connection", error, { port: socketConfig.port });
+      });
       server.listen(socketConfig.port);
       this.ownsRawServer = true;
     }
 
     container.set("socket.rawServer", server);
+
+    const before = this.snapshotListeners(server);
 
     this.socket = new SocketServer(server, {
       // The shared raw server may carry OTHER `upgrade` consumers — Vite's HMR
@@ -107,6 +132,11 @@ export class SocketConnector extends BaseConnector {
       destroyUpgrade: false,
       ...socketConfig.options,
     });
+
+    if (!this.ownsRawServer) {
+      this.sharedServer = server;
+      this.attachedListeners = this.diffListeners(before, this.snapshotListeners(server));
+    }
 
     if (socketConfig.adapter) {
       this.socket.adapter((await socketConfig.adapter(this.socket)) as never);
@@ -133,6 +163,16 @@ export class SocketConnector extends BaseConnector {
   }
 
   /**
+   * Restart re-boots too: the closed `io` must be replaced and the new
+   * `socket` config read, otherwise a config edit in dev restarts nothing.
+   */
+  public async restart(): Promise<void> {
+    await this.shutdown();
+    await this.boot();
+    await this.start();
+  }
+
+  /**
    * Shutdown Socket server
    *
    * Always closes the Socket.IO layer (and awaits the drain). The underlying
@@ -148,26 +188,71 @@ export class SocketConnector extends BaseConnector {
 
     const socket = container.tryGet("socket");
     if (socket) {
-      // socket.io's close() takes a callback — await it so shutdown doesn't
-      // report done while sockets are still draining.
-      await new Promise<void>((resolve) => {
-        socket.close(() => resolve());
-      });
-    }
-
-    const rawServer = this.ownsRawServer ? container.tryGet("socket.rawServer") : undefined;
-    if (rawServer) {
-      await new Promise<void>((resolve, reject) => {
-        rawServer.close((error?: Error) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve();
-          }
+      if (this.ownsRawServer) {
+        // We own the raw server: `io.close()` closes it too, so it is the only
+        // close needed (a second `rawServer.close()` always rejects with
+        // ERR_SERVER_NOT_RUNNING).
+        await new Promise<void>((resolve) => {
+          socket.close(() => resolve());
         });
-      });
+      } else {
+        // Shared mode: `io.close()` calls `httpServer.close()`, which would close
+        // Fastify's server from here and bypass its graceful drain. Detach
+        // instead: disconnect the clients and close the engine only.
+        socket.of("/").disconnectSockets(true);
+        socket.engine.close();
+        this.restoreListeners();
+      }
     }
 
     this.active = false;
+  }
+
+  /**
+   * Current listeners of the events socket.io touches on a node server.
+   */
+  private snapshotListeners(server: any): Map<string, Array<(...args: any[]) => void>> {
+    const snapshot = new Map<string, Array<(...args: any[]) => void>>();
+
+    for (const event of ["request", "upgrade", "close", "listening"]) {
+      snapshot.set(event, server?.listeners?.(event)?.slice() ?? []);
+    }
+
+    return snapshot;
+  }
+
+  private diffListeners(
+    before: Map<string, Array<(...args: any[]) => void>>,
+    after: Map<string, Array<(...args: any[]) => void>>,
+  ) {
+    const added: Array<[string, (...args: any[]) => void]> = [];
+    const removed: Array<[string, (...args: any[]) => void]> = [];
+
+    for (const [event, listeners] of before) {
+      const now = after.get(event) ?? [];
+
+      for (const listener of now) if (!listeners.includes(listener)) added.push([event, listener]);
+      for (const listener of listeners) if (!now.includes(listener)) removed.push([event, listener]);
+    }
+
+    return { added, removed };
+  }
+
+  /**
+   * Undo what attaching did to the shared server, leaving listeners other
+   * consumers added since (e.g. Vite's HMR upgrade handler) untouched.
+   */
+  private restoreListeners(): void {
+    const server = this.sharedServer;
+
+    if (!server) return;
+
+    const { added, removed } = this.attachedListeners;
+
+    for (const [event, listener] of added) server.removeListener(event, listener);
+    for (const [event, listener] of removed) server.on(event, listener);
+
+    this.attachedListeners = { added: [], removed: [] };
+    this.sharedServer = undefined;
   }
 }

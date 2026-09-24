@@ -99,7 +99,7 @@ export type ConnectorBuildContext = {
  */
 export type ConnectorEsbuildPatch = Pick<
   BuildOptions,
-  "jsx" | "jsxImportSource" | "define" | "external" | "loader"
+  "jsx" | "jsxImportSource" | "define" | "external" | "loader" | "plugins"
 >;
 
 /**

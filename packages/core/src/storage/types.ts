@@ -60,11 +60,12 @@ export type CloudStorageDriverOptions = {
   /**
    * Access key ID
    */
-  accessKeyId: string;
+  accessKeyId?: string;
   /**
    * Secret access key
+   * Omit both keys to use the AWS default credential provider chain
    */
-  secretAccessKey: string;
+  secretAccessKey?: string;
   /**
    * Custom endpoint URL
    * Optional - derived from provider if not specified
@@ -606,6 +607,16 @@ export type StorageDriverConfig = {
    */
   signatureKey?: string;
 
+  /**
+   * Storage path prefix (local and cloud drivers)
+   */
+  prefix?: string;
+
+  /**
+   * URL prefix for local temporary URLs
+   */
+  temporaryUrlPrefix?: string;
+
   // === Cloud driver options ===
 
   /**
@@ -617,11 +628,11 @@ export type StorageDriverConfig = {
    */
   region?: string;
   /**
-   * Access key ID (required for cloud drivers)
+   * Access key ID (optional: omit both keys to use the AWS default credential chain)
    */
   accessKeyId?: string;
   /**
-   * Secret access key (required for cloud drivers)
+   * Secret access key (optional, see accessKeyId)
    */
   secretAccessKey?: string;
   /**

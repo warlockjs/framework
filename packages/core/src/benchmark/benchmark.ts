@@ -50,9 +50,11 @@ export async function measure<T>(
   fn: () => T | Promise<T>,
   options?: BenchmarkOptions<T>,
 ): Promise<BenchmarkSuccessResult<T> | BenchmarkErrorResult> {
-  // Fast path: disabled — call fn() and return a zeroed success wrapper.
-  // No timing, no hooks. Re-throws if fn() throws.
-  if (options?.enabled === false) {
+  const benchmarkConfig = config.get<BenchmarkConfigurations>("benchmark");
+
+  // Fast path: disabled (inline option wins over global config) — call fn() and
+  // return a zeroed success wrapper. No timing, no hooks. Re-throws if fn() throws.
+  if ((options?.enabled ?? benchmarkConfig?.enabled) === false) {
     const value = await fn();
     return {
       name,
@@ -60,14 +62,13 @@ export async function measure<T>(
       value,
       latency: 0,
       state: "excellent",
-      tags: options.tags,
+      tags: options?.tags,
       startedAt: new Date(),
       endedAt: new Date(),
     };
   }
 
   // Resolve latency range from inline options or global config
-  const benchmarkConfig = config.get<BenchmarkConfigurations>("benchmark");
   const latencyRange = options?.latencyRange ?? benchmarkConfig?.latencyRange;
 
   const startedAt = new Date();
@@ -75,36 +76,20 @@ export async function measure<T>(
   const profiler = options?.profiler ?? benchmarkConfig?.profiler;
   const snapshotContainer = options?.snapshotContainer ?? benchmarkConfig?.snapshotContainer;
 
+  // Observers must never turn a successful call into a reported failure
+  // (callers such as use-case retry on failure), so each one is isolated.
+  const isolate = (observer: () => void) => {
+    try {
+      observer();
+    } catch (observerError) {
+      console.error(`[benchmark] observer for "${name}" threw`, observerError);
+    }
+  };
+
+  let value: T;
+
   try {
-    const value = await fn();
-
-    const endTime = performance.now();
-    const latency = Math.round(endTime - startTime);
-    const state = latencyRange ? latencyState(latency, latencyRange) : "good";
-
-    const result: BenchmarkSuccessResult<T> = {
-      name,
-      success: true,
-      value,
-      latency,
-      state,
-      tags: options?.tags,
-      startedAt,
-      endedAt: new Date(),
-    };
-
-    if (profiler) {
-      profiler.record(result);
-    }
-
-    if (snapshotContainer) {
-      snapshotContainer.record(result);
-    }
-
-    options?.onComplete?.(result);
-    options?.onFinish?.(result);
-
-    return result;
+    value = await fn();
   } catch (thrown) {
     // Decide whether to benchmark this error or just re-throw immediately
     const shouldBenchmark = options?.shouldBenchmarkError
@@ -134,17 +119,33 @@ export async function measure<T>(
       endedAt: new Date(),
     };
 
-    if (profiler) {
-      profiler.record(result);
-    }
-
-    if (snapshotContainer) {
-      snapshotContainer.record(result);
-    }
-
-    options?.onError?.(result);
-    options?.onFinish?.(result);
+    if (profiler) isolate(() => profiler.record(result));
+    if (snapshotContainer) isolate(() => snapshotContainer.record(result));
+    isolate(() => options?.onError?.(result));
+    isolate(() => options?.onFinish?.(result));
 
     return result;
   }
+
+  const endTime = performance.now();
+  const latency = Math.round(endTime - startTime);
+  const state = latencyRange ? latencyState(latency, latencyRange) : "good";
+
+  const result: BenchmarkSuccessResult<T> = {
+    name,
+    success: true,
+    value,
+    latency,
+    state,
+    tags: options?.tags,
+    startedAt,
+    endedAt: new Date(),
+  };
+
+  if (profiler) isolate(() => profiler.record(result));
+  if (snapshotContainer) isolate(() => snapshotContainer.record(result));
+  isolate(() => options?.onComplete?.(result));
+  isolate(() => options?.onFinish?.(result));
+
+  return result;
 }

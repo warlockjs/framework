@@ -349,18 +349,18 @@ export class Resource implements ResourceContract {
     if (!value) return undefined;
 
     const identity = value.id ?? value._id ?? value;
-    const seen = this._selfSeen ?? new Set();
+    // Ancestors of the current path only: siblings never see each other,
+    // so the set size is the depth.
+    const ancestors = this._selfSeen ?? new Set();
 
     // Circular reference or depth limit reached — stop recursion
-    if (seen.has(identity) || seen.size >= MAX_SELF_DEPTH) {
+    if (ancestors.has(identity) || ancestors.size >= MAX_SELF_DEPTH) {
       return undefined;
     }
 
-    seen.add(identity);
-
     const SelfConstructor = this.constructor as typeof Resource;
     const child = new SelfConstructor(value);
-    child._selfSeen = seen;
+    child._selfSeen = new Set(ancestors).add(identity);
 
     return child.toJSON();
   }

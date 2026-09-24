@@ -179,7 +179,7 @@ export type ImageTransformConfig = ImageTransformOptions | ImageTransformCallbac
  *   name: "random",
  *   randomLength: 64,
  *   prefix: false,
- *   defaultPrefixFormat: "dd-mm-yyyy-HH-ii-ss"
+ *   defaultPrefixFormat: "DD-MM-YYYY-HH-mm-ss"
  * }
  * ```
  */
@@ -204,14 +204,14 @@ export type UploadsConfigurations = {
    * Applied when `save()` is called without prefix option,
    * or when prefix option is `true`.
    *
-   * @default false (no prefix)
+   * @default { as: "directory", format: "DD-MM-YYYY" }
    */
   prefix?: PrefixConfig;
 
   /**
    * Default datetime format when prefix is `true`
    *
-   * @default "dd-mm-yyyy-HH-ii-ss"
+   * @default "DD-MM-YYYY-HH-mm-ss" (dayjs format tokens)
    */
   defaultPrefixFormat?: string;
 

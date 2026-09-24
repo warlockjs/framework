@@ -3,6 +3,7 @@ import {
   ensureDirectoryAsync as fsEnsureDirectoryAsync,
   putFileAsync as fsPutFileAsync,
 } from "@warlock.js/fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 /**
@@ -34,6 +35,37 @@ export function setDryRun(value: boolean): void {
   }
 }
 
+/**
+ * When true, a file that already exists and differs from the generated
+ * content is left untouched (and reported) instead of overwritten.
+ * Model/module generators enable it unless `--force --overwrite` is given.
+ */
+let skipExisting = false;
+const skippedFiles: string[] = [];
+
+export function setSkipExisting(value: boolean): void {
+  skipExisting = value;
+  skippedFiles.length = 0;
+}
+
+/** Print the files skipped because they exist and differ. No-op when none. */
+export function reportSkippedFiles(): void {
+  if (skippedFiles.length === 0) return;
+
+  console.log(
+    colors.yellow(
+      `
+! Skipped ${skippedFiles.length} existing file(s) that differ from the generated output (pass --force --overwrite to replace them):`,
+    ),
+  );
+
+  for (const file of skippedFiles) {
+    console.log(`  ${colors.gray(file)}`);
+  }
+
+  skippedFiles.length = 0;
+}
+
 export function isDryRun(): boolean {
   return dryRun;
 }
@@ -55,6 +87,14 @@ function relativePath(target: string): string {
 export async function putFileAsync(target: string, content: string): Promise<void> {
   if (dryRun) {
     console.log(`${colors.cyan("○")} would create ${colors.gray(relativePath(target))}`);
+    return;
+  }
+
+  if (skipExisting && existsSync(target)) {
+    if (readFileSync(target, "utf8") !== content) {
+      skippedFiles.push(relativePath(target));
+    }
+
     return;
   }
 

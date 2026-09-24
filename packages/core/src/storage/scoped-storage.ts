@@ -255,11 +255,11 @@ export class ScopedStorage implements ScopedStorageContract {
       throw new Error(`Failed to fetch file from ${url}: ${result.statusText}`);
     }
 
-    if (!result.contentType) {
+    if (!result.contentType && !putOptions.mimeType) {
       throw new Error(`Failed to fetch file from ${url}: missing content-type header`);
     }
 
-    const mimeType = putOptions.mimeType || result.contentType;
+    const mimeType = putOptions.mimeType || result.contentType || undefined;
 
     return this.put(result.buffer, location, { ...putOptions, mimeType });
   }

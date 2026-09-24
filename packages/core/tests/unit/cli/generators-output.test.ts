@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -25,6 +25,23 @@ const data = (args: string[], options: CommandActionData["options"] = {}): Comma
 
 const appPathFor = (...segments: string[]) =>
   path.join(process.cwd(), "src", "app", ...segments);
+
+/**
+ * `gen.migration` refuses to run when the target model file is missing
+ * (wave 2, C4:B22), so migration tests seed a model file first.
+ */
+const seedModel = async (moduleName: string, entity: string) => {
+  const dir = appPathFor(moduleName, "models", entity);
+
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, `${entity}.model.ts`), "export class Product {}");
+};
+
+/** Makes `process.exit` throw so a refusal is observable instead of killing vitest. */
+const stubExit = () =>
+  vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+    throw new Error(`exit:${code}`);
+  }) as never);
 
 let tempDir: string;
 let originalCwd: string;
@@ -131,6 +148,7 @@ describe("generateModule — dry run", () => {
 
 describe("generateMigration — create", () => {
   it("writes a Migration.create file for the model path", async () => {
+    await seedModel("products", "product");
     await generateMigration(data(["products/product"]));
 
     const dir = appPathFor("products", "models", "product", "migrations");
@@ -144,14 +162,27 @@ describe("generateMigration — create", () => {
   });
 
   it("rejects an invalid model path without writing", async () => {
-    await generateMigration(data(["nopath"]));
+    const exit = stubExit();
 
+    await expect(generateMigration(data(["nopath"]))).rejects.toThrow("exit:1");
     await expect(readdir(appPathFor("nopath"))).rejects.toMatchObject({ code: "ENOENT" });
+
+    exit.mockRestore();
+  });
+
+  it("refuses to generate when the model file is missing", async () => {
+    const exit = stubExit();
+
+    await expect(generateMigration(data(["products/product"]))).rejects.toThrow("exit:1");
+    await expect(readdir(appPathFor("products"))).rejects.toMatchObject({ code: "ENOENT" });
+
+    exit.mockRestore();
   });
 });
 
 describe("generateMigration — alter via column DSL", () => {
   it("emits a Migration.alter with the parsed add columns and imports", async () => {
+    await seedModel("products", "product");
     await generateMigration(
       data(["products/product"], { add: "sku:string:nullable,price:decimal" }),
     );
@@ -168,6 +199,7 @@ describe("generateMigration — alter via column DSL", () => {
   });
 
   it("emits drop and rename sections from their DSL forms", async () => {
+    await seedModel("products", "product");
     await generateMigration(
       data(["products/product"], { drop: "legacy,old_flag", rename: "name:title" }),
     );

@@ -14,8 +14,17 @@ export type WarlockConfig = {
    * Server configuration
    */
   server?: {
+    /**
+     * @deprecated Not read by the framework. Set the HTTP port in `config/http.ts` (`port`).
+     */
     port?: number;
+    /**
+     * @deprecated Not read by the framework. Set the HTTP host in `config/http.ts` (`host`).
+     */
     host?: string;
+    /**
+     * @deprecated Not read by the framework. Port fallback is not implemented.
+     */
     retryOtherPort?: boolean;
   };
 
@@ -242,13 +251,17 @@ export type WarlockConfig = {
      * Added to the default patterns.
      *
      * @example ["src/shared/[ALL]/*.test.ts"]
+     *
+     * @deprecated Not read by the framework. Configure test discovery in `config/tests.ts`.
      */
     include?: string[];
 
     /**
      * Glob patterns to exclude from test discovery.
      *
-     * @example [[ALL]/*.integration.test.ts"]
+     * @example ["[ALL]/*.integration.test.ts"]
+     *
+     * @deprecated Not read by the framework. Configure test discovery in `config/tests.ts`.
      */
     exclude?: string[];
   };

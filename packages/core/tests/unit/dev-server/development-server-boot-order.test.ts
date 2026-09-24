@@ -57,6 +57,17 @@ vi.mock("../../../src/dev-server/dev-logger", () => ({
   devServeLog: vi.fn(),
 }));
 
+// start() publishes typed route declarations after the late phase; the
+// real publisher scans the project and writes files, which this order test
+// must not do.
+vi.mock("../../../src/router/router", () => ({
+  router: { getNamedApiRoutes: vi.fn(() => []) },
+}));
+
+vi.mock("../../../src/dev-server/route-types-publisher", () => ({
+  publishCurrentRouteTypes: vi.fn(async () => undefined),
+}));
+
 vi.mock("../../../src/dev-server/ready-block", () => ({ printReadyBlock }));
 
 vi.mock("../../../src/dev-server/files-orchestrator", () => ({

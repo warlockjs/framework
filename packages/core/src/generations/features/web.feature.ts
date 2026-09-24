@@ -14,6 +14,9 @@ import {
 } from "../stubs";
 import { type FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
 
+/** The one vite range shared by every feature (web's peer range is `>=7.3.5 <8`). */
+export const VITE_RANGE = "^7.3.5";
+
 /**
  * Register the WebConnector in `warlock.config.ts`, and ONLY there.
  *
@@ -189,7 +192,7 @@ export const webFeature: FeatureDefinition = {
     "@types/react-dom": "^19.2.3",
     // Loaded through `await import()` by the dev server only, so both are
     // optional peers of `web` rather than hard dependencies.
-    vite: "^7.3.5",
+    vite: VITE_RANGE,
     "@vitejs/plugin-react": "^5.2.0",
   },
   onExecuting: completeWebInstallation,

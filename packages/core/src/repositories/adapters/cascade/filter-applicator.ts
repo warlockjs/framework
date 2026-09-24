@@ -2,7 +2,12 @@ import type {
   QueryBuilderContract as CascadeQueryBuilder,
   QueryBuilderContract,
 } from "@warlock.js/cascade";
+import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+import { BadRequestError } from "../../../http/errors/errors";
 import type { FilterOptions, FilterRule, FilterRules } from "../../contracts";
+
+dayjs.extend(customParseFormat);
 
 /**
  * Applies repository filters to a Cascade-Next query builder
@@ -167,6 +172,38 @@ export class FilterApplicator {
   }
 
   /**
+   * `like` is a contains match on every driver: a value without an explicit
+   * `%` is wrapped as `%value%` (Postgres would otherwise match exactly while
+   * Mongo matched a substring). Values carrying their own `%` are kept as-is.
+   */
+  private likePattern(value: any): any {
+    if (typeof value !== "string" || value.includes("%")) return value;
+    return `%${value}%`;
+  }
+
+  /**
+   * Coerce a client value to an integer or reject with a 400.
+   */
+  private toInt(value: any): number {
+    const parsed = parseInt(value);
+    if (Number.isNaN(parsed)) {
+      throw new BadRequestError(`Invalid integer filter value "${value}"`);
+    }
+    return parsed;
+  }
+
+  /**
+   * Coerce a client value to a number or reject with a 400.
+   */
+  private toNumber(value: any): number {
+    const parsed = Number(value);
+    if (value === "" || value === null || Number.isNaN(parsed)) {
+      throw new BadRequestError(`Invalid number filter value "${value}"`);
+    }
+    return parsed;
+  }
+
+  /**
    * Apply standard where operators
    */
   private applyWhereOperator(
@@ -205,7 +242,13 @@ export class FilterApplicator {
           query.whereNotIn(column, Array.isArray(value) ? value : [value]);
           break;
         case "like":
-          query.whereLike(column, value);
+          query.whereLike(column, this.likePattern(value));
+          break;
+        case "startsWith":
+          query.whereLike(column, `${value}%`);
+          break;
+        case "endsWith":
+          query.whereLike(column, `%${value}`);
           break;
         case "not like":
           query.whereNotLike(column, value);
@@ -227,7 +270,7 @@ export class FilterApplicator {
         // the object form of orWhere() only ever emits "=", so "like" needs the
         // callback/group form to keep the operator instead of silently degrading
         // to equality (D1).
-        this.anyOf(query, columns, (q, col) => q.where(col, "like", value));
+        this.anyOf(query, columns, (q, col) => q.where(col, "like", this.likePattern(value)));
       } else {
         // Every other operator silently degraded to equality via the object form
         // of orWhere() — refuse instead of returning a correct-looking, wrong query.
@@ -308,7 +351,7 @@ export class FilterApplicator {
   // NUMERIC FILTERS
   // ============================================================================
   private handleInt(query: QueryBuilderContract, column?: string, columns?: string[], value?: any) {
-    const intValue = parseInt(value);
+    const intValue = this.toInt(value);
     if (column) {
       query.where(column, intValue);
     } else if (columns) {
@@ -322,7 +365,7 @@ export class FilterApplicator {
     columns?: string[],
     value?: any,
   ) {
-    const intValue = parseInt(value);
+    const intValue = this.toInt(value);
     if (column) {
       query.where(column, "!=", intValue);
     } else if (columns) {
@@ -338,7 +381,7 @@ export class FilterApplicator {
     value: any,
     operator: string,
   ) {
-    const intValue = parseInt(value);
+    const intValue = this.toInt(value);
     if (column) {
       query.where(column, operator, intValue);
     } else if (columns) {
@@ -352,7 +395,7 @@ export class FilterApplicator {
     columns?: string[],
     value?: any,
   ) {
-    const values = (Array.isArray(value) ? value : [value]).map((v: any) => parseInt(v));
+    const values = (Array.isArray(value) ? value : [value]).map((v: any) => this.toInt(v));
     if (column) {
       query.whereIn(column, values);
     } else if (columns) {
@@ -367,7 +410,7 @@ export class FilterApplicator {
     columns?: string[],
     value?: any,
   ) {
-    const numValue = Number(value);
+    const numValue = this.toNumber(value);
     if (column) {
       query.where(column, numValue);
     } else if (columns) {
@@ -381,7 +424,7 @@ export class FilterApplicator {
     columns?: string[],
     value?: any,
   ) {
-    const values = (Array.isArray(value) ? value : [value]).map((v: any) => Number(v));
+    const values = (Array.isArray(value) ? value : [value]).map((v: any) => this.toNumber(v));
     if (column) {
       query.whereIn(column, values);
     } else if (columns) {
@@ -733,20 +776,30 @@ export class FilterApplicator {
   // ============================================================================
 
   /**
-   * Parse date string to Date object
-   * TODO: Implement proper date parsing with format support
+   * Parse a date string with the declared format; invalid input is a 400.
    */
   private parseDate(value: any, format?: string): Date {
-    if (value instanceof Date) return value;
-    return new Date(value);
+    return this.parseWithFormat(value, format);
   }
 
   /**
-   * Parse datetime string to Date object
-   * TODO: Implement proper datetime parsing with format support
+   * Parse a datetime string with the declared format; invalid input is a 400.
    */
   private parseDateTime(value: any, format?: string): Date {
+    return this.parseWithFormat(value, format);
+  }
+
+  private parseWithFormat(value: any, format?: string): Date {
     if (value instanceof Date) return value;
-    return new Date(value);
+
+    const parsed = format ? dayjs(String(value), format, true) : dayjs(value);
+
+    if (!parsed.isValid()) {
+      throw new BadRequestError(
+        `Invalid date filter value "${value}"${format ? ` (expected ${format})` : ""}`,
+      );
+    }
+
+    return parsed.toDate();
   }
 }

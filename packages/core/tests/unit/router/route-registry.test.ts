@@ -79,11 +79,12 @@ describe("RouteRegistry — matching", () => {
     expect(registry.find("GET", "/users/")?.route.path).toBe("/users");
   });
 
-  it("matches the path case-insensitively (caseSensitive: false)", () => {
+  it("matches the path case-sensitively, like production Fastify (C1:B21)", () => {
     const registry = new RouteRegistry();
     registry.register([route("GET", "/Users")]);
 
-    expect(registry.find("GET", "/users")?.route.path).toBe("/Users");
+    expect(registry.find("GET", "/Users")?.route.path).toBe("/Users");
+    expect(registry.find("GET", "/users")).toBeFalsy();
   });
 
   it("does NOT normalize the HTTP method — find-my-way expects it uppercased", () => {

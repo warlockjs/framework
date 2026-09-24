@@ -1,5 +1,6 @@
+import fs from "node:fs";
 import path from "node:path";
-import ts from "typescript";
+import { readTsconfig } from "get-tsconfig";
 import { Path } from "../utils/normalized-path";
 
 export class TSConfigManager {
@@ -21,14 +22,20 @@ export class TSConfigManager {
   public init() {
     if (this.tsconfig) return;
 
-    // use typescript to load the tsconfig.json file
-    const output = ts.readConfigFile(Path.toAbsolute("tsconfig.json"), ts.sys.readFile);
+    // `ts.readConfigFile` does not follow `extends`; `readTsconfig` resolves the
+    // whole chain (paths, baseUrl, decorator flags) and keeps string enum values,
+    // which is what esbuild's `tsconfigRaw` expects.
+    const configPath = Path.toAbsolute("tsconfig.json");
+    const parsed = fs.existsSync(configPath)
+      ? readTsconfig(configPath, { typescriptVersion: false }).config
+      : {};
+    const compilerOptions = parsed.compilerOptions ?? {};
 
-    this.tsconfig = output.config!;
+    this.tsconfig = { ...parsed, compilerOptions };
 
-    this.aliases = output.config?.compilerOptions?.paths || {};
+    this.aliases = (compilerOptions.paths as Record<string, string[]> | undefined) || {};
 
-    this.baseUrl = output.config?.compilerOptions?.baseUrl || ".";
+    this.baseUrl = compilerOptions.baseUrl || ".";
   }
 
   /**

@@ -14,7 +14,7 @@ export const UPLOADS_DEFAULTS: UploadsConfigurations = {
     as: "directory",
     format: "DD-MM-YYYY",
   },
-  // defaultPrefixFormat: "DD-MM-YYYY-HH-II-SS",
+  defaultPrefixFormat: "DD-MM-YYYY-HH-mm-ss",
 };
 
 /**

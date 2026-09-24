@@ -55,5 +55,5 @@ export async function generateRepository(data: CommandActionData): Promise<void>
 
   await putFileAsync(repositoryPath, repositoryContent);
 
-  console.log(colors.cyan(`\nâœ¨ Repository "${name.pascal}Repository" generated successfully!`));
+  console.log(colors.cyan(`\nRepository "${name.pascal}Repository" generated successfully!`));
 }

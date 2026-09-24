@@ -133,14 +133,42 @@ export async function getUseCaseHistory(name: string): Promise<UseCaseResult<any
 export async function addUseCaseHistory(name: string, result: UseCaseResult<any>) {
   const useCaseConfig = config.get<UseCaseConfigurations>("use-cases");
 
-  if (useCaseConfig?.history?.enabled === false) return;
+  // On by default outside production; opt in to production with `history.enabled: true`.
+  const enabled = useCaseConfig?.history?.enabled ?? process.env.NODE_ENV !== "production";
 
+  if (!enabled) return;
+
+  const previous = historyWrites.get(name) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(() => writeHistory(name, result));
+
+  historyWrites.set(name, current);
+
+  try {
+    await current;
+  } finally {
+    if (historyWrites.get(name) === current) {
+      historyWrites.delete(name);
+    }
+  }
+}
+
+/**
+ * Per-use-case write chain so the list read-modify-write never interleaves
+ * within a process (keeps the cap enforced under concurrency).
+ */
+const historyWrites = new Map<string, Promise<unknown>>();
+
+async function writeHistory(name: string, result: UseCaseResult<any>) {
+  const useCaseConfig = config.get<UseCaseConfigurations>("use-cases");
   const ttl = resolveHistoryTtl(useCaseConfig);
   const maxEntries = useCaseConfig?.history?.maxEntries ?? 100;
   const key = `use-case:history:${name}:${result.id}`;
   const listKey = `use-case:history:${name}:list`;
 
-  await cache.set(key, result, ttl);
+  // Store a projection only: `output` and `ctx` (tokens, payloads) never reach the cache.
+  const projection = { ...result, output: undefined, ctx: undefined } as unknown as UseCaseResult<any>;
+
+  await cache.set(key, projection, ttl);
 
   const list = (await cache.get<string[]>(listKey)) || [];
 

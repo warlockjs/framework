@@ -74,6 +74,8 @@ export async function storagePutAction({ args, options }: CommandActionData): Pr
       for (const { localPath: fp, error } of result.failed) {
         console.warn(`     - ${fp}: ${error.message}`);
       }
+
+      process.exitCode = 1;
     }
   } else {
     // ── Single file upload ──────────────────────────────────────────────────

@@ -11,7 +11,7 @@ import type { FileManifest } from "../../../src/dev-server/types";
 const fsMocks = vi.hoisted(() => ({
   fileExistsAsync: vi.fn(),
   getJsonFileAsync: vi.fn(),
-  putFileAsync: vi.fn(),
+  atomicWriteAsync: vi.fn(),
 }));
 
 vi.mock("@warlock.js/fs", () => fsMocks);
@@ -112,7 +112,7 @@ describe("ManifestManager — init", () => {
 describe("ManifestManager — save", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    fsMocks.putFileAsync.mockResolvedValue(undefined);
+    fsMocks.atomicWriteAsync.mockResolvedValue(undefined);
   });
 
   it("recomputes stats and writes serialized JSON", async () => {
@@ -123,9 +123,9 @@ describe("ManifestManager — save", () => {
 
     await manager.save();
 
-    expect(fsMocks.putFileAsync).toHaveBeenCalledOnce();
+    expect(fsMocks.atomicWriteAsync).toHaveBeenCalledOnce();
 
-    const [, written] = fsMocks.putFileAsync.mock.calls[0];
+    const [, written] = fsMocks.atomicWriteAsync.mock.calls[0];
     const parsed = JSON.parse(written as string);
 
     expect(parsed.stats.totalFiles).toBe(2);

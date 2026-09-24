@@ -83,3 +83,14 @@ describe("FilesWatcher — watcher-settle timing (devServer.timings on)", () => 
     expect(observedSettleMs).toBeGreaterThan(0);
   });
 });
+
+describe("glob ignore patterns (C2:B10)", () => {
+  it("matches DEFAULT_EXCLUDE-style and user globs", async () => {
+    const { createIgnoredMatcher } = await import("./files-watcher");
+    const ignored = createIgnoredMatcher(["**/node_modules/**", "**/*.{snap,log}"]);
+
+    expect(ignored("/p/node_modules/x/index.js")).toBe(true);
+    expect(ignored("/p/src/a.log")).toBe(true);
+    expect(ignored("/p/src/a.ts")).toBe(false);
+  });
+});

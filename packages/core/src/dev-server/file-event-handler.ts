@@ -6,6 +6,7 @@ import type { FileOperations } from "./file-operations";
 import { FILE_PROCESSING_BATCH_SIZE, isTimingsEnabled } from "./flags";
 import type { ManifestManager } from "./manifest-manager";
 import { clearFileExistsCache } from "./parse-imports";
+import { isCodeFile } from "./special-file-patterns";
 import { Path } from "../utils/normalized-path";
 
 /** Lets an isolated editor save reach HMR without the former fixed 50ms delay. */
@@ -30,6 +31,9 @@ export class FileEventHandler {
   /** Slowest watcher-settle duration seen so far this batch, when `devServer.timings` is on. */
   private watcherSettleMs?: number;
 
+  /** Tail of the batch-processing chain; keeps batches strictly sequential. */
+  private batchQueue: Promise<void> = Promise.resolve();
+
   private debounceTimer?: ReturnType<typeof setTimeout>;
   private maxWaitTimer?: ReturnType<typeof setTimeout>;
 
@@ -39,6 +43,17 @@ export class FileEventHandler {
     private readonly dependencyGraph: DependencyGraph,
     private readonly files: Map<string, FileManager>,
   ) {}
+
+  /** Matches paths the user listed in `devServer.watch.include`. */
+  private includeMatcher: (path: string) => boolean = () => false;
+
+  /**
+   * Non-code files in the include set (`.sql` fixtures, JSON config) can't be
+   * hot-reloaded, so they are reported as restart triggers instead.
+   */
+  public setIncludeMatcher(matcher: (path: string) => boolean): void {
+    this.includeMatcher = matcher;
+  }
 
   public handleFileChange(absolutePath: string, settleMs?: number): void {
     this.recordTimingStart(settleMs);
@@ -81,7 +96,13 @@ export class FileEventHandler {
       this.maxWaitTimer = undefined;
     }
 
-    void this.processBatch();
+    // Serialize: a batch arriving while the previous one is in flight queues
+    // behind it (pending sets keep coalescing meanwhile) instead of racing it.
+    this.batchQueue = this.batchQueue
+      .then(() => this.processBatch())
+      .catch((error) => {
+        console.error("[dev-server] batch processing failed", error);
+      });
   }
 
   /**
@@ -121,10 +142,13 @@ export class FileEventHandler {
     // Both .env files and warlock.config.ts live outside src/ — they should
     // never enter the dep graph, only ride along in the batch event so the
     // dev server can react (config reload / restart warning).
-    const externalChanges = changes.filter(isExternalPath);
-    const externalAdds = adds.filter(isExternalPath);
-    const codeChanges = changes.filter((p) => !isExternalPath(p));
-    const codeAdds = adds.filter((p) => !isExternalPath(p));
+    const isIncludedData = (p: string) => !isCodeFile(p) && this.includeMatcher(p);
+    const isExternal = (p: string) => isExternalPath(p) || isIncludedData(p);
+    const externalChanges = changes.filter(isExternal);
+    const externalAdds = adds.filter(isExternal);
+    const codeChanges = changes.filter((p) => !isExternal(p));
+    const codeAdds = adds.filter((p) => !isExternal(p));
+    const restartTriggers = [...changes, ...adds, ...deletes].filter(isIncludedData);
 
     // Multi-file batches can race the filesystem on Windows.
     if (codeAdds.length + codeChanges.length > 1) {
@@ -153,7 +177,8 @@ export class FileEventHandler {
     events.trigger("dev-server:batch-complete", {
       added: [...externalAdds, ...addedCodePaths],
       changed: [...externalChanges, ...changedCodePaths],
-      deleted: [...deletes, ...vanished],
+      deleted: [...deletes.filter((p) => !isIncludedData(p)), ...vanished],
+      restartTriggers,
       timings: isTimingsEnabled()
         ? { watcherSettleMs: watcherSettleMs ?? 0, debounceWaitMs: debounceWaitMs ?? 0 }
         : undefined,

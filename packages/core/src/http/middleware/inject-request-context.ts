@@ -115,16 +115,34 @@ export function createRequestStore(
       return output as ReturnedResponse;
     } catch (error) {
       request.log(error, "error");
-      return handleRequestError(error, response);
+      return handleRequestError(error, response, request);
     }
   });
+}
+
+/**
+ * Unconditional floor for an unhandled request error (canon 8d3c13a8): route it
+ * through the logger, and when no logger channel is configured (nothing would
+ * record it) fall back to `console.error` so the only copy is never lost.
+ * @internal
+ */
+function reportUnhandledRequestError(error: unknown, request: Request<any>) {
+  log.error("http", "unhandled-request-error", error, { requestId: request.id });
+
+  if (log.channels.length === 0) {
+    console.error(`[http] unhandled-request-error (requestId: ${request.id})`, error);
+  }
 }
 
 /**
  * Handle request errors
  * @internal
  */
-function handleRequestError(error: unknown, response: Response): ReturnedResponse {
+function handleRequestError(
+  error: unknown,
+  response: Response,
+  request: Request<any>,
+): ReturnedResponse {
   // Availability floor, not a cache-policy nit: `handleRequestError` is the
   // single funnel every unhandled error in every Warlock app passes through
   // (`createRequestStore`'s catch above), and none of the branches below set
@@ -144,6 +162,12 @@ function handleRequestError(error: unknown, response: Response): ReturnedRespons
   response.header("Cache-Control", "private, no-store");
 
   if (error instanceof HttpError) {
+    // 5xx HttpErrors (e.g. `ServerError`) are server faults: send them to the
+    // logger channels too, tagged with the request id.
+    if (error.status >= 500) {
+      log.error("http", "request-error", error, { requestId: request.id });
+    }
+
     const payload: GenericObject = {
       error: error.message,
     };
@@ -169,7 +193,7 @@ function handleRequestError(error: unknown, response: Response): ReturnedRespons
   // itself is discarded here — no stack, no message, nothing in any log — and
   // an unrecognised failure becomes indistinguishable from a working server
   // returning 500. Never swallow the only copy of an error (`65e476ee`).
-  console.error("[warlock] unhandled request error:", error);
+  reportUnhandledRequestError(error, request);
 
   return response.serverError({
     error: "Internal server error.",

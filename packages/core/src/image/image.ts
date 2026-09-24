@@ -1,7 +1,7 @@
-import { http } from "@mongez/http";
 import { createRequire } from "node:module";
 import type sharp from "sharp";
 import type { FormatEnum } from "sharp";
+import { safeFetchToBuffer } from "../storage/utils/safe-fetch";
 
 // ============================================================
 // Lazily Resolved Sharp Module
@@ -344,17 +344,16 @@ export class Image {
    * Create image instance from url
    */
   public static async fromUrl(url: string): Promise<Image> {
-    const { data, error } = await http.get<ArrayBuffer>(url, {
-      responseType: "arrayBuffer",
-    });
+    // SSRF-guarded: scheme allowlist, private-IP deny (incl. redirects), size cap, timeout
+    const { buffer, ok, status, statusText } = await safeFetchToBuffer(url);
 
-    if (error || !data) {
+    if (!ok || buffer.length === 0) {
       throw new Error(
-        `Failed to load image from URL "${url}": ${error?.message ?? "Empty response received"}`,
+        `Failed to load image from URL "${url}": ${ok ? "Empty response received" : `${status} ${statusText}`}`,
       );
     }
 
-    return new Image(Buffer.from(data));
+    return new Image(buffer);
   }
 
   /**
@@ -574,8 +573,16 @@ export class Image {
       return this.image;
     }
 
+    // sharp's composite() REPLACES the previous list, so every layer is
+    // collected and applied in a single call, in operation order.
+    const layers: sharp.OverlayOptions[] = [];
+
     for (const operation of this.operations) {
-      await this.executeOperation(this.image, operation);
+      await this.executeOperation(this.image, operation, layers);
+    }
+
+    if (layers.length > 0) {
+      this.image.composite(layers);
     }
 
     await this.applyFormatAndQuality(this.image);
@@ -588,7 +595,11 @@ export class Image {
   /**
    * Execute a single operation
    */
-  protected async executeOperation(image: sharp.Sharp, operation: ImageOperation): Promise<void> {
+  protected async executeOperation(
+    image: sharp.Sharp,
+    operation: ImageOperation,
+    layers: sharp.OverlayOptions[] = [],
+  ): Promise<void> {
     switch (operation.type) {
       case "resize":
         image.resize(operation.options);
@@ -625,12 +636,12 @@ export class Image {
       case "opacity": {
         const alpha = Math.round((operation.value / 100) * 255);
         const alphaPixel = Buffer.from([255, 255, 255, alpha]);
-        image.composite([
-          {
-            blend: "dest-in",
-            input: alphaPixel,
-          },
-        ]);
+        layers.push({
+          blend: "dest-in",
+          input: alphaPixel,
+          raw: { width: 1, height: 1, channels: 4 },
+          tile: true,
+        });
         break;
       }
 
@@ -648,12 +659,10 @@ export class Image {
 
       case "watermark": {
         const buffer = await this.resolveImageBuffer(operation.config.image);
-        image.composite([
-          {
-            input: buffer,
-            ...operation.config.options,
-          },
-        ]);
+        layers.push({
+          input: buffer,
+          ...operation.config.options,
+        });
         break;
       }
 
@@ -661,12 +670,12 @@ export class Image {
         const buffers = await Promise.all(
           operation.configs.map((config) => this.resolveImageBuffer(config.image)),
         );
-        image.composite(
-          operation.configs.map((config, index) => ({
+        operation.configs.forEach((config, index) => {
+          layers.push({
             input: buffers[index],
             ...config.options,
-          })),
-        );
+          });
+        });
         break;
       }
     }

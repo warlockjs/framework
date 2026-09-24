@@ -25,6 +25,7 @@ import type { Route } from "../router";
 import { StorageFile } from "../storage";
 import { renderReact } from "./../react";
 import type { Request } from "./request";
+import { matchesIfNoneMatch } from "./uploads/matches-if-none-match";
 import { flushPendingCookies } from "./flush-pending-cookies";
 import { streamReactResponse, type PipeableReactStream } from "./stream-react-response";
 import type { ResponseEvent, ResponseSSEController, ResponseStreamController } from "./types";
@@ -287,10 +288,10 @@ export class Response {
   protected static async trigger(event: ResponseEvent, ...args: any[]) {
     // make a timeout to make sure the request events is executed first
     return new Promise((resolve) => {
-      setTimeout(async () => {
+      setImmediate(async () => {
         await events.triggerAllAsync(`response.${event}`, ...args);
         resolve(true);
-      }, 0);
+      });
     });
   }
 
@@ -307,6 +308,16 @@ export class Response {
   public async parse(value: any): Promise<any> {
     // if it is a falsy value, return it
     if (!value || isScalar(value)) return value;
+
+    // binary and stream bodies pass through untouched (Buffer has a `toJSON`)
+    if (Buffer.isBuffer(value) || value instanceof Uint8Array || typeof value.pipe === "function") {
+      return value;
+    }
+
+    // a Map serialises as a plain object rather than an array of pairs
+    if (value instanceof Map) {
+      return await this.parse(Object.fromEntries(value));
+    }
 
     // if it has a `toJSON` method, call it and await the result then return it
     if (value.toJSON) {
@@ -331,13 +342,14 @@ export class Response {
     }
 
     // loop over the object and check if the value and call `parse` on it
-    for (const key in value) {
-      const subValue = value[key];
+    // parse into a copy so caller-owned (e.g. cached) objects are never rewritten
+    const parsed: Record<string, any> = {};
 
-      value[key] = await this.parse(subValue);
+    for (const key in value) {
+      parsed[key] = await this.parse(value[key]);
     }
 
-    return value;
+    return parsed;
   }
 
   /**
@@ -394,7 +406,7 @@ export class Response {
 
     if (data === this) return this;
 
-    if (data) {
+    if (data !== undefined) {
       this.currentBody = data;
     }
 
@@ -450,66 +462,93 @@ export class Response {
 
     this.log("Response sent");
 
-    if (triggerEvents) {
-      // trigger the sent event
-      Response.trigger("sent", this);
-
-      for (const callback of this.events.get("sent") || []) {
-        callback(this);
-      }
-
-      // trigger the success event if the status code is 2xx
-      if (this.currentStatusCode >= 200 && this.currentStatusCode < 300) {
-        Response.trigger("success", this);
-      }
-
-      // trigger the successCreate event if the status code is 201
-      if (this.currentStatusCode === 201) {
-        Response.trigger("successCreate", this);
-      }
-
-      // trigger the badRequest event if the status code is 400
-      if (this.currentStatusCode === 400) {
-        Response.trigger("badRequest", this);
-      }
-
-      // trigger the unauthorized event if the status code is 401
-      if (this.currentStatusCode === 401) {
-        Response.trigger("unauthorized", this);
-      }
-
-      // trigger the forbidden event if the status code is 403
-      if (this.currentStatusCode === 403) {
-        Response.trigger("forbidden", this);
-      }
-
-      // trigger the notFound event if the status code is 404
-      if (this.currentStatusCode === 404) {
-        Response.trigger("notFound", this);
-      }
-
-      // trigger the content too large event if the status code is 413
-      if (this.currentStatusCode === 413) {
-        Response.trigger("contentTooLarge", this);
-      }
-
-      // trigger the throttled event if the status code is 429
-      if (this.currentStatusCode === 429) {
-        Response.trigger("throttled", this);
-      }
-
-      // trigger the serverError event if the status code is 500
-      if (this.currentStatusCode === 500) {
-        Response.trigger("serverError", this);
-      }
-
-      // trigger the error event if the status code is 4xx or 5xx
-      if (this.currentStatusCode >= 400) {
-        Response.trigger("error", this);
-      }
-    }
+    if (triggerEvents) this.fireSentEvents();
 
     return this;
+  }
+
+  /**
+   * Fire the post-send lifecycle (`sent`, `success`, status-specific and `error`
+   * events). Every helper that writes to the Fastify reply directly (noContent,
+   * redirect, sendFile, sendBuffer, sendImage, downloadFile) goes through here.
+   */
+  protected fireSentEvents(statusCode?: number) {
+    if (statusCode) this.currentStatusCode = statusCode;
+
+    // trigger the sent event
+    Response.trigger("sent", this);
+
+    for (const callback of this.events.get("sent") || []) {
+      callback(this);
+    }
+
+    // trigger the success event if the status code is 2xx
+    if (this.currentStatusCode >= 200 && this.currentStatusCode < 300) {
+      Response.trigger("success", this);
+    }
+
+    // trigger the successCreate event if the status code is 201
+    if (this.currentStatusCode === 201) {
+      Response.trigger("successCreate", this);
+    }
+
+    // trigger the badRequest event if the status code is 400
+    if (this.currentStatusCode === 400) {
+      Response.trigger("badRequest", this);
+    }
+
+    // trigger the unauthorized event if the status code is 401
+    if (this.currentStatusCode === 401) {
+      Response.trigger("unauthorized", this);
+    }
+
+    // trigger the forbidden event if the status code is 403
+    if (this.currentStatusCode === 403) {
+      Response.trigger("forbidden", this);
+    }
+
+    // trigger the notFound event if the status code is 404
+    if (this.currentStatusCode === 404) {
+      Response.trigger("notFound", this);
+    }
+
+    // trigger the content too large event if the status code is 413
+    if (this.currentStatusCode === 413) {
+      Response.trigger("contentTooLarge", this);
+    }
+
+    // trigger the throttled event if the status code is 429
+    if (this.currentStatusCode === 429) {
+      Response.trigger("throttled", this);
+    }
+
+    // trigger the serverError event if the status code is 500
+    if (this.currentStatusCode === 500) {
+      Response.trigger("serverError", this);
+    }
+
+    // trigger the error event if the status code is 4xx or 5xx
+    if (this.currentStatusCode >= 400) {
+      Response.trigger("error", this);
+    }
+  }
+
+  /** Send a bare 304 and fire the lifecycle. */
+  protected send304() {
+    const reply = this.baseResponse.status(304).send();
+
+    this.fireSentEvents(304);
+
+    return reply;
+  }
+
+  /** Send a raw stream/buffer body and fire the lifecycle. */
+  protected sendRaw(body: any) {
+    const reply = this.baseResponse.send(body);
+
+    this.fireSentEvents(this.baseResponse.statusCode);
+
+    return reply;
   }
 
   /**
@@ -930,6 +969,7 @@ export class Response {
    */
   public redirect(url: string, statusCode = 302) {
     this.baseResponse.redirect(url, statusCode);
+    this.fireSentEvents(statusCode);
 
     return this;
   }
@@ -939,6 +979,7 @@ export class Response {
    */
   public permanentRedirect(url: string) {
     this.baseResponse.redirect(url, 301);
+    this.fireSentEvents(301);
 
     return this;
   }
@@ -1212,7 +1253,11 @@ export class Response {
    * Send a no content response with status code 204
    */
   public noContent() {
-    return this.baseResponse.status(204).send();
+    const reply = this.baseResponse.status(204).send();
+
+    this.fireSentEvents(204);
+
+    return reply;
   }
 
   /**
@@ -1308,9 +1353,9 @@ export class Response {
 
       // Check If-None-Match for conditional request
       const ifNoneMatch = this.request.header("if-none-match");
-      if (ifNoneMatch && ifNoneMatch === options.etag) {
+      if (ifNoneMatch && matchesIfNoneMatch(ifNoneMatch, options.etag)) {
         this.log("Content not modified (ETag match), sending 304");
-        this.baseResponse.status(304).send();
+        this.send304();
         return true; // Indicates 304 was sent
       }
     }
@@ -1371,17 +1416,22 @@ export class Response {
       const ifModifiedSince = this.request.header("if-modified-since");
 
       // Handle If-None-Match (ETag validation)
-      if (ifNoneMatch && ifNoneMatch === etag) {
+      if (ifNoneMatch && matchesIfNoneMatch(ifNoneMatch, etag)) {
         this.log("File not modified (ETag match), sending 304");
-        return this.baseResponse.status(304).send();
+        return this.send304();
       }
 
       // Handle If-Modified-Since (Last-Modified validation)
-      if (ifModifiedSince) {
+      // RFC 9110: If-Modified-Since is ignored when If-None-Match is present.
+      // The header has second precision, so floor the mtime to seconds.
+      if (ifModifiedSince && !ifNoneMatch) {
         const modifiedSinceDate = new Date(ifModifiedSince);
-        if (lastModified.getTime() <= modifiedSinceDate.getTime()) {
+        if (
+          Math.floor(lastModified.getTime() / 1000) <=
+          Math.floor(modifiedSinceDate.getTime() / 1000)
+        ) {
           this.log("File not modified (Last-Modified check), sending 304");
-          return this.baseResponse.status(304).send();
+          return this.send304();
         }
       }
 
@@ -1400,7 +1450,7 @@ export class Response {
       });
 
       // Send the stream (endTime will be set by finish event listener)
-      return this.baseResponse.send(stream);
+      return this.sendRaw(stream);
     } catch (error: any) {
       this.log(`Error sending file: ${error.message}`, "error");
       return this.serverError({
@@ -1425,7 +1475,7 @@ export class Response {
     if (sent304) return this.baseResponse;
 
     // Note: endTime is set in the main send() method for non-streaming responses
-    return this.baseResponse.send(buffer);
+    return this.sendRaw(buffer);
   }
 
   /**
@@ -1465,7 +1515,7 @@ export class Response {
     if (sent304) return this.baseResponse;
 
     // Note: endTime is set in the main send() method for non-streaming responses
-    return this.baseResponse.send(buffer);
+    return this.sendRaw(buffer);
   }
 
   /**
@@ -1522,7 +1572,7 @@ export class Response {
       });
 
       // Send the stream (endTime will be set by finish event listener)
-      return this.baseResponse.send(stream);
+      return this.sendRaw(stream);
     } catch (error: any) {
       this.log(`Error downloading file: ${error.message}`, "error");
       return this.serverError({
@@ -1544,12 +1594,13 @@ export class Response {
    * Mark the response as failed
    */
   public failedSchema(result: ValidationResult) {
-    const { errors, inputKey, inputError, status } = config.get("validation.response", {
+    const { errors, inputKey, inputError, status } = {
       errors: "errors",
       inputKey: "input",
       inputError: "error",
       status: 422,
-    });
+      ...config.get("validation.response", {}),
+    };
 
     log.error("request", "validation", `${this.request.id} - Validation failed`);
 

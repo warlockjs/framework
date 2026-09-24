@@ -112,14 +112,12 @@ class ESLintHealthWorker {
       this.cwd = config.cwd || process.cwd();
 
       // Check if ESLint flat config exists
-      const flatConfigPath = path.join(this.cwd, "eslint.config.js");
-      const flatConfigMjsPath = path.join(this.cwd, "eslint.config.mjs");
-      const flatConfigCjsPath = path.join(this.cwd, "eslint.config.cjs");
+      // (.ts/.mts/.cts are supported since ESLint 9.18)
+      const flatConfigExtensions = ["js", "mjs", "cjs", "ts", "mts", "cts"];
 
-      this.hasConfig =
-        fs.existsSync(flatConfigPath) ||
-        fs.existsSync(flatConfigMjsPath) ||
-        fs.existsSync(flatConfigCjsPath);
+      this.hasConfig = flatConfigExtensions.some((extension) =>
+        fs.existsSync(path.join(this.cwd, `eslint.config.${extension}`)),
+      );
 
       if (!this.hasConfig) {
         this.initialized = true;

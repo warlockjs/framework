@@ -21,6 +21,7 @@ vi.mock("../../../src/dev-server/restart-dev-server", () => ({
   restartDevServer: (...args: unknown[]) => restartDevServer(...(args as [])),
 }));
 
+const { QUIT_EXIT_CODE } = await import("../../../src/dev-server/supervisor");
 const { registerDevShortcuts } = await import("../../../src/dev-server/register-dev-shortcuts");
 
 /** Just enough of a dev server for the quit/restart handlers. */
@@ -114,7 +115,8 @@ describe("registerDevShortcuts", () => {
 
     await armed("q")?.handler();
 
-    expect(exit).toHaveBeenCalledWith(1);
+    // QUIT_EXIT_CODE: the supervisor treats it as a deliberate quit and exits 1.
+    expect(exit).toHaveBeenCalledWith(QUIT_EXIT_CODE);
   });
 
   it("lists whatever is armed right now on h, including a late-armed u", () => {

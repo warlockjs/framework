@@ -220,8 +220,11 @@ export class FileManager {
   protected detectFileType(): void {
     const path = this.relativePath;
 
-    if (path.includes("main.ts") || path.includes("main.tsx")) {
+    if (/(^|\/)main\.tsx?$/.test(path)) {
       this.type = "main";
+    } else if (/\.model\.tsx?$/.test(path)) {
+      // Before the folder-name checks below: `events/models/x.model.ts` is a model.
+      this.type = "model";
     } else if (path.startsWith("src/config/")) {
       this.type = "config";
     } else if (path.endsWith("routes.ts") || path.endsWith("routes.tsx")) {
@@ -232,8 +235,6 @@ export class FileManager {
       this.type = "controller";
     } else if (path.includes("service")) {
       this.type = "service";
-    } else if (path.endsWith(".model.ts")) {
-      this.type = "model";
     } else {
       this.type = "other";
     }

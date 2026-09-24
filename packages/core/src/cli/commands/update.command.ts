@@ -22,8 +22,13 @@ export const updateCommand = command({
       throw result.error ?? new Error("Package manager install failed.");
     }
 
+    // `--check` must not pass blind: an unanswered registry is exit 2.
+    if (check && result.outcome === "registry-unreachable") {
+      process.exit(2);
+    }
+
     // `--check` is a gate, so its exit code carries the answer: 0 current,
-    // 1 behind. `--dry-run` only reports, and always succeeds.
+    // 1 behind, 2 registry unreachable. `--dry-run` only reports, and always succeeds.
     if (check && result.outcome === "outdated") {
       console.log(
         colors.dim("Run ") +

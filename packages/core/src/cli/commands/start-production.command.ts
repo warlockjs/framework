@@ -3,6 +3,9 @@ import { superviseProductionProcess } from "../../production/production-supervis
 import { resolveBuildConfig } from "../../production/resolve-build-config";
 import { command } from "../../commands/cli-command";
 
+const NODE_FLAG_PATTERN =
+  /^--(inspect(-brk|-wait)?(=.*)?|max-old-space-size=.*|enable-source-maps|trace-.*)$/;
+
 export const startProductionCommand = command({
   name: "start",
   description: "Start production server",
@@ -33,16 +36,21 @@ export const startProductionCommand = command({
       nodeArgs.push("--enable-source-maps");
     }
 
-    // Add entry file
-    nodeArgs.push(entryPath);
-
-    // Pass through any additional flags after "start" command
+    // Recognised Node flags go BEFORE the entry file; everything else is app argv.
     // process.argv = [node, cli.ts, start, ...extra]
+    const appArgs: string[] = [];
     const startIndex = process.argv.findIndex((arg) => arg === "start");
     if (startIndex !== -1 && startIndex < process.argv.length - 1) {
-      const extraArgs = process.argv.slice(startIndex + 1);
-      nodeArgs.push(...extraArgs);
+      for (const arg of process.argv.slice(startIndex + 1)) {
+        if (NODE_FLAG_PATTERN.test(arg)) {
+          nodeArgs.push(arg);
+        } else {
+          appArgs.push(arg);
+        }
+      }
     }
+
+    nodeArgs.push(entryPath, ...appArgs);
 
     // Progress goes to stderr, never stdout. Stdout carries exactly one claim —
     // "started" — so that whatever greps it cannot mistake an intention for an

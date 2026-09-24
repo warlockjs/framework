@@ -1,6 +1,8 @@
 import events from "@mongez/events";
 import { Random } from "@mongez/reinforcements";
 import chokidar from "chokidar";
+import fg from "fast-glob";
+import fs from "node:fs";
 import nodePath from "node:path";
 import { rootPath, srcPath } from "../utils";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
@@ -40,6 +42,77 @@ export type WatchConfig = {
  * Default patterns to exclude from watching
  */
 const DEFAULT_EXCLUDE = ["**/node_modules/**", "**/dist/**", "**/.warlock/**", "**/.git/**"];
+
+const GLOB_CHARS = /[*?{}[\]]/;
+
+/**
+ * Convert a glob (`**`, `*`, `?`, `{a,b}`) to a RegExp over a forward-slash
+ * path. chokidar >= 4 has no glob support, so patterns are matched here
+ * instead of being handed to it.
+ */
+export function globToRegExp(glob: string): RegExp {
+  let source = "";
+  let braceDepth = 0;
+
+  for (let i = 0; i < glob.length; i++) {
+    const char = glob[i]!;
+
+    if (char === "*") {
+      if (glob[i + 1] === "*") {
+        i++;
+        if (glob[i + 1] === "/") {
+          i++;
+          source += "(?:.*/)?";
+        } else {
+          source += ".*";
+        }
+      } else {
+        source += "[^/]*";
+      }
+    } else if (char === "?") {
+      source += "[^/]";
+    } else if (char === "{") {
+      braceDepth++;
+      source += "(?:";
+    } else if (char === "}" && braceDepth > 0) {
+      braceDepth--;
+      source += ")";
+    } else if (char === "," && braceDepth > 0) {
+      source += "|";
+    } else {
+      source += /[.+^$()|[\]\\]/.test(char) ? `\\${char}` : char;
+    }
+  }
+
+  return new RegExp(`^${source}$`);
+}
+
+/**
+ * Build a chokidar `ignored` predicate from glob and literal patterns. A
+ * pattern matches the absolute path or the project-relative path.
+ */
+export function createIgnoredMatcher(patterns: string[]): (path: string) => boolean {
+  const matchers = patterns.map((pattern) => globToRegExp(Path.normalize(pattern)));
+
+  return (path: string) => {
+    const absolute = Path.normalize(path);
+    const relative = Path.toRelative(absolute);
+
+    return matchers.some((matcher) => matcher.test(absolute) || matcher.test(relative));
+  };
+}
+
+/**
+ * Expand glob `include` entries to concrete files (chokidar watches literal
+ * paths only); literal entries pass through unchanged.
+ */
+function expandIncludes(include: string[]): string[] {
+  return include.flatMap((entry) =>
+    GLOB_CHARS.test(entry)
+      ? fg.sync(entry.replace(/\\/g, "/"), { cwd: rootPath(), absolute: true })
+      : [entry],
+  );
+}
 
 /**
  * All .env file variants to watch
@@ -85,18 +158,25 @@ export class FilesWatcher {
     // 2. warlock.config.ts (project-level settings; restart-required on change)
     // 3. src directory
     // 4. Any additional paths from user config
-    const envPaths = ENV_FILES.map((file) => rootPath(file));
+    // Also any other `.env*` at the root (`.env.shared`, `.env.staging`, …).
+    const rootEnvFiles = fs
+      .readdirSync(rootPath(), { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.startsWith(".env"))
+      .map((entry) => entry.name);
+    const envPaths = [...new Set([...ENV_FILES, ".env.shared", ...rootEnvFiles])].map((file) =>
+      rootPath(file),
+    );
     const basePaths = [...envPaths, rootPath("warlock.config.ts"), srcPath()];
-    const additionalPaths = userWatchConfig?.include || config?.include || [];
+    const additionalPaths = expandIncludes(userWatchConfig?.include || config?.include || []);
 
     const paths = [...basePaths, ...additionalPaths].map((path) => Path.normalize(path));
 
     // Merge default exclude with config exclude
-    const ignored = [
+    const ignored = createIgnoredMatcher([
       ...DEFAULT_EXCLUDE,
       ...(userWatchConfig?.exclude || []),
       ...(config?.exclude || []),
-    ];
+    ]);
 
     const timingsEnabled = devServerConfig?.timings === true;
 

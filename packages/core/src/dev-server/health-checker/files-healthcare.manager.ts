@@ -89,6 +89,11 @@ export class FilesHealthcareManager {
   private workerInitPromises = new Map<string, Promise<boolean>>();
 
   /**
+   * Per-worker queue that serializes check requests
+   */
+  private workerQueues = new Map<string, Promise<void>>();
+
+  /**
    * Aggregated stats for each checker
    */
   private checkerStats = new Map<
@@ -275,30 +280,73 @@ export class FilesHealthcareManager {
       relativePath: f.relativePath,
     }));
 
+    // Workers reply without a request id, so calls are serialized per worker:
+    // exactly one "check" is in flight and its reply can only belong to it.
+    const previous = this.workerQueues.get(checkerName) ?? Promise.resolve();
+
+    const current = previous.then(() =>
+      this.postCheck(checkerName, worker, files, serializedFiles),
+    );
+
+    this.workerQueues.set(
+      checkerName,
+      current.then(
+        () => undefined,
+        () => undefined,
+      ),
+    );
+
+    return current;
+  }
+
+  /**
+   * Post one check to the worker and wait for its single reply.
+   * Resolves as healthy if the worker errors or exits so callers never hang.
+   */
+  private postCheck(
+    checkerName: string,
+    worker: Worker,
+    files: FileManager[],
+    serializedFiles: SerializedFile[],
+  ): Promise<FileCheckResult[]> {
     return new Promise((resolve) => {
+      const fallback = () =>
+        files.map((f) => ({
+          path: f.absolutePath,
+          relativePath: f.relativePath,
+          healthy: true,
+          errors: [],
+          warnings: [],
+        }));
+
+      const cleanup = () => {
+        worker.off("message", handler);
+        worker.off("error", onFailure);
+        worker.off("exit", onFailure);
+      };
+
+      const onFailure = () => {
+        cleanup();
+        resolve(fallback());
+      };
+
       const handler = (response: WorkerResponse) => {
         if (response.type === "results") {
-          worker.off("message", handler);
+          cleanup();
 
           // Update stats
           this.updateStats(checkerName, response.results);
 
           resolve(response.results);
         } else if (response.type === "error") {
-          worker.off("message", handler);
-          resolve(
-            files.map((f) => ({
-              path: f.absolutePath,
-              relativePath: f.relativePath,
-              healthy: true,
-              errors: [],
-              warnings: [],
-            })),
-          );
+          cleanup();
+          resolve(fallback());
         }
       };
 
       worker.on("message", handler);
+      worker.on("error", onFailure);
+      worker.on("exit", onFailure);
       worker.postMessage({ type: "check", files: serializedFiles });
     });
   }

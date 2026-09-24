@@ -159,10 +159,10 @@ describe("HTTP routing — dispatch", () => {
       payload: { from: "body", extra: "value" },
     });
 
-    // params win over query which wins over body in the spread order.
+    // 5.21 (C1:B11): one precedence everywhere — body over query, params last.
     expect(harness.json(result)).toEqual({
       id: "7",
-      from: "query",
+      from: "body",
       extra: "value",
     });
   });

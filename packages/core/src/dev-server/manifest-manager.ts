@@ -1,7 +1,9 @@
-import { fileExistsAsync, getJsonFileAsync, putFileAsync } from "@warlock.js/fs";
+import { atomicWriteAsync, fileExistsAsync, getJsonFileAsync } from "@warlock.js/fs";
 import { FileManager } from "./file-manager";
 import type { FileManifest } from "./types";
 import { MANIFEST_PATH } from "./flags";
+
+const MANIFEST_VERSION = "1.0.0";
 
 /**
  * Manifest structure with metadata and files
@@ -22,7 +24,7 @@ export class ManifestManager {
    * Manifest data with metadata
    */
   private manifest: Manifest = {
-    version: "1.0.0",
+    version: MANIFEST_VERSION,
     lastBuildTime: Date.now(),
     stats: {
       totalFiles: 0,
@@ -42,11 +44,22 @@ export class ManifestManager {
    */
   public async init(): Promise<boolean> {
     if (await fileExistsAsync(MANIFEST_PATH)) {
-      this.manifest = await getJsonFileAsync(MANIFEST_PATH);
-      return true;
-    } else {
-      return false;
+      try {
+        const loaded = await getJsonFileAsync<Manifest>(MANIFEST_PATH);
+
+        // A torn write or a format change across upgrades is treated as absent.
+        if (loaded?.version !== MANIFEST_VERSION || typeof loaded.files !== "object") {
+          return false;
+        }
+
+        this.manifest = loaded;
+        return true;
+      } catch {
+        return false;
+      }
     }
+
+    return false;
   }
 
   /**
@@ -58,7 +71,7 @@ export class ManifestManager {
     this.manifest.stats.totalDependencies = this.calculateTotalDependencies();
     this.manifest.lastBuildTime = Date.now();
 
-    await putFileAsync(MANIFEST_PATH, JSON.stringify(this.manifest, null, 2));
+    await atomicWriteAsync(MANIFEST_PATH, JSON.stringify(this.manifest, null, 2));
   }
 
   /**

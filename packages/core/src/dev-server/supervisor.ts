@@ -27,6 +27,13 @@ export const RESTART_EXIT_CODE = 75;
  */
 export const BOOT_PRECONDITION_EXIT_CODE = 78;
 
+/**
+ * Exit code a worker uses when the user deliberately quit (Ctrl+C, `q`, a
+ * signal) but the connector shutdown failed. The supervisor honours it as
+ * final — never a crash to recover from — and exits 1.
+ */
+export const QUIT_EXIT_CODE = 79;
+
 /** Signals the supervisor must hand to the worker rather than act on itself. */
 const FORWARDED_SIGNALS: NodeJS.Signals[] = ["SIGTERM", "SIGHUP"];
 
@@ -35,6 +42,9 @@ const FORWARDED_SIGNALS: NodeJS.Signals[] = ["SIGTERM", "SIGHUP"];
  * worth recovering from rather than a failed boot worth reporting once.
  */
 const HEALTHY_UPTIME_MS = 5_000;
+
+/** IPC message the worker sends once boot completes; uptime counts from it. */
+export const WORKER_BOOTED_MESSAGE = "warlock:booted";
 
 /** Crashes allowed inside {@link CRASH_WINDOW_MS} before we stop restarting. */
 const CRASH_RESTART_LIMIT = 3;
@@ -74,15 +84,21 @@ export function superviseDevServer(now: () => number = Date.now): Promise<never>
   let crashes: number[] = [];
 
   const spawnWorker = (): void => {
-    const spawnedAt = now();
+    // Stays undefined until the worker reports a completed boot: a worker that
+    // dies before that failed to boot, however long it took to fail.
+    let bootedAt: number | undefined;
 
     const spawnedWorker = spawn(process.execPath, [...process.execArgv, ...process.argv.slice(1)], {
       cwd: process.cwd(),
       env: { ...process.env, [WORKER_ENV_FLAG]: "1" },
-      stdio: "inherit",
+      stdio: ["inherit", "inherit", "inherit", "ipc"],
       windowsHide: false,
     });
     worker = spawnedWorker;
+
+    spawnedWorker.on("message", (message) => {
+      if (message === WORKER_BOOTED_MESSAGE) bootedAt = now();
+    });
 
     spawnedWorker.on("error", (error) => {
       if (worker !== spawnedWorker) return;
@@ -123,9 +139,14 @@ export function superviseDevServer(now: () => number = Date.now): Promise<never>
         return;
       }
 
+      if (code === QUIT_EXIT_CODE) {
+        process.exit(1);
+        return;
+      }
+
       const crashed = signal !== null || (code ?? 0) !== 0;
 
-      if (crashed && shouldRecoverFromCrash(now() - spawnedAt)) {
+      if (crashed && shouldRecoverFromCrash(bootedAt === undefined ? 0 : now() - bootedAt)) {
         devLogWarn(
           `Development server ${signal ? `was killed by ${signal}` : `exited with code ${code}`} — restarting.`,
         );

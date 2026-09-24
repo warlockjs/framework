@@ -15,7 +15,8 @@ export const existsExceptCurrentIdRule: SchemaRule<ExistsExceptCurrentIdRuleOpti
       query,
       column = context.key,
       exceptCurrentIdColumn = "id",
-    } = this.context.options;
+      param = "id",
+    } = this.context.options as ExistsExceptCurrentIdRuleOptions & { param?: string };
 
     const { request } = useRequestStore();
 
@@ -24,7 +25,15 @@ export const existsExceptCurrentIdRule: SchemaRule<ExistsExceptCurrentIdRuleOpti
     const dbQuery = ResolvedModelClass.query();
 
     dbQuery.where(column, value);
-    dbQuery.where(exceptCurrentIdColumn, "!=", request.int("id"));
+    // Read the current id from the configured route param, keeping ObjectId/UUID strings intact
+    const rawId = request.input(param);
+
+    if (rawId !== undefined && rawId !== null && rawId !== "") {
+      const currentId =
+        typeof rawId === "string" && /^\d{1,15}$/.test(rawId) ? Number(rawId) : rawId;
+
+      dbQuery.where(exceptCurrentIdColumn, "!=", currentId);
+    }
 
     if (query) {
       await query({

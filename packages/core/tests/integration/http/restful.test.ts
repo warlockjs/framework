@@ -39,7 +39,24 @@ class InMemoryRepository {
   }
 
   public newModel(data?: Partial<RecordRow>) {
-    return this.decorate({ id: 0, title: "", ...data } as RecordRow);
+    const repository = this;
+    const model = this.decorate({ id: 0, title: "", ...data } as RecordRow);
+    const decoratedSave = model.save;
+
+    // 5.21 (restful create saves the hook-visible model): the first save of a
+    // new model is what persists it, so fake that against the in-memory rows.
+    model.save = async function (this: typeof model, changes: Partial<RecordRow> = {}) {
+      await decoratedSave.call(this, changes);
+
+      const row: RecordRow = { id: repository.nextId++, title: this.title };
+
+      repository.rows.push(row);
+      this.id = row.id;
+
+      return this;
+    };
+
+    return model;
   }
 
   public async create(data: Partial<RecordRow>) {

@@ -18,3 +18,7 @@ export const isEventFile = (path: string) =>
 /** `src/app/<module>/utils/locales.ts` */
 export const isLocaleFile = (path: string) =>
   /^src\/app\/[^/]+\/utils\/locales\.(ts|tsx)$/.test(normalize(path));
+
+/** Source files the dev server can hot-reload; anything else is data (`.sql`, `.json`, …) */
+export const isCodeFile = (path: string) =>
+  /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/.test(normalize(path));

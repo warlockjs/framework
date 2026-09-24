@@ -9,24 +9,12 @@ import { captureMail } from "./test-mailbox";
 import {
   MailError,
   type CapturedMail,
-  type MailAddress,
   type MailAttachment,
   type MailOptions,
   type MailPriority,
   type MailResult,
   type NormalizedMail,
 } from "./types";
-
-/**
- * Normalize email address to string
- */
-function addressToString(address: MailAddress): string {
-  if (typeof address === "string") {
-    return address;
-  }
-
-  return `"${address.name}" <${address.address}>`;
-}
 
 /**
  * Normalize recipients to array
@@ -116,7 +104,8 @@ async function resolveAttachment(attachment: MailAttachment): Promise<{
 async function buildNodemailerOptions(normalized: NormalizedMail): Promise<NodemailerOptions> {
   const options: NodemailerOptions = {
     to: normalized.to,
-    from: addressToString(normalized.from),
+    // nodemailer encodes/escapes {name, address} objects itself
+    from: normalized.from,
     subject: normalized.subject,
     priority: mapPriority(normalized.priority),
   };
@@ -161,6 +150,36 @@ async function buildNodemailerOptions(normalized: NormalizedMail): Promise<Nodem
   }
 
   return options;
+}
+
+/**
+ * Map a send failure to a MailError code, preferring nodemailer's `code` / `responseCode`
+ */
+function detectErrorCode(error: unknown): MailError["code"] {
+  if (error instanceof MailError) {
+    return error.code;
+  }
+
+  const { code, responseCode } = (error ?? {}) as { code?: string; responseCode?: number };
+
+  if (code === "EAUTH" || responseCode === 535 || responseCode === 534) return "AUTH_ERROR";
+
+  if (["ECONNECTION", "ECONNREFUSED", "ENOTFOUND", "ESOCKET"].includes(code as string)) {
+    return "CONNECTION_ERROR";
+  }
+
+  if (["ETIMEDOUT", "ETIMEOUT", "ECONNECTIONTIMEOUT"].includes(code as string)) return "TIMEOUT";
+  if (code === "EENVELOPE") return "INVALID_ADDRESS";
+  if (responseCode && [421, 450, 451, 452].includes(responseCode)) return "RATE_LIMIT";
+
+  const message = error instanceof Error ? error.message : "";
+
+  if (message.includes("ECONNREFUSED") || message.includes("ENOTFOUND")) return "CONNECTION_ERROR";
+  if (message.includes("authentication") || message.includes("auth")) return "AUTH_ERROR";
+  if (message.includes("timeout") || message.includes("ETIMEDOUT")) return "TIMEOUT";
+  if (message.includes("rate") || message.includes("limit")) return "RATE_LIMIT";
+
+  return "UNKNOWN";
 }
 
 /**
@@ -357,8 +376,15 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
     const accepted = output.accepted || (output.messageId ? normalized.to : []);
     const rejected = output.rejected || [];
 
+    if (accepted.length === 0) {
+      throw new MailError(
+        `All recipients were rejected: ${(rejected as string[]).join(", ")}`,
+        "REJECTED",
+      );
+    }
+
     const result: MailResult = {
-      success: accepted.length > 0,
+      success: true,
       messageId: output.messageId,
       accepted: accepted as string[],
       rejected: rejected as string[],
@@ -366,13 +392,13 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
       envelope: output.envelope,
     };
 
-    if (result.success) {
-      log.success(`mail.${driver}`, "sent", `Mail sent successfully (ID: ${result.messageId})`);
-      await runMailEvent(options.onSuccess, options, result);
-      await triggerEvents(mailId, "success", options, result);
-    } else {
+    if (rejected.length > 0) {
       log.warn(`mail.${driver}`, "partial", `Mail partially rejected: ${rejected.join(", ")}`);
     }
+
+    log.success(`mail.${driver}`, "sent", `Mail sent successfully (ID: ${result.messageId})`);
+    await runMailEvent(options.onSuccess, options, result);
+    await triggerEvents(mailId, "success", options, result);
 
     await runMailEvent(options.onSent, options, result, null);
     await triggerEvents(mailId, "sent", options, result, null);
@@ -380,18 +406,7 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
     return result;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    let code: MailError["code"] = "UNKNOWN";
-
-    // Detect error type
-    if (errorMessage.includes("ECONNREFUSED") || errorMessage.includes("ENOTFOUND")) {
-      code = "CONNECTION_ERROR";
-    } else if (errorMessage.includes("authentication") || errorMessage.includes("auth")) {
-      code = "AUTH_ERROR";
-    } else if (errorMessage.includes("timeout") || errorMessage.includes("ETIMEDOUT")) {
-      code = "TIMEOUT";
-    } else if (errorMessage.includes("rate") || errorMessage.includes("limit")) {
-      code = "RATE_LIMIT";
-    }
+    const code = detectErrorCode(error);
 
     const mailError = new MailError(
       `Failed to send mail: ${errorMessage}`,

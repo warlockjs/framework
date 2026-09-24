@@ -255,10 +255,19 @@ describe("S3Driver — exists", () => {
   });
 
   it("returns false when HeadObject throws", async () => {
-    sendMock.mockRejectedValueOnce(new Error("NotFound"));
+    const notFound: any = new Error("NotFound");
+    notFound.name = "NotFound";
+    sendMock.mockRejectedValueOnce(notFound);
     const driver = makeDriver();
 
     expect(await driver.exists("nope.txt")).toBe(false);
+  });
+
+  it("rethrows non-404 errors instead of reporting absent", async () => {
+    sendMock.mockRejectedValueOnce(new Error("AccessDenied"));
+    const driver = makeDriver();
+
+    await expect(driver.exists("nope.txt")).rejects.toThrow("AccessDenied");
   });
 });
 
@@ -294,6 +303,7 @@ describe("S3Driver — metadata", () => {
 describe("S3Driver — copy / move", () => {
   it("copy issues CopyObject + HeadObject with the right CopySource", async () => {
     sendResponses = [
+      { Grants: [] }, // GetObjectAcl (visibility lookup preserved across copy)
       { CopyObjectResult: { ETag: '"copied"' }, VersionId: "v2" },
       { ContentLength: 50, ContentType: "image/png", ETag: '"copied"' },
     ];

@@ -59,3 +59,28 @@ describe("parseImports — a newly-created import target resolves without a cach
     );
   });
 });
+
+describe("parseImports — NodeNext .js specifier resolves to the .ts source (C2:B2)", () => {
+  let root: string;
+
+  beforeEach(() => {
+    clearFileExistsCache();
+    root = mkdtempSync(path.join(tmpdir(), "warlock-parse-imports-js-"));
+  });
+
+  afterEach(() => {
+    clearFileExistsCache();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it("keeps the dependency edge for `./x.js` when only x.ts exists", async () => {
+    writeFileSync(path.join(root, "x.ts"), `export const x = 1;\n`);
+
+    const result = await parseImports(`import { x } from "./x.js";\n`, path.join(root, "a.ts"));
+
+    expect(result.has("./x.js")).toBe(true);
+    expect(Path.toRelative(result.get("./x.js")!.absolutePath)).toBe(
+      Path.toRelative(path.join(root, "x.ts")),
+    );
+  });
+});

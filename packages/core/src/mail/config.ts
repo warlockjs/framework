@@ -1,3 +1,5 @@
+import { config } from "../config";
+import { environment } from "../utils/environment";
 import type { MailConfigurations, MailersConfig, MailMode, SMTPConfigurations } from "./types";
 
 /**
@@ -24,9 +26,10 @@ function withSmtpDefaults(config: MailConfigurations): SMTPConfigurations {
 }
 
 /**
- * Current mail mode
+ * Mode set explicitly through `setMailMode`; when undefined the mode is
+ * derived from the environment.
  */
-let currentMode: MailMode = "production";
+let explicitMode: MailMode | undefined;
 
 /**
  * Registered mailers configuration
@@ -52,35 +55,42 @@ let mailersConfig: MailersConfig = {};
  * ```
  */
 export function setMailMode(mode: MailMode): void {
-  currentMode = mode;
+  explicitMode = mode;
 }
 
 /**
  * Get the current mail mode
  */
 export function getMailMode(): MailMode {
-  return currentMode;
+  if (explicitMode) return explicitMode;
+
+  // Development and test never send real mail unless `mail.sendInDevelopment` is true
+  if (environment() !== "production" && config.key("mail.sendInDevelopment") !== true) {
+    return "development";
+  }
+
+  return "production";
 }
 
 /**
  * Check if in production mode
  */
 export function isProductionMode(): boolean {
-  return currentMode === "production";
+  return getMailMode() === "production";
 }
 
 /**
  * Check if in development mode
  */
 export function isDevelopmentMode(): boolean {
-  return currentMode === "development";
+  return getMailMode() === "development";
 }
 
 /**
  * Check if in test mode
  */
 export function isTestMode(): boolean {
-  return currentMode === "test";
+  return getMailMode() === "test";
 }
 
 /**
@@ -178,6 +188,6 @@ export function resolveMailConfig(options: {
  * Reset all configurations (useful for testing)
  */
 export function resetMailConfig(): void {
-  currentMode = "production";
+  explicitMode = undefined;
   mailersConfig = {};
 }

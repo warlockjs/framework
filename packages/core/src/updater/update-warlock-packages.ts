@@ -136,6 +136,18 @@ export async function updateWarlockPackages(
     return { outcome: "registry-unreachable", updates: [] };
   }
 
+  // A partial failure would bump some family members and leave others behind,
+  // a lockstep drift reported as success. Refuse the whole run instead.
+  const failedLookups = resolved.filter((dependency) => !dependency.latest);
+
+  if (failedLookups.length > 0) {
+    console.log(
+      `${colors.yellow("⚠")} Could not look up ${failedLookups.map((dependency) => dependency.name).join(", ")} — ` +
+        `no versions were changed, to keep @warlock.js packages in lockstep. Try again.`,
+    );
+    return { outcome: "registry-unreachable", updates: [] };
+  }
+
   const updates = resolvePackageUpdates(resolved);
 
   if (updates.length === 0) {

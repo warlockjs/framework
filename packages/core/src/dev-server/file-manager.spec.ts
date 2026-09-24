@@ -73,3 +73,23 @@ describe("FileManager.process — ENOENT between read and stat is a deletion, no
     await expect(fileManager.process()).rejects.toBe(permissionError);
   });
 });
+
+describe("FileManager file type detection (C2:B7)", () => {
+  function typeOf(relative: string) {
+    const manager = new FileManager(`/project/${relative}`, new Map(), {} as never);
+    const internal = manager as unknown as { relativePath: string; detectFileType(): void };
+    internal.relativePath = relative;
+    internal.detectFileType();
+    return manager.type;
+  }
+
+  it("types a model under an events/ or service-named folder as a model", () => {
+    expect(typeOf("src/app/events/models/event.model.ts")).toBe("model");
+    expect(typeOf("src/app/customer-service/models/ticket.model.ts")).toBe("model");
+  });
+
+  it("does not treat domain.ts as main", () => {
+    expect(typeOf("src/app/domain.ts")).not.toBe("main");
+    expect(typeOf("src/main.ts")).toBe("main");
+  });
+});

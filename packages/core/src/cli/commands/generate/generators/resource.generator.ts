@@ -55,5 +55,5 @@ export async function generateResource(data: CommandActionData): Promise<void> {
 
   await putFileAsync(resourcePath, resourceContent);
 
-  console.log(colors.cyan(`\nâœ¨ Resource "${name.pascal}Resource" generated successfully!`));
+  console.log(colors.cyan(`\nResource "${name.pascal}Resource" generated successfully!`));
 }

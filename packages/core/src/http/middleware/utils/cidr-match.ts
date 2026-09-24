@@ -32,10 +32,22 @@ function ipv4ToInt(ip: string): number | null {
   return result >>> 0;
 }
 
-export function ipMatches(ip: string, pattern: string): boolean {
-  if (!ip || !pattern) {
+const IPV4_MAPPED_PREFIX = /^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/i;
+
+/**
+ * Normalize IPv4-mapped IPv6 (`::ffff:1.2.3.4`) to plain IPv4.
+ */
+function normalizeIp(value: string): string {
+  return value.replace(IPV4_MAPPED_PREFIX, "");
+}
+
+export function ipMatches(rawIp: string, rawPattern: string): boolean {
+  if (!rawIp || !rawPattern) {
     return false;
   }
+
+  const ip = normalizeIp(rawIp);
+  const pattern = normalizeIp(rawPattern);
 
   if (pattern === ip) {
     return true;

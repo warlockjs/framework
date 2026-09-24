@@ -14,7 +14,7 @@ import { assertNoReservedConnectorNames } from "../connectors/assert-no-reserved
 import { assertUniqueConnectorNames } from "../connectors/assert-unique-connector-names";
 import type { Connector, ConnectorBuildContext, ConnectorEsbuildPatch } from "../connectors/types";
 import { configKeyFromPath } from "../config/config-key-from-path";
-import { isEventFile, isLocaleFile, isMainFile, isRouteFile } from "../dev-server/special-file-patterns";
+import { isConfigFile, isEventFile, isLocaleFile, isMainFile, isRouteFile } from "../dev-server/special-file-patterns";
 import { tsconfigManager } from "../dev-server/tsconfig-manager";
 import { appPath, rootPath, warlockPath } from "../utils";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
@@ -383,9 +383,11 @@ export class ProductionBuilder {
 
     const content = `${appBootstrapImport}import { bootstrap, Application } from "@warlock.js/core";
 
-// Set production environment
+// Production runtime; NODE_ENV is only defaulted so an explicit value (e.g. staging) wins
 Application.setRuntimeStrategy("production");
-Application.setEnvironment("production");
+if (!process.env.NODE_ENV) {
+  Application.setEnvironment("production");
+}
 
 // Bootstrap the application
 bootstrap();
@@ -456,6 +458,7 @@ bootstrap();
 
     // Same key rule as the dev config loader: the raw path, never camel-cased
     const configNames = files
+      .filter((f) => isConfigFile("src/config/" + f))
       .map((f) => ({
         path: f.replace(/\.(ts|tsx)$/, ""),
         key: configKeyFromPath("src/config/" + f),
@@ -759,6 +762,7 @@ bootstrap();
       define: contributedDefine,
       external: contributedExternal,
       loader: contributedLoader,
+      plugins: contributedPlugins,
       ...contributedOptions
     } = this.contributedEsbuild;
 
@@ -826,6 +830,9 @@ bootstrap();
           ...(perEdgeExternals
             ? [bundleFrameworkDependencies({ appRoot: rootPath(), aliasKeys: Object.keys(alias) })]
             : []),
+          // Contributor plugins run last: they load their own file types and
+          // must not shadow the resolvers above.
+          ...(contributedPlugins ?? []),
         ],
         // Between the defaults and the user spread — the ruled precedence.
         ...contributedOptions,

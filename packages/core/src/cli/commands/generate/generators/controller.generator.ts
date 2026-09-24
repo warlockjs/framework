@@ -67,5 +67,5 @@ export async function generateController(data: CommandActionData): Promise<void>
     await putFileAsync(schemaPath, schemaContent);
   }
 
-  console.log(colors.cyan(`\nâœ¨ Controller "${name.camel}" generated successfully!`));
+  console.log(colors.cyan(`\nController "${name.camel}" generated successfully!`));
 }

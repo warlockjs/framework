@@ -42,7 +42,17 @@ export async function broadcastUseCaseResult<Output>(params: {
 
   const projector = typeof broadcast === "object" ? broadcast.output : undefined;
   const event = typeof broadcast === "object" && broadcast.event ? broadcast.event : name;
-  const payload = projector ? projector(output, result) : output;
+  let payload: unknown = output;
+
+  if (projector) {
+    try {
+      payload = projector(output, result);
+    } catch (error) {
+      log.error("use-cases", name, "broadcast projector failed", { error });
+
+      return;
+    }
+  }
 
   const broadcastEvent: UseCaseBroadcastEvent = {
     useCase: name,

@@ -20,6 +20,7 @@ const typeMapping: Record<string, string> = {
   object: "objectCol",
   decimal: "decimal",
   float: "float",
+  number: "float",
   enum: "enumCol",
   set: "setCol",
   blob: "blobCol",
@@ -42,7 +43,13 @@ export function parseColumnDsl(input: string): ParsedColumn[] {
     const parts = colStr.split(":").map((p) => p.trim());
     const name = parts[0];
     const rawType = parts[1] || "string";
-    const helper = typeMapping[rawType] || rawType; // fallback to raw string if not mapped
+    const helper = typeMapping[rawType];
+
+    if (!helper) {
+      throw new Error(
+        `Unknown column type "${rawType}" for "${name}". Valid types: ${Object.keys(typeMapping).join(", ")}`,
+      );
+    }
 
     const modifiers: string[] = [];
     for (let i = 2; i < parts.length; i++) {

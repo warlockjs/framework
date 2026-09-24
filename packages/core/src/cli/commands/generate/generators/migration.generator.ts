@@ -1,4 +1,5 @@
 import { colors } from "@mongez/copper";
+import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { appPath } from "../../../../utils";
 import type { CommandActionData } from "../../../../commands/types";
@@ -24,6 +25,15 @@ export async function createMigrationFile(
   // Generate timestamp: MM-DD-YYYY_HH-MM-SS
   const timestamp = migrationTimestamp();
 
+  // "Create missing, skip existing": never write a second CREATE-table migration
+  // for an entity that already has one (it would fail with "table already exists").
+  const isCreate = !(options.add || options.drop || options.rename);
+  const existingDir = path.join(appPath(), moduleName, "models", entity.kebab, "migrations");
+
+  if (isCreate && existsSync(existingDir) && readdirSync(existingDir).some((file) => file.endsWith(".migration.ts"))) {
+    return undefined;
+  }
+
   const migrationFileName = `${timestamp}-${entity.kebab}.migration.ts`;
   const migrationsPath = path.join(appPath(), moduleName, "models", entity.kebab, "migrations");
 
@@ -33,7 +43,8 @@ export async function createMigrationFile(
   const addParams = options.add as string;
   const dropParams = options.drop as string;
   const renameParams = options.rename as string;
-  const timestamps = options.timestamps !== "false" && options.timestamps !== false;
+  const timestamps =
+    options.timestamps !== "false" && options.timestamps !== false && !options.noTimestamps;
 
   let migrationContent = "";
 
@@ -95,7 +106,7 @@ export async function generateMigration(data: CommandActionData) {
     console.log(colors.red("Error: Model path is required"));
     console.log(colors.gray("Usage: warlock gen.migration <model-path>"));
     console.log(colors.gray("Example: warlock gen.migration products/product"));
-    return;
+    process.exit(1);
   }
 
   // Parse model path (e.g., "products/product")
@@ -104,14 +115,40 @@ export async function generateMigration(data: CommandActionData) {
   if (!moduleName || !entityName) {
     console.log(colors.red("Error: Invalid model path format. Expected: <module>/<entity>"));
     console.log(colors.gray("Example: warlock gen.migration products/product"));
-    return;
+    process.exit(1);
+  }
+
+  const entity = parseName(entityName);
+  const modelFilePath = path.join(
+    appPath(),
+    moduleName,
+    "models",
+    entity.kebab,
+    `${entity.kebab}.model.ts`,
+  );
+
+  if (!existsSync(modelFilePath)) {
+    console.log(
+      colors.red(`Error: Model not found at ${path.relative(appPath(), modelFilePath)}`),
+    );
+    console.log(colors.gray("Generate the model first: warlock gen.model " + modelPath));
+    process.exit(1);
   }
 
   setDryRun(Boolean(data.options.dryRun));
 
   const migrationFilePath = await createMigrationFile(moduleName, entityName, data.options);
 
+  if (!migrationFilePath) {
+    console.log(
+      colors.yellow(
+        "Skipped: this model already has a create migration. Use --add/--drop/--rename for changes.",
+      ),
+    );
+    return;
+  }
+
   console.log(
-    colors.cyan(`\nâœ¨ Migration file created at: ${path.relative(appPath(), migrationFilePath)}`),
+    colors.cyan(`\n✨ Migration file created at: ${path.relative(appPath(), migrationFilePath)}`),
   );
 }

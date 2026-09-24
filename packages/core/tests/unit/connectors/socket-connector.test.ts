@@ -23,7 +23,11 @@ const makeFakeSocket = () => {
     cb?.();
   });
 
-  return { close };
+  return {
+    close,
+    of: vi.fn(() => ({ disconnectSockets: vi.fn() })),
+    engine: { close: vi.fn() },
+  };
 };
 
 /** A node-server double whose close(cb) invokes the callback with no error. */
@@ -55,7 +59,10 @@ describe("SocketConnector — shutdown server ownership", () => {
 
     await connector.shutdown();
 
-    expect(socket.close).toHaveBeenCalledTimes(1);
+    // Shared mode detaches (disconnect clients + close engine) instead of
+    // io.close(), which would close http's server and bypass its drain.
+    expect(socket.close).not.toHaveBeenCalled();
+    expect(socket.engine.close).toHaveBeenCalledTimes(1);
     expect(rawServer.close).not.toHaveBeenCalled();
   });
 
@@ -72,8 +79,10 @@ describe("SocketConnector — shutdown server ownership", () => {
 
     await connector.shutdown();
 
+    // io.close() closes the raw server itself; a second close would reject
+    // with ERR_SERVER_NOT_RUNNING.
     expect(socket.close).toHaveBeenCalledTimes(1);
-    expect(rawServer.close).toHaveBeenCalledTimes(1);
+    expect(rawServer.close).not.toHaveBeenCalled();
   });
 
   it("awaits the socket drain before resolving", async () => {
@@ -94,7 +103,7 @@ describe("SocketConnector — shutdown server ownership", () => {
     container.set("socket", socket as never);
 
     connector.setActive(true);
-    connector.setOwnsRawServer(false);
+    connector.setOwnsRawServer(true);
 
     await connector.shutdown();
     order.push("shutdown-returned");

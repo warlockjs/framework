@@ -20,6 +20,7 @@ const {
   BOOT_PRECONDITION_EXIT_CODE,
   RESTART_EXIT_CODE,
   superviseDevServer,
+  WORKER_BOOTED_MESSAGE,
   WORKER_ENV_FLAG,
 } = await import("../../../src/dev-server/supervisor");
 
@@ -28,6 +29,11 @@ function createWorker() {
   const worker = new EventEmitter() as EventEmitter & { kill: ReturnType<typeof vi.fn> };
   worker.kill = vi.fn();
   return worker;
+}
+
+/** Model the worker's IPC "boot completed" message; uptime counts from it. */
+function boot(worker: ReturnType<typeof createWorker>) {
+  worker.emit("message", WORKER_BOOTED_MESSAGE);
 }
 
 describe("supervisor", () => {
@@ -77,13 +83,14 @@ describe("supervisor", () => {
     const [command, args, options] = spawn.mock.calls[0] as [
       string,
       string[],
-      { env: NodeJS.ProcessEnv; stdio: string },
+      { env: NodeJS.ProcessEnv; stdio: string[] },
     ];
 
     expect(command).toBe(process.execPath);
     expect(args).toEqual([...process.execArgv, ...process.argv.slice(1)]);
     expect(options.env[WORKER_ENV_FLAG]).toBe("1");
-    expect(options.stdio).toBe("inherit");
+    // The fourth fd is the IPC channel the worker reports boot completion on.
+    expect(options.stdio).toEqual(["inherit", "inherit", "inherit", "ipc"]);
   });
 
   it("replaces a worker that asks for a restart, without deepening the tree", () => {
@@ -183,6 +190,7 @@ describe("supervisor", () => {
 
       void superviseDevServer(time.now);
 
+      boot(workers[0]);
       time.advance(30_000);
       workers[0].emit("exit", 1, null);
 
@@ -195,6 +203,7 @@ describe("supervisor", () => {
 
       void superviseDevServer(time.now);
 
+      boot(workers[0]);
       time.advance(30_000);
       workers[0].emit("exit", null, "SIGSEGV");
 
@@ -206,7 +215,7 @@ describe("supervisor", () => {
 
       void superviseDevServer(time.now);
 
-      // A broken config exits almost immediately, having printed why.
+      // A broken config exits before it ever reports a completed boot, having printed why.
       time.advance(400);
       workers[0].emit("exit", 1, null);
 
@@ -219,6 +228,7 @@ describe("supervisor", () => {
 
       void superviseDevServer(time.now);
 
+      boot(workers[0]);
       time.advance(30_000);
       workers[0].emit("exit", 0, null);
 
@@ -233,6 +243,7 @@ describe("supervisor", () => {
 
       // Three crashes, each after a healthy-looking run, are recovered.
       for (let crash = 0; crash < 3; crash++) {
+        boot(workers[crash]);
         time.advance(6_000);
         workers[crash].emit("exit", 1, null);
       }
@@ -241,6 +252,7 @@ describe("supervisor", () => {
       expect(exit).not.toHaveBeenCalled();
 
       // The fourth inside the same window is flapping, not bad luck.
+      boot(workers[3]);
       time.advance(6_000);
       workers[3].emit("exit", 1, null);
 
@@ -255,6 +267,7 @@ describe("supervisor", () => {
 
       void superviseDevServer(time.now);
 
+      boot(workers[0]);
       time.advance(6_000);
       workers[0].emit("exit", 1, null);
 
@@ -279,6 +292,7 @@ describe("supervisor", () => {
       void superviseDevServer(time.now);
 
       for (let crash = 0; crash < 3; crash++) {
+        boot(workers[crash]);
         time.advance(6_000);
         workers[crash].emit("exit", 1, null);
       }
@@ -286,6 +300,7 @@ describe("supervisor", () => {
       expect(spawn).toHaveBeenCalledTimes(4);
 
       // Well past the 60s window — the earlier crashes no longer count.
+      boot(workers[3]);
       time.advance(120_000);
       workers[3].emit("exit", 1, null);
 
@@ -356,6 +371,7 @@ describe("supervisor", () => {
         void superviseDevServer(time.now);
 
         for (let crash = 0; crash < 3; crash++) {
+          boot(workers[workers.length - 1]);
           time.advance(6_000);
           workers[workers.length - 1].emit("exit", 1, null);
         }

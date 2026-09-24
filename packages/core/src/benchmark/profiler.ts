@@ -28,9 +28,14 @@ export class BenchmarkProfiler {
 
     if (options?.flushEvery) {
       this.interval = setInterval(() => {
-        // We use void to explicitly ignore the promise, as this is a background interval
-        void this.flush();
+        // Background interval: a failing channel must not become an unhandled rejection
+        this.flush().catch((error) => {
+          console.error("[benchmark] profiler flush failed", error);
+        });
       }, options.flushEvery);
+
+      // Don't keep CLI / test processes alive just for the flush timer
+      this.interval.unref?.();
     }
   }
 

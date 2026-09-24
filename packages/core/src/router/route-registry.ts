@@ -30,7 +30,7 @@ export class RouteRegistry {
       // makes that shared normalizer, rather than a second router option, the
       // reason development accepts a terminal slash.
       ignoreTrailingSlash: false,
-      caseSensitive: false,
+      caseSensitive: true,
     });
   }
 
@@ -74,7 +74,10 @@ export class RouteRegistry {
     // Strip query string from URL (find-my-way expects just the path)
     const path = normalizeRequestPath(url.split("?")[0] ?? "/");
 
-    const match = this.router.find(method as HTTPMethod, path);
+    // HEAD falls back to the GET route, as Fastify's implicit HEAD does in production.
+    const match =
+      this.router.find(method as HTTPMethod, path) ??
+      (method === "HEAD" ? this.router.find("GET", path) : null);
 
     if (!match) {
       return null;

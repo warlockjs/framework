@@ -207,7 +207,10 @@ describe("Restful.create", () => {
 
     await resource.create({ request: makeRequest({ all: { title: "New" } }), response: response });
 
-    expect(repository.create).toHaveBeenCalledWith({ title: "New" });
+    // 5.21: create saves the model the hooks received (newModel) instead of repository.create
+    const created = repository.newModel.mock.results[0].value;
+
+    expect(created.save).toHaveBeenCalledWith({ title: "New" });
     expect(response.calls.at(-1)?.method).toBe("successCreate");
   });
 
@@ -225,18 +228,22 @@ describe("Restful.create", () => {
     expect(response.calls.at(-1)?.method).toBe("success");
   });
 
-  it("returns badRequest when create throws", async () => {
+  it("rethrows when create throws so the request error handler picks the status", async () => {
     const repository = makeRepository();
-    repository.create.mockRejectedValueOnce(new Error("validation failed"));
+    const failing = model({ id: 0, title: "" });
+
+    failing.save.mockRejectedValueOnce(new Error("validation failed"));
+    repository.newModel.mockReturnValueOnce(failing);
+
     const resource = makeResource(repository);
     const response = makeResponse();
 
-    await resource.create({ request: makeRequest({ all: {} }), response: response });
+    // 5.21: errors are no longer leaked as 400 badRequest
+    await expect(
+      resource.create({ request: makeRequest({ all: {} }), response: response }),
+    ).rejects.toThrow("validation failed");
 
-    expect(response.calls.at(-1)).toMatchObject({
-      method: "badRequest",
-      payload: { error: "validation failed" },
-    });
+    expect(response.calls).toHaveLength(0);
   });
 });
 

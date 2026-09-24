@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { resetMailConfig, resolveMailConfig, setMailConfigurations } from "./config";
+import { getMailMode, resetMailConfig, resolveMailConfig, setMailConfigurations, setMailMode } from "./config";
 
 describe("mail config secure default", () => {
   afterEach(() => resetMailConfig());
@@ -21,5 +21,27 @@ describe("mail config secure default", () => {
     expect((resolveMailConfig({}) as any).secure).toBe(true);
 
     expect((resolveMailConfig({ config: { host: "h", port: 465, secure: false } as any }) as any).secure).toBe(false);
+  });
+});
+
+describe("mail mode default", () => {
+  const original = process.env.NODE_ENV;
+
+  afterEach(() => {
+    process.env.NODE_ENV = original;
+    resetMailConfig();
+  });
+
+  it("defaults to development mode under test/development (no real sends)", () => {
+    process.env.NODE_ENV = "test";
+    expect(getMailMode()).toBe("development");
+  });
+
+  it("defaults to production in production and lets setMailMode override", () => {
+    process.env.NODE_ENV = "production";
+    expect(getMailMode()).toBe("production");
+
+    setMailMode("test");
+    expect(getMailMode()).toBe("test");
   });
 });

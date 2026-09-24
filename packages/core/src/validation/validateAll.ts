@@ -2,7 +2,8 @@ import config from "@mongez/config";
 import { merge } from "@mongez/reinforcements";
 import { log } from "@warlock.js/logger";
 import { v } from "@warlock.js/seal";
-import type { Request, Response } from "../http";
+import type { Request } from "../http";
+import { Response } from "../http/response";
 import type { RequestHandlerValidation, Route } from "../router";
 
 function resolveDataToParse(validating: RequestHandlerValidation["validating"], request: Request) {
@@ -70,14 +71,13 @@ export async function validateAll(
 
     // if there is a result, it means it failed
     if (result) {
-      // check if there is no response status code, then set it to config value or 400 as default
-      if (!response.statusCode) {
-        response.setStatusCode(config.get("validation.responseStatus", 400));
-      }
-
       log.info("validation", "failed", "Validation failed");
 
-      return result;
+      // a returned Response already carries its own status; anything else is
+      // sent with the configured failure status (400 by default)
+      if (result instanceof Response) return result;
+
+      return response.send(result, config.get("validation.responseStatus", 400));
     }
 
     log.info("validation", "passed", "Validation passed");

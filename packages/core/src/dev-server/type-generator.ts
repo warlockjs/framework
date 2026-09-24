@@ -185,6 +185,8 @@ export class TypeGenerator {
     let configChanged = false;
     let unchangedCount = 0;
 
+    this.configCache.clear();
+
     // Check storage config
     for (const [path, fileManager] of files) {
       if (path.startsWith("src/config/storage")) {
@@ -200,7 +202,7 @@ export class TypeGenerator {
     // Check config files
     for (const [path, fileManager] of files) {
       if (!path.startsWith("src/config/")) continue;
-      if (path.includes("index")) continue;
+      if (path.split("/").pop()?.replace(/[.][^.]+$/, "") === "index") continue;
 
       // Extract config name (remove dir prefix and extension)
       const configName = path.replace("src/config/", "").replace(/\.[^.]+$/, "");
@@ -240,7 +242,7 @@ export class TypeGenerator {
       const driverKeys = await this.extractStorageDriverKeys(configPath);
 
       if (driverKeys.length === 0) {
-        devServeLog("âš ï¸ No storage drivers found in config");
+        devServeLog("⚠️ No storage drivers found in config");
         return;
       }
 
@@ -279,7 +281,7 @@ ${interfaceContent}
 
       devLogSuccess(`Generated storage types: ${driverKeys.join(", ")}`);
     } catch (error) {
-      devServeLog(`âš ï¸ Failed to generate storage types: ${error}`);
+      devServeLog(`⚠️ Failed to generate storage types: ${error}`);
     }
   }
 
@@ -360,7 +362,7 @@ ${interfaceContent}
 
       for (const [path, fileManager] of files) {
         if (!path.startsWith("src/config/")) continue;
-        if (path.includes("index")) continue;
+        if (path.split("/").pop()?.replace(/[.][^.]+$/, "") === "index") continue;
 
         // Extract config name
         const configName = path.replace("src/config/", "").replace(/\.[^.]+$/, "");
@@ -378,7 +380,7 @@ ${interfaceContent}
 
       await this.writeConfigTypesFromCache();
     } catch (error) {
-      devServeLog(`âš ï¸ Failed to generate config types: ${error}`);
+      devServeLog(`⚠️ Failed to generate config types: ${error}`);
     }
   }
 
@@ -710,14 +712,14 @@ ${keyEntries}
     const absolutePath = resolve(configPath);
 
     if (!(await this.exists(absolutePath))) {
-      devServeLog(`âš ï¸ Storage config not found: ${absolutePath}`);
+      devServeLog(`⚠️ Storage config not found: ${absolutePath}`);
       return [];
     }
 
     const sourceFile = await readConfigAst(absolutePath);
 
     if (!sourceFile) {
-      devServeLog(`âš ï¸ Could not parse storage config: ${absolutePath}`);
+      devServeLog(`⚠️ Could not parse storage config: ${absolutePath}`);
       return [];
     }
 

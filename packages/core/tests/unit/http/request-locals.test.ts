@@ -16,7 +16,7 @@ import { Request } from "../../../src/http/request";
  */
 declare module "@warlock.js/core" {
   interface RequestLocals {
-    session?: { token: string };
+    testSession?: { token: string };
     owner?: string;
   }
 }
@@ -25,16 +25,16 @@ describe("Request — locals persistence", () => {
   it("persists a written value across multiple reads within the same request", () => {
     const request = new Request();
 
-    request.locals.session = { token: "abc" };
+    request.locals.testSession = { token: "abc" };
 
-    expect(request.locals.session).toEqual({ token: "abc" });
+    expect(request.locals.testSession).toEqual({ token: "abc" });
     // Same object identity on re-read, not a copy.
-    expect(request.locals.session).toBe(request.locals.session);
+    expect(request.locals.testSession).toBe(request.locals.testSession);
   });
 
   it("starts as a fresh, empty object per instance — no leakage between two `new Request()` calls", () => {
     const first = new Request();
-    first.locals.session = { token: "first-token" };
+    first.locals.testSession = { token: "first-token" };
 
     const second = new Request();
 
@@ -78,19 +78,19 @@ describe("Request — locals stays out of the input surface", () => {
       params: {},
     };
 
-    request.locals.session = { token: "abc" };
+    request.locals.testSession = { token: "abc" };
     request.locals.owner = "request-a";
     request.setValidatedData({ name: "Sam" });
 
     expect(request.all()).toEqual({ name: "Sam" });
-    expect(request.all()).not.toHaveProperty("session");
+    expect(request.all()).not.toHaveProperty("testSession");
     expect(request.all()).not.toHaveProperty("owner");
 
     expect(request.validated()).toEqual({ name: "Sam" });
-    expect(request.validated()).not.toHaveProperty("session");
+    expect(request.validated()).not.toHaveProperty("testSession");
     expect(request.validated()).not.toHaveProperty("owner");
 
-    expect(request.input("session")).toBeUndefined();
+    expect(request.input("testSession")).toBeUndefined();
     expect(request.input("owner")).toBeUndefined();
     expect(request.input("locals")).toBeUndefined();
   });

@@ -18,6 +18,8 @@ import {
 } from "./positional-handler-diagnostics";
 import { normalizeRoutePath } from "./normalize-route-path";
 import { RouteBuilder } from "./route-builder";
+import { buildRouteRateLimit } from "./build-route-rate-limit";
+import { DEV_DISPATCH_METHODS, buildNotFoundBody, createDevRateLimiter } from "./dev-dispatch";
 import { RouteRegistry } from "./route-registry";
 import { routeNameMethodSuffix } from "./route-name-method-suffix";
 import type {
@@ -323,6 +325,10 @@ export class Router {
     path = normalizeRoutePath(prefix, path);
 
     const middlewarePrecedence = options.middlewarePrecedence || "after";
+
+    // Work on a copy: the caller may reuse one options object for several
+    // routes, and merging the group stack into it would compound per route.
+    options = { ...options };
 
     if (middlewarePrecedence === "before") {
       options.middleware = [...(options.middleware || []), ...this.stacks.middleware];
@@ -917,7 +923,7 @@ export class Router {
           explicitHeadPaths.has(route.path) && { exposeHeadRoute: false }),
         config: {
           ...route.serverOptions?.config,
-          ...(route.rateLimit && { rateLimit: route.rateLimit }),
+          ...(route.rateLimit && { rateLimit: buildRouteRateLimit(route.rateLimit) }),
         },
       };
 
@@ -957,6 +963,8 @@ export class Router {
     let routeRegistry: RouteRegistry | undefined;
     let registryVersion = -1;
 
+    const applyDevRateLimit = createDevRateLimiter(server);
+
     // Rebuilt when the route table changes rather than per request. Building it
     // inside the handler re-registered every route on every hit — and `all`
     // routes expand into seven registrations each. Keyed on `routesVersion`
@@ -993,6 +1001,14 @@ export class Router {
 
         fastifyRequest.params = match.params;
 
+        // Same slot production gives it: the limiter runs first in onRequest,
+        // ahead of the route's own hooks.
+        await applyDevRateLimit(match.route, fastifyRequest, fastifyReply);
+
+        if (fastifyReply.sent) {
+          return fastifyReply;
+        }
+
         return runRouteHooks(match.route, "onRequest", fastifyRequest, fastifyReply);
       },
     );
@@ -1015,11 +1031,9 @@ export class Router {
 
       // No match found - return 404
       if (!match) {
-        return fastifyReply.code(404).send({
-          error: "Route not found",
-          path: fastifyRequest.url,
-          method: fastifyRequest.method,
-        });
+        return fastifyReply
+          .code(404)
+          .send(buildNotFoundBody(fastifyRequest.method, fastifyRequest.url));
       }
 
       try {
@@ -1040,13 +1054,20 @@ export class Router {
       }
     };
 
-    // Register wildcard route for all methods EXCEPT OPTIONS (to avoid conflict with CORS)
-    // OPTIONS is handled by @fastify/cors plugin for preflight requests
-    const methods = ["GET", "POST", "PUT", "DELETE", "PATCH"] as const;
-    for (const method of methods) {
+    // Every verb production can register. Fastify's implicit HEAD for the GET
+    // wildcard is switched off so the HEAD wildcard owns it (the registry falls
+    // back to the GET route, exactly as production's implicit HEAD does).
+    // `@fastify/cors` registers its own OPTIONS "*" catch-all; when it is
+    // there, preflight stays with it rather than duplicating the route.
+    for (const method of DEV_DISPATCH_METHODS) {
+      if (method === "OPTIONS" && server.hasRoute({ method: "OPTIONS", url: "*" })) {
+        continue;
+      }
+
       server.route({
         method,
         url: "*",
+        ...(method === "GET" && { exposeHeadRoute: false }),
         handler: wildcardHandler,
       });
     }
@@ -1065,22 +1086,35 @@ export class Router {
   /**
    * Get the route path for the given route name
    */
-  public getRoute(name: string, params: any = {}) {
+  public getRoute(name: string, params: Record<string, any> = {}) {
     const route = this.routes.find((route) => route.name === name);
 
     if (!route) {
       throw new Error(`Route name "${name}" not found`);
     }
 
-    let path = route.path;
+    const used = new Set<string>();
 
-    if (route.path.includes(":")) {
-      Object.keys(params).forEach((key) => {
-        path = path.replace(":" + key, params[key]);
-      });
-    }
+    const path = route.path.replace(/:([A-Za-z0-9_]+)(\?)?/g, (_match, key: string, optional) => {
+      const value = params[key];
 
-    return path;
+      if (value === undefined || value === null) {
+        if (optional) return "";
+
+        throw new Error(`Route "${name}" is missing the "${key}" param`);
+      }
+
+      used.add(key);
+
+      return encodeURIComponent(String(value));
+    });
+
+    const query = Object.keys(params)
+      .filter((key) => !used.has(key) && params[key] !== undefined && params[key] !== null)
+      .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(String(params[key]))}`)
+      .join("&");
+
+    return query ? `${path}?${query}` : path;
   }
 
   /**
@@ -1139,8 +1173,22 @@ export class Router {
         () => request.execute(),
       );
 
+      // A handler may return a plain object (`ReturnedResponse`). Route it
+      // through `Response.send` so status, events and hooks apply, exactly as
+      // middleware outputs already do.
+      let output = result;
+
+      if (
+        output !== undefined &&
+        output !== null &&
+        !(output instanceof Response) &&
+        (output as unknown) !== fastifyResponse
+      ) {
+        output = await response.send(output);
+      }
+
       return {
-        output: result,
+        output,
         response,
         request,
       };

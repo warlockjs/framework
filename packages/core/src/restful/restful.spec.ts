@@ -27,7 +27,7 @@ const makeRecord = () => ({ save: vi.fn(async () => undefined), clone: () => ({}
 
 function build(overrides: Record<string, any> = {}, record = makeRecord()) {
   const repository: any = {
-    newModel: () => ({}),
+    newModel: () => record,
     create: vi.fn(async (data) => data),
     getCached: vi.fn(async () => record),
     find: vi.fn(async () => record),
@@ -48,7 +48,7 @@ describe("Restful", () => {
     const { resource, repository, record } = build({ validation: { all: {} } });
 
     await resource.create({ request: makeRequest(), response: makeResponse() });
-    expect(repository.create).toHaveBeenCalledWith({ name: "a" });
+    expect(record.save).toHaveBeenCalledWith({ name: "a" });
 
     await resource.update({ request: makeRequest(), response: makeResponse() });
     expect(record.save).toHaveBeenCalledWith({ name: "a" });

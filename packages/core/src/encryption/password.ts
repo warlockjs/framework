@@ -45,7 +45,7 @@ async function loadBcryptjs() {
   }
 }
 
-loadBcryptjs();
+const bcryptjsLoading = loadBcryptjs();
 
 /**
  * Hashes a password using bcrypt (async — does not block the event loop).
@@ -60,6 +60,8 @@ loadBcryptjs();
  * // Store \`hashed\` in the database
  */
 export async function hashPassword(password: string): Promise<string> {
+  await bcryptjsLoading;
+
   if (!isModuleExists) {
     throw new Error(BCRYPTJS_INSTALL_INSTRUCTIONS);
   }
@@ -84,6 +86,8 @@ export async function verifyPassword(
   plainPassword: string,
   hashedPassword: string,
 ): Promise<boolean> {
+  await bcryptjsLoading;
+
   if (!isModuleExists) {
     throw new Error(BCRYPTJS_INSTALL_INSTRUCTIONS);
   }

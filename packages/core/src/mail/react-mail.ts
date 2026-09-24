@@ -37,12 +37,22 @@ export async function renderReactMail(
   const React = await import("react");
   const reactElement = typeof element === "function" ? React.createElement(element) : element;
 
+  let render: typeof import("@react-email/render").render;
+
   try {
-    const { render } = await import("@react-email/render");
-    return await render(reactElement as React.ReactElement);
-  } catch {
+    ({ render } = await import("@react-email/render"));
+  } catch (error) {
+    const code = (error as { code?: string } | null)?.code;
+
+    if (code !== "ERR_MODULE_NOT_FOUND" && code !== "MODULE_NOT_FOUND") {
+      throw error;
+    }
+
     // @react-email/render not installed — graceful fallback
     const content = renderReact(reactElement);
     return createHtmlPage(content);
   }
+
+  // A throwing component must surface its real error, not fall back silently
+  return await render(reactElement as React.ReactElement);
 }

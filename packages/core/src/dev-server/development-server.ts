@@ -23,6 +23,8 @@ type Batch = {
   added: string[];
   changed: string[];
   deleted: string[];
+  /** Non-code `watch.include` files that changed; only a restart applies them. */
+  restartTriggers?: string[];
   timings?: IncomingReloadTimings;
 };
 
@@ -34,6 +36,9 @@ type Batch = {
 export class DevelopmentServer {
   private layerExecutor?: LayerExecutor;
   private running = false;
+
+  /** Set once boot begins, so a failed boot still closes connectors that already started. */
+  private connectorsStarted = false;
   private readonly options: StartDevServerOptions;
 
   public constructor(options: StartDevServerOptions = {}) {
@@ -43,6 +48,7 @@ export class DevelopmentServer {
 
   public async start(): Promise<void> {
     try {
+      this.connectorsStarted = true;
       const startedAt = performance.now();
 
       // --fresh deletes the manifest so reconciliation re-parses every file
@@ -114,6 +120,10 @@ export class DevelopmentServer {
       // above it and stay there — see `ready-block.ts`.
       printReadyBlock(duration);
 
+      // Tell the supervisor (when there is one) that boot completed, so its
+      // healthy-uptime window counts from here rather than from spawn.
+      process.send?.("warlock:booted");
+
       // Precedence: explicit CLI option > devServer.* config > default.
       const devServerConfig = await warlockConfigManager.get("devServer");
       const generateTypings =
@@ -145,8 +155,17 @@ export class DevelopmentServer {
     }
   }
 
+  /** Tail of the batch-reload chain (see `setupEventListeners`). */
+  private reloadQueue: Promise<void> = Promise.resolve();
+
   private setupEventListeners(): void {
-    events.on("dev-server:batch-complete", (batch: Batch) => this.handleBatchComplete(batch));
+    // Reloads run one at a time: a second batch waits for the first to finish
+    // so route re-registration and connector restarts never interleave.
+    events.on("dev-server:batch-complete", (batch: Batch) => {
+      this.reloadQueue = this.reloadQueue
+        .then(() => this.handleBatchComplete(batch))
+        .catch((error) => devServeLog(colors.redBright(`Batch reload failed: ${error}`)));
+    });
   }
 
   private async handleBatchComplete(batch: Batch): Promise<void> {
@@ -178,7 +197,7 @@ export class DevelopmentServer {
     // declined (`restartOnConfigChange: false`) or wasn't possible — they are
     // never hot-reloaded, so keep them out of the reload set either way.
     const codeFiles = [...batch.added, ...batch.changed].filter(
-      (p) => !isEnvPath(p) && p !== "warlock.config.ts",
+      (p) => !isEnvPath(p) && p !== "warlock.config.ts" && !batch.restartTriggers?.includes(p),
     );
 
     try {
@@ -212,7 +231,7 @@ export class DevelopmentServer {
       return "warlock.config.ts";
     }
 
-    return [...batch.added, ...batch.changed].find(isEnvPath);
+    return [...batch.added, ...batch.changed].find(isEnvPath) ?? batch.restartTriggers?.[0];
   }
 
   /**
@@ -247,9 +266,10 @@ export class DevelopmentServer {
     // shell without line editing or Ctrl+C.
     devServerShortcuts.release();
 
-    if (!this.running) return;
+    if (!this.running && !this.connectorsStarted) return;
     devServeLog(colors.redBright("Shutting down Development Server..."));
     this.running = false;
+    this.connectorsStarted = false;
     await connectorsManager.shutdown();
     devServeLog(colors.greenBright("Development Server stopped"));
   }

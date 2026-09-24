@@ -3,6 +3,7 @@ import { fileExistsAsync, putFileAsync } from "@warlock.js/fs";
 import type { CommandActionData } from "../../commands/types";
 import { rootPath, srcPath } from "../../utils";
 import type { FeatureDefinition } from "./types";
+import { VITE_RANGE } from "./web.feature";
 
 async function completeTestInstallation(options: CommandActionData) {
   // Create test-global-setup.ts (runs once before all tests)
@@ -106,7 +107,7 @@ export const testFeature: FeatureDefinition = {
   },
   devDependencies: {
     "@mongez/vite": "^2.0.4",
-    vite: "^8.0.16",
+    vite: VITE_RANGE,
     vitest: "^4.1.8",
     "@vitest/coverage-v8": "^4.1.8",
   },

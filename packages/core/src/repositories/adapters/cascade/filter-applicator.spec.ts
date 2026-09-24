@@ -50,3 +50,35 @@ describe("FilterApplicator multi-column filters", () => {
     expect(calls.some(([method]) => method === "orWhere")).toBe(false);
   });
 });
+
+describe("FilterApplicator value handling", () => {
+  const run = (rules: any, values: any, options: any = {}) => {
+    const { query, calls } = recorder();
+    new FilterApplicator().apply(query, rules, values, options);
+    return calls;
+  };
+
+  it("wraps a plain like value so it is a contains match on every driver", () => {
+    expect(run({ name: "like" }, { name: "john" })).toEqual([["whereLike", "name", "%john%"]]);
+  });
+
+  it("supports startsWith and endsWith", () => {
+    expect(run({ name: "startsWith" }, { name: "jo" })).toEqual([["whereLike", "name", "jo%"]]);
+    expect(run({ name: "endsWith" }, { name: "hn" })).toEqual([["whereLike", "name", "%hn"]]);
+  });
+
+  it("parses dates with the declared format", () => {
+    const calls = run({ created: "date" }, { created: "24-09-2026" }, { dateFormat: "DD-MM-YYYY" });
+    const date = calls[0][2] as Date;
+    expect([date.getFullYear(), date.getMonth(), date.getDate()]).toEqual([2026, 8, 24]);
+  });
+
+  it("rejects invalid dates and integers with a 400 instead of a 500", () => {
+    expect(() => run({ created: "date" }, { created: "nope" }, { dateFormat: "DD-MM-YYYY" })).toThrow(
+      expect.objectContaining({ name: "BadRequestError" }),
+    );
+    expect(() => run({ x: "int" }, { x: "abc" })).toThrow(
+      expect.objectContaining({ name: "BadRequestError" }),
+    );
+  });
+});

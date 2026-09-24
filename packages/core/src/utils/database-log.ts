@@ -44,9 +44,6 @@ export class DatabaseLog extends LogChannel<DatabaseLogOptions> implements LogCo
     if (message instanceof Error) {
       data.stack = message.stack;
       data.content = message.message;
-    } else {
-      data.content = message;
-      data.stack = new Error().stack;
     }
 
     try {

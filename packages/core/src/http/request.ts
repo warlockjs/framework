@@ -509,7 +509,14 @@ export class Request<RequestValidation = any> {
    * Get the domain of the origin
    */
   public get originDomain() {
-    const domain = this.origin ? new URL(this.origin).hostname : null;
+    let domain: string | null = null;
+
+    try {
+      domain = this.origin ? new URL(this.origin).hostname : null;
+    } catch {
+      // `Origin: null` (sandboxed iframes) or any unparsable value
+      domain = null;
+    }
 
     if (domain?.startsWith("www.")) {
       return domain.replace(/^www\./, "");
@@ -605,15 +612,28 @@ export class Request<RequestValidation = any> {
   }
 
   protected parsePayload() {
-    this.payload.body = this.parseBody(this.baseRequest.body);
+    this.payload.body = this.isJsonBody()
+      ? (this.baseRequest.body ?? {})
+      : this.parseBody(this.baseRequest.body);
 
     this.payload.query = this.parseBody(this.baseRequest.query);
     this.payload.params = { ...(this.baseRequest.params || {}) };
+    // same precedence as `allExceptParams()`: body over query, params last
     this.payload.all = {
-      ...this.payload.body,
       ...this.payload.query,
+      ...this.payload.body,
       ...this.payload.params,
     };
+  }
+
+  /**
+   * JSON bodies are already typed by the client, so they skip the
+   * bracket/coercion parsing meant for querystring, urlencoded and multipart.
+   */
+  protected isJsonBody() {
+    const contentType = this.baseRequest.headers?.["content-type"];
+
+    return typeof contentType === "string" && /json/i.test(contentType);
   }
 
   /**
@@ -684,6 +704,9 @@ export class Request<RequestValidation = any> {
             const keyNameParts = firstBracket.split("]");
 
             const index = Number(keyNameParts[0]);
+
+            // a crafted huge index would allocate a giant sparse array
+            if (Number.isInteger(index) && index > 1000) continue;
 
             /*
               A NON-NUMERIC first segment is not an array index — it is a deeper
@@ -786,6 +809,8 @@ export class Request<RequestValidation = any> {
     } catch (error) {
       console.log(error);
       this.log(error, "error");
+
+      return {};
     }
   }
 

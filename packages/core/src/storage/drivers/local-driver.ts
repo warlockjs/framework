@@ -10,13 +10,14 @@ import crypto from "crypto";
 import { createReadStream, createWriteStream, promises as fsPromises } from "fs";
 import { copyFile, readFile, readdir, rename, stat, unlink, writeFile } from "fs/promises";
 import { basename, dirname, join, resolve } from "path";
-import type { Readable } from "stream";
+import { Transform, type Readable } from "stream";
 import { pipeline } from "stream/promises";
 import { UploadedFile } from "../../http";
 import { storagePath } from "../../utils/paths";
 import { url } from "../../utils/urls";
 import { storageDriverContext } from "../context/storage-driver-context";
 import { resolveWithinRoot } from "../utils/contain-path";
+import { StorageError } from "../utils/storage-error";
 import type {
   DeleteManyResult,
   ListOptions,
@@ -65,11 +66,6 @@ export class LocalDriver implements StorageDriverContract {
    * Secret key for signing temporary URLs
    */
   protected signatureKey?: string;
-
-  /**
-   * Cached Storage File Metadata
-   */
-  protected _metadata = new Map<string, StorageFileInfo>();
 
   public constructor(public options: LocalStorageDriverOptions = {}) {
     // Resolve the root to an absolute, normalized path up front so the
@@ -135,8 +131,6 @@ export class LocalDriver implements StorageDriverContract {
 
     await writeFile(absolutePath, new Uint8Array(fileBuffer));
 
-    // Invalidate any stale cached metadata for this location.
-    this._metadata.delete(location);
 
     const stats = await stat(absolutePath);
     const mimeType = options?.mimeType || this.guessMimeType(location);
@@ -195,8 +189,6 @@ export class LocalDriver implements StorageDriverContract {
       await unlink(tempPath).catch(() => undefined);
     }
 
-    // Invalidate any stale cached metadata for this location.
-    this._metadata.delete(location);
 
     const stats = await stat(absolutePath);
     const mimeType = options?.mimeType || this.guessMimeType(location);
@@ -223,16 +215,20 @@ export class LocalDriver implements StorageDriverContract {
 
     await ensureDirectoryAsync(dirname(absolutePath));
 
-    // Create write stream and pipe
+    // Hash while streaming so large files are never read back into memory
+    const hasher = crypto.createHash("sha256");
+    const hashTransform = new Transform({
+      transform(chunk, _encoding, callback) {
+        hasher.update(chunk);
+        callback(null, chunk);
+      },
+    });
+
     const writeStream = createWriteStream(absolutePath);
-    await pipeline(stream, writeStream);
+    await pipeline(stream, hashTransform, writeStream);
 
-    // Invalidate any stale cached metadata for this location.
-    this._metadata.delete(location);
 
-    // Calculate hash and get stats
-    const fileBuffer = await readFile(absolutePath);
-    const hash = this.calculateHash(fileBuffer);
+    const hash = hasher.digest("hex");
     const stats = await stat(absolutePath);
     const mimeType = options?.mimeType || this.guessMimeType(location);
 
@@ -284,8 +280,6 @@ export class LocalDriver implements StorageDriverContract {
 
     await unlinkAsync(absolutePath);
 
-    // Invalidate any stale cached metadata for this location.
-    this._metadata.delete(location);
 
     return true;
   }
@@ -319,8 +313,15 @@ export class LocalDriver implements StorageDriverContract {
    * contained within the storage root — the raw, caller-supplied argument is
    * never handed to the filesystem (preventing `../` traversal deletes).
    */
-  public async deleteDirectory(directoryPath: string) {
+  public async deleteDirectory(directoryPath: string, options?: { allowRoot?: boolean }) {
     const absolutePath = this.getAbsolutePath(directoryPath);
+
+    if (!options?.allowRoot && resolve(absolutePath) === this.root) {
+      throw new StorageError(
+        `Refusing to delete the storage root ("${directoryPath}"). Pass { allowRoot: true } to confirm.`,
+        { context: { directoryPath } },
+      );
+    }
 
     await removeDirectoryAsync(absolutePath);
 
@@ -343,7 +344,7 @@ export class LocalDriver implements StorageDriverContract {
    * Get public URL for file
    */
   public url(location: string): string {
-    return url(this.urlPrefix + "/" + ltrim(location, "/"));
+    return url(this.urlPrefix + "/" + ltrim(this.applyPrefix(location), "/"));
   }
 
   /**
@@ -472,10 +473,6 @@ export class LocalDriver implements StorageDriverContract {
    * Get file info/metadata without downloading
    */
   public async metadata(location: string): Promise<StorageFileInfo> {
-    if (this._metadata.has(location)) {
-      return this._metadata.get(location)!;
-    }
-
     const absolutePath = this.getAbsolutePath(location);
 
     if (!(await fileExistsAsync(absolutePath))) {
@@ -485,16 +482,14 @@ export class LocalDriver implements StorageDriverContract {
     const stats = await stat(absolutePath);
     const name = location.split("/").pop() || "";
 
-    this._metadata.set(location, {
+    return {
       path: location,
       name,
       size: stats.size,
       isDirectory: stats.isDirectory(),
       lastModified: stats.mtime,
       mimeType: this.guessMimeType(location),
-    });
-
-    return this._metadata.get(location)!;
+    };
   }
 
   /**
@@ -523,11 +518,8 @@ export class LocalDriver implements StorageDriverContract {
     await ensureDirectoryAsync(dirname(toPath));
     await copyFile(fromPath, toPath);
 
-    // Invalidate any stale cached metadata for the destination.
-    this._metadata.delete(to);
 
-    const fileBuffer = await readFile(toPath);
-    const hash = this.calculateHash(fileBuffer);
+    const hash = await this.hashFile(toPath);
     const stats = await stat(toPath);
 
     return {
@@ -554,12 +546,8 @@ export class LocalDriver implements StorageDriverContract {
     await ensureDirectoryAsync(dirname(toPath));
     await rename(fromPath, toPath);
 
-    // Invalidate any stale cached metadata for both source and destination.
-    this._metadata.delete(from);
-    this._metadata.delete(to);
 
-    const fileBuffer = await readFile(toPath);
-    const hash = this.calculateHash(fileBuffer);
+    const hash = await this.hashFile(toPath);
     const stats = await stat(toPath);
 
     return {
@@ -647,7 +635,18 @@ export class LocalDriver implements StorageDriverContract {
    */
   protected getAbsolutePath(location: string): string {
     const prefixedLocation = this.applyPrefix(location);
-    return resolveWithinRoot(this.root, prefixedLocation);
+    const resolved = resolveWithinRoot(this.root, prefixedLocation);
+
+    // The prefix is a containment boundary too: "../t2/x" under prefix "t1"
+    // must not land in a sibling tenant's directory.
+    const prefix = storageDriverContext.getPrefix() || this.options.prefix;
+
+    if (prefix) {
+      const prefixRoot = resolveWithinRoot(this.root, prefix.replace(/^[\\/]+|[\\/]+$/g, ""));
+      resolveWithinRoot(prefixRoot, resolved);
+    }
+
+    return resolved;
   }
 
   /**
@@ -671,6 +670,19 @@ export class LocalDriver implements StorageDriverContract {
    */
   protected calculateHash(buffer: Buffer): string {
     return crypto.createHash("sha256").update(new Uint8Array(buffer)).digest("hex");
+  }
+
+  /**
+   * Calculate SHA-256 hash of a file by streaming it (constant memory)
+   */
+  protected async hashFile(absolutePath: string): Promise<string> {
+    const hasher = crypto.createHash("sha256");
+
+    for await (const chunk of createReadStream(absolutePath)) {
+      hasher.update(chunk);
+    }
+
+    return hasher.digest("hex");
   }
 
   /**

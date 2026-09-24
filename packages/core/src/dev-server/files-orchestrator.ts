@@ -1,5 +1,6 @@
 import { colors } from "@mongez/copper";
 import { init } from "es-module-lexer";
+import { fileURLToPath } from "node:url";
 import type { MessagePort } from "node:worker_threads";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 import { DependencyGraph } from "./dependency-graph";
@@ -7,7 +8,7 @@ import { devLogDim, devLogSuccess } from "./dev-logger";
 import { FileEventHandler } from "./file-event-handler";
 import { FileManager } from "./file-manager";
 import { FileOperations } from "./file-operations";
-import { FilesWatcher } from "./files-watcher";
+import { FilesWatcher, createIgnoredMatcher } from "./files-watcher";
 import { FILE_PROCESSING_BATCH_SIZE } from "./flags";
 import { EslintHealthChecker } from "./health-checker/checkers/eslint-health-checker";
 import { TypescriptHealthChecker } from "./health-checker/checkers/typescript-health-checker";
@@ -37,7 +38,12 @@ export function onCleanup(callback: () => any) {
   const stack = new Error().stack;
   const callerLine = stack?.split("\n")[2];
   const match = callerLine?.match(/\((.+?):\d+:\d+\)/) || callerLine?.match(/at (.+?):\d+:\d+/);
-  const callerFile = match?.[1];
+  const rawCaller = match?.[1];
+
+  // Loaded modules report `file:///…?v=N`; turn that back into a plain path.
+  const callerFile = rawCaller?.startsWith("file://")
+    ? fileURLToPath(rawCaller.replace(/\?.*$/, ""))
+    : rawCaller;
 
   if (!callerFile) return;
   const fileManager = filesOrchestrator.files.get(Path.toRelative(callerFile));
@@ -290,6 +296,10 @@ export class FilesOrchestrator {
     this.filesWatcher.onFileDelete((p, settleMs) => this.eventHandler.handleFileDelete(p, settleMs));
 
     const watchConfig = warlockConfigManager.get("devServer")?.watch;
+    if (watchConfig?.include?.length) {
+      this.eventHandler.setIncludeMatcher(createIgnoredMatcher(watchConfig.include));
+    }
+
     await this.filesWatcher.watch(watchConfig);
   }
 }

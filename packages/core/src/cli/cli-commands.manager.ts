@@ -1,3 +1,4 @@
+import { toCamelCase } from "@mongez/reinforcements";
 import { colors } from "@mongez/copper";
 import { fileExistsAsync } from "@warlock.js/fs";
 import { Application } from "../application";
@@ -239,7 +240,9 @@ export class CLICommandsManager {
       await manifestManager.removeCommandsFile();
     }
 
-    if (options.version || options.v) {
+    // `-v` is only the version flag when no command was given: after a command
+    // name it is that command's own short flag (`--with-validation`).
+    if (options.version || (options.v && !name)) {
       await displayWarlockVersionInTerminal();
       process.exit(0);
     }
@@ -352,26 +355,9 @@ export class CLICommandsManager {
    * Uses manifest if available for fast display
    */
   protected async showGlobalHelp() {
-    if (
-      manifestManager.isCommandLoaded &&
-      Object.keys(manifestManager.commandsJson?.commands || {}).length > 0
-    ) {
-      // Use manifest directly - no need to load command files
-      const helpCommands: HelpCommandInfo[] = Object.entries(
-        manifestManager.commandsJson?.commands || {},
-      ).map(([name, cmd]) => ({
-        name,
-        alias: cmd.alias,
-        description: cmd.description,
-        source: cmd.source,
-      }));
-
-      await displayHelp(helpCommands);
-      return;
-    }
-
-    // Fallback: No manifest, build from registered commands
-    // This happens on first run before warm-cache
+    // Always rescan rather than trusting `.warlock/commands.json`: the manifest
+    // has no invalidation, so a newly added project command stayed invisible
+    // and a removed one lingered in help until `--warm-cache`.
     await this.loadPluginsCommands();
 
     const projectCommands = await cliCommandsLoader.scanAll();
@@ -396,7 +382,7 @@ export class CLICommandsManager {
    */
   protected async warmCache() {
     console.log();
-    console.log(`  ${colors.cyan("â€º")} Scanning project commands...`);
+    console.log(`  ${colors.cyan("›")} Scanning project commands...`);
 
     const projectCommands = await cliCommandsLoader.scanAll();
 
@@ -405,7 +391,7 @@ export class CLICommandsManager {
     await manifestManager.saveCommands();
 
     console.log(
-      `  ${colors.green("âœ”")} Cached ${colors.bold(String(projectCommands.length))} project commands`,
+      `  ${colors.green("✔")} Cached ${colors.bold(String(projectCommands.length))} project commands`,
     );
     console.log();
   }
@@ -508,8 +494,12 @@ export class CLICommandsManager {
     command.commandOptions.forEach((opt) => {
       if (opt.required) {
         // Check if option is provided by name or alias
+        const name = toCamelCase(opt.name);
+        const alias = opt.alias ? toCamelCase(opt.alias) : "";
         const hasOption =
-          options[opt.name] !== undefined || (opt.alias && options[opt.alias] !== undefined);
+          options[name] !== undefined ||
+          options[opt.name] !== undefined ||
+          (alias && options[alias] !== undefined);
         if (!hasOption) {
           missing.push(opt);
         }
@@ -528,7 +518,20 @@ export class CLICommandsManager {
   ): Record<string, string | boolean | number> {
     const result = { ...options };
 
-    command.commandOptions.forEach((opt) => {
+    command.commandOptions.forEach((declared) => {
+      // Parsed keys are camelCase; normalise so commands built with raw kebab
+      // names still resolve, and mirror the value to the kebab key.
+      const camelName = toCamelCase(declared.name);
+      const opt = {
+        ...declared,
+        name: camelName,
+        alias: declared.alias ? toCamelCase(declared.alias) : declared.alias,
+      };
+
+      if (result[camelName] === undefined && result[declared.name] !== undefined) {
+        result[camelName] = result[declared.name];
+      }
+
       if (opt.defaultValue !== undefined) {
         const hasOption =
           result[opt.name] !== undefined || (opt.alias && result[opt.alias] !== undefined);
@@ -669,7 +672,7 @@ export class CLICommandsManager {
       displayCommandError(command.name, error as Error);
       // Persistent commands (dev/start) own their startup-failure exits;
       // by the time an error reaches here they've already entered their
-      // run loop, so it's a runtime error we log but don't crash on â€”
+      // run loop, so it's a runtime error we log but don't crash on —
       // HMR or process supervisors can recover. Non-persistent
       // one-shot commands always exit on failure.
       if (!command.isPersistent) {
@@ -787,7 +790,7 @@ export class CLICommandsManager {
     }
 
     // Initialize connectors.
-    // `connectors: true` only starts the early phase here â€” late-phase
+    // `connectors: true` only starts the early phase here — late-phase
     // connectors (http, socket) start after the command's action loads
     // app code. Explicit lists bypass phase splitting (caller knows
     // exactly which connectors they want).

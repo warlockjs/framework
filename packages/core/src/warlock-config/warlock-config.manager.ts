@@ -4,6 +4,7 @@ import { readFile, unlink, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "url";
 import { rootPath } from "../utils";
 import { type WarlockConfig } from "./types";
+import { getDeprecatedConfigWarnings } from "./warn-deprecated-config";
 
 /**
  * True when `error` is Node's "this runtime can't import a `.ts` file" error.
@@ -58,6 +59,11 @@ export class WarlockConfigManager {
     this.config = await this.loading;
     this.loading = undefined;
 
+    // Console, not the logger: this runs before any log channel exists.
+    for (const warning of getDeprecatedConfigWarnings(this.config)) {
+      console.warn(warning);
+    }
+
     return this.config;
   }
 
@@ -76,7 +82,9 @@ export class WarlockConfigManager {
       // configured a single channel, so a logger call here reaches nobody in
       // any application — the warning would be silently dropped exactly when
       // the user most needs it.
-      console.warn("warlock.config.ts is missing — run `warlock init` to create it");
+      console.warn(
+        "warlock.config.ts is missing — create it at the project root (see https://warlock.js.org/docs for the config reference)",
+      );
       return;
     }
 

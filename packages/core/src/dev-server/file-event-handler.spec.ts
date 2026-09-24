@@ -210,3 +210,75 @@ describe("FileEventHandler — ENOENT during an add is treated as a removal, not
     );
   });
 });
+
+describe("FileEventHandler — batches are serialized (C2:B11)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("does not start batch B while batch A is still in flight", async () => {
+    let releaseFirst!: () => void;
+    const updateFile = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise<boolean>((resolve) => (releaseFirst = () => resolve(true))))
+      .mockResolvedValue(true);
+
+    const handler = new FileEventHandler(
+      { updateFile, addFile: vi.fn(), updateFileDependents: vi.fn(), syncFilesToManifest: vi.fn() } as never,
+      { save: vi.fn().mockResolvedValue(undefined) } as never,
+      {} as never,
+      new Map() as never,
+    );
+
+    handler.handleFileChange(absolute("src/app/a.ts"));
+    await vi.advanceTimersByTimeAsync(12);
+    expect(updateFile).toHaveBeenCalledTimes(1);
+
+    handler.handleFileChange(absolute("src/app/b.ts"));
+    await vi.advanceTimersByTimeAsync(50);
+    expect(updateFile).toHaveBeenCalledTimes(1);
+
+    releaseFirst();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(updateFile).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("FileEventHandler — non-code include files", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("reports a changed .sql include as a restart trigger, outside the module graph", async () => {
+    const updateFile = vi.fn().mockResolvedValue(true);
+    const handler = new FileEventHandler(
+      { updateFile, addFile: vi.fn(), updateFileDependents: vi.fn(), syncFilesToManifest: vi.fn() } as never,
+      { save: vi.fn().mockResolvedValue(undefined) } as never,
+      {} as never,
+      new Map() as never,
+    );
+    handler.setIncludeMatcher((p) => p.startsWith("fixtures/"));
+
+    const batches: Array<{ changed: string[]; restartTriggers: string[] }> = [];
+    const listener = (batch: never) => batches.push(batch);
+    const subscription = events.on("dev-server:batch-complete", listener);
+
+    handler.handleFileChange(path.join(process.cwd(), "fixtures/seed.sql"));
+    await vi.advanceTimersByTimeAsync(50);
+
+    subscription.unsubscribe();
+
+    expect(updateFile).not.toHaveBeenCalled();
+    expect(batches[0]?.restartTriggers).toEqual(["fixtures/seed.sql"]);
+  });
+});

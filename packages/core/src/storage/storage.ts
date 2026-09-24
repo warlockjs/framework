@@ -179,6 +179,14 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @internal
    */
   protected loadDriversFromConfig(): void {
+    // `activeDriver` is a synchronous getter, so an async resolver can never be
+    // honoured. Fail loudly instead of silently ignoring it.
+    if (storageConfig("resolver")) {
+      throw new Error(
+        "storage.resolver is not supported: use storageDriverContext (per-request driver) for multi-tenant storage.",
+      );
+    }
+
     this.registerBuiltInLocalDriver();
 
     const drivers = storageConfig<Record<string, StorageDriverConfig>>("drivers", {});
@@ -595,11 +603,11 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
       throw new Error(`Failed to fetch file from URL: ${result.statusText}`);
     }
 
-    if (!result.contentType) {
+    if (!result.contentType && !putOptions.mimeType) {
       throw new Error(`Failed to fetch file from URL: missing content-type header`);
     }
 
-    const mimeType = putOptions.mimeType || result.contentType;
+    const mimeType = putOptions.mimeType || result.contentType || undefined;
 
     return this.put(result.buffer, location, { ...putOptions, mimeType });
   }
@@ -1104,7 +1112,9 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
       case "local":
         return {
           root: options.root,
+          prefix: options.prefix,
           urlPrefix: options.urlPrefix,
+          temporaryUrlPrefix: options.temporaryUrlPrefix,
           signatureKey: options.signatureKey,
         } satisfies LocalStorageDriverOptions;
 
@@ -1114,8 +1124,8 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
           ...options,
           bucket: options.bucket!,
           region: options.region!,
-          accessKeyId: options.accessKeyId!,
-          secretAccessKey: options.secretAccessKey!,
+          accessKeyId: options.accessKeyId,
+          secretAccessKey: options.secretAccessKey,
           endpoint: options.endpoint,
           urlPrefix: options.urlPrefix,
         } satisfies CloudStorageDriverOptions;
@@ -1130,8 +1140,8 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
           ...options,
           region: options.region || "auto",
           bucket: options.bucket!,
-          accessKeyId: options.accessKeyId!,
-          secretAccessKey: options.secretAccessKey!,
+          accessKeyId: options.accessKeyId,
+          secretAccessKey: options.secretAccessKey,
           endpoint: options.endpoint,
           urlPrefix: options.urlPrefix,
           accountId: options.accountId,
@@ -1144,8 +1154,8 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
           ...options,
           bucket: options.bucket!,
           region: options.region!,
-          accessKeyId: options.accessKeyId!,
-          secretAccessKey: options.secretAccessKey!,
+          accessKeyId: options.accessKeyId,
+          secretAccessKey: options.secretAccessKey,
           endpoint: options.endpoint,
           urlPrefix: options.urlPrefix,
         } satisfies CloudStorageDriverOptions;
@@ -1160,7 +1170,9 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @internal
    */
   protected validateCloudConfig(config: StorageDriverConfig, driverName: string): void {
-    const required = ["bucket", "accessKeyId", "secretAccessKey"];
+    // Credentials are optional: when absent, the AWS default provider chain
+    // applies (IAM roles, ECS task roles, IRSA, SSO profiles).
+    const required = ["bucket"];
 
     if (driverName !== "r2") {
       required.push("region");
@@ -1170,6 +1182,12 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
       if (!config[field as keyof StorageDriverConfig]) {
         throw new Error(`${driverName.toUpperCase()} driver requires "${field}" configuration`);
       }
+    }
+
+    if (Boolean(config.accessKeyId) !== Boolean(config.secretAccessKey)) {
+      throw new Error(
+        `${driverName.toUpperCase()} driver requires both "accessKeyId" and "secretAccessKey", or neither`,
+      );
     }
   }
 
@@ -1212,21 +1230,6 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
 
     this.drivers.set(name, driver);
     return driver;
-  }
-
-  /**
-   * Resolve the default driver name (supports async resolver for multi-tenancy)
-   * @internal
-   */
-  protected async resolveDefaultDriver(): Promise<StorageDriverName> {
-    const resolver = storageConfig("resolver");
-
-    if (resolver) {
-      const resolved = await resolver();
-      return resolved || this.defaultDriverName;
-    }
-
-    return this.defaultDriverName;
   }
 }
 

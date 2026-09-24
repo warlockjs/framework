@@ -130,6 +130,7 @@ export function superviseProductionProcess({
       clearTimeout(readinessNoticeTimer);
       process.off("SIGTERM", onSigterm);
       process.off("SIGINT", onSigint);
+      process.off("SIGHUP", onSighup);
 
       resolve(result);
     };
@@ -160,24 +161,34 @@ export function superviseProductionProcess({
       settle({ exitCode: 1, ready: false });
     });
 
-    // SIGTERM doesn't auto-propagate like SIGINT does on Windows.
-    const onSigterm = () => {
+    // Forward every stop signal so a supervisor that only signals this
+    // process (docker kill -s INT, systemd KillSignal) still stops the child.
+    // A repeated signal means the graceful shutdown is stuck: force-kill.
+    const forward = (signal: NodeJS.Signals) => () => {
       if (isShuttingDown) {
+        child.kill("SIGKILL");
         return;
       }
 
       isShuttingDown = true;
-      child.kill("SIGTERM");
+      child.kill(signal);
     };
 
+    const onSigterm = forward("SIGTERM");
+    const onSighup = forward("SIGHUP");
+
     // On Windows Ctrl+C reaches both processes, so the child already has it —
-    // we only record that this exit was asked for.
-    const onSigint = () => {
-      isShuttingDown = true;
-    };
+    // we only record that this exit was asked for (kill() there is a hard kill).
+    const onSigint =
+      process.platform === "win32"
+        ? () => {
+            isShuttingDown = true;
+          }
+        : forward("SIGINT");
 
     process.on("SIGTERM", onSigterm);
     process.on("SIGINT", onSigint);
+    process.on("SIGHUP", onSighup);
 
     // `close`, not `exit`: `exit` fires as soon as the OS process ends, which
     // can race ahead of the last chunks still in flight on the piped stdout/

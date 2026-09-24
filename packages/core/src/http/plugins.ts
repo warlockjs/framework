@@ -1,6 +1,8 @@
 import fastifyMultipart from "@fastify/multipart";
 import config from "@mongez/config";
 import type { FastifyRequest } from "fastify";
+import { log } from "@warlock.js/logger";
+import { router } from "../router";
 import { rootPath } from "../utils";
 import { buildCorsOptions } from "./build-cors-options";
 import { buildRateLimitOptions } from "./build-rate-limit-options";
@@ -13,6 +15,12 @@ export async function registerHttpPlugins(server: FastifyInstance) {
 
   if (rateLimitOptions) {
     server.register(import("@fastify/rate-limit"), rateLimitOptions);
+  } else if (router.list().some((route) => route.rateLimit)) {
+    log.warn(
+      "http",
+      "rateLimit",
+      "Routes declare `rateLimit`, but `http.rateLimit.enabled` is false so the rate-limit plugin is not registered: route rate limits (and their errorMessage) are inactive.",
+    );
   }
 
   // 👇🏻 register cors plugin

@@ -20,6 +20,7 @@ const makeRequest = (data: Record<string, unknown>) => {
 const makeResponse = () => {
   return {
     statusCode: 0,
+    send: vi.fn((payload: unknown, status?: number) => ({ sent: payload, status })),
     failedSchema: vi.fn((result: unknown) => ({ failed: result })),
     setStatusCode: vi.fn(function (this: { statusCode: number }, code: number) {
       this.statusCode = code;
@@ -75,7 +76,7 @@ describe("validateAll - schema validation", () => {
 });
 
 describe("validateAll - custom validate function", () => {
-  it("returns the result and leaves the status when validate fails with a status set", async () => {
+  it("sends the failure with the configured status (default 400) when validate fails (C1:B13)", async () => {
     const request = makeRequest({});
     const response = makeResponse();
 
@@ -89,8 +90,8 @@ describe("validateAll - custom validate function", () => {
 
     const result = await validateAll(validation as never, request as never, response as never);
 
-    expect(result).toBe(failure);
-    expect(response.setStatusCode).not.toHaveBeenCalled();
+    expect(response.send).toHaveBeenCalledWith(failure, 400);
+    expect(result).toEqual({ sent: failure, status: 400 });
   });
 
   it("passes through when the custom validate returns nothing", async () => {

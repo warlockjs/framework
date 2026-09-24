@@ -1,4 +1,3 @@
-import { type ServerOptions } from "node:http";
 import type { Server } from "socket.io";
 
 /**
@@ -18,7 +17,12 @@ export type SocketOptions = {
   /**
    * Socket.IO options
    */
-  options?: ServerOptions;
+  options?: Partial<import("socket.io").ServerOptions>;
+  /**
+   * TLS key/cert, used when the socket connector creates its own server
+   * (http not enabled in the project)
+   */
+  ssl?: { key: string | Buffer; cert: string | Buffer };
   /**
    * Adapter factory for multi-server broadcasting (e.g. `@socket.io/redis-adapter`).
    * See ./README.md.
