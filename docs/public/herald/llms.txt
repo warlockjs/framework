@@ -6,7 +6,7 @@
 
 ## Skills
 
-- [consume-message](@warlock.js/herald/consume-message/SKILL.md): Consume messages in @warlock.js/herald; use when you need to consume message.
+- [consume-message](@warlock.js/herald/consume-message/SKILL.md): (no description)
 - [herald-basics](@warlock.js/herald/herald-basics/SKILL.md): Start here for @warlock.js/herald event publishing, consumers, request-response messaging, and configuration.
-- [publish-message](@warlock.js/herald/publish-message/SKILL.md): Publish messages in @warlock.js/herald; use when you need to publish message.
-- [request-and-respond](@warlock.js/herald/request-and-respond/SKILL.md): Request-response over the bus in @warlock.js/herald; use when you need to request and respond.
+- [publish-message](@warlock.js/herald/publish-message/SKILL.md): (no description)
+- [request-and-respond](@warlock.js/herald/request-and-respond/SKILL.md): (no description)

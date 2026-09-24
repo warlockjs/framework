@@ -75,10 +75,20 @@ import { href } from "@warlock.js/web";
 const productUrl = href("products.show", { id: "42" });
 ```
 
-`href()` accepts a string name. `href("products.shoow", { id: "42" })`
-compiles, then throws at runtime with the known route names after the route
-table is published. Generated route-name and parameter types are not available
-in 5.17.
+During development and production builds, Warlock writes the discovered route
+table to `.warlock/typings/web-routes.d.ts`. Include that directory in the
+application TypeScript project. Once present, `href()` accepts only known page
+names and requires the parameters declared by the route:
+
+```ts
+href("products.show", { id: "42" });
+// href("products.shoow", { id: "42" }); // TypeScript error
+// href("products.show", {}); // TypeScript error: id is required
+```
+
+The generated file is an aid, not a security boundary. Before declarations
+exist (for example in a new checkout), names remain strings and `href()` still
+validates against the published route table at runtime.
 
 ## Cache public pages explicitly
 

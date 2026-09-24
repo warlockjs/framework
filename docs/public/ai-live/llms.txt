@@ -6,4 +6,4 @@
 
 ## Skills
 
-- [use-ai-live](@warlock.js/ai-live/use-ai-live/SKILL.md): Live rich-media — ai.video + ai.realtime (@warlock.js/ai-live) in @warlock.js/ai-live; use when you need to use ai live.
+- [use-ai-live](@warlock.js/ai-live/use-ai-live/SKILL.md): (no description)

@@ -125,14 +125,30 @@ still shows a fallback, and React doesn't unmount the whole tree.
 
 ## `web.streaming.deferTimeout`
 
+The root package exports the configuration types, so a single app-owned Web
+config can type streaming, crawler, sitemap, robots, locale, and error policy:
+
 ```ts title="warlock.config.ts"
+import type {
+  CrawlerDetectionOptions,
+  WebConfigurations,
+  WebStreamingConfigurations,
+} from "@warlock.js/web";
+
+const crawlerDetection: CrawlerDetectionOptions = {
+  userAgents: [/ExampleCrawler/i],
+};
+
+const streaming: WebStreamingConfigurations = {
+  crawlers: crawlerDetection,
+  deferTimeout: 15_000,
+};
+
 export default {
   web: {
-    streaming: {
-      deferTimeout: 15_000, // milliseconds; default 10000
-    },
+    streaming,
   },
-};
+} satisfies { web: WebConfigurations };
 ```
 
 The budget applies **per deferred key**, not per request — three deferred

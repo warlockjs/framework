@@ -6,8 +6,8 @@
 
 ## Skills
 
-- [evaluate-system-prompt](@warlock.js/ai-panoptic/evaluate-system-prompt/SKILL.md): Evaluate a trace's system prompt from the dashboard in @warlock.js/ai-panoptic; use when you need to evaluate system prompt.
-- [export-traces](@warlock.js/ai-panoptic/export-traces/SKILL.md): Export traces — the sink end of Panoptic in @warlock.js/ai-panoptic; use when you need to export traces.
-- [observe-with-panoptic](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md): Observe a run with Panoptic — the one-call subscriber in @warlock.js/ai-panoptic; use when you need to observe with panoptic.
-- [query-traces](@warlock.js/ai-panoptic/query-traces/SKILL.md): Query traces — the in-memory queryable store in @warlock.js/ai-panoptic; use when you need to query traces.
-- [use-local-dashboard](@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md): The local Panoptic dashboard — zero-setup trace viewing in @warlock.js/ai-panoptic; use when you need to use local dashboard.
+- [evaluate-system-prompt](@warlock.js/ai-panoptic/evaluate-system-prompt/SKILL.md): (no description)
+- [export-traces](@warlock.js/ai-panoptic/export-traces/SKILL.md): (no description)
+- [observe-with-panoptic](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md): (no description)
+- [query-traces](@warlock.js/ai-panoptic/query-traces/SKILL.md): (no description)
+- [use-local-dashboard](@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md): (no description)

@@ -6,8 +6,8 @@
 
 ## Skills
 
-- [configure-queue](@warlock.js/queue/configure-queue/SKILL.md): Configure the queue in @warlock.js/queue; use when you need to configure queue.
-- [define-jobs](@warlock.js/queue/define-jobs/SKILL.md): Define and dispatch jobs in @warlock.js/queue; use when you need to define jobs.
-- [manage-failed-jobs](@warlock.js/queue/manage-failed-jobs/SKILL.md): Failed jobs in @warlock.js/queue; use when you need to manage failed jobs.
+- [configure-queue](@warlock.js/queue/configure-queue/SKILL.md): (no description)
+- [define-jobs](@warlock.js/queue/define-jobs/SKILL.md): (no description)
+- [manage-failed-jobs](@warlock.js/queue/manage-failed-jobs/SKILL.md): (no description)
 - [overview](@warlock.js/queue/overview/SKILL.md): @warlock.js/queue overview for orientation and choosing the focused skill for the task.
-- [queue-notifications](@warlock.js/queue/queue-notifications/SKILL.md): Queue notifications with BullMQ in @warlock.js/queue; use when you need to queue notifications.
+- [queue-notifications](@warlock.js/queue/queue-notifications/SKILL.md): (no description)

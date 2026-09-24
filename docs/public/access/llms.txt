@@ -6,9 +6,9 @@
 
 ## Skills
 
-- [check-permissions](@warlock.js/access/check-permissions/SKILL.md): Check permissions in @warlock.js/access; use when you need to check permissions.
-- [configure-access](@warlock.js/access/configure-access/SKILL.md): Configure access in @warlock.js/access; use when you need to configure access.
-- [define-policies](@warlock.js/access/define-policies/SKILL.md): Define policies (ABAC) in @warlock.js/access; use when you need to define policies.
-- [implement-resolver](@warlock.js/access/implement-resolver/SKILL.md): Implement a resolver in @warlock.js/access; use when you need to implement resolver.
-- [manage-roles](@warlock.js/access/manage-roles/SKILL.md): Manage roles in @warlock.js/access; use when you need to manage roles.
+- [check-permissions](@warlock.js/access/check-permissions/SKILL.md): (no description)
+- [configure-access](@warlock.js/access/configure-access/SKILL.md): (no description)
+- [define-policies](@warlock.js/access/define-policies/SKILL.md): (no description)
+- [implement-resolver](@warlock.js/access/implement-resolver/SKILL.md): (no description)
+- [manage-roles](@warlock.js/access/manage-roles/SKILL.md): (no description)
 - [overview](@warlock.js/access/overview/SKILL.md): @warlock.js/access overview for orientation and choosing the focused skill for the task.

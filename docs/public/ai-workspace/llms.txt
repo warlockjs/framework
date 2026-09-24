@@ -6,5 +6,5 @@
 
 ## Skills
 
-- [build-loop-agent](@warlock.js/ai-workspace/build-loop-agent/SKILL.md): Build a build-loop agent — read → edit → run tests, until green in @warlock.js/ai-workspace; use when you need to build loop agent.
-- [use-a-workspace](@warlock.js/ai-workspace/use-a-workspace/SKILL.md): Use a workspace — a policy jail for an agent's filesystem + shell in @warlock.js/ai-workspace; use when you need to use a workspace.
+- [build-loop-agent](@warlock.js/ai-workspace/build-loop-agent/SKILL.md): (no description)
+- [use-a-workspace](@warlock.js/ai-workspace/use-a-workspace/SKILL.md): (no description)

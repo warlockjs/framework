@@ -68,6 +68,21 @@ A pattern like `/posts/:id` is not a URL.
 | `priority` | `0.0`–`1.0`. |
 | `alternates` | Language versions of this page. See [Alternates](#language-alternates) below. |
 
+## Images
+
+Set `images` to absolute HTTP(S) URLs for Google's image sitemap extension:
+
+```ts
+sitemap.add({
+  path: "/products/widget",
+  images: [{ loc: "https://cdn.example.com/widget.jpg" }],
+});
+```
+
+The image namespace is emitted only when an entry uses it. At most 1,000
+images are emitted for one URL. Extra images are dropped; configure
+`onImageLimitExceeded` in `SitemapOptions` to receive a route diagnostic.
+
 Both methods return `this`, so you can chain them. An entry the protocol can't
 represent throws `InvalidSitemapEntryError` from `add()`: a missing path, a
 priority outside `0.0`–`1.0`, an unknown `changefreq`, an invalid `Date`, or

@@ -8,7 +8,7 @@
 
 ---
 name: check-permissions
-description: "Check permissions in @warlock.js/access; use when you need to check permissions."
+description: 'Check permissions in `@warlock.js/access` — `can` / `cannot` / `canAll` / `canAny` (boolean), `authorize` / `authorizeAll` / `authorizeAny` (throw 403), and the `gate` / `gateAny` / `gateAll` route middleware. Class-level vs instance-level (pass a `resource` to run its policy). TRIGGER: `can(`, `authorize(`, `canAll`, `canAny`, `gate`, `gateAny`, `gateAll`, "check a permission", "protect route by permission", "403 forbidden", "any vs all permissions". Skip: ownership / tenant conditions — `@warlock.js/access/define-policies/SKILL.md`; role checks — `@warlock.js/access/manage-roles/SKILL.md`.'
 ---
 
 # Check permissions
@@ -83,7 +83,7 @@ await authorize(user, "orders.update", { resource: order, tenant }); // grant AN
 
 ---
 name: configure-access
-description: "Configure access in @warlock.js/access; use when you need to configure access."
+description: 'Configure `@warlock.js/access` — the REQUIRED `resolver` (the quickstart `DefaultAccessResolver` over a fixed code map vs the ejected, DB-backed `DatabaseAccessResolver`), `cache: { ttl }`, and the ambient tenant via the resolver''s optional `resolveTenant()`. TRIGGER: `AccessConfigurations`, `config.access`, `src/config/access.ts`, "set up permissions", "DefaultAccessResolver", "DatabaseAccessResolver", "access cache ttl", "access tenant". Skip: checking permissions — `@warlock.js/access/check-permissions/SKILL.md`; custom storage — `@warlock.js/access/implement-resolver/SKILL.md`.'
 ---
 
 # Configure access
@@ -176,7 +176,7 @@ The engine caches each user's resolved set (`cache.ttl`, default `10m`). Roles c
 
 ---
 name: define-policies
-description: "Define policies (ABAC) in @warlock.js/access; use when you need to define policies."
+description: 'ABAC conditions in `@warlock.js/access` — `definePolicy(permission, (user, resource, ctx) => boolean)` adds an instance-level rule (ownership / tenant / state) on top of the RBAC grant, evaluated when an authorization check carries a `resource`. TRIGGER: `definePolicy`, "ownership check", "only their own", "can edit this specific record", "ABAC", "policy", "resource-level permission", `authorize(user, perm, { resource })`. Skip: plain grant checks — `@warlock.js/access/check-permissions/SKILL.md`.'
 ---
 
 # Define policies (ABAC)
@@ -248,7 +248,7 @@ definePolicy("orders.refund", (user, order, ctx) =>
 
 ---
 name: implement-resolver
-description: "Implement a resolver in @warlock.js/access; use when you need to implement resolver."
+description: 'Connect `@warlock.js/access` to your role/permission storage by implementing the `AccessResolver` contract (`resolveRoles` / `resolvePermissions`, optional `resolveTenant`) — for a DB-backed catalog, a user column, a pivot table, a token claim, or an external directory. The engine owns matching / caching / policies; the resolver only fetches. TRIGGER: `AccessResolver`, `DatabaseAccessResolver`, `resolveTenant`, "custom resolver", "where do roles come from", "roles in a token claim", "permissions from an external API", "implement resolver". Skip: the quickstart `DefaultAccessResolver` — `@warlock.js/access/configure-access/SKILL.md`.'
 ---
 
 # Implement a resolver
@@ -358,7 +358,7 @@ class DirectResolver implements AccessResolver {
 
 ---
 name: manage-roles
-description: "Manage roles in @warlock.js/access; use when you need to manage roles."
+description: 'Assign and read roles in `@warlock.js/access` — the ejected `UserRole.assign` / `UserRole.revoke` (the `user_roles` table) followed by `access.flush`, plus `hasRole` / `hasAnyRole` / `hasAllRoles`. The role→permission catalog is the ejected `Role` table (dynamic). TRIGGER: `UserRole.assign`, `UserRole.revoke`, `access.flush`, `hasRole`, `hasAnyRole`, `hasAllRoles`, `Role` table, "give a user a role", "assign role", "check a user role", "roles per tenant". Skip: permission checks — `@warlock.js/access/check-permissions/SKILL.md`; resolver choice — `@warlock.js/access/configure-access/SKILL.md`.'
 ---
 
 # Manage roles

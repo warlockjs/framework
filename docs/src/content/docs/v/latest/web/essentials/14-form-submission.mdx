@@ -26,6 +26,14 @@ It needs `@mongez/http:^3.5.0` and `@mongez/react-form:^4.0.0`. By default it us
 
 Pass exactly one of `route` or `path`. A named route uses its server-declared method; a direct `path` defaults to `POST` and accepts `method`. Use `params` for path segments and `query` for URL parameters. GET and HEAD send form values as query data; other requests send native `FormData`.
 
+Named API routes are captured in the same generated declaration file as page
+routes. With `.warlock/typings/web-routes.d.ts` included in the app TypeScript
+project, `route` and `params` are checked against the registered API route.
+The browser receives only each API route's name, path, and method; it never
+receives handlers, schemas, or server policy. An API route registered with
+method `"all"` does not prevent boot, but cannot be submitted by name: choose
+an explicit `path` and `method` instead.
+
 The hook returns `submit`, `data`, `error`, `response`, `isLoading`, `formErrors`, `reset`, and `cancel`. Data, error, and response begin as `null`; loading begins as `false` and form errors as an empty array. Lifecycle callbacks receive the full `HttpResult`. `beforeSubmit` may return `false` to cancel before a request. Duplicate calls share the pending promise; cancellation and unmount prevent stale state updates. `reset()` clears results and errors assigned by the hook without clearing form values or cancelling an active request.
 
 Validation field mapping is enabled by default. Matching fields receive server errors, while unknown field names and general errors are collected in `formErrors`. Disable it with `mapFieldErrors: false`, or supply a mapper returning field-message pairs.

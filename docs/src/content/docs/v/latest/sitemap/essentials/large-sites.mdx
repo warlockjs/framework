@@ -55,6 +55,19 @@ site is small enough for [`Sitemap`](/v/latest/sitemap/essentials/standalone/).
 | `maxBytesPerFile` | `50 * 1024 * 1024` | The uncompressed byte limit per shard, with the same protocol limit. |
 | `changefreq` / `priority` / `lastmod` | — | Defaults for every entry, as with `Sitemap`. |
 
+`shardPathPrefix` changes the public URL directory written into the master
+index without changing where `saveTo()` writes shards. Use it when a proxy or
+generation-aware route exposes the files elsewhere:
+
+```ts
+const index = new SitemapIndex({
+  baseUrl: "https://example.com",
+  shardPathPrefix: "sitemaps/generation-42",
+});
+```
+
+It accepts safe URL path segments and does not move, rename, or publish files.
+
 ## Sources are factories
 
 `addSource(factory)` and `addSource(key, factory)` take a **function** that

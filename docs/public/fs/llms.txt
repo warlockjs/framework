@@ -6,9 +6,9 @@
 
 ## Skills
 
-- [hash-files](@warlock.js/fs/hash-files/SKILL.md): Compute file and content hashes in @warlock.js/fs; use when you need to hash files.
-- [manage-directories](@warlock.js/fs/manage-directories/SKILL.md): Manage directories and files on disk in @warlock.js/fs; use when you need to manage directories.
+- [hash-files](@warlock.js/fs/hash-files/SKILL.md): (no description)
+- [manage-directories](@warlock.js/fs/manage-directories/SKILL.md): (no description)
 - [overview](@warlock.js/fs/overview/SKILL.md): @warlock.js/fs overview for orientation and choosing the focused skill for the task.
-- [read-and-write-files](@warlock.js/fs/read-and-write-files/SKILL.md): Read and write files in @warlock.js/fs; use when you need to read and write files.
-- [use-the-fs-facade](@warlock.js/fs/use-the-fs-facade/SKILL.md): @warlock.js/fs — the fs shorthand facade in @warlock.js/fs; use when you need to use the fs facade.
-- [write-atomically](@warlock.js/fs/write-atomically/SKILL.md): Atomic file writes in @warlock.js/fs; use when you need to write atomically.
+- [read-and-write-files](@warlock.js/fs/read-and-write-files/SKILL.md): (no description)
+- [use-the-fs-facade](@warlock.js/fs/use-the-fs-facade/SKILL.md): (no description)
+- [write-atomically](@warlock.js/fs/write-atomically/SKILL.md): (no description)

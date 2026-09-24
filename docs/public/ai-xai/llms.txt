@@ -6,4 +6,4 @@
 
 ## Skills
 
-- [setup-xai](@warlock.js/ai-xai/setup-xai/SKILL.md): @warlock.js/ai-xai in @warlock.js/ai-xai; use when you need to set up xai.
+- [setup-xai](@warlock.js/ai-xai/setup-xai/SKILL.md): (no description)

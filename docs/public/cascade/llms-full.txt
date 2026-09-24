@@ -8,7 +8,7 @@
 
 ---
 name: aggregate-data
-description: "Use aggregates and groupBy in @warlock.js/cascade; use when you need to aggregate data."
+description: 'Compute aggregates over a query — scalar `.count()` / `.sum(field)` / `.avg` / `.min` / `.max`, plus grouped rollups via the two-arg `.groupBy(fields, { alias: $agg.* })`, portable date-bucketing via `.groupByDate(col, unit, aggregates?)`, the `$agg` helpers (including expression-aware `$agg.sum($expr.mul("price","quantity"))` / `$agg.sumRaw`), and `.having(alias, op, value)` on computed aggregates, plus MongoDB pipeline stages `.unwind(field, options?)` / `.addFields(fields)` / pipeline-form `join()` (`UnsupportedQueryOperationError` on Postgres). Triggers: `.unwind`, `.addFields`, `.joinRaw`, `.raw`, `$unwind`, `$lookup`, `.count`, `.sum`, `.avg`, `.min`, `.max`, `.groupBy`, `.groupByDate`, `.having`, `$agg`, `$agg.sum`, `$agg.sumRaw`, `$agg.count`, `$expr`, `$expr.mul`, `$expr.col`, `$expr.lit`; "monthly revenue report", "revenue per month", "X per category", "group by status", "sum price times quantity", "dashboard rollup"; typical import `import { Model, $agg, $expr } from "@warlock.js/cascade"`. Skip: row queries — `@warlock.js/cascade/query-data/SKILL.md`; cached aggregates — `@warlock.js/cache/use-cached-hof/SKILL.md`; competing tools raw SQL `GROUP BY`, `mongoose aggregate`, `prisma` `groupBy`.'
 ---
 
 # Use aggregates and groupBy
@@ -177,7 +177,7 @@ Raw stages: `joinRaw({ $lookup: { from, let, pipeline, as } })` (or an array of 
 
 ---
 name: alter-migration
-description: "Alter a migration in @warlock.js/cascade; use when you need to alter migration."
+description: 'Evolve an existing table with `Migration.alter(Model, schema, options?)` — add/drop/rename/modify columns; add/drop regular, unique, expression, full-text, geo, vector, and TTL indexes; add/drop foreign keys and CHECK constraints; write rollbacks with class-form methods in `down()`. Triggers: "alter a table", "add a column to existing table", "drop a column", "rename a column", "add an index", "drop a unique constraint", "change a column type", `Migration.alter`, `dropUnique`, `addIndex`, `addForeign`. Skip: creating a brand-new table — `@warlock.js/cascade/write-migration/SKILL.md`.'
 ---
 
 # Alter a migration
@@ -813,7 +813,7 @@ const page = await User.paginate({ page: 1, limit: 20 });
 
 ---
 name: configure-delete-strategy
-description: "Use delete strategies in @warlock.js/cascade; use when you need to configure delete strategy."
+description: 'Pick the delete behavior — `permanent` (hard delete), `soft` (set `deletedAt`, keep the row), `trash` (move to a separate table). Configure via `static deleteStrategy` or `.destroy({ strategy })`; restore via static `Model.restore(id)` / `Model.restoreAll()`. Triggers: `static deleteStrategy`, `.destroy`, `Model.restore`, `Model.restoreAll`, `deletedAtColumn`, `trashTable`; "soft delete users", "restore a deleted record", "GDPR hard delete"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: lifecycle events — `@warlock.js/cascade/subscribe-to-model-events/SKILL.md`; competing libs `mongoose-delete`, `typeorm softRemove`, `sequelize` paranoid.'
 ---
 
 # Use delete strategies
@@ -947,7 +947,7 @@ See [`@warlock.js/cascade/subscribe-to-model-events/SKILL.md`](@warlock.js/casca
 
 ---
 name: define-model
-description: "Define a model in @warlock.js/cascade; use when you need to define model."
+description: 'Define a Cascade model — `@RegisterModel()`, class extends `Model<TSchema>`, `static table`, `static schema`, three update idioms (`.set` / `.merge` / `.save`), `.unset`, `.destroy`, `static toJsonColumns` / `resource` / `static hidden` for output shaping. Covers write safety: `static hidden` fields are ALWAYS stripped from `toJSON()` regardless of `resource`/`toJsonColumns`, cascade warns once per model on an unhidden credential-shaped field, and `merge()` on a persisted model drops identity columns so request data can never retarget an `update()`/`destroy()` at another row. Triggers: `Model`, `RegisterModel`, `static schema`, `.set`, `.merge`, `.save`, `.unset`, `.destroy`, `toJsonColumns`, `resource`, `hidden`, `trustedPrimaryKey`; "how do I define a model", "shape the JSON output", "remove a field", "hide password from response", "prevent id in request body overwriting another row"; typical import `import { Model, RegisterModel } from "@warlock.js/cascade"`. Skip: querying — `@warlock.js/cascade/query-data/SKILL.md`; relations — `@warlock.js/cascade/define-relations/SKILL.md`; competing libs `mongoose`, `prisma`, `typeorm` `@Entity`.'
 ---
 
 # Define a model
@@ -1156,7 +1156,7 @@ export class User extends Model<UserSchema> {
 
 ---
 name: define-relations
-description: "Define and query relations in @warlock.js/cascade; use when you need to define relations."
+description: 'Define and query relations — `@BelongsTo` / `@HasMany` / `@BelongsToMany`, `.with("relation")` eager loading, `.whereHas(relation, cb)` filter-by-related, `setRelation` on save, `.joinWith` for SQL joins, `loadRelation`, `lazy(() => Model)`. Triggers: `@BelongsTo`, `@HasMany`, `@BelongsToMany`, `.with`, `.whereHas`, `setRelation`, `.joinWith`, `lazy`; "define a relation", "avoid N+1", "eager load posts", "filter parents by child"; typical import `import { BelongsTo, HasMany, BelongsToMany } from "@warlock.js/cascade"`. Skip: model basics — `@warlock.js/cascade/define-model/SKILL.md`; competing libs `mongoose populate`, `prisma include`, `typeorm relations`.'
 ---
 
 # Define and query relations
@@ -1331,7 +1331,7 @@ For embedded/denormalized relations (cached `author_name` on posts, etc.), Casca
 
 ---
 name: manage-data-sources
-description: "Manage data sources in @warlock.js/cascade; use when you need to manage data sources."
+description: 'Configure multiple databases — register each via `connectToDatabase({ name, driver, database, isDefault })`, assign a model with `static dataSource = "name"`, route a migration with `dataSource` on the migration class, inspect via `dataSourceRegistry.get(name)` / `getAllDataSources()`. The first (or `isDefault: true`) source is the default. Triggers: `connectToDatabase`, `dataSourceRegistry`, `dataSourceRegistry.get`, `getAllDataSources`, `static dataSource`; "multi-database app", "per-tenant DB", "analytics on separate DB"; typical import `import { connectToDatabase, dataSourceRegistry } from "@warlock.js/cascade"`. Skip: per-source migrations — `@warlock.js/cascade/write-migration/SKILL.md`; transaction scope — `@warlock.js/cascade/manage-transactions/SKILL.md`; competing patterns `mongoose.createConnection`, `typeorm` `DataSource`, `prisma` multi-schema.'
 ---
 
 # Manage data sources
@@ -1475,7 +1475,7 @@ There is no `has(name)` / `list()` / `setDefault()` — guard with a `try/catch`
 
 ---
 name: manage-transactions
-description: "Use transactions in @warlock.js/cascade; use when you need to manage transactions."
+description: 'Wrap multi-statement work in `transaction(async () => {...})` — rollback on throw, commit on resolve, optional `isolation` level (Postgres), per-`dataSource` scope. Also the home for row locking (`lockForUpdate({ skipLocked })` → `SELECT ... FOR UPDATE [SKIP LOCKED | NOWAIT]`, Postgres-only), transaction-aware raw SQL (`Model.raw` / `DataSource.raw` → `RawQueryResult`) and Postgres native-array column handling (`JSONB[]` / `TEXT[]` / `INTEGER[]` auto-detected via schema introspection on connect; `nativeArrayColumns` is an optional override). Postgres native; MongoDB requires replica set. Triggers: `transaction`, `isolation`, `SERIALIZABLE`, `READ COMMITTED`, nested transaction, flat nesting, nested savepoints, `lockForUpdate`, `skipLocked`, `FOR UPDATE`, `SKIP LOCKED`, `NOWAIT`, row lock, pessimistic lock, queue claim, `Model.raw`, `DataSource.raw`, raw SQL, `RawQueryResult`, `nativeArrayColumns`, `JSONB[]`, `TEXT[]`; "wrap two writes atomically", "transfer balance between accounts", "rollback on error", "MongoDB replica set transactions", "lock rows so workers don''t double-process", "claim jobs from a table", "run raw SQL", "native array column", "malformed array literal", "array column not saving", "nested transaction not visible", "foreign key violation on insert inside transaction", "service transaction inside seeder"; typical import `import { transaction } from "@warlock.js/cascade"`. Skip: single-row atomic ops without a transaction — `@warlock.js/cascade/perform-atomic-ops/SKILL.md`; per-source scope — `@warlock.js/cascade/manage-data-sources/SKILL.md`; competing patterns `mongoose.startSession`, `pg` `BEGIN` manually, `prisma.$transaction`, `typeorm` `QueryRunner`.'
 ---
 
 # Use transactions
@@ -1653,6 +1653,23 @@ connectToDatabase({
 
 For "side effects must only happen if the transaction succeeded" (publish to a queue, send an email, write to a search index), don't run them inside the transaction. Use the outbox pattern: write a row to an outbox table inside the transaction, dispatch from the outbox in a separate worker after commit.
 
+## Run side effects after commit — `afterCommit(fn)`
+
+Model events (`saved`, `created`, `updated`, `deleted`) fire **inside** the transaction, before COMMIT. For a side effect that must see committed data (cache clear, sitemap regeneration, email, webhook), queue it with `afterCommit`:
+
+```ts
+import { afterCommit } from "@warlock.js/cascade";
+
+Product.events().onSaved(() => afterCommit(() => regenerateSitemap()));
+```
+
+- **Inside a transaction:** `fn` is queued and runs after the **outermost** COMMIT, in order, awaited one by one. Discarded on rollback or a failed COMMIT.
+- **Outside a transaction:** runs on the next microtask (the caller does not await it).
+- **Errors** are logged and never change the transaction result or stop the remaining callbacks.
+- Callbacks run after the transaction context has exited, so DB work inside them is **not** part of the finished transaction.
+
+Use the outbox pattern above instead when the side effect must survive a crash between COMMIT and the callback — `afterCommit` is in-memory.
+
 ## Things NOT to do
 
 - Don't call external APIs (HTTP, queues, file writes) inside a transaction. Long-running side effects extend the lock; failures don't roll back the external call.
@@ -1670,7 +1687,7 @@ For "side effects must only happen if the transaction succeeded" (publish to a q
 
 ---
 name: paginate-results
-description: "Paginate results in @warlock.js/cascade; use when you need to paginate results."
+description: 'Paginate query results — `.paginate({page, limit, filter?})` for offset (returns `data` + `pagination` total/page/limit/pages), `.cursorPaginate({limit, cursor})` for very large datasets, `.chunk(size, callback)` for streaming. Triggers: `.paginate`, `.cursorPaginate`, `.chunk`, `nextCursor`, `hasMore`, `pagination.total`; "paginate the list", "infinite scroll / load more", "stream a large table", "page 2 of users"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: filter chain — `@warlock.js/cascade/query-data/SKILL.md`; eager loading on pages — `@warlock.js/cascade/define-relations/SKILL.md`; competing libs `mongoose-paginate-v2`, `prisma` cursor, `typeorm-pagination`.'
 ---
 
 # Paginate results
@@ -1796,7 +1813,7 @@ The total count requires an extra query. On very large filtered tables, this can
 
 ---
 name: perform-atomic-ops
-description: "Use atomic operations in @warlock.js/cascade; use when you need to perform atomic ops."
+description: 'Avoid races on concurrent writes — `Model.increase(filter, field, n)` / `Model.decrease` for atomic counters, `Model.atomic(filter, ops, options?)` for arbitrary mutations (`$set` / `$inc` / `$push` / `$pull` / `$addToSet` / `$setOnInsert`, pipeline updates, `upsert`, `returnDocument`, `arrayFilters`, `trustedFilter`), `Model.createMany` / `Model.findAndUpdate` / `Model.delete` for bulk. `atomic()` / `findAndUpdate()` / `findOneAndUpdate()` / `findAndReplace()` / `findOneAndDelete()` sanitize their `filter` argument — `$`-prefixed keys throw `UnsafeFilterError`, same check as `where()`. Triggers: `Model.increase`, `Model.decrease`, `Model.atomic`, `Model.createMany`, `createMany bulk`, `batchSize`, `Model.findAndUpdate`, `Model.findOneAndUpdate`, `Model.findAndReplace`, `Model.findOneAndDelete`, `Model.delete`, `$inc`, `$set`, `UnsafeFilterError`, `UnsupportedUpdateOperationError`, `upsert`, `returnDocument`, `$setOnInsert`; "upsert a counter", "reserve quota atomically", "increment counter under concurrency", "bulk insert without N+1", "fast bulk insert", "insert thousands of rows", "atomic update without loading", "is atomic() safe with a request body filter"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: multi-row atomicity — `@warlock.js/cascade/manage-transactions/SKILL.md`; competing patterns `mongoose findOneAndUpdate`, `pg` `UPDATE ... SET x = x + 1`.'
 ---
 
 # Use atomic operations
@@ -1956,7 +1973,7 @@ for (const user of targets) {
 
 ---
 name: query-data
-description: "Query data in @warlock.js/cascade; use when you need to query data."
+description: 'Query records via the model — `.where(field, value)` / `.where(field, op, value)`, `.find(id)` / `.first` / `.all`, `.orderBy`, `.count` / `.exists`, `.lean()` plain-object reads, plus `.whereIn` / `.whereBetween` / `.whereLike` / `.pluck` / `.firstOrFail` / scopes via `addScope`. Covers filter safety: `where()` rejects `$`-prefixed keys (`UnsafeFilterError`), `whereRaw()` string form rejects `$where`/`$function`/`$accumulator` (`UnsafeRawExpressionError`), and `whereLike`/`whereStartsWith`/`whereEndsWith`/`whereSearch` match string arguments literally (pass a `RegExp` for pattern semantics). Triggers: `.where`, `.find`, `.first`, `.firstOrFail`, `.all`, `.get`, `.orderBy`, `.exists`, `.whereIn`, `.whereBetween`, `.whereLike`, `.whereRaw`, `.lean`, `UnsupportedLeanOperationError`, `addScope`, `escapeRegex`, `likePatternToRegexSource`, `UnsafeFilterError`, `UnsafeRawExpressionError`; "filter by status", "find by id", "fetch active users", "check existence", "search box query", "is where() safe from injection"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: pagination — `@warlock.js/cascade/paginate-results/SKILL.md`; aggregates — `@warlock.js/cascade/aggregate-data/SKILL.md`.'
 ---
 
 # Query data
@@ -2173,7 +2190,7 @@ const activeUsers = await User.query().scope("active").get();
 
 ---
 name: run-cascade-cli
-description: "Run the cascade CLI / Operations API in @warlock.js/cascade; use when you need to run cascade cli."
+description: 'Cascade''s standalone `cascade` binary + the Operations API it wraps — `cascade migrate` / `migrate:list` / `migrate:rollback` / `migrate:export-sql`, and `runMigrations` / `rollbackMigrations` / `freshMigrate` / `exportMigrationsSQL` / `listExecutedMigrations` / `createDatabase` / `dropAllTables` / `migrationRunner`. Triggers: `cascade migrate`, `migrate:list`, `migrate:rollback`, `migrate:export-sql`, `runMigrations`, `rollbackMigrations`, `freshMigrate`, `exportMigrationsSQL`, `listExecutedMigrations`, `migrationRunner`; "run migrations in deploy/CI", "reset DB for tests", "programmatic migration", "foreign key constraint cannot be implemented", `CASCADE_PRIMARY_KEY`; typical import `import { runMigrations, migrationRunner } from "@warlock.js/cascade"`. Skip: writing migration files — `@warlock.js/cascade/write-migration/SKILL.md`; competing tools `knex migrate:latest`, `prisma migrate deploy`, `typeorm migration:run`.'
 ---
 
 # Run the cascade CLI / Operations API
@@ -2302,7 +2319,7 @@ Reach for these when you need migrations inside test setup (`beforeAll(async () 
 
 ---
 name: search-by-vector
-description: "Use vector search in @warlock.js/cascade; use when you need to search by vector."
+description: 'Vector similarity search via `.similarTo(column, embedding, alias?)` — adds a similarity `score` column and orders by vector distance so the index is used; cap results with `.limit()`. Postgres uses pgvector (IVFFlat index via `this.vectorIndex`); MongoDB needs Atlas. Schema: `this.vector(column, dimensions)` + `this.vectorIndex(column, { dimensions, similarity })`. Triggers: `.similarTo`, `this.vector`, `this.vectorIndex`, `.whereFullText`, pgvector; "semantic search", "RAG retrieval", "find similar articles", "hybrid vector + full-text"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: query basics — `@warlock.js/cascade/query-data/SKILL.md`; semantic cache — `@warlock.js/cache/use-cache-similarity/SKILL.md`; competing libs `pgvector` directly, `chromadb`, `pinecone`, `weaviate`, `qdrant`.'
 ---
 
 # Use vector search
@@ -2433,7 +2450,7 @@ For local dev with MongoDB, develop the vector path against Postgres + pgvector.
 
 ---
 name: subscribe-to-model-events
-description: "Use model events in @warlock.js/cascade; use when you need to subscribe to model events."
+description: 'Hook into model lifecycle events — `saving` / `saved`, `creating` / `created`, `updating` / `updated`, `validating` / `validated`, `deleting` / `deleted`, `restoring` / `restored`, `fetching` / `fetched`. Per-model `Model.on(event, fn)` or global via `Model.globalEvents()`. Triggers: `Model.on`, `Model.off`, `saving`, `saved`, `created`, `updated`, `deleting`, `deleted`, `restored`; "audit log on save", "notify on change", "denormalize into search index"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: dirty tracking — `@warlock.js/cascade/track-changes/SKILL.md`; competing libs `mongoose` middleware, `typeorm` subscribers, `prisma` extensions.'
 ---
 
 # Use model events
@@ -2585,7 +2602,7 @@ For external side effects (queues, emails) that must only fire if a surrounding 
 
 ---
 name: track-changes
-description: "Track changes in @warlock.js/cascade; use when you need to track changes."
+description: 'Inspect a model''s pending changes — `hasChanges()` (any field dirty?), `isDirty(column)` (one column), `getDirtyColumns()` (changed field names), `getDirtyColumnsWithValues()` (old + new per field), `getRemovedColumns()` (unset fields). Triggers: `hasChanges`, `isDirty`, `getDirtyColumns`, `getDirtyColumnsWithValues`, `getRemovedColumns`; "only run if email changed", "diff for an audit log", "what fields are dirty", "compare old vs new value"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: hooking into save — `@warlock.js/cascade/subscribe-to-model-events/SKILL.md`; update idioms — `@warlock.js/cascade/define-model/SKILL.md`; competing libs `mongoose` `isModified` / `modifiedPaths`, `typeorm` change detection.'
 ---
 
 # Track changes
@@ -2716,7 +2733,7 @@ Before 4.9.1 a `Date` merged over a column that **already held a `Date`** was si
 
 ---
 name: write-migration
-description: "Write a migration in @warlock.js/cascade; use when you need to write migration."
+description: 'Write a Cascade migration — the declarative `Migration.create(Model, { columns })` / `Migration.alter(Model, { ... })` factory is the primary form (column helpers `string` / `text` / `uuid` / `integer` imported from cascade, chained with `.notNullable()` / `.unique()` / `.references()`); the `extends Migration` class form is the imperative escape hatch. Run with the `cascade migrate` CLI; pin a source via `public dataSource`. Triggers: `Migration.create`, `Migration.alter`, `string()`, `text()`, `uuid()`, `.references`, `extends Migration`, `cascade migrate`; "write a migration", "create the users table", "add a column", "rollback the last batch"; typical import `import { Migration, text, uuid } from "@warlock.js/cascade"`. Skip: running migrations programmatically — `@warlock.js/cascade/run-cascade-cli/SKILL.md`; per-source migrations — `@warlock.js/cascade/manage-data-sources/SKILL.md`; competing tools `knex migrate`, `prisma migrate`, `typeorm migration`.'
 ---
 
 # Write a migration

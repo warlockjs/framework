@@ -7,14 +7,14 @@
 ## Skills
 
 - [capture-unhandled-errors](@warlock.js/logger/capture-unhandled-errors/SKILL.md): (no description)
-- [configure-logger](@warlock.js/logger/configure-logger/SKILL.md): Setup — registering channels at startup in @warlock.js/logger; use when you need to configure logger.
+- [configure-logger](@warlock.js/logger/configure-logger/SKILL.md): (no description)
 - [filter-log-entries](@warlock.js/logger/filter-log-entries/SKILL.md): (no description)
 - [flush-logs-on-shutdown](@warlock.js/logger/flush-logs-on-shutdown/SKILL.md): (no description)
 - [logger-basics](@warlock.js/logger/logger-basics/SKILL.md): Start here for @warlock.js/logger channels, structured entries, transports, and application logging setup.
 - [overview](@warlock.js/logger/overview/SKILL.md): (no description)
 - [pick-log-channel](@warlock.js/logger/pick-log-channel/SKILL.md): (no description)
-- [redact-sensitive-log-fields](@warlock.js/logger/redact-sensitive-log-fields/SKILL.md): Redaction — keeping secrets out of logs in @warlock.js/logger; use when you need to redact sensitive log fields.
+- [redact-sensitive-log-fields](@warlock.js/logger/redact-sensitive-log-fields/SKILL.md): (no description)
 - [ship-logs-to-sentry](@warlock.js/logger/ship-logs-to-sentry/SKILL.md): (no description)
-- [test-logging-code](@warlock.js/logger/test-logging-code/SKILL.md): Testing — code that logs, and asserting on log output in @warlock.js/logger; use when you need to test logging code.
-- [use-log-helpers](@warlock.js/logger/use-log-helpers/SKILL.md): Helpers — assert, timer in @warlock.js/logger; use when you need to use log helpers.
+- [test-logging-code](@warlock.js/logger/test-logging-code/SKILL.md): (no description)
+- [use-log-helpers](@warlock.js/logger/use-log-helpers/SKILL.md): (no description)
 - [write-custom-log-channel](@warlock.js/logger/write-custom-log-channel/SKILL.md): (no description)

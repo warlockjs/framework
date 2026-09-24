@@ -6,12 +6,12 @@
 
 ## Skills
 
-- [bridge-standard-schema](@warlock.js/seal/bridge-standard-schema/SKILL.md): The Standard Schema bridge in @warlock.js/seal; use when you need to bridge standard schema.
-- [compose-seal-modifiers](@warlock.js/seal/compose-seal-modifiers/SKILL.md): Cross-cutting modifiers + the pipeline in @warlock.js/seal; use when you need to compose seal modifiers.
-- [define-structural-shape](@warlock.js/seal/define-structural-shape/SKILL.md): Structural validators — picking guide in @warlock.js/seal; use when you need to define structural shape.
-- [extend-seal-with-plugins](@warlock.js/seal/extend-seal-with-plugins/SKILL.md): Extend seal with plugins in @warlock.js/seal; use when you need to extend seal with plugins.
-- [generate-json-schema](@warlock.js/seal/generate-json-schema/SKILL.md): JSON Schema generation in @warlock.js/seal; use when you need to generate json schema.
-- [handle-seal-errors](@warlock.js/seal/handle-seal-errors/SKILL.md): ValidationResult — reading errors in @warlock.js/seal; use when you need to handle seal errors.
+- [bridge-standard-schema](@warlock.js/seal/bridge-standard-schema/SKILL.md): (no description)
+- [compose-seal-modifiers](@warlock.js/seal/compose-seal-modifiers/SKILL.md): (no description)
+- [define-structural-shape](@warlock.js/seal/define-structural-shape/SKILL.md): (no description)
+- [extend-seal-with-plugins](@warlock.js/seal/extend-seal-with-plugins/SKILL.md): (no description)
+- [generate-json-schema](@warlock.js/seal/generate-json-schema/SKILL.md): (no description)
+- [handle-seal-errors](@warlock.js/seal/handle-seal-errors/SKILL.md): (no description)
 - [overview](@warlock.js/seal/overview/SKILL.md): @warlock.js/seal overview for orientation and choosing the focused skill for the task.
-- [pick-seal-primitive](@warlock.js/seal/pick-seal-primitive/SKILL.md): Picking the right primitive in @warlock.js/seal; use when you need to choose seal primitive.
+- [pick-seal-primitive](@warlock.js/seal/pick-seal-primitive/SKILL.md): (no description)
 - [seal-basics](@warlock.js/seal/seal-basics/SKILL.md): Start here for @warlock.js/seal schemas, validation, parsing, and typed structural contracts.

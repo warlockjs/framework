@@ -20,6 +20,12 @@ A connector is the **wrong** shape for per-request work (use middleware), config
 
 ## The shape
 
+When Web is configured, `ConnectorBuildContext.namedApiRoutes` is also a fresh
+readonly registration snapshot. Its records contain only `name`, `path`, and
+`method`, which makes it suitable for generated browser declarations; it never
+includes handlers, middleware, schemas, or source paths. It is absent for a
+Core-only app.
+
 ```ts title="src/connectors/queue-worker-connector.ts"
 import {
   BaseConnector,

@@ -41,34 +41,50 @@ files are optional and `warlock dev` detects their add/edit/delete changes.
 
 ## Type loader data into the page
 
-```tsx title="src/web/products/[id].page.tsx"
-import type { PageConfig, PageLoader, PageProps } from "@warlock.js/web";
+```tsx title="src/web/products/[id].setup.ts"
+import { v } from "@warlock.js/seal";
+import type { PageConfig, PageLoaderContext, PageProps } from "@warlock.js/web";
 
-export const loader = (async ({ request }) => {
+const productParams = v.object({ id: v.string() });
+
+export const config = {
+  route: { path: "/products/:id", name: "products.show" },
+  validation: { params: productParams },
+  cache: { public: true, maxAge: 60 },
+} satisfies PageConfig;
+
+export async function loader(
+  { request }: PageLoaderContext<typeof config.validation, typeof config.route>,
+) {
   const id = request.input("id");
 
   return {
     product: { id, name: `Product ${id}` },
   };
-}) satisfies PageLoader;
+}
 
-export const config: PageConfig<typeof loader> = {
-  route: { path: "/products/:id", name: "products.show" },
-  cache: { public: true, maxAge: 60 },
-  metadata: ({ data }) => ({
-    title: data.product.name,
-    description: `Details for ${data.product.name}`,
-  }),
-};
+export const metadata = ({ data }: PageProps<typeof loader>) => ({
+  title: data.product.name,
+  description: `Details for ${data.product.name}`,
+});
+```
+
+Use the context type for the file role: `PageLoaderContext` for a page,
+`LayoutLoaderContext` for a layout, and `AppLoaderContext` for `root`. Type the
+context and let TypeScript infer the return value so `PageProps<typeof loader>`
+retains the concrete data shape.
+
+```tsx title="src/web/products/[id].page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./[id].setup";
 
 export default function ProductPage({ data }: PageProps<typeof loader>) {
   return <h1>{data.product.name}</h1>;
 }
 ```
 
-Use `satisfies PageLoader`, not a `: PageLoader` annotation. `satisfies` checks
-the contract while preserving the concrete return type that
-`PageProps<typeof loader>` uses for `data`.
+Do not annotate the whole function as `PageLoader`, use `satisfies` on a
+loader, duplicate its payload shape, or cast an unknown return.
 
 Components receive data, not HTTP objects. Keep repositories, secrets, and
 request work in the loader; the default component must also render in the

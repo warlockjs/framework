@@ -75,5 +75,24 @@ await refresh();
 ```
 
 `navigateTo()` accepts a path, not a route name. `href()` resolves named routes
-through the server-published route table. `refresh()` leaves history unchanged
+through the server-published route table. Generated declarations in
+`.warlock/typings/web-routes.d.ts` make page names and required path parameters
+type-safe when they are available; runtime validation remains active before
+generation. `refresh()` leaves history unchanged
 and resolves `false` when fresh data did not reach the screen.
+
+## Type a Link wrapper
+
+`LinkProps` is exported from `@warlock.js/web` when a shared component should
+accept the exact same destination contract as `<Link>`:
+
+```tsx
+import { Link, type LinkProps } from "@warlock.js/web";
+
+export function NavigationItem(props: LinkProps) {
+  return <Link {...props} />;
+}
+```
+
+This keeps generated named-route and parameter checking intact. Do not
+redeclare destination props as broad strings in a wrapper.

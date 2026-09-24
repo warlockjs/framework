@@ -1,82 +1,59 @@
 ---
 title: In a Warlock app
-description: How a Warlock web app uses @warlock.js/sitemap — warlock add sitemap, the web.sitemap section in src/config/web.ts, app.publicUrl, and upgrading from the 5.15 connector.
+description: Configure Web-managed sitemap generations, page discovery, storage, and robots.txt.
 sidebar:
   order: 3
   label: "In a Warlock app"
 ---
 
-import { Aside } from "@astrojs/starlight/components";
+`@warlock.js/sitemap` remains framework-blind. In a Warlock application,
+`@warlock.js/web` discovers page policy, publishes sitemap generations, and
+serves the HTTP routes.
 
-`@warlock.js/sitemap` doesn't import Warlock. In a Warlock app,
-`@warlock.js/web` calls the package, just as an Express handler would. Web
-handles everything that depends on the app:
-
-- finding pages and applying page-level `config.sitemap` policy;
-- expanding locales into `hreflang` alternates;
-- choosing `Sitemap` or `SitemapIndex`;
-- generating the file at `warlock build` and at boot;
-- serving `/sitemap.xml`, the shard files, and `/robots.txt`.
-
-## Install
+## Install and configure
 
 ```sh
 warlock add sitemap
 ```
 
-This command installs `@warlock.js/sitemap`, and `@warlock.js/web` if it isn't
-installed yet. It then adds a **disabled** `sitemap` section to
-`src/config/web.ts`. If the file already exists, the section is merged in and
-nothing else in the file changes. Running the command again does nothing.
+The command adds a disabled section in `src/config/web.ts`. Enable it after
+`app.publicUrl` is configured:
 
 ```ts title="src/config/web.ts"
-import type { WebSitemapConfig } from "@warlock.js/web/sitemap";
+import type { WebConfigurations } from "@warlock.js/web";
 
-const webConfig: { sitemap: WebSitemapConfig } = {
+const web = {
   sitemap: {
-    enabled: false,
-    path: "/sitemap.xml",
-    defaults: { changefreq: "weekly", priority: 0.5 },
+    enabled: true,
+    storage: { directory: "sitemap" },
+    coordination: "local",
   },
-};
+} satisfies WebConfigurations;
 
-export default webConfig;
+export default web;
 ```
 
-It ships disabled because a sitemap needs absolute URLs, and a new app doesn't
-know its public origin yet. To turn it on:
+The origin is `app.publicUrl`; no request-derived fallback is used. Missing
+origin makes generation fail safely and `/sitemap.xml` returns `503` until a
+generation succeeds.
 
-1. Set `app.publicUrl` in `src/config/app.ts`, or set the `PUBLIC_APP_URL`
-   environment variable. `app.publicUrl` wins if both are set.
-2. Set `sitemap.enabled` to `true`.
+`storage` selects durable generation and manifest storage. Its `directory`
+must be a dedicated relative prefix. Omit `disk` for the app's default storage.
+`outputDir` is the compatible local writer option; it conflicts with
+`storage` rather than silently winning.
 
-<Aside type="caution" title="No origin, no sitemap">
-  If the sitemap is enabled but has no origin, generation throws `MissingPublicUrlError`. It never
-  builds URLs from a guessed or request-derived host. Sitemap generation runs at runtime, not during
-  `warlock build`. At boot, the error is logged and `/sitemap.xml` returns `503` until a later
-  generation succeeds.
-</Aside>
+## What Web adds
 
-The [Sitemap and robots.txt guide](/v/latest/web/guides/sitemap-and-robots/)
-covers the rest: every `web.sitemap` key, page-level `config.sitemap`,
-locales, `robots.txt`, and regenerating after your data changes.
+Web includes static pages, applies `config.sitemap: false`, expands locales,
+and lets dynamic pages declare concrete URLs with `config.sitemap.entries`.
+It keeps each published generation immutable, serves the latest valid manifest,
+and never creates a document in response to a crawler request.
 
-## Upgrading from 5.15
+Use `coordination: "shared"` only with storage that supports atomic
+create-if-absent and consistent reads/listing. No Redis service is required.
+See the [Sitemap and robots.txt guide](/v/latest/web/guides/sitemap-and-robots/)
+for refreshes, model invalidation, conditional HTTP caching, shards, and
+robots.txt.
 
-5.16 rewrites this package, and the 5.15 API is gone. That includes the
-connector, its standalone config file, the page-registry helpers, and the
-`sitemap.path`/`defaults` config module. In 5.17, page sitemap policy moves
-into the page's direct `config` object, typed with `PageConfig` from
-`@warlock.js/web`.
-
-| 5.15                                                 | Current API (5.17)                                                                                                                                                            |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A connector registered in `warlock.config.ts`        | Nothing to register. `@warlock.js/web` reads `web.sitemap` itself. Remove the connector entry.                                                                                |
-| A standalone sitemap config file                     | A `sitemap` section in `src/config/web.ts`, typed as `WebSitemapConfig` from `@warlock.js/web/sitemap`. Move `enabled`, `path`, and `defaults` there.                         |
-| `export const sitemap = async () => [...]` on a page | Move the function into `config.sitemap` and type the direct config object with `PageConfig` from `@warlock.js/web`. The value can also be a static options object or `false`. |
-| API-only apps passing an `entries` supplier          | Build a `Sitemap` yourself and return it with `response.xml(sitemap)`. See [Build a sitemap](/v/latest/sitemap/essentials/standalone/#toxml).                                 |
-| Collecting and serialising pages yourself            | `new Sitemap({ baseUrl })`, then `add()` and `toXML()`.                                                                                                                       |
-| `MissingPublicUrlError` from the sitemap package     | `MissingPublicUrlError` from `@warlock.js/web/sitemap`, raised when generation runs rather than at connector boot.                                                            |
-
-The builder takes its origin as the `baseUrl` argument, so the standalone
-package can no longer be missing one.
+API-only applications can use `new Sitemap({ baseUrl })` directly and choose
+their own delivery route. See [Build a sitemap](/v/latest/sitemap/essentials/standalone/).

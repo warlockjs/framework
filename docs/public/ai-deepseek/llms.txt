@@ -6,4 +6,4 @@
 
 ## Skills
 
-- [setup-deepseek](@warlock.js/ai-deepseek/setup-deepseek/SKILL.md): @warlock.js/ai-deepseek in @warlock.js/ai-deepseek; use when you need to set up deepseek.
+- [setup-deepseek](@warlock.js/ai-deepseek/setup-deepseek/SKILL.md): (no description)
