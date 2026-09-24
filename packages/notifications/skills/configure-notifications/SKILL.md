@@ -1,6 +1,6 @@
 ---
 name: configure-notifications
-description: "Configure notifications in @warlock.js/notifications; use when you need to configure notifications."
+description: 'Wire `@warlock.js/notifications` via a declarative `src/config/notifications.ts` that exports a `NotificationConfig` default — the notifications connector registers it at boot, so app code never calls `setNotificationConfig`. `channels`: registry mapping name → factory result (`mailChannel`, `inApp.configure`, custom `defineChannel`); `queue`: optional `QueueDispatcher` (`.queue()` throws without it); `preferences`: optional `PreferenceProvider` (drops channels the recipient muted); `rateLimit`: optional `RateLimiter` (drops channels exceeding per-recipient budgets). Triggers: `config/notifications.ts`, `NotificationConfig`, `setNotificationConfig`, `getNotificationConfig`, `mailChannel`, `inApp.configure`, "configure notifications", "wire notifications at boot", "set preferences provider", "set rate limit"; typical import `import { type NotificationConfig, mailChannel, inApp } from "@warlock.js/notifications"`. Skip: building a reusable notification — `@warlock.js/notifications/define-notification/SKILL.md`; the in-app read API — `@warlock.js/notifications/use-in-app/SKILL.md`; adding a custom channel — `@warlock.js/notifications/define-channel/SKILL.md`.'
 ---
 
 # Configure notifications

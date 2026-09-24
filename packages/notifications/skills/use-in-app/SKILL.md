@@ -1,6 +1,6 @@
 ---
 name: use-in-app
-description: "inApp — in-app notification read API in @warlock.js/notifications; use when you need to use in app."
+description: 'Use the `inApp` facade for the in-app/database channel''s READ side: `inApp.configure({ model: Notification })` or `{ repository: myRepo }` binds the store AND returns the channel; `inApp.list / listUnread / countUnread / markAsRead / markAsUnread` are RECIPIENT-SCOPED by construction (no IDOR — `markAsRead(user, id)` cannot flip another user''s row even with a foreign id). `countUnread` uses `RepositoryManager.countCached` for the badge fast-path. Triggers: `inApp.configure`, `inApp.list`, `inApp.listUnread`, `inApp.countUnread`, `inApp.markAsRead`, `inApp.markAsUnread`, `BaseNotificationsRepository`, `DatabaseNotification`, `NotificationsFilter`, "in-app notifications", "mark notification as read", "unread count", "notification badge", "IDOR-safe markAsRead"; typical import `import { inApp } from "@warlock.js/notifications"`. Skip: writing notifications (use `defineNotification` or `notify.database`) — `@warlock.js/notifications/define-notification/SKILL.md`; the migration columns — `@warlock.js/notifications/write-notification-migration/SKILL.md`; wiring it into config — `@warlock.js/notifications/configure-notifications/SKILL.md`.'
 ---
 
 # `inApp` — in-app notification read API

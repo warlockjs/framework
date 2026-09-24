@@ -1,6 +1,6 @@
 ---
 name: send-ad-hoc
-description: "notify.<channel> — ad-hoc, per-channel sends in @warlock.js/notifications; use when you need to send ad hoc."
+description: 'Ad-hoc per-channel send via the `notify.<channel>(to, payload, options?)` Proxy facade. Works for any channel registered in `NotificationChannels` (built-in or custom). `to` accepts a `Notifiable` model OR a raw route string (`"x@y.com"`); `payload` is typed per channel via the registry; `options` is the standard `SendOptions`. `notify.channel(name).send(...)` is the runtime escape when the channel name is not a compile-time literal. Type-based preference gating applies when a type is known — explicit via `options.type` OR auto-detected from a database payload''s `type` field. For multi-channel sends use `defineNotification` instead — there is no inline `notify(to, { via, ... })` form on purpose. Triggers: `notify.<channel>`, `notify.channel(name)`, `notify.mail`, `notify.database`, "send a one-off notification", "ad-hoc notification", "send an email without defining a notification", "raw email target", "dynamic channel name"; typical import `import { notify } from "@warlock.js/notifications"`. Skip: reusable multi-channel notifications — `@warlock.js/notifications/define-notification/SKILL.md`; configuring channels — `@warlock.js/notifications/configure-notifications/SKILL.md`.'
 ---
 
 # `notify.<channel>` — ad-hoc, per-channel sends

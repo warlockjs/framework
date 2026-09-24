@@ -1,6 +1,6 @@
 ---
 name: define-notification
-description: "defineNotification — reusable multi-channel notification in @warlock.js/notifications; use when you need to define notification."
+description: 'Build a reusable multi-channel notification with `defineNotification<Data>({ type, via, ...renderers })`. `type` is the stable identifier preference/rate-limit gates use AND defaults the database channel''s `type`. `via` is `ChannelName[]` OR `(data, to) => ChannelName[]` for per-recipient channel selection. Renderers are `(data, to, ctx) => NotificationChannels[C]`; `ctx` carries `locale` + `meta` from `SendOptions`. The returned object exposes `.send(to|to[], data, options?)`, `.queue(to|to[], data, options?)`, and `.only(...channels)`. Per-recipient + per-channel `Promise.allSettled` isolates failures; the database channel''s `type` is auto-defaulted from `def.type`; `SendOptions.idempotencyKey` is injected into the database payload. Triggers: `defineNotification`, `via`, "reusable notification", "multi-channel notification", "send through several channels at once", "render per channel", `RenderContext`, `def.type`; "force on a notification", "queue with delay"; typical import `import { defineNotification } from "@warlock.js/notifications"`. Skip: single-channel ad-hoc sends — `@warlock.js/notifications/send-ad-hoc/SKILL.md`; adding a brand-new channel — `@warlock.js/notifications/define-channel/SKILL.md`; observing dispatch outcomes — `@warlock.js/notifications/observe-notifications/SKILL.md`.'
 ---
 
 # `defineNotification` — reusable multi-channel notification
