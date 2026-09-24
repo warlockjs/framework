@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@mongez/copper": "^2.1.2",
-    "@mongez/reinforcements": "^4.0.1",
+    "@mongez/reinforcements": "^4.0.2",
     "@warlock.js/fs": "workspace:^",
     "dayjs": "^1.11.9",
     "safe-stable-stringify": "^2.5.0"
