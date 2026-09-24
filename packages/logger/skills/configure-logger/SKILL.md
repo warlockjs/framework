@@ -1,6 +1,6 @@
 ---
 name: configure-logger
-description: "Setup — registering channels at startup in @warlock.js/logger; use when you need to configure logger."
+description: 'Register channels via log.addChannel / log.setChannels / log.configure({channels, autoFlushOn, redact, minLevel}) at boot. Triggers: `log.configure`, `log.addChannel`, `log.setChannels`, `Logger`, `autoFlushOn`, `disableAutoFlush`; "wire channels at startup", "branch logger by NODE_ENV", "isolate a library''s logger", "replace channel list"; typical import `import { log, Logger, ConsoleLog, FileLog } from "@warlock.js/logger"`. Skip: channel picks — `@warlock.js/logger/pick-log-channel/SKILL.md`; flushing — `@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`; redaction — `@warlock.js/logger/redact-sensitive-log-fields/SKILL.md`; competing libs `winston.createLogger`, `pino`.'
 ---
 
 # Setup — registering channels at startup

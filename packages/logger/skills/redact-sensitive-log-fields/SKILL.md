@@ -1,6 +1,6 @@
 ---
 name: redact-sensitive-log-fields
-description: "Redaction — keeping secrets out of logs in @warlock.js/logger; use when you need to redact sensitive log fields."
+description: 'Strip secrets from log output — a built-in secret-key denylist on by default (DEFAULT_REDACT_KEYS), plus two-layer additive redaction via log.configure({redact: {paths, keys}}) (logger floor) + per-channel redact (more on top). Dotted glob paths (*, **). Triggers: `redact`, `paths`, `keys`, `defaultKeys`, `censor`, `log.setRedact`, `applyRedact`; "redact passwords in logs", "strip tokens from log output", "hide authorization headers", "scrub PII before logging", "turn off default redaction"; typical import `import { log } from "@warlock.js/logger"`. Skip: filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; competing libs `pino.redact`, `fast-redact`.'
 ---
 
 # Redaction — keeping secrets out of logs

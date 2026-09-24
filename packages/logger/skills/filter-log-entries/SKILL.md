@@ -1,6 +1,6 @@
 ---
 name: filter-log-entries
-description: "Filtering — levels + filter predicate + minLevel in @warlock.js/logger; use when you need to filter log entries."
+description: 'Drop log entries — per-channel levels whitelist, per-channel filter predicate, logger-wide setMinLevel(level) fast path. Triggers: `levels`, `filter`, `minLevel`, `log.setMinLevel`, `shouldBeLogged`, `LoggingData`, `LogLevel`; "silence a noisy module", "route errors to a dedicated file", "raise global severity floor", "drop debug logs in prod"; typical import `import { log } from "@warlock.js/logger"`. Skip: custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; channel picks — `@warlock.js/logger/pick-log-channel/SKILL.md`; competing libs `pino.levels`, `winston.format.filter`, `debug` env var.'
 ---
 
 # Filtering — `levels` + `filter` predicate + `minLevel`
