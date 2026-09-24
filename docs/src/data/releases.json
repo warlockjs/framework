@@ -1,4 +1,10 @@
 {
+  "5.19.1": {
+    "publishedAt": "2026-09-24T08:12:33.002Z",
+    "matrix": "none",
+    "summary": "`@warlock.js/web` fixes paired setup-module register projection in development SSR while preserving server-only setup exports. `create-warlock` now prompts API and full-stack presets for a database choice and supports an explicit AI opt-out. Lockstep release across all 30 packages. Generator matrix scope: `none`.",
+    "featured": ["@warlock.js/web", "create-warlock", "@warlock.js/core", "@warlock.js/seal"]
+  },
   "5.19.0": {
     "publishedAt": "2026-09-23T18:07:30.092Z",
     "matrix": "none",
