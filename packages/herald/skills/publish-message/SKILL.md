@@ -1,6 +1,6 @@
 ---
 name: publish-message
-description: "Publish messages in @warlock.js/herald; use when you need to publish message."
+description: 'Publish messages to a channel — .publish(payload, options?) for single, .publishBatch([...], options?) for batch, with priority / ttl / delay / persistent / correlationId / headers options. Optional schema validation via .channel(name, {schema}). Triggers: `publish`, `publishBatch`, `channel`, `priority`, `ttl`, `delay`, `persistent`, `correlationId`, `headers`, `schema`; "publish a message", "emit an event after a domain change", "fan out a notification", "schedule delayed work", "batch publish"; typical import `import { herald } from "@warlock.js/herald"`. Skip: setup — `@warlock.js/herald/herald-basics/SKILL.md`; consuming — `@warlock.js/herald/consume-message/SKILL.md`; RPC — `@warlock.js/herald/request-and-respond/SKILL.md`; competing libs `amqplib`, `kafkajs`, `bullmq`; NestJS `ClientProxy.emit`.'
 ---
 
 # Publish messages
