@@ -1,6 +1,6 @@
 ---
 name: pick-seal-primitive
-description: "Picking the right primitive in @warlock.js/seal; use when you need to choose seal primitive."
+description: 'Pick the right `v` factory primitive — string / int / literal / date / enum / computed / managed / instanceof / any. Triggers: `v.string`, `v.email`, `v.number`, `v.int`, `v.float`, `v.numeric`, `v.boolean`, `v.scalar`, `v.date`, `v.literal`, `v.enum`, `v.instanceof`, `v.computed`, `v.managed`, `v.any`; "v.string vs v.scalar", "v.literal vs v.enum", "v.date vs v.instanceof(Date)", "what is v.computed"; typical import `import { v } from "@warlock.js/seal"`. Skip: structural shapes — `@warlock.js/seal/define-structural-shape/SKILL.md`; modifiers — `@warlock.js/seal/compose-seal-modifiers/SKILL.md`; competing libs `zod`, `valibot`, `yup`.'
 ---
 
 # Picking the right primitive

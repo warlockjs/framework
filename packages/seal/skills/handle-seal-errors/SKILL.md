@@ -1,6 +1,6 @@
 ---
 name: handle-seal-errors
-description: "ValidationResult — reading errors in @warlock.js/seal; use when you need to handle seal errors."
+description: 'Read `ValidationResult` — `isValid`, `errors[]`, `data`. Branch on `error.type`, customize messages, hook translation. Triggers: `ValidationResult`, `ValidationError`, `validate`, `isValid`, `errors`, `data`, `error.type`, `error.input`, `error.error`, `translationParams`, `.attribute`, `SealConfig`; "how to read seal errors", "branch on a specific rule failure", "customize validation error message", "translate seal error", "surface validation errors as 422"; typical import `import { validate, v } from "@warlock.js/seal"`. Skip: modifiers — `@warlock.js/seal/compose-seal-modifiers/SKILL.md`; structural shapes — `@warlock.js/seal/define-structural-shape/SKILL.md`; competing libs `zod` `.safeParse`, `yup` `ValidationError`, `joi`.'
 ---
 
 # `ValidationResult` — reading errors

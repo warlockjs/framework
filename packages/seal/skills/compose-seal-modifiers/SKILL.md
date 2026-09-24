@@ -1,6 +1,6 @@
 ---
 name: compose-seal-modifiers
-description: "Cross-cutting modifiers + the pipeline in @warlock.js/seal; use when you need to compose seal modifiers."
+description: 'Apply cross-cutting modifiers — `.optional` / `.nullable` / `.default` / `.catch` / `.omit` / membership rules — plus the mutator-vs-transformer pipeline and `Infer.Input` vs `Infer.Output`. Triggers: `.optional`, `.required`, `.nullable`, `.default`, `.catch`, `.present`, `.requiredIf`, `.requiredWith`, `.in`, `.oneOf`, `.notIn`, `.omit`, `.attribute`, `.mutable`, `.addMutator`, `Infer.Input`, `Infer.Output`; "mark field optional in seal", "default value in schema", "mutator vs transformer", "when does .catch fire"; typical import `import { v, type Infer } from "@warlock.js/seal"`. Skip: primitives — `@warlock.js/seal/pick-seal-primitive/SKILL.md`; containers — `@warlock.js/seal/define-structural-shape/SKILL.md`; errors — `@warlock.js/seal/handle-seal-errors/SKILL.md`; competing `zod` `.optional`/`.default`.'
 ---
 
 # Cross-cutting modifiers + the pipeline

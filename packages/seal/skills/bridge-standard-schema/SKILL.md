@@ -1,6 +1,6 @@
 ---
 name: bridge-standard-schema
-description: "The Standard Schema bridge in @warlock.js/seal; use when you need to bridge standard schema."
+description: 'Diagnose `StandardSchemaV1` interop — phantom-intersection at the `v` factory return, why typed slots reject a schema, cascade `Model<TSchema>` variance. Triggers: `StandardSchemaV1`, `~standard`, `Infer`, `ObjectValidator`, `StringValidator`, `LiteralValidator`, `BaseValidator`, `Model<TSchema>`, `StandardJSONSchemaV1`, `Result<unknown>`; "StandardSchemaV1 slot rejecting my schema", "Result<unknown> error", "drop as unknown as cast", "cascade Model schema variance"; typical import `import { v, type Infer } from "@warlock.js/seal"`. Skip: foundations — `@warlock.js/seal/seal-basics/SKILL.md`; JSON Schema gen — `@warlock.js/seal/generate-json-schema/SKILL.md`; competing spec `@standard-schema/spec`.'
 ---
 
 # The Standard Schema bridge

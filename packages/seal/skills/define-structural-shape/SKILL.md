@@ -1,6 +1,6 @@
 ---
 name: define-structural-shape
-description: "Structural validators — picking guide in @warlock.js/seal; use when you need to define structural shape."
+description: 'Compose `v.object` / `v.array` / `v.record` / `v.tuple` / `v.union` / `v.discriminatedUnion` / `v.lazy`. Triggers: `v.object`, `v.array`, `v.record`, `v.tuple`, `v.union`, `v.discriminatedUnion`, `v.lazy`, `ObjectValidator`; "how do I build an object schema", "dynamic-keyed record", "tagged union with discriminator", "recursive schema", "self-referencing schema"; typical import `import { v, type Infer } from "@warlock.js/seal"`. Skip: leaf primitives — `@warlock.js/seal/pick-seal-primitive/SKILL.md`; modifiers — `@warlock.js/seal/compose-seal-modifiers/SKILL.md`; standard-schema bridge — `@warlock.js/seal/bridge-standard-schema/SKILL.md`; competing libs `zod`, `valibot`.'
 ---
 
 # Structural validators — picking guide
