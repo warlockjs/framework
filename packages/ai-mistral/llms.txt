@@ -6,4 +6,4 @@
 
 ## Skills
 
-- [setup-mistral](@warlock.js/ai-mistral/setup-mistral/SKILL.md): @warlock.js/ai-mistral in @warlock.js/ai-mistral; use when you need to set up mistral.
+- [setup-mistral](@warlock.js/ai-mistral/setup-mistral/SKILL.md): (no description)
