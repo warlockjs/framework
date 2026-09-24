@@ -24,12 +24,14 @@ vi.mock("@mongez/config", () => ({
 const cacheStore = {
   get: vi.fn(),
   set: vi.fn(),
+  remove: vi.fn(),
 };
 
 vi.mock("@warlock.js/cache", () => ({
   cache: {
     get: (...args: unknown[]) => cacheStore.get(...args),
     set: (...args: unknown[]) => cacheStore.set(...args),
+    remove: (...args: unknown[]) => cacheStore.remove(...args),
   },
 }));
 
@@ -130,13 +132,12 @@ describe("idempotencyMiddleware", () => {
 
     await new Promise((resolve) => setImmediate(resolve));
 
-    expect(cacheStore.set).toHaveBeenCalledTimes(1);
-    expect(logError).toHaveBeenCalledTimes(1);
-    expect(logError).toHaveBeenCalledWith(
-      "idempotency-middleware",
-      "set",
-      expect.any(Error),
-    );
+    // 5.20: the key is reserved (create-only) before the handler, then the
+    // response is stored in onSent. Both writes reject here; both failures are
+    // logged, the request still runs (fail open), and nothing is unhandled.
+    expect(cacheStore.set).toHaveBeenCalledTimes(2);
+    expect(logError).toHaveBeenCalledWith("idempotency-middleware", "reserve", expect.any(Error));
+    expect(logError).toHaveBeenCalledWith("idempotency-middleware", "set", expect.any(Error));
   });
 
   it("replays a HIT (same body) through response.replay with cached metadata", async () => {
@@ -174,7 +175,12 @@ describe("idempotencyMiddleware", () => {
     await middleware(makeCtx({ request, response }));
 
     response.fireSent();
+    await new Promise((resolve) => setImmediate(resolve));
 
-    expect(cacheStore.set).not.toHaveBeenCalled();
+    // 5.20: only the create-only reservation is written; the 5xx response is
+    // never stored, and the reservation is removed so a retry can run.
+    expect(cacheStore.set).toHaveBeenCalledTimes(1);
+    expect(cacheStore.set.mock.calls[0][2]).toMatchObject({ onConflict: "create" });
+    expect(cacheStore.remove).toHaveBeenCalledWith("idem:anonymous:127.0.0.1:01J9XZQ-ABC");
   });
 });

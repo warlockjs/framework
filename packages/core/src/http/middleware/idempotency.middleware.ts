@@ -109,17 +109,7 @@ export function idempotencyMiddleware(options: IdempotencyOptions = {}): Middlew
     const cacheKey = buildIdempotencyCacheKey(request, idempotencyKey);
     const bodyHash = hashBody(request.body);
 
-    // Reserve the key atomically before the handler runs, so concurrent
-    // requests with the same key can't both execute it.
-    const reservation = (await cacheDriver.set(
-      cacheKey,
-      { state: "in-flight", startedAt: Date.now() } satisfies InFlightReservation,
-      { onConflict: "create", ttl: reservationTtl },
-    )) as { wasSet: boolean; existing?: CachedResponse | InFlightReservation } | undefined;
-
-    if (reservation && !reservation.wasSet) {
-      const existing = reservation.existing;
-
+    const respondToExisting = (existing: CachedResponse | InFlightReservation | undefined | null) => {
       if (!existing || (existing as InFlightReservation).state === "in-flight") {
         response.header("Retry-After", "1");
 
@@ -145,6 +135,35 @@ export function idempotencyMiddleware(options: IdempotencyOptions = {}): Middlew
         body: cached.body,
         contentType: cached.contentType,
       });
+    };
+
+    // Fast path: a finished (or in-flight) request is already recorded.
+    let existing: CachedResponse | InFlightReservation | null = null;
+
+    try {
+      existing = (await cacheDriver.get(cacheKey)) as CachedResponse | InFlightReservation | null;
+    } catch (error) {
+      // The cache is an optimisation of idempotency, not a gate on writes:
+      // when it is down, fail open (the handler runs) and log it.
+      log.error("idempotency-middleware", "get", error);
+    }
+
+    if (existing) return respondToExisting(existing);
+
+    // Reserve the key atomically before the handler runs, so concurrent
+    // requests with the same key can't both execute it.
+    try {
+      const reservation = (await cacheDriver.set(
+        cacheKey,
+        { state: "in-flight", startedAt: Date.now() } satisfies InFlightReservation,
+        { onConflict: "create", ttl: reservationTtl },
+      )) as { wasSet?: boolean; existing?: CachedResponse | InFlightReservation } | undefined;
+
+      if (reservation && reservation.wasSet === false) {
+        return respondToExisting(reservation.existing);
+      }
+    } catch (error) {
+      log.error("idempotency-middleware", "reserve", error);
     }
 
     response.onSent((sentResponse: Response) => {
@@ -152,9 +171,12 @@ export function idempotencyMiddleware(options: IdempotencyOptions = {}): Middlew
       // 4xx are deterministic outcomes of the request, so caching is fine.
       // Free the reservation so a retry can run.
       if (sentResponse.statusCode >= 500) {
-        cacheDriver.remove(cacheKey).catch((error: unknown) => {
-          log.error("idempotency-middleware", "remove", error);
-        });
+        // Wrapped so a synchronous throw is caught as well as a rejection.
+        Promise.resolve()
+          .then(() => cacheDriver.remove(cacheKey))
+          .catch((error: unknown) => {
+            log.error("idempotency-middleware", "remove", error);
+          });
 
         return;
       }
