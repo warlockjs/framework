@@ -10,7 +10,7 @@
   "dependencies": {
     "@mongez/copper": "^2.1.2",
     "@mongez/events": "^2.2.7",
-    "@mongez/reinforcements": "^4.0.1",
+    "@mongez/reinforcements": "^4.0.2",
     "@warlock.js/logger": "workspace:^",
     "@warlock.js/seal": "workspace:^"
   },
