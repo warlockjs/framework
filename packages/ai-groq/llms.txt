@@ -6,4 +6,4 @@
 
 ## Skills
 
-- [setup-groq](@warlock.js/ai-groq/setup-groq/SKILL.md): @warlock.js/ai-groq in @warlock.js/ai-groq; use when you need to set up groq.
+- [setup-groq](@warlock.js/ai-groq/setup-groq/SKILL.md): (no description)
