@@ -32,6 +32,20 @@ const esbuildShouldFail = vi.hoisted(() => ({ value: false }));
 /** The connectors `initializeOptions` reads out of warlock.config.ts. */
 const configuredConnectors = vi.hoisted(() => ({ value: [] as Connector[] }));
 
+/**
+ * Promotion tests exercise staging and rollback, not the separately covered
+ * registration-child IPC. Keep Web's build context valid without requiring a
+ * packaged child entry from a source-tree unit test.
+ */
+const routeRegistrationSnapshot = vi.hoisted(() =>
+  Object.freeze({
+    version: 1 as const,
+    routes: Object.freeze([
+      Object.freeze({ name: "browser.posts.create", path: "/posts", method: "POST" }),
+    ]),
+  }),
+);
+
 const esbuildBuild = vi.hoisted(() =>
   vi.fn(async (_options: Record<string, unknown>) => {
     if (esbuildShouldFail.value) {
@@ -88,10 +102,13 @@ vi.mock("../../../src/production/resolve-build-config", () => ({
   })),
 }));
 
+vi.mock("../../../src/production/route-registration-snapshot", () => ({
+  collectRouteRegistrationSnapshot: vi.fn(async () => routeRegistrationSnapshot),
+}));
+
 const { ProductionBuilder } = await import("../../../src/production/production-builder");
-const { DIST_BUILD_MANIFEST_FILE_NAME } = await import(
-  "../../../src/production/dist-build-manifest"
-);
+const { DIST_BUILD_MANIFEST_FILE_NAME } =
+  await import("../../../src/production/dist-build-manifest");
 
 /**
  * A connector carrying only the two build hooks — enough for the drain, and
