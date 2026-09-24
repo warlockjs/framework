@@ -1,6 +1,6 @@
 ---
 name: subscribe-to-model-events
-description: "Use model events in @warlock.js/cascade; use when you need to subscribe to model events."
+description: 'Hook into model lifecycle events — `saving` / `saved`, `creating` / `created`, `updating` / `updated`, `validating` / `validated`, `deleting` / `deleted`, `restoring` / `restored`, `fetching` / `fetched`. Per-model `Model.on(event, fn)` or global via `Model.globalEvents()`. Triggers: `Model.on`, `Model.off`, `saving`, `saved`, `created`, `updated`, `deleting`, `deleted`, `restored`; "audit log on save", "notify on change", "denormalize into search index"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: dirty tracking — `@warlock.js/cascade/track-changes/SKILL.md`; competing libs `mongoose` middleware, `typeorm` subscribers, `prisma` extensions.'
 ---
 
 # Use model events

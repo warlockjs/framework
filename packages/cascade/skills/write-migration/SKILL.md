@@ -1,6 +1,6 @@
 ---
 name: write-migration
-description: "Write a migration in @warlock.js/cascade; use when you need to write migration."
+description: 'Write a Cascade migration — the declarative `Migration.create(Model, { columns })` / `Migration.alter(Model, { ... })` factory is the primary form (column helpers `string` / `text` / `uuid` / `integer` imported from cascade, chained with `.notNullable()` / `.unique()` / `.references()`); the `extends Migration` class form is the imperative escape hatch. Run with the `cascade migrate` CLI; pin a source via `public dataSource`. Triggers: `Migration.create`, `Migration.alter`, `string()`, `text()`, `uuid()`, `.references`, `extends Migration`, `cascade migrate`; "write a migration", "create the users table", "add a column", "rollback the last batch"; typical import `import { Migration, text, uuid } from "@warlock.js/cascade"`. Skip: running migrations programmatically — `@warlock.js/cascade/run-cascade-cli/SKILL.md`; per-source migrations — `@warlock.js/cascade/manage-data-sources/SKILL.md`; competing tools `knex migrate`, `prisma migrate`, `typeorm migration`.'
 ---
 
 # Write a migration

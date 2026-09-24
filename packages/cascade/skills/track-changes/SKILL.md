@@ -1,6 +1,6 @@
 ---
 name: track-changes
-description: "Track changes in @warlock.js/cascade; use when you need to track changes."
+description: 'Inspect a model''s pending changes — `hasChanges()` (any field dirty?), `isDirty(column)` (one column), `getDirtyColumns()` (changed field names), `getDirtyColumnsWithValues()` (old + new per field), `getRemovedColumns()` (unset fields). Triggers: `hasChanges`, `isDirty`, `getDirtyColumns`, `getDirtyColumnsWithValues`, `getRemovedColumns`; "only run if email changed", "diff for an audit log", "what fields are dirty", "compare old vs new value"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: hooking into save — `@warlock.js/cascade/subscribe-to-model-events/SKILL.md`; update idioms — `@warlock.js/cascade/define-model/SKILL.md`; competing libs `mongoose` `isModified` / `modifiedPaths`, `typeorm` change detection.'
 ---
 
 # Track changes
