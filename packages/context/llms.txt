@@ -6,6 +6,6 @@
 
 ## Skills
 
-- [define-context](@warlock.js/context/define-context/SKILL.md): Define a context in @warlock.js/context; use when you need to define context.
-- [orchestrate-contexts](@warlock.js/context/orchestrate-contexts/SKILL.md): Orchestrate contexts — contextManager in @warlock.js/context; use when you need to orchestrate contexts.
+- [define-context](@warlock.js/context/define-context/SKILL.md): (no description)
+- [orchestrate-contexts](@warlock.js/context/orchestrate-contexts/SKILL.md): (no description)
 - [overview](@warlock.js/context/overview/SKILL.md): @warlock.js/context overview for orientation and choosing the focused skill for the task.
