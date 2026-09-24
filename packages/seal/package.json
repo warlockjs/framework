@@ -25,8 +25,8 @@
     "environment": "universal"
   },
   "dependencies": {
-    "@mongez/supportive-is": "^2.1.4",
-    "@mongez/reinforcements": "^4.0.1",
+    "@mongez/supportive-is": "^2.1.5",
+    "@mongez/reinforcements": "^4.0.2",
     "dayjs": "^1.11.9"
   },
   "scripts": {
