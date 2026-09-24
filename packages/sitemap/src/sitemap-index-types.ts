@@ -1,4 +1,10 @@
-import type { ChangeFreq, DuplicateReport, RouteSummary, SitemapEntry } from "./types";
+import type {
+  ChangeFreq,
+  DuplicateReport,
+  RouteSummary,
+  SitemapEntry,
+  SitemapImageLimitExceeded,
+} from "./types";
 
 /** What a source factory produces: one walk over a group's entries. */
 export type SitemapSource = Iterable<SitemapEntry> | AsyncIterable<SitemapEntry>;
@@ -17,6 +23,8 @@ export type SitemapIndexOptions = {
   readonly filePrefix?: string;
   /** Index file name. Default `sitemap_index.xml`. */
   readonly indexFileName?: string;
+  /** URL directory for shard links, independent of their on-disk directory. */
+  readonly shardPathPrefix?: string;
   /** Write `.xml.gz` beside each shard and point the index at it. Default false. */
   readonly gzip?: boolean;
   /** Hard ceiling per shard. Default 50_000; never accepted above the protocol ceiling. */
@@ -26,6 +34,8 @@ export type SitemapIndexOptions = {
   readonly changefreq?: ChangeFreq;
   readonly priority?: number;
   readonly lastmod?: string | Date;
+  /** Called once per route when an entry exceeds Google's 1,000-image limit. */
+  readonly onImageLimitExceeded?: (event: SitemapImageLimitExceeded) => void;
 };
 
 export type SitemapSetResult = {

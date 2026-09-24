@@ -36,6 +36,8 @@ export class SitemapIndex {
   /** Canonical (lowercased) keys already registered, so a case collision is caught at `addSource()`. */
   private readonly registeredKeys = new Set<string>();
 
+  private readonly warnedImageRoutes = new Set<string>();
+
   public constructor(options: SitemapIndexOptions) {
     this.options = normalizeSitemapIndexOptions(options);
   }
@@ -91,7 +93,10 @@ export class SitemapIndex {
           gzip: this.options.gzip,
           maxUrlsPerFile: this.options.maxUrlsPerFile,
           maxBytesPerFile: this.options.maxBytesPerFile,
-          defaults: this.options.defaults,
+          defaults: {
+            ...this.options.defaults,
+            onImageLimitExceeded: (event) => this.reportImageLimit(event),
+          },
           duplicates,
           routes,
         });
@@ -99,7 +104,11 @@ export class SitemapIndex {
         shardFiles.push(...files);
       }
 
-      const indexXml = buildSitemapIndexXml(shardFiles, this.options.baseUrl);
+      const indexXml = buildSitemapIndexXml(
+        shardFiles,
+        this.options.baseUrl,
+        this.options.shardPathPrefix,
+      );
 
       await writeFile(join(tempDir, this.options.indexFileName), indexXml, "utf8");
 
@@ -127,5 +136,18 @@ export class SitemapIndex {
       duplicates: duplicates.report(),
       routes: routes.summary(),
     };
+  }
+
+  private reportImageLimit(event: { readonly route?: string; readonly dropped: number }): void {
+    const key = event.route ?? "unattributed";
+    if (this.warnedImageRoutes.has(key)) return;
+
+    this.warnedImageRoutes.add(key);
+    if (this.options.defaults.onImageLimitExceeded)
+      this.options.defaults.onImageLimitExceeded(event);
+    else
+      console.warn(
+        `[warlock:sitemap] ${key} exceeded the 1,000-image limit; dropped ${event.dropped} image(s).`,
+      );
   }
 }

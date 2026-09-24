@@ -1,6 +1,6 @@
 ---
 name: sitemap-overview
-description: 'Front-door orientation for `@warlock.js/sitemap` — the framework-blind `Sitemap` builder class (`new Sitemap({ baseUrl, changefreq, priority, lastmod })`, `add`/`addMany`/`declareRoute`, `size`/`entries()`/`routes()`/`duplicates()`, sync `toXML()`, `saveTo()`), the constructor-time `baseUrl` validation and `InvalidBaseUrlError`, entry validation and `InvalidSitemapEntryError`, the keyed-by-path silent last-write-wins rule and how `duplicates()` makes it visible, the `count: 0` route diagnostic that `declareRoute()` exists to make possible, `hreflang` alternates via `xhtml:link`, and the 50,000-URL / 50MB protocol ceiling that separates this bounded builder from the streaming writer. TRIGGER when: code imports anything from `@warlock.js/sitemap`; user asks "what does @warlock.js/sitemap do", "how do I generate a sitemap", "how do I add a URL to the sitemap", "why is my dynamic route missing from sitemap.xml", "sitemap changefreq/priority", "sitemap hreflang", "sitemap baseUrl", "InvalidBaseUrlError", "sitemap without Warlock", "sitemap in Express"; package.json adds `@warlock.js/sitemap`; user is scaffolding `warlock add sitemap`. Skip: user wants to PARSE or fetch a remote sitemap — this package only generates one; the Warlock page-registry discovery, locale expansion, the `/sitemap.xml` route and `robots.txt` live in `@warlock.js/web`, not here.'
+description: 'Front-door orientation for `@warlock.js/sitemap`: framework-blind `Sitemap` and streaming `SitemapIndex` builders, URL metadata, hreflang, Google image entries, sharding, diagnostics, and atomic publication. Use when adding or debugging sitemap output; Warlock page discovery and `/sitemap.xml` routing belong to `@warlock.js/web`.'
 ---
 
 # `@warlock.js/sitemap` — overview
@@ -75,6 +75,7 @@ never `/posts/:id`. A pattern is not a URL.
 | `changefreq` | One of the seven protocol values; anything else throws. |
 | `priority` | `0.0`–`1.0`; anything else throws. |
 | `alternates` | `{ hreflang, path }[]` — language versions of this page. |
+| `images` | `{ loc }[]` — absolute HTTP(S) image URLs, including verified external CDNs. |
 
 Invalid entries throw `InvalidSitemapEntryError` from `add()`. Paths are
 normalised to carry a leading slash, so `a` and `/a` are ONE entry.
@@ -132,6 +133,29 @@ applies the same rule PER SHARD — a shard declares `xmlns:xhtml` only when its
 own entries carry alternates — and an alternate's `<xhtml:link>` bytes count
 toward that shard's byte ceiling exactly like the rest of its `<url>` block.
 
+## Images
+
+Use `images` when a page has image assets to expose:
+
+```ts
+sitemap.add({
+  path: "/products/widget",
+  images: [{ loc: "https://cdn.example.com/widget.jpg" }],
+});
+```
+
+Each image `loc` must be an absolute HTTP(S) URL. The builder emits Google's
+`<image:image><image:loc>…</image:loc></image:image>` extension and declares
+`xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"` only in
+documents that need it. An external CDN URL is valid when that host is verified
+for the site.
+
+Google permits at most 1,000 images for one `<url>`. Extra images are dropped.
+Pass `onImageLimitExceeded({ route, dropped })` in `SitemapOptions` to receive
+the one diagnostic for that route; without it, the builder issues one
+`console.warn` per route. Image XML and its namespace count toward the shard byte
+ceiling.
+
 ## `toXML()` is pure, repeatable and synchronous
 
 Calling it twice returns the same string; it mutates nothing and drains
@@ -148,6 +172,10 @@ plus an index.
 `maxBytesPerFile` is enforced at shard boundaries, not within an entry: a
 single entry too large for the ceiling is written alone in its own shard
 rather than split — an entry can't be split.
+
+For `SitemapIndex`, `shardPathPrefix` changes the URL directory used for shard
+links in the index without changing where `saveTo(outDir)` writes those files.
+Use it when a proxy serves generated shards from a different public path.
 
 ## `SitemapIndex.saveTo(outDir)` owns the whole directory
 
@@ -170,5 +198,6 @@ empty, or already carries that marker. A non-empty, unmarked `outDir` gets
 ## Also exported
 
 `buildSitemapXml(entries, baseUrl)`, `escapeXml(value)`, `joinOrigin(origin,
-path)` — the pieces the class is built from, for a caller who wants the
-serialiser without the builder.
+path)`, `SitemapImage`, and `SitemapImageLimitExceeded` — the pieces the class
+is built from, for a caller who wants the serialiser or image diagnostics
+without the builder.

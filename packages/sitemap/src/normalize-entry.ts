@@ -1,6 +1,12 @@
 import { InvalidSitemapEntryError } from "./errors";
 import { formatLastmod } from "./lastmod";
-import type { ChangeFreq, ResolvedSitemapEntry, SitemapEntry, SitemapOptions } from "./types";
+import type {
+  ChangeFreq,
+  ResolvedSitemapEntry,
+  SitemapEntry,
+  SitemapImage,
+  SitemapOptions,
+} from "./types";
 
 const CHANGE_FREQS: readonly ChangeFreq[] = [
   "always",
@@ -11,6 +17,7 @@ const CHANGE_FREQS: readonly ChangeFreq[] = [
   "yearly",
   "never",
 ];
+const MAX_IMAGES_PER_URL = 1_000;
 
 function assertChangeFreq(value: unknown): asserts value is ChangeFreq {
   if (!CHANGE_FREQS.includes(value as ChangeFreq)) {
@@ -49,7 +56,7 @@ export function normalizePath(path: unknown): string {
  */
 export function normalizeEntry(
   entry: SitemapEntry,
-  defaults: Pick<SitemapOptions, "changefreq" | "priority" | "lastmod">,
+  defaults: Pick<SitemapOptions, "changefreq" | "priority" | "lastmod" | "onImageLimitExceeded">,
 ): ResolvedSitemapEntry {
   const path = normalizePath(entry.path);
   const changefreq = entry.changefreq ?? defaults.changefreq;
@@ -66,6 +73,32 @@ export function normalizeEntry(
 
     return { hreflang: alternate.hreflang, path: normalizePath(alternate.path) };
   });
+  if (entry.images !== undefined && !Array.isArray(entry.images)) {
+    throw new InvalidSitemapEntryError("images must be an array");
+  }
+  const images = entry.images?.slice(0, MAX_IMAGES_PER_URL).map((image): SitemapImage => {
+    if (typeof image?.loc !== "string" || image.loc.trim() === "") {
+      throw new InvalidSitemapEntryError("image loc is required");
+    }
+
+    let url: URL;
+    try {
+      url = new URL(image.loc);
+    } catch {
+      throw new InvalidSitemapEntryError("image loc must be an absolute HTTP(S) URL");
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new InvalidSitemapEntryError("image loc must be an absolute HTTP(S) URL");
+    }
+
+    return { loc: image.loc };
+  });
+  if ((entry.images?.length ?? 0) > MAX_IMAGES_PER_URL) {
+    defaults.onImageLimitExceeded?.({
+      ...(entry.route === undefined ? {} : { route: entry.route }),
+      dropped: entry.images!.length - MAX_IMAGES_PER_URL,
+    });
+  }
 
   return {
     path,
@@ -75,5 +108,6 @@ export function normalizeEntry(
     ...(changefreq !== undefined ? { changefreq } : {}),
     ...(priority !== undefined ? { priority } : {}),
     ...(alternates !== undefined ? { alternates } : {}),
+    ...(images !== undefined ? { images } : {}),
   };
 }

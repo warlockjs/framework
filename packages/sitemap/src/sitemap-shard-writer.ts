@@ -7,7 +7,7 @@ import type { ResolvedSitemapEntry, SitemapOptions } from "./types";
 import type { DuplicatePathTracker } from "./duplicate-path-tracker";
 import type { RouteCounter } from "./route-counter";
 import type { SitemapSourceFactory } from "./sitemap-index-types";
-import { buildSitemapXml, renderUrlBlock, XHTML_NAMESPACE_ATTR } from "./xml";
+import { buildSitemapXml, IMAGE_NAMESPACE_ATTR, renderUrlBlock, XHTML_NAMESPACE_ATTR } from "./xml";
 
 /** One `addSource` group: the unnamed group merges every unkeyed call; a keyed group holds exactly one factory. */
 export type ShardGroup = {
@@ -22,7 +22,10 @@ export type ShardWriterContext = {
   readonly gzip: boolean;
   readonly maxUrlsPerFile: number;
   readonly maxBytesPerFile: number;
-  readonly defaults: Pick<SitemapOptions, "changefreq" | "priority" | "lastmod">;
+  readonly defaults: Pick<
+    SitemapOptions,
+    "changefreq" | "priority" | "lastmod" | "onImageLimitExceeded"
+  >;
   readonly duplicates: DuplicatePathTracker;
   readonly routes: RouteCounter;
 };
@@ -48,6 +51,7 @@ function envelopeBytes(baseUrl: string): number {
  * shard's real bytes on disk exceed the ceiling it was rolled against.
  */
 const NAMESPACE_BYTES = Buffer.byteLength(XHTML_NAMESPACE_ATTR, "utf8");
+const IMAGE_NAMESPACE_BYTES = Buffer.byteLength(IMAGE_NAMESPACE_ATTR, "utf8");
 
 async function writeShardFile(
   ctx: ShardWriterContext,
@@ -86,6 +90,7 @@ export async function writeShardGroup(
   // Charged once, the moment the buffer's first alternate-bearing entry is added — mirrors
   // buildSitemapXml()'s own "at least one entry has alternates" rule for the same shard.
   let bufferHasAlternates = false;
+  let bufferHasImages = false;
   let ordinal = 1;
 
   const flush = async () => {
@@ -100,6 +105,7 @@ export async function writeShardGroup(
     buffer = [];
     bufferBytes = envelopeBytes(ctx.baseUrl);
     bufferHasAlternates = false;
+    bufferHasImages = false;
   };
 
   for (const factory of group.factories) {
@@ -112,11 +118,14 @@ export async function writeShardGroup(
       if (!ctx.duplicates.attempt(resolved.path, resolved.route)) continue;
 
       const entryHasAlternates = (resolved.alternates?.length ?? 0) > 0;
+      const entryHasImages = (resolved.images?.length ?? 0) > 0;
       const blockBytes = Buffer.byteLength(renderUrlBlock(resolved, ctx.baseUrl), "utf8") + 1;
       // What this entry would add to the CURRENT shard: its own block, plus the namespace
       // attribute if this is the shard's first alternate and the buffer doesn't carry it yet.
       const addedBytes =
-        blockBytes + (entryHasAlternates && !bufferHasAlternates ? NAMESPACE_BYTES : 0);
+        blockBytes +
+        (entryHasAlternates && !bufferHasAlternates ? NAMESPACE_BYTES : 0) +
+        (entryHasImages && !bufferHasImages ? IMAGE_NAMESPACE_BYTES : 0);
 
       const hitsUrlCeiling = buffer.length >= ctx.maxUrlsPerFile;
       // A single entry can never be split, so the byte ceiling only rolls an already-nonempty shard.
@@ -125,10 +134,15 @@ export async function writeShardGroup(
       if (hitsUrlCeiling || hitsByteCeiling) await flush();
 
       const addsNamespaceNow = entryHasAlternates && !bufferHasAlternates;
+      const addsImageNamespaceNow = entryHasImages && !bufferHasImages;
 
       buffer.push(resolved);
-      bufferBytes += blockBytes + (addsNamespaceNow ? NAMESPACE_BYTES : 0);
+      bufferBytes +=
+        blockBytes +
+        (addsNamespaceNow ? NAMESPACE_BYTES : 0) +
+        (addsImageNamespaceNow ? IMAGE_NAMESPACE_BYTES : 0);
       if (addsNamespaceNow) bufferHasAlternates = true;
+      if (addsImageNamespaceNow) bufferHasImages = true;
       ctx.routes.record(resolved.route);
     }
   }

@@ -16,6 +16,17 @@ export type SitemapAlternate = {
   readonly path: string;
 };
 
+/** One image associated with a page URL in Google's image sitemap extension. */
+export type SitemapImage = {
+  /** An absolute HTTP(S) URL. It may point at a verified external CDN. */
+  readonly loc: string;
+};
+
+export type SitemapImageLimitExceeded = {
+  readonly route?: string;
+  readonly dropped: number;
+};
+
 /**
  * One `<url>` block. Only `path` is required; `name` and `route` are carried
  * for the diagnostics in `routes()` and `duplicates()` and never serialised.
@@ -32,6 +43,8 @@ export type SitemapEntry = {
   readonly priority?: number;
   /** Language versions of THIS page, conventionally including itself. */
   readonly alternates?: readonly SitemapAlternate[];
+  /** Images discoverable from this page. At most 1,000 are emitted per URL. */
+  readonly images?: readonly SitemapImage[];
 };
 
 /**
@@ -51,6 +64,8 @@ export type SitemapOptions = {
   readonly changefreq?: ChangeFreq;
   readonly priority?: number;
   readonly lastmod?: string | Date;
+  /** Called once per route when an entry exceeds Google's 1,000-image limit. */
+  readonly onImageLimitExceeded?: (event: SitemapImageLimitExceeded) => void;
 };
 
 /**

@@ -85,4 +85,22 @@ describe("buildSitemapXml", () => {
     expect(withAlternates).toContain('xmlns:xhtml="http://www.w3.org/1999/xhtml"');
     expect(withoutAlternates).not.toContain("xmlns:xhtml");
   });
+
+  it("emits Google's image extension once and escapes external CDN image URLs", () => {
+    const xml = buildSitemapXml(
+      [
+        {
+          path: "/products/one",
+          images: [{ loc: "https://cdn.example.test/images/one.jpg?width=800&fit=crop" }],
+        },
+      ],
+      "https://example.com",
+    );
+
+    expect(xml).toContain('xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"');
+    expect(xml).toContain("<image:image>");
+    expect(xml).toContain(
+      "<image:loc>https://cdn.example.test/images/one.jpg?width=800&amp;fit=crop</image:loc>",
+    );
+  });
 });

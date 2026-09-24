@@ -19,6 +19,7 @@ export function escapeXml(value: string): string {
 }
 
 const XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
+const IMAGE_NAMESPACE = "http://www.google.com/schemas/sitemap-image/1.1";
 
 /**
  * The `xmlns:xhtml` attribute exactly as it appears on `<urlset>`, including
@@ -26,6 +27,8 @@ const XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
  * against the ceiling without duplicating the string it measures.
  */
 export const XHTML_NAMESPACE_ATTR = ` xmlns:xhtml="${XHTML_NAMESPACE}"`;
+/** See {@link XHTML_NAMESPACE_ATTR}; measured by the shard writer before roll-over. */
+export const IMAGE_NAMESPACE_ATTR = ` xmlns:image="${IMAGE_NAMESPACE}"`;
 
 /**
  * Renders one `<url>` block. Exported so the streaming writer can measure the
@@ -56,6 +59,12 @@ export function renderUrlBlock(entry: ResolvedSitemapEntry, baseUrl: string): st
     );
   }
 
+  for (const image of entry.images ?? []) {
+    lines.push(`    <image:image>`);
+    lines.push(`      <image:loc>${escapeXml(resolveAgainstBase(baseUrl, image.loc))}</image:loc>`);
+    lines.push(`    </image:image>`);
+  }
+
   lines.push(`  </url>`);
 
   return lines.join("\n");
@@ -72,7 +81,8 @@ export function renderUrlBlock(entry: ResolvedSitemapEntry, baseUrl: string): st
  */
 export function buildSitemapXml(entries: readonly ResolvedSitemapEntry[], baseUrl: string): string {
   const hasAlternates = entries.some((entry) => (entry.alternates?.length ?? 0) > 0);
-  const namespaces = hasAlternates ? XHTML_NAMESPACE_ATTR : "";
+  const hasImages = entries.some((entry) => (entry.images?.length ?? 0) > 0);
+  const namespaces = `${hasAlternates ? XHTML_NAMESPACE_ATTR : ""}${hasImages ? IMAGE_NAMESPACE_ATTR : ""}`;
   const body = entries.map((entry) => renderUrlBlock(entry, baseUrl)).join("\n");
 
   return (

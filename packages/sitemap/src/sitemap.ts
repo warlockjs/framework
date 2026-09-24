@@ -26,7 +26,14 @@ import { buildSitemapXml } from "./xml";
 export class Sitemap {
   private readonly baseUrl: string;
 
-  private readonly defaults: Pick<SitemapOptions, "changefreq" | "priority" | "lastmod">;
+  private readonly defaults: Pick<
+    SitemapOptions,
+    "changefreq" | "priority" | "lastmod" | "onImageLimitExceeded"
+  >;
+
+  private readonly warnedImageRoutes = new Set<string>();
+
+  private readonly optionsImageReporter: SitemapOptions["onImageLimitExceeded"];
 
   /** Keyed by path: a duplicate `<loc>` makes the document invalid, so the later add wins. */
   private readonly entriesByPath = new Map<string, ResolvedSitemapEntry>();
@@ -39,11 +46,25 @@ export class Sitemap {
 
   public constructor(options: SitemapOptions) {
     this.baseUrl = normalizeBaseUrl(options?.baseUrl);
+    this.optionsImageReporter = options.onImageLimitExceeded;
     this.defaults = {
       changefreq: options.changefreq,
       priority: options.priority,
       lastmod: options.lastmod,
+      onImageLimitExceeded: (event) => this.reportImageLimit(event),
     };
+  }
+
+  private reportImageLimit(event: { readonly route?: string; readonly dropped: number }): void {
+    const key = event.route ?? "unattributed";
+    if (this.warnedImageRoutes.has(key)) return;
+
+    this.warnedImageRoutes.add(key);
+    if (this.optionsImageReporter) this.optionsImageReporter(event);
+    else
+      console.warn(
+        `[warlock:sitemap] ${key} exceeded the 1,000-image limit; dropped ${event.dropped} image(s).`,
+      );
   }
 
   public add(entry: SitemapEntry): this {

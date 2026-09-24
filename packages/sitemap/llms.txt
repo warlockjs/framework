@@ -6,4 +6,4 @@
 
 ## Skills
 
-- [sitemap-overview](@warlock.js/sitemap/sitemap-overview/SKILL.md): @warlock.js/sitemap — overview in @warlock.js/sitemap; use when you need to sitemap overview.
+- [sitemap-overview](@warlock.js/sitemap/sitemap-overview/SKILL.md): (no description)

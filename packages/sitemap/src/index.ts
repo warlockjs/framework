@@ -24,6 +24,8 @@ export type {
   RouteSummary,
   SitemapAlternate,
   SitemapEntry,
+  SitemapImage,
+  SitemapImageLimitExceeded,
   SitemapOptions,
 } from "./types";
 
@@ -38,3 +40,20 @@ export type {
 export { buildSitemapXml, escapeXml, renderUrlBlock } from "./xml";
 
 export { joinOrigin } from "./url";
+
+export {
+  GENERATION_MANIFEST_VERSION,
+  InvalidSitemapGenerationManifestError,
+  MANIFEST_FENCE_WIDTH,
+  parseSitemapGenerationManifest,
+  parseSitemapManifestKey,
+  sitemapManifestKey,
+  sortSitemapManifestCandidates,
+} from "./generation-manifest";
+
+export type {
+  SitemapGenerationFile,
+  SitemapGenerationKind,
+  SitemapGenerationManifest,
+  SitemapManifestKey,
+} from "./generation-manifest";

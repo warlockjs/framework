@@ -8,11 +8,15 @@ import type { ShardFile } from "./sitemap-shard-writer";
  * nested per-group indexes, and never a zero-url row (that is a diagnostic
  * for `files`, not something a crawler should be told to fetch).
  */
-export function buildSitemapIndexXml(files: readonly ShardFile[], baseUrl: string): string {
+export function buildSitemapIndexXml(
+  files: readonly ShardFile[],
+  baseUrl: string,
+  shardPathPrefix = "",
+): string {
   const body = files
     .filter((file) => file.urls > 0)
     .map((file) => {
-      const loc = escapeXml(joinOrigin(baseUrl, file.fileName));
+      const loc = escapeXml(joinOrigin(baseUrl, `${shardPathPrefix}${file.fileName}`));
 
       return `  <sitemap>\n    <loc>${loc}</loc>\n  </sitemap>`;
     })

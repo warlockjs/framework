@@ -10,10 +10,14 @@ export type ResolvedSitemapIndexOptions = {
   readonly baseUrl: string;
   readonly filePrefix: string;
   readonly indexFileName: string;
+  readonly shardPathPrefix: string;
   readonly gzip: boolean;
   readonly maxUrlsPerFile: number;
   readonly maxBytesPerFile: number;
-  readonly defaults: Pick<SitemapOptions, "changefreq" | "priority" | "lastmod">;
+  readonly defaults: Pick<
+    SitemapOptions,
+    "changefreq" | "priority" | "lastmod" | "onImageLimitExceeded"
+  >;
 };
 
 /** Validates and folds in defaults, once, at the constructor — the same discipline as `Sitemap`. */
@@ -21,6 +25,7 @@ export function normalizeSitemapIndexOptions(
   options: SitemapIndexOptions,
 ): ResolvedSitemapIndexOptions {
   const baseUrl = normalizeBaseUrl(options?.baseUrl);
+  const shardPathPrefix = normalizeShardPathPrefix(options.shardPathPrefix);
 
   const maxUrlsPerFile = options.maxUrlsPerFile ?? PROTOCOL_MAX_URLS_PER_FILE;
   const maxBytesPerFile = options.maxBytesPerFile ?? PROTOCOL_MAX_BYTES_PER_FILE;
@@ -51,6 +56,7 @@ export function normalizeSitemapIndexOptions(
     baseUrl,
     filePrefix: options.filePrefix ?? "sitemap",
     indexFileName: options.indexFileName ?? "sitemap_index.xml",
+    shardPathPrefix,
     gzip: options.gzip ?? false,
     maxUrlsPerFile,
     maxBytesPerFile,
@@ -58,6 +64,21 @@ export function normalizeSitemapIndexOptions(
       changefreq: options.changefreq,
       priority: options.priority,
       lastmod: options.lastmod,
+      onImageLimitExceeded: options.onImageLimitExceeded,
     },
   };
+}
+
+function normalizeShardPathPrefix(value: string | undefined): string {
+  if (value === undefined || value === "" || value === "/") return "";
+
+  const prefix = value.replace(/^\//, "").replace(/\/$/, "");
+  if (
+    prefix.length === 0 ||
+    prefix.split("/").some((segment) => !/^[A-Za-z0-9_-]+$/.test(segment))
+  ) {
+    throw new TypeError("shardPathPrefix must contain only safe URL path segments.");
+  }
+
+  return `${prefix}/`;
 }
