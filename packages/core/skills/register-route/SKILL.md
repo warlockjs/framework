@@ -1,6 +1,6 @@
 ---
 name: register-route
-description: "Warlock — register a route in @warlock.js/core; use when you need to register route."
+description: 'Register HTTP routes via @warlock.js/core''s router — single routes, prefix groups, middleware-guarded blocks, and RESTful resource chains. Routes always live in `src/app/<module>/routes.ts`. Triggers: `router.get`, `router.post`, `router.prefix`, `router.group`, `router.route`, `guarded`; "add a route", "wire a controller to a URL", "group routes by prefix", "register a RESTful resource"; typical import `import { router } from "@warlock.js/core"`. Skip: handler shape — `@warlock.js/core/create-controller/SKILL.md`; CRUD chain details — `@warlock.js/core/build-restful/SKILL.md`; middleware authoring — `@warlock.js/core/write-middleware/SKILL.md`; competing libs `express`, `fastify`, `koa`, `@nestjs/common`.'
 ---
 
 # Warlock — register a route

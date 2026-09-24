@@ -1,6 +1,6 @@
 ---
 name: define-resource
-description: "Warlock — define a resource in @warlock.js/core; use when you need to define resource."
+description: 'Map model fields to wire-shape via `defineResource()` or `Resource` subclasses. Output-only — never put business logic, hydration, or reconciliation in a resource. Triggers: `defineResource`, `Resource`, `RegisterResource`, `toJSON`, `"self"`, `"localized"`, `"uploadsUrl"`; "shape an API response", "nest related resources", "rename a field on output", "self-referential tree resource"; typical import `import { defineResource } from "@warlock.js/core"`. Skip: localized columns — `@warlock.js/core/use-localization/SKILL.md`; URL casting — `@warlock.js/core/build-url/SKILL.md`; controller side — `@warlock.js/core/create-controller/SKILL.md`; competing libs `@nestjs/swagger` `@ApiProperty`, `class-transformer`, hand-rolled DTO mappers.'
 ---
 
 # Warlock — define a resource

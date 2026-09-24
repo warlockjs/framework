@@ -1,6 +1,6 @@
 ---
 name: lower-stage3-decorators
-description: "Lower Stage-3 decorators for Vite/Vitest in @warlock.js/core; use when you need to lower stage3 decorators."
+description: 'Vite/Vitest plugin `lowerStage3Decorators()` that lowers TC39 Stage-3 (native) decorators with esbuild before oxc / the SSR rewrite mangles them — so `@RegisterModel`-decorated Cascade models load under Vitest 4 / Vite 8. Triggers: `lowerStage3Decorators`, "SyntaxError: Invalid or unexpected token" on a decorated class, "@(0, __vite_ssr_import__.X)()", "decorator crashes vitest", "models won''t load in tests", "Vite 8 oxc decorators"; typical import `import { lowerStage3Decorators } from "@warlock.js/core/vite"` in `vite.config.ts` / `vitest.config.ts`. Skip: writing the tests themselves — `@warlock.js/core/test-service/SKILL.md` / `@warlock.js/core/test-http/SKILL.md`; runtime migrations — `@warlock.js/cascade/write-migration/SKILL.md`.'
 ---
 
 # Lower Stage-3 decorators for Vite/Vitest

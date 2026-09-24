@@ -1,6 +1,6 @@
 ---
 name: write-use-case
-description: "Warlock — write a use case in @warlock.js/core; use when you need to write use case."
+description: 'Author `useCase()` pipelines for business logic — guards, schema, before/after middleware, retry, benchmark, broadcast, lifecycle callbacks; transport-agnostic and observable by default. Input is inferred from the `schema`. Triggers: `useCase`, `UseCaseContext`, `UseCaseResult`, `retry`, `benchmark`, `broadcast`, `description`, `globalUseCasesEvents`, `UseCaseBroadcastChannel`; "encapsulate a business operation", "share logic between HTTP and CLI", "add guards and lifecycle hooks", "broadcast a use case result", "transport-agnostic pipeline"; typical import `import { useCase } from "@warlock.js/core"`. Skip: thin handler shape — `@warlock.js/core/create-controller/SKILL.md`; schema details — `@warlock.js/core/validate-input/SKILL.md`; the standalone retry util — `@warlock.js/core/retry-operation/SKILL.md`; competing libs `@nestjs/cqrs`, `inversify`, hand-rolled service classes.'
 ---
 
 # Warlock — write a use case

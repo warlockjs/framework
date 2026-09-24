@@ -1,6 +1,6 @@
 ---
 name: warlock-doctor
-description: "Warlock — warlock doctor in @warlock.js/core; use when you need to warlock doctor."
+description: 'Run `warlock doctor` — a read-only diagnostics command that checks routes / config / connectors / optional-peers / health endpoints / release hygiene and prints a pass/warn/fail report, exiting non-zero on any failure. Add your own probe with the `DoctorCheck` contract and `runChecks` / `formatReportLines`. Triggers: `warlock doctor`, `doctorCommand`, `DoctorCheck`, `CheckResult`, `CheckStatus`, `DoctorReport`, `runChecks`, `formatReportLines`, `printReport`, `defaultDoctorChecks`; "diagnose my app", "preflight / preflight check", "is the app healthy", "why are there 0 routes", "pre-release sanity check", "CI smoke check"; run as `npx warlock doctor`. Skip: the live `/health` + `/ready` HTTP probes — `@warlock.js/core/health-checks/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; releasing the package — `releasing-warlock-monorepo`; competing tools `npm doctor`, `nest info`, hand-rolled preflight scripts.'
 ---
 
 # Warlock — `warlock doctor`

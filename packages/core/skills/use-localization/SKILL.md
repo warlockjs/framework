@@ -1,6 +1,6 @@
 ---
 name: use-localization
-description: "Warlock — translate keys + pick localized values in @warlock.js/core; use when you need to use localization."
+description: 'Multi-locale translations via `groupedTranslations` (declare keys), `t()` / `request.t()` / `request.trans()` (look up), `request.getLocaleCode()` (detect locale from headers/query), `getLocalized` (pick the right value from a localized-array column). Triggers: `groupedTranslations`, `t`, `request.t`, `request.trans`, `request.transFrom`, `request.getLocaleCode`, `request.setLocaleCode`, `getLocalized`; "add a translation key", "resolve a localized error message", "detect request locale", "pick the right per-locale column value"; typical import `import { t, getLocalized } from "@warlock.js/core"`. Skip: resource output — `@warlock.js/core/define-resource/SKILL.md`; module scaffold — `@warlock.js/core/create-module/SKILL.md`; competing libs `i18next`, `react-intl`, raw `@mongez/localization`.'
 ---
 
 # Warlock — translate keys + pick localized values

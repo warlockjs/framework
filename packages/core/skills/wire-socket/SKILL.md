@@ -1,6 +1,6 @@
 ---
 name: wire-socket
-description: "Warlock — wire a Socket.IO server in @warlock.js/core; use when you need to wire socket."
+description: 'Configure Socket.IO via `src/config/socket.ts`, reach the live server through `getSocketServer()` (or `app.socket` post-bootstrap), register `connection` handlers once the late-phase socket connector has booted, emit from controllers/services, use rooms and namespaces. Triggers: `app.socket`, `getSocketServer`, `SocketOptions`, `socket.io` `Server`, `socket.join`, `socket.to`, `io.of`, `io.use`; "add realtime chat", "emit socket events from a service", "use rooms and namespaces", "per-socket JWT auth". Skip: connector lifecycle — `@warlock.js/core/add-connector/SKILL.md`; app context accessors — `@warlock.js/core/use-app-context/SKILL.md`; competing libs `ws`, `socket.io` direct without Warlock connector, `uWebSockets.js`.'
 ---
 
 # Warlock — wire a Socket.IO server

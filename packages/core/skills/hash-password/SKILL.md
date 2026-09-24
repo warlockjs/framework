@@ -1,6 +1,6 @@
 ---
 name: hash-password
-description: "Warlock — hash a password in @warlock.js/core; use when you need to hash password."
+description: 'One-way bcrypt password hashing — `hashPassword` / `verifyPassword`, plus the declarative `useHashedPassword()` schema transformer that auto-hashes a model''s password field on save. Salt rounds come from `src/config/encryption.ts`. Triggers: `hashPassword`, `verifyPassword`, `useHashedPassword`, `password.salt`, `bcryptjs`; "hash a user password", "verify login credentials", "auto-hash on save", "rotate a password"; typical import `import { hashPassword, verifyPassword } from "@warlock.js/core"`. Skip: reversible secrets — `@warlock.js/core/encrypt-data/SKILL.md`; the other transformers — `@warlock.js/core/use-model-transformers/SKILL.md`; config wiring — `@warlock.js/core/configure-app/SKILL.md`; competing libs `bcrypt` native, `argon2`, `scrypt`.'
 ---
 
 # Warlock — hash a password

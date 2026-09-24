@@ -1,6 +1,6 @@
 ---
 name: resolve-path
-description: "Warlock — resolve a path in @warlock.js/core; use when you need to resolve path."
+description: 'Path helpers anchored at `process.cwd()` — `rootPath`, `srcPath`, `appPath`, `configPath`, `publicPath`, `storagePath`, `uploadsPath`, `cachePath`, `logsPath`, `tempPath`, `warlockPath`, `sanitizePath`. Optional `uploads.root` config overrides the uploads anchor. Triggers: `appPath`, `configPath`, `uploadsPath`, `storagePath`, `publicPath`, `cachePath`, `logsPath`, `tempPath`, `sanitizePath`, `paths`; "resolve a path inside src/app", "absolute upload destination", "sanitize a user filename", "ship uploads to a mounted volume"; typical import `import { appPath, uploadsPath } from "@warlock.js/core"`. Skip: HTTP URL helpers — `@warlock.js/core/build-url/SKILL.md`; app metadata — `@warlock.js/core/use-app-context/SKILL.md`; storage abstraction — `@warlock.js/core/store-file/SKILL.md`; competing patterns: `path.join(process.cwd(), ...)`, hand-rolled directory constants.'
 ---
 
 # Warlock — resolve a path

@@ -1,6 +1,6 @@
 ---
 name: request-memo
-description: "Warlock — memoize work for one request in @warlock.js/core; use when you need to request memo."
+description: 'Memoize async work for one HTTP request with `requestMemo<T>(key, fn)` — the v5 replacement for removed `fromRequest`, with single-flight promise sharing, settled-success reuse, rejection eviction, and no cross-request fallback. Triggers: `requestMemo`, `fromRequest`, `fromRequest removed`, `request-scoped cache`, `single-flight`, `current request memo`; "migrate off fromRequest", "load this once per request", "deduplicate concurrent loaders", "cache a repository lookup during one request"; typical import `import { requestMemo } from "@warlock.js/core"`. Skip: middleware-written request state — `@warlock.js/core/use-request-locals/SKILL.md`; process-wide or cross-request caching — `@warlock.js/core/use-middleware/SKILL.md`; competing patterns: dynamic `request[key]` properties, module-global `Map`, payload `request.get()` / `request.set()`.'
 ---
 
 # Warlock — memoize work for one request

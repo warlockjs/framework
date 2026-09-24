@@ -1,6 +1,6 @@
 ---
 name: test-service
-description: "Warlock — test a service in @warlock.js/core; use when you need to test service."
+description: 'Pure unit tests against services, repositories, models, and use-cases — `setupTest({ connectors })` bootstraps the framework with its own DB/cache connections so you can call your code directly, and `teardownTest()` closes it. Triggers: `setupTest`, `teardownTest`, `src/test-setup.ts`, `tests.connectors`, `tests.setupTimeout`, `Application.setEnvironment`; "unit-test a service", "test a repository query", "vitest setupFiles", "skip connectors for pure-logic tests"; typical import `import { setupTest, teardownTest } from "@warlock.js/core/tests"`. Skip: HTTP integration — `@warlock.js/core/test-http/SKILL.md`; warlock add test scaffold — `@warlock.js/core/write-cli-command/SKILL.md`; competing tooling: jest direct, `supertest`, `nock`.'
 ---
 
 # Warlock — test a service

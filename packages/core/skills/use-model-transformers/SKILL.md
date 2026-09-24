@@ -1,6 +1,6 @@
 ---
 name: use-model-transformers
-description: "Warlock — declare model transformers in @warlock.js/core; use when you need to use model transformers."
+description: 'Three schema-side helpers — `useHashedPassword()` (bcrypt on save) attaches via `.addTransformer(...)`; `useComputedSlug(field?, scope?)` (auto-slug from another field) and `useComputedModel(callback)` (arbitrary computed-on-save value) attach via `v.computed(...)`. Triggers: `useHashedPassword`, `useComputedSlug`, `useComputedModel`, `.addTransformer`, `v.computed`, `ComputedCallback`; "auto-hash a password field", "auto-slug from title on save", "derive a value at write time", "declarative model transformers"; typical import `import { useHashedPassword, useComputedSlug } from "@warlock.js/core"`. Skip: bcrypt setup details — `@warlock.js/core/hash-password/SKILL.md`; repository writes — `@warlock.js/core/use-repository/SKILL.md`; output filtering — `@warlock.js/core/define-resource/SKILL.md`; competing patterns: manual `await hashPassword(input)` in services, ORM lifecycle hooks.'
 ---
 
 # Warlock — declare model transformers

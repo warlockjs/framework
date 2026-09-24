@@ -1,6 +1,6 @@
 ---
 name: use-repository
-description: "Warlock — use a repository in @warlock.js/core; use when you need to use repository."
+description: 'Subclass `RepositoryManager` for data access — declare `source`, `filterBy`, `defaultOptions`, then call `list()`/`listCached()`/`find()`/`create()`/`update()`/`delete()`, the active/cached/cursor variants, and the `filterBy`-aware aggregates `sum()`/`avg()`/`min()`/`max()`/`groupBy()`/`aggregate()`. Triggers: `RepositoryManager`, `FilterRules`, `RepositoryOptions`, `.list`, `.listCached`, `.find`, `.findCached`, `.create`, `.update`, `.delete`, `.sum`, `.avg`, `.min`, `.max`, `.groupBy`, `.aggregate`, `simpleSelectColumns`; "create a repository", "filter rules for a list endpoint", "cursor vs page pagination", "cached vs uncached read", "sum/avg/group-by with filters"; typical import `import { RepositoryManager } from "@warlock.js/core"`. Skip: cache singleton — `@warlock.js/cache/cache-basics/SKILL.md`; use-case pipelines — `@warlock.js/core/write-use-case/SKILL.md`; wire mapping — `@warlock.js/core/define-resource/SKILL.md`; competing libs `typeorm` Repository, `prisma.client.<model>`, `@nestjs/typeorm`.'
 ---
 
 # Warlock — use a repository

@@ -1,6 +1,6 @@
 ---
 name: validate-input
-description: "Warlock — validate a request in @warlock.js/core; use when you need to validate input."
+description: 'Author seal schemas, attach them to controllers via `controller.validation = { schema }`, infer types via `Infer<typeof schema>`, and layer DB-aware (`unique`/`exists`) and file validators on top. Triggers: `v.object`, `v.string`, `v.email`, `Infer`, `controller.validation`, `.unique`, `.exists`, `uniqueExceptCurrentId`, `request.validated`; "validate a request body", "attach a schema to a controller", "DB-aware unique rule", "infer schema types"; typical import `import { v, type Infer } from "@warlock.js/seal"`. Skip: schema authoring foundations — `@warlock.js/seal/seal-basics/SKILL.md`; controller wiring — `@warlock.js/core/create-controller/SKILL.md`; file rules deep-dive — `@warlock.js/core/upload-file/SKILL.md`; competing libs `zod`, `joi`, `yup`, `class-validator`.'
 ---
 
 # Warlock — validate a request

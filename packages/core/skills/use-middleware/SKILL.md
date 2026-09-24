@@ -1,6 +1,6 @@
 ---
 name: use-middleware
-description: "Warlock — use built-in middleware in @warlock.js/core; use when you need to use middleware."
+description: 'Attach built-in HTTP middleware to routes via the `middleware` namespace from `@warlock.js/core` — rateLimit, concurrencyLimit, maxBodySize, idempotency, maintenance, ipFilter, cache. Plus `X-Request-Id` correlation, wired automatically. Triggers: `middleware.rateLimit`, `middleware.concurrencyLimit`, `middleware.maxBodySize`, `middleware.idempotency`, `middleware.maintenance`, `middleware.ipFilter`, `middleware.cache`, `X-Request-Id`, `Idempotency-Key`; "add rate limiting", "dedupe writes by idempotency key", "cap concurrent requests", "block IPs", "cache a GET response"; typical import `import { middleware } from "@warlock.js/core"`. Skip: author custom middleware — `@warlock.js/core/write-middleware/SKILL.md`; cache singleton — `@warlock.js/cache/cache-basics/SKILL.md`; competing libs `@fastify/rate-limit` direct, `express-rate-limit`, `helmet`.'
 ---
 
 # Warlock — use built-in middleware

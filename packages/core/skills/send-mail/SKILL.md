@@ -1,6 +1,6 @@
 ---
 name: send-mail
-description: "Warlock — send a mail in @warlock.js/core; use when you need to send mail."
+description: 'Send transactional email — `Mail` fluent builder, `sendMail()` direct call, React Email components. Test mode auto-captures into an in-memory mailbox; dev mode logs. Triggers: `Mail.to`, `sendMail`, `setMailMode`, `mailEvents`, `assertMailSent`, `getTestMailbox`, `wasMailSentTo`, `closeAllMailers`; "send a transactional email", "build a React Email template", "configure SMTP or SES", "assert an email was sent in tests"; typical import `import { Mail, sendMail } from "@warlock.js/core"`. Skip: per-config wiring — `@warlock.js/core/configure-app/SKILL.md`; layered service patterns — `@warlock.js/core/warlock-conventions/SKILL.md`; competing libs `nodemailer` direct, `@sendgrid/mail`, `resend`, `mailgun.js`.'
 ---
 
 # Warlock — send a mail

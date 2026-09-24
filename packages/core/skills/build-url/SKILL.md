@@ -1,6 +1,6 @@
 ---
 name: build-url
-description: "Warlock — build a URL in @warlock.js/core; use when you need to build url."
+description: 'HTTP URL helpers — `url`, `publicUrl`, `assetsUrl`, `uploadsUrl`, anchored at `app.baseUrl`. Use to render `src` / `href` / API URLs in resources and responses. `setBaseUrl` is wired by the HTTP connector from `config.get("app.baseUrl")`. Triggers: `url`, `publicUrl`, `assetsUrl`, `uploadsUrl`, `setBaseUrl`, `BASE_URL`; "render an avatar src URL", "absolute download link", "embed asset URL in email", "URL helpers vs path helpers"; typical import `import { url, publicUrl, uploadsUrl } from "@warlock.js/core"`. Skip: filesystem paths — `@warlock.js/core/resolve-path/SKILL.md`; signed CDN URLs — `@warlock.js/core/store-file/SKILL.md`; resource output — `@warlock.js/core/define-resource/SKILL.md`; competing patterns: hand-rolled `${baseUrl}/...` template strings.'
 ---
 
 # Warlock — build a URL

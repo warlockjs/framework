@@ -1,6 +1,6 @@
 ---
 name: run-app
-description: "Warlock — run the app in @warlock.js/core; use when you need to run app."
+description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`, `PortInUseError`, `assertPortIsAvailable`, `EADDRINUSE`, `EsbuildBinaryMissingError`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server", "port already in use"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — `@warlock.js/core/write-cli-command/SKILL.md`; config shape — `@warlock.js/core/configure-app/SKILL.md`; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
 ---
 
 # Warlock — run the app

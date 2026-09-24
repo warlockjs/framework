@@ -1,6 +1,6 @@
 ---
 name: write-middleware
-description: "Warlock — write a middleware in @warlock.js/core; use when you need to write middleware."
+description: 'Author HTTP middleware for @warlock.js/core — the `({ request, response })` signature, short-circuit by returning a response, enrich the request with extra fields, register per-route, per-group, or app-wide. Triggers: `Middleware`, `MiddlewareResponse`, `router.group`, `guarded`, `request.detectIp`, `authMiddleware`; "write a custom middleware", "short-circuit a request", "enrich the request with extra fields", "per-route vs per-group middleware"; typical import `import type { Middleware } from "@warlock.js/core"`. Skip: built-in middleware catalog — `@warlock.js/core/use-middleware/SKILL.md`; route attachment — `@warlock.js/core/register-route/SKILL.md`; response helpers — `@warlock.js/core/send-response/SKILL.md`; competing patterns: `express` `(req, res, next)` middleware, Fastify `preHandler` hooks.'
 ---
 
 # Warlock — write a middleware

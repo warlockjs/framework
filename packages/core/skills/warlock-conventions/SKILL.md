@@ -1,6 +1,6 @@
 ---
 name: warlock-conventions
-description: "Warlock — framework-wide conventions in @warlock.js/core; use when you need to warlock conventions."
+description: 'Framework-wide invariants for projects built on @warlock.js/core — module layout, canonical imports, layered flow, file naming, and the non-negotiable rules every other warlock skill assumes. Triggers: `src/app/<module>`, `routes.ts`, `main.ts`, `Request<TSchema>`, `RequestHandler`, `GuardedRequestHandler`, `app/<module>/...`; "where do files go in this project", "canonical Warlock imports", "module layout rules", "controller-service-repository layering"; typical import `import { router, type RequestHandler } from "@warlock.js/core"`. Skip: scaffold a new module — `@warlock.js/core/create-module/SKILL.md`; route shape — `@warlock.js/core/register-route/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing patterns: `express` ad-hoc layouts, `@nestjs/common` decorator-driven structure.'
 ---
 
 # Warlock — framework-wide conventions
