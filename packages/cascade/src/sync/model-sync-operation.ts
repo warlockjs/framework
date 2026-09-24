@@ -8,6 +8,7 @@
  * @module cascade-next/sync/model-sync-operation
  */
 
+import { log } from "@warlock.js/logger";
 import events, { type EventSubscription } from "@mongez/events";
 import type { ChildModel, Model } from "../model/model";
 import { getModelDeletedEvent, getModelUpdatedEvent } from "./model-events";
@@ -260,9 +261,10 @@ export class ModelSyncOperation implements ModelSyncOperationContract {
         this.buildSyncConfig(),
       );
     } catch (error) {
-      console.error(
-        `[ModelSync] Failed to sync ${this.config.sourceModel.name} -> ${this.config.targetModel.name}:`,
-        error,
+      log.error(
+        "database",
+        "sync.failed",
+        `[ModelSync] Failed to sync ${this.config.sourceModel.name} -> ${this.config.targetModel.name}: ${error}`,
       );
     }
   };
@@ -296,9 +298,10 @@ export class ModelSyncOperation implements ModelSyncOperationContract {
         await syncManager.syncDeleteWithConfig(sourceId, this.buildSyncConfig());
       }
     } catch (error) {
-      console.error(
-        `[ModelSync] Failed to handle delete for ${this.config.sourceModel.name}:`,
-        error,
+      log.error(
+        "database",
+        "sync.failed",
+        `[ModelSync] Failed to handle delete for ${this.config.sourceModel.name}: ${error}`,
       );
     }
   };

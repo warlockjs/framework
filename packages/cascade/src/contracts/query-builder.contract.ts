@@ -722,6 +722,26 @@ export interface QueryBuilderContract<T = unknown> {
   whereNotBetween(field: string, range: [unknown, unknown]): this;
 
   /**
+   * OR variant of `whereIn`.
+   *
+   * @example
+   * query.where('a', 1).orWhereIn('status', ['active', 'pending'])
+   */
+  orWhereIn(field: string, values: unknown[]): this;
+
+  /** OR variant of `whereNotIn`. */
+  orWhereNotIn(field: string, values: unknown[]): this;
+
+  /** OR variant of `whereNull`. */
+  orWhereNull(field: string): this;
+
+  /** OR variant of `whereNotNull`. */
+  orWhereNotNull(field: string): this;
+
+  /** OR variant of `whereBetween` (inclusive range). */
+  orWhereBetween(field: string, range: [unknown, unknown]): this;
+
+  /**
    * Apply pattern matching (case-insensitive) for the given field.
    *
    * @example
@@ -1875,6 +1895,20 @@ export interface QueryBuilderContract<T = unknown> {
    * @returns Number of rows affected
    */
   update(fields: Record<string, unknown>): Promise<number>;
+
+  /**
+   * Delete every row matching the current query (scopes and filters applied).
+   *
+   * @returns Number of rows deleted
+   */
+  delete(): Promise<number>;
+
+  /**
+   * Delete a single row matching the current query.
+   *
+   * @returns Number of rows deleted (0 or 1)
+   */
+  deleteOne(): Promise<number>;
 
   count(): Promise<number>;
 

@@ -425,16 +425,20 @@ export async function connectToDatabase<TDriverOptions = any, TClientOptions = a
   });
 
   // Register data source
-  dataSourceRegistry.register(dataSource, { explicitDefault: options.isDefault === true });
+  const registeredSource = dataSourceRegistry.register(dataSource, {
+    explicitDefault: options.isDefault === true,
+  });
 
   // Connect to the database
   try {
     await driver.connect();
   } catch (error) {
-    console.log(error);
+    // Do not leave a dead source registered as the default
+    dataSourceRegistry.unregister(registeredSource);
 
     throw new Error(
       `Failed to connect to ${driverType} database: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
     );
   }
 

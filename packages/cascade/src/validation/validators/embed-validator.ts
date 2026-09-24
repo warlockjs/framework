@@ -12,6 +12,7 @@ export class EmbedModelValidator extends BaseValidator {
     return (
       value instanceof Model ||
       typeof value === "number" ||
+      typeof value === "string" ||
       (Array.isArray(value) && value.every((item) => item instanceof Model))
     );
   }

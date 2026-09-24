@@ -1,4 +1,4 @@
-import events from "@mongez/events";
+import { log } from "@warlock.js/logger";
 import type {
   DriverContract,
   UpdateOperations,
@@ -10,7 +10,8 @@ import type {
 } from "../contracts/database-remover.contract";
 import type { OnDeletedEventContext } from "../events/model-events";
 import type { ChildModel, Model } from "../model/model";
-import { getModelDeletedEvent } from "../sync/model-events";
+import { triggerModelEvent } from "../sync/model-events";
+import { afterCommit } from "../transactions/after-commit";
 import type { DataSource } from "./../data-source/data-source";
 
 /**
@@ -170,9 +171,11 @@ export class DatabaseRemover implements RemoverContract {
         const updateOperations: UpdateOperations = {
           $set: { [deletedAtColumn]: deletedAt },
         };
+        // Guard: an already soft-deleted row must keep its original timestamp
+        const softFilter = { ...filter, [deletedAtColumn]: null };
         const updateResult = await this.driver.update(
           this.table,
-          filter,
+          softFilter,
           updateOperations,
         );
         deletedCount = updateResult.modifiedCount > 0 ? 1 : 0;
@@ -182,6 +185,16 @@ export class DatabaseRemover implements RemoverContract {
         // and `model.get(deletedAtColumn)` stays undefined after destroy().
         if (deletedCount > 0) {
           this.model.set(deletedAtColumn, deletedAt);
+
+          // The timestamp is already persisted, so it must not stay dirty.
+          // Re-baseline only when it is the sole pending change, so unsaved
+          // edits to other columns keep their dirty state.
+          const dirty = this.model.dirtyTracker.getDirtyColumns();
+          if (dirty.length === 1 && dirty[0] === deletedAtColumn) {
+            this.model.dirtyTracker.reset(
+              this.model.data as Record<string, unknown>,
+            );
+          }
         }
         break;
       }
@@ -206,9 +219,11 @@ export class DatabaseRemover implements RemoverContract {
       await this.model.emitEvent("deleted", context);
     }
 
-    // 7. Trigger sync operations (fire-and-forget, non-blocking)
-    if (!options.skipSync) {
-      void this.triggerSync();
+    // 7. Trigger sync operations after COMMIT; failures are logged
+    // A soft delete keeps the row, so embedded copies must stay: only permanent/trash fire it.
+    // TODO(5.22, K2:B10): move this fan-out to a retry/queue-backed path.
+    if (!options.skipSync && strategy !== "soft") {
+      afterCommit(() => this.triggerSync());
     }
 
     return {
@@ -243,9 +258,12 @@ export class DatabaseRemover implements RemoverContract {
     documentData: Record<string, unknown>,
   ): Record<string, unknown> {
     // Preserve all original fields and add deletion metadata
+    const deletedAtColumn = this.ctor.deletedAtColumn;
+
     return {
       ...documentData,
-      deletedAt: new Date(),
+      [typeof deletedAtColumn === "string" ? deletedAtColumn : "deletedAt"]:
+        new Date(),
       originalTable: this.table,
     };
   }
@@ -283,6 +301,10 @@ export class DatabaseRemover implements RemoverContract {
    */
   private async triggerSync(): Promise<void> {
     // Emit model.deleted event - ModelSyncOperation listens to these
-    await events.triggerAll(getModelDeletedEvent(this.ctor), this.model);
+    try {
+      await triggerModelEvent(this.ctor, "deleted", this.model);
+    } catch (error) {
+      log.error("database", "sync.failed", `[cascade] sync failed for ${this.ctor.name}: ${error}`);
+    }
   }
 }

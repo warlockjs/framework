@@ -46,7 +46,6 @@ type OnFetchedEventContext = {
  * with consistent semantics.
  */
 export type ModelEventName =
-  | "initializing"
   | "fetching"
   | "hydrating"
   | "fetched"

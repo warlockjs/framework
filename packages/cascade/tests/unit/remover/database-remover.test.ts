@@ -127,7 +127,7 @@ describe("DatabaseRemover", () => {
       expect(result.strategy).toBe("soft");
       expect(mockDriver.update).toHaveBeenCalledWith(
         "test_models",
-        { id: 1 },
+        { id: 1, deletedAt: null },
         {
           $set: { deletedAt: expect.any(Date) },
         },
@@ -193,7 +193,7 @@ describe("DatabaseRemover", () => {
 
       expect(mockDriver.update).toHaveBeenCalledWith(
         "custom_models",
-        { id: 1 },
+        { id: 1, removed_at: null },
         {
           $set: { removed_at: expect.any(Date) },
         },

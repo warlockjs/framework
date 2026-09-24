@@ -28,6 +28,10 @@ class DataSourceRegistry {
   private defaultSource?: DataSource;
   private defaultIsExplicit = false;
   private readonly events = new EventEmitter();
+  /** Replaced sources; their forwarded driver events are ignored (drivers have no `off`). */
+  private readonly detached = new WeakSet<DataSource>();
+  /** In-flight `getOrRegister` factories, so concurrent callers share one creation. */
+  private readonly pending = new Map<string, Promise<DataSource>>();
 
   /**
    * Register a new data source definition.
@@ -46,10 +50,16 @@ class DataSourceRegistry {
    *
    * @param options - Data source configuration
    * @param meta - `explicitDefault` tells whether the caller explicitly requested `isDefault: true`
-   *  (defaults to `options.isDefault`), as opposed to it being implied by being the first source
+   *  (defaults to `options.isDefault`), as opposed to it being implied by being the first source.
+   *  `replace: true` also disconnects the previously registered source of the same name (in the
+   *  background). Either way the old source's events stop being forwarded and, if it was the
+   *  default, the new source takes its place.
    * @returns The registered data source instance
    */
-  public register(options: DataSourceOptions, meta?: { explicitDefault?: boolean }): DataSource {
+  public register(
+    options: DataSourceOptions,
+    meta?: { explicitDefault?: boolean; replace?: boolean },
+  ): DataSource {
     const source = new DataSource(options);
     const explicitDefault = meta?.explicitDefault ?? source.isDefault;
 
@@ -64,13 +74,28 @@ class DataSourceRegistry {
       );
     }
 
+    const previous = this.sources.get(source.name);
+
     this.sources.set(source.name, source);
 
-    const isNewDefault = explicitDefault || !this.defaultSource;
+    if (previous) {
+      this.detached.add(previous);
+
+      if (meta?.replace) {
+        previous.driver.disconnect().catch(() => undefined);
+      }
+    }
+
+    // A replaced default hands the default over to its replacement, otherwise get()
+    // would keep returning the stale source.
+    const replacesDefault = previous !== undefined && previous === this.defaultSource;
+    const isNewDefault = explicitDefault || !this.defaultSource || replacesDefault;
 
     if (isNewDefault) {
       this.defaultSource = source;
-      this.defaultIsExplicit = explicitDefault;
+      this.defaultIsExplicit = replacesDefault
+        ? this.defaultIsExplicit || explicitDefault
+        : explicitDefault;
     }
 
     // Emit registration events
@@ -81,14 +106,63 @@ class DataSourceRegistry {
     }
 
     source.driver.on("connected", () => {
-      this.events.emit("connected", source);
+      if (!this.detached.has(source)) this.events.emit("connected", source);
     });
 
     source.driver.on("disconnected", () => {
-      this.events.emit("disconnected", source);
+      if (!this.detached.has(source)) this.events.emit("disconnected", source);
     });
 
     return source;
+  }
+
+  /**
+   * Remove a registered source (only if it is still the one registered under its name).
+   * If it was the default, the registry has no default until another source claims it.
+   */
+  public unregister(source: DataSource): void {
+    if (this.sources.get(source.name) !== source) return;
+
+    this.sources.delete(source.name);
+    this.detached.add(source);
+
+    if (this.defaultSource === source) {
+      this.defaultSource = undefined;
+      this.defaultIsExplicit = false;
+    }
+  }
+
+  /**
+   * Return the registered source for `name`, or create and register it via `factory`.
+   *
+   * Concurrent callers for the same name share one in-flight factory call, so only one
+   * driver/pool is created. A failed factory is not cached.
+   */
+  public getOrRegister(
+    name: string,
+    factory: () => DataSourceOptions | Promise<DataSourceOptions>,
+  ): Promise<DataSource> {
+    const existing = this.sources.get(name);
+
+    if (existing) return Promise.resolve(existing);
+
+    const inFlight = this.pending.get(name);
+
+    if (inFlight) return inFlight;
+
+    const promise = (async () => {
+      try {
+        const options = await factory();
+
+        return this.sources.get(name) ?? this.register({ ...options, name });
+      } finally {
+        this.pending.delete(name);
+      }
+    })();
+
+    this.pending.set(name, promise);
+
+    return promise;
   }
 
   /**
@@ -105,6 +179,7 @@ class DataSourceRegistry {
     this.defaultSource = undefined;
     this.defaultIsExplicit = false;
     this.sources.clear();
+    this.pending.clear();
   }
 
   /**

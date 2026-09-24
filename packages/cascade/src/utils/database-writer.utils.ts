@@ -9,14 +9,18 @@ type transformCallbackOptions = {
   isNew: boolean;
 };
 
-export type ModelTransformCallback = (options: transformCallbackOptions) => string;
+export type ModelTransformCallback = (options: transformCallbackOptions) => unknown | Promise<unknown>;
 
 /**
  * Transfer value before saving it into the database
  */
 export function useModelTransformer(callback: ModelTransformCallback) {
   const transformCallback: TransformerCallback = (data, { context }) => {
-    const model = context.rootContext?.model as Model;
+    const model = context.rootContext?.model as Model | undefined;
+
+    // No model (e.g. the schema is reused to validate a request body): nothing to transform
+    if (!model) return data;
+
     const column = context.key;
     const value = data;
     const isChanged = model.isDirty(column);

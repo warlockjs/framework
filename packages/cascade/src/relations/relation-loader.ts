@@ -148,7 +148,15 @@ export class RelationLoader<TModel extends Model = Model> {
    */
   private get relationDefaults() {
     try {
-      return this.modelClass.getDataSource()?.relationDefaults;
+      const dataSource = this.modelClass.getDataSource();
+
+      if (!dataSource) return undefined;
+
+      const namingConvention =
+        dataSource.modelDefaults?.namingConvention ??
+        dataSource.driver?.modelDefaults?.namingConvention;
+
+      return { ...dataSource.relationDefaults, namingConvention };
     } catch {
       return undefined;
     }
@@ -329,6 +337,8 @@ export class RelationLoader<TModel extends Model = Model> {
     // Build and execute query
     const query = RelatedModel.query().whereIn(foreignKey, localKeyValues);
 
+    this.applySelect(query, definition, [foreignKey]);
+
     if (constraint) {
       constraint(query);
     }
@@ -370,6 +380,8 @@ export class RelationLoader<TModel extends Model = Model> {
 
     // Build and execute query
     const query = RelatedModel.query().whereIn(foreignKey, localKeyValues);
+
+    this.applySelect(query, definition, [foreignKey]);
 
     if (constraint) {
       constraint(query);
@@ -419,6 +431,8 @@ export class RelationLoader<TModel extends Model = Model> {
 
     // Build and execute query
     const query = RelatedModel.query().whereIn(ownerKey, foreignKeyValues);
+
+    this.applySelect(query, definition, [ownerKey]);
 
     if (constraint) {
       constraint(query);
@@ -489,6 +503,8 @@ export class RelationLoader<TModel extends Model = Model> {
 
     // Step 3: Query the related model
     const relatedQuery = RelatedModel.query().whereIn(relatedKey, relatedIds);
+
+    this.applySelect(relatedQuery, definition, [relatedKey]);
 
     if (constraint) {
       constraint(relatedQuery);
@@ -617,6 +633,22 @@ export class RelationLoader<TModel extends Model = Model> {
     }
 
     return ModelClass;
+  }
+
+  /**
+   * Applies the relation definition's `select` columns to the related query.
+   * Runs before the constraint callback so an explicit constraint can still
+   * override it. The key columns used to match records back to their owners
+   * are always included.
+   */
+  private applySelect(
+    query: { select: (columns: string[]) => unknown },
+    definition: RelationDefinition,
+    requiredKeys: string[],
+  ): void {
+    if (!definition.select || definition.select.length === 0) return;
+
+    query.select([...new Set([...definition.select, ...requiredKeys])]);
   }
 
   /**

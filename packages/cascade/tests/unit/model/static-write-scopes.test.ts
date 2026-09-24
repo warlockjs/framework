@@ -17,6 +17,7 @@ function makeModel() {
     replace: vi.fn(async () => ({ id: 7 })),
   };
   const scopedWhere = vi.fn((filter: Record<string, unknown>) => ({
+    first: async () => null,
     pluck: async () => (filter.name === "a" || filter.id === 7 ? rows.map((row) => row.id) : []),
     withoutGlobalScopes: () => ({ where: () => ({ exists: async () => false }) }),
   }));

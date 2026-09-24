@@ -552,9 +552,13 @@ export class ColumnBuilder {
     const operations = (this.migration as any).pendingOperations;
 
     // Remove the addColumn pushed by the column type method (e.g. uuid(), string())
-    const lastOp = operations[operations.length - 1];
-    if (lastOp?.type === "addColumn" && lastOp.payload === this.definition) {
-      operations.pop();
+    // (by identity, anywhere in the queue: .unique()/.index() may have pushed ops after it)
+    const addIndex = operations.findIndex(
+      (op: { type: string; payload: unknown }) =>
+        op.type === "addColumn" && op.payload === this.definition,
+    );
+    if (addIndex !== -1) {
+      operations.splice(addIndex, 1);
     }
 
     // If .references() was called before .change(), the addForeignKey op is now

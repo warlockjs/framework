@@ -4,6 +4,7 @@ import {
   type ModelEventName,
 } from "../../events/model-events";
 import type { Model } from "../model";
+import { emitStaticEvent } from "./static-event-methods";
 
 export async function emitModelEvent<TContext = unknown>(
   model: Model,
@@ -12,7 +13,7 @@ export async function emitModelEvent<TContext = unknown>(
 ): Promise<void> {
   const ctor = model.constructor as any;
   await model.events.emit(event, model, context as TContext);
-  await ctor.events().emit(event, model, context as TContext);
+  await emitStaticEvent(ctor, event, model, context as TContext);
   await globalModelEvents.emit(event, model, context as TContext);
 }
 

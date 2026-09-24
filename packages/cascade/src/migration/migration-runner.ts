@@ -5,7 +5,7 @@ import path from "path";
 import type { MigrationDriverContract } from "../contracts/migration-driver.contract";
 import type { DataSource } from "../data-source/data-source";
 import { dataSourceRegistry } from "../data-source/data-source-registry";
-import { type Migration, type MigrationContract } from "./migration";
+import { type Migration, type MigrationContract, type MigrationStep } from "./migration";
 import { sortMigrations, sortMigrationsForRollback } from "./migration-order";
 import { parseCreatedAt } from "./parse-created-at";
 import { SQLGrammar } from "./sql-grammar";
@@ -52,6 +52,8 @@ type MigrationData = {
   dataSource: DataSource;
   /** Serialized `up()` statements (empty for direct-execution drivers). */
   statements: string[];
+  /** Same as `statements`, with queued data steps kept in authored order. */
+  steps: MigrationStep[];
   /** Whether the migration runs inside a transaction. */
   transactional: boolean;
   /** Driver has no SQL dialect (MongoDB): executed through `runMigration`. */
@@ -66,7 +68,52 @@ type ExecuteOptions = {
   readonly dryRun?: boolean;
   /** Record to migrations table (default: true for batch, false for single) */
   readonly record?: boolean;
+  /**
+   * Rollback only: delete the `_migrations` rows whose migration file is no
+   * longer registered, instead of failing on them.
+   */
+  readonly pruneMissing?: boolean;
 };
+
+/** Name of the lock document Mongo migrations claim inside the migrations collection. */
+const MIGRATION_LOCK_NAME = "__warlock_migration_lock__";
+const MIGRATION_LOCK_KEY = "warlock:migrations";
+const MIGRATION_LOCK_TTL_MS = 10 * 60 * 1000;
+const MIGRATION_LOCK_WAIT_MS = 60 * 1000;
+const MIGRATION_LOCK_RETRY_MS = 1000;
+
+/** Held lock for one data source. `refresh` extends the TTL; `release` frees it. */
+type MigrationLock = {
+  refresh: () => Promise<void>;
+  release: () => Promise<void>;
+};
+
+type PgLockClient = {
+  query: (sql: string, params?: unknown[]) => Promise<unknown>;
+  release: () => void;
+};
+
+/** Minimal Mongo surface the lock needs (kept structural: no driver import). */
+type MongoLockDatabase = {
+  collection: (name: string) => {
+    findOneAndUpdate: (filter: object, update: object, options: object) => Promise<unknown>;
+    findOne: (filter: object) => Promise<{ owner?: string; expiresAt?: unknown } | null>;
+    deleteOne: (filter: object) => Promise<unknown>;
+  };
+};
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Derive a migration name from a file path: drop everything after the first dot
+ * and strip a trailing `-migration` / `_migration` suffix. Shared by every CLI
+ * so the same file is recorded under the same name.
+ */
+export function inferMigrationName(file: string): string {
+  const basename = path.basename(file).split(".")[0] ?? "";
+
+  return basename.replace(/-migration$/, "").replace(/_migration$/, "");
+}
 
 /**
  * Migration runner that executes migrations.
@@ -223,6 +270,142 @@ export class MigrationRunner {
   }
 
   // ============================================================================
+  // LOCKING
+  // ============================================================================
+
+  /** Locks held by the run in progress (Mongo TTL heartbeat). */
+  private activeLocks: MigrationLock[] = [];
+
+  /** Extend every held lock's TTL; called between migrations. */
+  private async refreshLocks(): Promise<void> {
+    for (const lock of this.activeLocks) {
+      await lock.refresh();
+    }
+  }
+
+  /**
+   * Run `callback` while holding a migration lock on every given data source, so
+   * concurrent `migrate` invocations (replicas, init containers) serialize.
+   */
+  private async withLock<T>(sources: DataSource[], callback: () => Promise<T>): Promise<T> {
+    const held: MigrationLock[] = [];
+
+    try {
+      for (const dataSource of sources) {
+        const lock = await this.acquireLock(dataSource);
+        if (lock) held.push(lock);
+      }
+
+      this.activeLocks = held;
+
+      return await callback();
+    } finally {
+      this.activeLocks = [];
+
+      for (const lock of held.reverse()) {
+        try {
+          await lock.release();
+        } catch (error) {
+          log.warn(
+            "database",
+            "migration",
+            `Failed to release migration lock: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+    }
+  }
+
+  /** Acquire the lock for one data source; `undefined` when its driver has no lock support. */
+  private async acquireLock(dataSource: DataSource): Promise<MigrationLock | undefined> {
+    const driver = dataSource.driver as unknown as {
+      name: string;
+      getClient?: () => { connect?: () => Promise<PgLockClient> };
+      getDatabase?: () => MongoLockDatabase;
+    };
+
+    if (driver.name === "postgres" && driver.getClient) {
+      // A dedicated client: advisory locks are per-session, not per-pool.
+      const client = await driver.getClient().connect?.();
+      if (!client) return undefined;
+
+      try {
+        await client.query("SELECT pg_advisory_lock(hashtext($1))", [MIGRATION_LOCK_KEY]);
+      } catch (error) {
+        client.release();
+        throw error;
+      }
+
+      return {
+        refresh: async () => {},
+        release: async () => {
+          try {
+            await client.query("SELECT pg_advisory_unlock(hashtext($1))", [MIGRATION_LOCK_KEY]);
+          } finally {
+            client.release();
+          }
+        },
+      };
+    }
+
+    if (driver.getDatabase) {
+      // The unique index on `name` (created here) makes the claim below atomic.
+      await this.getMigrationDriver(dataSource).ensureMigrationsTable(this.migrationsTable);
+
+      const collection = driver.getDatabase().collection(this.migrationsTable);
+      const owner = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const deadline = Date.now() + MIGRATION_LOCK_WAIT_MS;
+
+      const claim = async (): Promise<boolean> => {
+        const now = new Date();
+
+        try {
+          await collection.findOneAndUpdate(
+            {
+              name: MIGRATION_LOCK_NAME,
+              $or: [{ expiresAt: { $lt: now } }, { owner }],
+            },
+            {
+              $set: { owner, expiresAt: new Date(now.getTime() + MIGRATION_LOCK_TTL_MS) },
+              $setOnInsert: { batch: 0 },
+            },
+            { upsert: true },
+          );
+
+          return true;
+        } catch (error) {
+          // Held by someone else: the upsert collides with the unique `name` index.
+          if ((error as { code?: number }).code === 11000) return false;
+          throw error;
+        }
+      };
+
+      while (!(await claim())) {
+        if (Date.now() >= deadline) {
+          const holder = await collection.findOne({ name: MIGRATION_LOCK_NAME });
+          throw new Error(
+            `Could not acquire the migration lock within ${MIGRATION_LOCK_WAIT_MS / 1000}s; ` +
+              `held by "${holder?.owner ?? "unknown"}" until ${holder?.expiresAt ?? "unknown"}.`,
+          );
+        }
+
+        await sleep(MIGRATION_LOCK_RETRY_MS);
+      }
+
+      return {
+        refresh: async () => {
+          await claim();
+        },
+        release: async () => {
+          await collection.deleteOne({ name: MIGRATION_LOCK_NAME, owner });
+        },
+      };
+    }
+
+    return undefined;
+  }
+
+  // ============================================================================
   // REGISTRATION
   // ============================================================================
 
@@ -249,12 +432,24 @@ export class MigrationRunner {
           `Set it in CLI after importing: MigrationClass.migrationName = "filename";`,
       );
     }
-    // Avoid duplicates
-    if (!this.migrations.some((m) => m.migrationName === name)) {
-      // `name` is proven present by the throw above, so this satisfies the stricter
-      // stored type that every reader downstream relies on.
-      this.migrations.push(MigrationClass as MigrationClass);
+    const existing = this.migrations.find((m) => m.migrationName === name);
+
+    if (existing) {
+      // Re-registering the same class is idempotent; a DIFFERENT class under the
+      // same name would silently never run, so fail loudly.
+      if ((existing as unknown) !== MigrationClass) {
+        throw new Error(
+          `Duplicate migration name "${name}": two different migration classes resolve to the same name. ` +
+            `Rename one of the files (or set a unique static 'migrationName').`,
+        );
+      }
+
+      return this;
     }
+
+    // `name` is proven present by the throw above, so this satisfies the stricter
+    // stored type that every reader downstream relies on.
+    this.migrations.push(MigrationClass as MigrationClass);
 
     return this;
   }
@@ -356,12 +551,21 @@ export class MigrationRunner {
    * ```
    */
   public async runAll(options: ExecuteOptions = {}): Promise<MigrationResult[]> {
+    // A dry run writes nothing, so it needs no lock.
+    if (options.dryRun) return this.runAllUnlocked(options);
+
+    // The pending set is computed INSIDE the lock, so a replica that waited sees
+    // what the winner already applied.
+    return this.withLock(this.getSources(), () => this.runAllUnlocked(options));
+  }
+
+  private async runAllUnlocked(options: ExecuteOptions): Promise<MigrationResult[]> {
     const { dryRun = false, record = true } = options;
 
     const results: MigrationResult[] = [];
 
-    // Get pending migrations
-    const pending = await this.getPendingMigrations();
+    // Get pending migrations (a dry run must not create the migrations table)
+    const pending = await this.getPendingMigrations({ readOnly: dryRun });
 
     if (pending.length === 0) {
       log.warn("database", "migration", "Nothing to migrate.");
@@ -393,6 +597,7 @@ export class MigrationRunner {
           name,
           dataSource,
           statements: [],
+          steps: [],
           transactional: false,
           direct: true,
         });
@@ -401,9 +606,15 @@ export class MigrationRunner {
 
       migration.setDriver(this.getMigrationDriver(dataSource));
       migration.setMigrationDefaults(dataSource.migrationDefaults);
+      // Collection must not run `withConnection` side effects during a dry run.
+      migration.setDryRun?.(dryRun);
 
       await migration.up();
-      const statements = migration.toSQL();
+      const steps: MigrationStep[] = migration.toSteps?.() ?? migration.toSQL();
+      const statements = steps.map((step) =>
+        typeof step === "string" ? step : "-- data step (withConnection) skipped",
+      );
+      migration.setDryRun?.(false);
 
       migrationsData.push({
         MigrationClass,
@@ -411,6 +622,7 @@ export class MigrationRunner {
         name,
         dataSource,
         statements,
+        steps,
         transactional:
           !!dataSource.driver.transaction &&
           this.resolveTransactional(MigrationClass, migration, dataSource, statements),
@@ -470,6 +682,7 @@ export class MigrationRunner {
     for (const run of runs) {
       const first = run[0];
       if (!first) continue;
+      await this.refreshLocks();
       const dataSource = first.dataSource;
       const nextBatch = batches.get(dataSource)!;
       const startTime = Date.now();
@@ -493,9 +706,10 @@ export class MigrationRunner {
 
       const executeRun = async (): Promise<void> => {
         for (const data of run) {
-          for (const sql of data.statements) {
+          for (const step of data.steps) {
             try {
-              await driver.query(sql);
+              if (typeof step === "string") await driver.query(step);
+              else await step.data();
             } catch (err) {
               failingMigrationName = data.name;
               throw err;
@@ -600,7 +814,7 @@ export class MigrationRunner {
     }
 
     const migrationsToExport = options.pendingOnly
-      ? await this.getPendingMigrations()
+      ? await this.getPendingMigrations({ readOnly: true })
       : this.migrations;
 
     if (migrationsToExport.length === 0) {
@@ -615,11 +829,16 @@ export class MigrationRunner {
     );
 
     const upStatements: TaggedSQL[] = [];
-    const downStatements: TaggedSQL[] = [];
+    // Down SQL is grouped per migration so only the migration order is reversed,
+    // never the statements inside one migration's down().
+    const downGroups: { createdAt?: string; index: number; statements: TaggedSQL[] }[] = [];
 
-    for (const MigrationClass of migrationsToExport) {
+    for (const [index, MigrationClass] of migrationsToExport.entries()) {
       const migration = this.createMigrationInstance(MigrationClass);
       const name = MigrationClass.migrationName;
+
+      // Export performs no writes: `withConnection` callbacks are skipped.
+      migration.setDryRun?.(true);
 
       // Collect up SQL
       await migration.up();
@@ -635,8 +854,9 @@ export class MigrationRunner {
 
       // Collect down SQL (reuse same instance — toSQL() cleared pendingOps)
       await migration.down();
+      const statements: TaggedSQL[] = [];
       for (const sql of migration.toSQL()) {
-        downStatements.push({
+        statements.push({
           sql,
           phase: SQLGrammar.phase(sql),
           statementType: SQLGrammar.classify(sql),
@@ -644,11 +864,19 @@ export class MigrationRunner {
           migrationName: name,
         });
       }
+      downGroups.push({ createdAt: MigrationClass.createdAt, index, statements });
     }
 
     const sortedUp = SQLGrammar.sort(upStatements);
-    // Down SQL: reverse order (undo in reverse dependency order)
-    const sortedDown = downStatements.reverse();
+    // Down SQL: newest migration first (chronological, registration order breaks
+    // ties), each migration's own down() statements keep their order.
+    const sortedDown = downGroups
+      .sort((a, b) => {
+        const byDate = (a.createdAt ?? "").localeCompare(b.createdAt ?? "");
+        return byDate !== 0 ? byDate : a.index - b.index;
+      })
+      .reverse()
+      .flatMap((group) => group.statements);
 
     const upSQLString = this.formatSQLForExport(sortedUp, options.compact);
     const downSQLString = this.formatSQLForExport(sortedDown, options.compact);
@@ -691,11 +919,23 @@ export class MigrationRunner {
     batches: number,
     options: ExecuteOptions = {},
   ): Promise<MigrationResult[]> {
+    if (options.dryRun) return this.rollbackBatchesUnlocked(batches, options);
+
+    return this.withLock(this.getSources(), () => this.rollbackBatchesUnlocked(batches, options));
+  }
+
+  private async rollbackBatchesUnlocked(
+    batches: number,
+    options: ExecuteOptions,
+  ): Promise<MigrationResult[]> {
     const dryRun = options.dryRun ?? false;
     const record = options.record ?? true;
     const results: MigrationResult[] = [];
 
-    const toRollback = await this.getMigrationsToRollback(batches);
+    const toRollback = await this.getMigrationsToRollback(batches, {
+      pruneMissing: options.pruneMissing,
+      readOnly: dryRun,
+    });
 
     if (toRollback.length === 0) {
       log.warn("database", "migration", "Nothing to rollback.");
@@ -705,6 +945,8 @@ export class MigrationRunner {
     log.info("database", "migration", `Rolling back ${toRollback.length} migration(s).`);
 
     for (const MigrationClass of toRollback) {
+      await this.refreshLocks();
+
       const result = await this.runMigration(MigrationClass, "down", {
         dryRun,
         record,
@@ -767,7 +1009,7 @@ export class MigrationRunner {
     const executedBySource = new Map<DataSource, Map<string, MigrationRecord>>();
 
     for (const dataSource of this.getSources()) {
-      const executed = await this.getExecutedMigrations(dataSource);
+      const executed = await this.getExecutedMigrations(dataSource, { readOnly: true });
       executedBySource.set(dataSource, new Map(executed.map((r) => [r.name, r])));
     }
 
@@ -900,7 +1142,10 @@ export class MigrationRunner {
         // drivers without SQL serialization (MongoDB) keep them queued and
         // execute them directly through the migration driver.
         const directExecution = databaseDriver.supportsSqlSerialization === false;
-        const sqlStatements = directExecution ? [] : migration.toSQL();
+        const steps: MigrationStep[] = directExecution
+          ? []
+          : (migration.toSteps?.() ?? migration.toSQL());
+        const sqlStatements = steps.filter((step): step is string => typeof step === "string");
         const shouldUseTransaction = this.resolveTransactional(
           MigrationClass,
           migration,
@@ -915,8 +1160,9 @@ export class MigrationRunner {
           }
 
           // Execute generated SQL statements sequentially (no phase-sorting here since it's single execution)
-          for (const sql of sqlStatements) {
-            await databaseDriver.query(sql);
+          for (const step of steps) {
+            if (typeof step === "string") await databaseDriver.query(step);
+            else await step.data();
           }
         };
 
@@ -1067,11 +1313,13 @@ export class MigrationRunner {
    *
    * @see listPendingMigrations
    */
-  public async getPendingMigrations(): Promise<MigrationClass[]> {
+  public async getPendingMigrations(
+    options: { readOnly?: boolean } = {},
+  ): Promise<MigrationClass[]> {
     // "Executed" is judged in each migration's own data source's migrations table.
     const executedNames = new Map<DataSource, Set<string>>();
     for (const dataSource of this.getSources()) {
-      const executed = await this.getExecutedMigrations(dataSource);
+      const executed = await this.getExecutedMigrations(dataSource, options);
       executedNames.set(dataSource, new Set(executed.map((r) => r.name)));
     }
 
@@ -1096,12 +1344,19 @@ export class MigrationRunner {
    * what this method used to do after a `.reverse()` — silently restored the
    * forward `up` order and made the reverse dead code.)
    */
-  private async getMigrationsToRollback(batches: number): Promise<MigrationClass[]> {
+  private async getMigrationsToRollback(
+    batches: number,
+    options: { pruneMissing?: boolean; readOnly?: boolean } = {},
+  ): Promise<MigrationClass[]> {
     const migrations: MigrationClass[] = [];
+    const batchOf = new Map<MigrationClass, number>();
+    const orphans: Array<{ name: string; dataSource: DataSource }> = [];
 
     // Batches are numbered per data source (each has its own migrations table).
     for (const dataSource of this.getSources()) {
-      const executed = await this.getExecutedMigrations(dataSource);
+      const executed = await this.getExecutedMigrations(dataSource, {
+        readOnly: options.readOnly,
+      });
       if (executed.length === 0) continue;
 
       const batchNumbers = [...new Set(executed.map((r) => r.batch))]
@@ -1114,11 +1369,38 @@ export class MigrationRunner {
         const MigrationClass = this.migrations.find(
           (m) => m.migrationName === record.name && this.sourceOf(m) === dataSource,
         );
-        if (MigrationClass) migrations.push(MigrationClass);
+        if (MigrationClass) {
+          migrations.push(MigrationClass);
+          batchOf.set(MigrationClass, record.batch);
+        } else {
+          orphans.push({ name: record.name, dataSource });
+        }
       }
     }
 
-    return migrations.sort(sortMigrationsForRollback);
+    if (orphans.length > 0) {
+      if (!options.pruneMissing) {
+        throw new Error(
+          `Cannot roll back: ${orphans.length} executed migration(s) have no registered file: ` +
+            `${orphans.map((o) => o.name).join(", ")}. ` +
+            `They were renamed, deleted, or not matched by the migration pattern. ` +
+            `Restore the file(s), or pass pruneMissing (--prune-missing) to delete those records.`,
+        );
+      }
+
+      if (!options.readOnly) {
+        for (const orphan of orphans) {
+          await this.removeMigrationRecord(orphan.name, orphan.dataSource);
+          log.warn("database", "migration", `Pruned orphaned migration record: ${orphan.name}`);
+        }
+      }
+    }
+
+    // Newest batch first, then newest migration first within a batch.
+    return migrations.sort(
+      (a, b) =>
+        (batchOf.get(b) ?? 0) - (batchOf.get(a) ?? 0) || sortMigrationsForRollback(a, b),
+    );
   }
 
   /**
@@ -1126,20 +1408,25 @@ export class MigrationRunner {
    */
   public async getExecutedMigrations(
     dataSource: DataSource = this.getDataSource(),
+    options: { readOnly?: boolean } = {},
   ): Promise<MigrationRecord[]> {
     const driver = dataSource.driver;
+    const migrationDriver = this.getMigrationDriver(dataSource);
 
-    try {
-      const migrationDriver = this.getMigrationDriver(dataSource);
-
-      // Ensure migrations table exists
+    if (options.readOnly) {
+      // Dry runs and listings must not create the migrations table.
+      if (!(await migrationDriver.tableExists(this.migrationsTable))) return [];
+    } else {
+      // A missing table is created here; every other error (connection,
+      // permission…) propagates instead of looking like "nothing executed".
       await migrationDriver.ensureMigrationsTable(this.migrationsTable);
-
-      const queryBuilder = driver.queryBuilder<MigrationRecord>(this.migrationsTable);
-      return await queryBuilder.orderBy("batch", "asc").orderBy("name", "asc").get();
-    } catch {
-      return [];
     }
+
+    const queryBuilder = driver.queryBuilder<MigrationRecord>(this.migrationsTable);
+    const records = await queryBuilder.orderBy("batch", "asc").orderBy("name", "asc").get();
+
+    // The Mongo lock document lives in this collection; it is not a migration.
+    return records.filter((record) => record.name !== MIGRATION_LOCK_NAME);
   }
 
   /**
@@ -1181,8 +1468,9 @@ export class MigrationRunner {
    */
   private async getNextBatchNumber(
     dataSource: DataSource = this.getDataSource(),
+    readOnly = false,
   ): Promise<number> {
-    const executed = await this.getExecutedMigrations(dataSource);
+    const executed = await this.getExecutedMigrations(dataSource, { readOnly });
     if (executed.length === 0) return 1;
     return Math.max(...executed.map((r) => r.batch)) + 1;
   }

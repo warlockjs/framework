@@ -1,5 +1,5 @@
-import events from "@mongez/events";
 import { when } from "@mongez/reinforcements";
+import { log } from "@warlock.js/logger";
 import { getSealConfig, v, type ObjectValidator } from "@warlock.js/seal";
 import type {
   DriverContract,
@@ -14,9 +14,10 @@ import type {
 } from "../contracts/database-writer.contract";
 import { mergeDriverFields } from "../model/methods/accessor-methods";
 import type { ChildModel, Model } from "../model/model";
-import { getModelUpdatedEvent } from "../sync/model-events";
+import { triggerModelEvent } from "../sync/model-events";
 import type { StrictMode } from "../types";
 import { DatabaseWriterValidationError } from "../validation";
+import { afterCommit } from "../transactions/after-commit";
 import type { DataSource } from "./../data-source/data-source";
 
 /**
@@ -133,15 +134,13 @@ export class DatabaseWriter implements WriterContract {
       });
     }
 
-    // 3. Validate and cast data
-    await this.validateAndCast(isInsert, options);
-
-    // 4. Execute insert or update
+    // 3-4. Execute insert or update (validation happens inside each path)
     let result: InsertResult | UpdateResult;
 
     if (isInsert) {
       result = await this.performInsert(options);
     } else {
+      await this.validateAndCast(false, options);
       result = await this.performUpdate(options);
     }
 
@@ -156,9 +155,10 @@ export class DatabaseWriter implements WriterContract {
       await this.model.emitEvent(isInsert ? "created" : "updated");
     }
 
-    // 7. Trigger sync operations (fire-and-forget, non-blocking)
+    // 7. Trigger sync operations after COMMIT (inside a transaction they are
+    // queued, so a rolled-back write never fans out). Failures are logged.
     if (!options.skipSync && !isInsert) {
-      void this.triggerSync(changedFields);
+      afterCommit(() => this.triggerSync(changedFields));
     }
 
     return {
@@ -260,8 +260,6 @@ export class DatabaseWriter implements WriterContract {
     });
 
     if (!result.isValid) {
-      console.trace(result.errors);
-
       const error = new DatabaseWriterValidationError(
         `[${this.model.constructor.name} Model] ${isInsert ? "Insert" : "Update"} Validation failed`,
         result.errors,
@@ -313,6 +311,44 @@ export class DatabaseWriter implements WriterContract {
    * @private
    */
   private async performInsert(options: WriterOptions): Promise<InsertResult> {
+    const dataToInsert = await this.prepareForInsert(options);
+
+    // INSERT: use full validated data
+    let result: InsertResult;
+
+    try {
+      result = await this.driver.insert(this.table, dataToInsert);
+    } catch (error) {
+      throw this.mapUniqueViolation(error, true);
+    }
+
+    // Merge returned data (e.g., generated _id, timestamps)
+    // Note: We use merge here because the result might not include all fields
+    // (e.g., our generated 'id' field), and we don't want to lose them
+    mergeDriverFields(this.model, result.document as Record<string, unknown>);
+
+    // Reset dirty tracker immediately after merge to prevent
+    // database-generated fields (like _id) from being marked as dirty
+    this.model.dirtyTracker.reset();
+
+    return result;
+  }
+
+  /**
+   * Run the insert pipeline (validation, casting, id generation, timestamps,
+   * `validating`/`validated`/`creating` hooks) WITHOUT writing.
+   *
+   * `save()` uses this for its insert path, so bulk inserts and single inserts
+   * cannot drift. The caller is responsible for sending the returned document
+   * to the driver.
+   *
+   * @param options - Save options (e.g. `skipEvents`, `skipValidation`)
+   * @returns The prepared document to insert
+   */
+  public async prepareForInsert(options: WriterOptions = {}): Promise<Record<string, unknown>> {
+    // Validate and cast data
+    await this.validateAndCast(true, options);
+
     // Generate ID if needed (NoSQL only)
     await this.generateNextId();
 
@@ -343,19 +379,7 @@ export class DatabaseWriter implements WriterContract {
       await this.model.emitEvent("creating");
     }
 
-    // INSERT: use full validated data
-    const result = await this.driver.insert(this.table, dataToInsert);
-
-    // Merge returned data (e.g., generated _id, timestamps)
-    // Note: We use merge here because the result might not include all fields
-    // (e.g., our generated 'id' field), and we don't want to lose them
-    mergeDriverFields(this.model, result.document as Record<string, unknown>);
-
-    // Reset dirty tracker immediately after merge to prevent
-    // database-generated fields (like _id) from being marked as dirty
-    this.model.dirtyTracker.reset();
-
-    return result;
+    return dataToInsert;
   }
 
   /**
@@ -401,10 +425,59 @@ export class DatabaseWriter implements WriterContract {
     }
 
     // Execute update with operations
-    return await this.driver.update(
-      this.table,
-      this.buildPrimaryKeyFilter(),
-      operations,
+    try {
+      return await this.driver.update(
+        this.table,
+        this.buildPrimaryKeyFilter(),
+        operations,
+      );
+    } catch (error) {
+      throw this.mapUniqueViolation(error, false);
+    }
+  }
+
+  /**
+   * Map a driver unique-constraint violation (Postgres 23505, MongoDB 11000)
+   * to a field validation error, so a lost `unique` race never surfaces as a
+   * 500. Any other error is returned untouched.
+   */
+  private mapUniqueViolation(error: unknown, isInsert: boolean): unknown {
+    const err = error as
+      | {
+          code?: string | number;
+          detail?: string;
+          keyPattern?: Record<string, unknown>;
+          message?: string;
+        }
+      | undefined;
+
+    if (err?.code !== "23505" && err?.code !== 11000 && err?.code !== "11000") {
+      return error;
+    }
+
+    let field: string | undefined;
+
+    if (err.keyPattern) {
+      field = Object.keys(err.keyPattern)[0];
+    } else {
+      // Postgres: "Key (email)=(x) already exists."
+      field = /Key \(([^)]+)\)=/.exec(err.detail ?? "")?.[1]?.split(",")[0]?.trim();
+    }
+
+    if (!field) {
+      // Mongo: "index: email_1 dup key"
+      field = /index: (\S+?)_-?1\b/.exec(err.message ?? "")?.[1];
+    }
+
+    return new DatabaseWriterValidationError(
+      `[${this.model.constructor.name} Model] ${isInsert ? "Insert" : "Update"} Validation failed`,
+      [
+        {
+          type: "unique",
+          error: `The ${field ?? "value"} must be unique`,
+          input: field ?? "id",
+        },
+      ],
     );
   }
 
@@ -550,14 +623,14 @@ export class DatabaseWriter implements WriterContract {
    * @private
    */
   private resolveIncrementBy(): number {
-    if (this.ctor.incrementIdBy) {
-      return this.ctor.incrementIdBy;
-    }
-
     if (this.ctor.randomIncrement) {
       return typeof this.ctor.randomIncrement === "function"
         ? this.ctor.randomIncrement()
         : this.randomInt(1, 10);
+    }
+
+    if (this.ctor.incrementIdBy) {
+      return this.ctor.incrementIdBy;
     }
 
     return 1; // Default increment
@@ -585,11 +658,11 @@ export class DatabaseWriter implements WriterContract {
    * @private
    */
   private async triggerSync(changedFields: string[]): Promise<void> {
-    // Emit model.updated event - ModelSyncOperation listens to these
-    await events.triggerAll(
-      getModelUpdatedEvent(this.ctor),
-      this.model,
-      changedFields,
-    );
+    try {
+      // Emit model.updated event - ModelSyncOperation listens to these
+      await triggerModelEvent(this.ctor, "updated", this.model, changedFields);
+    } catch (error) {
+      log.error("database", "sync.failed", `[cascade] sync failed for ${this.ctor.name}: ${error}`);
+    }
   }
 }

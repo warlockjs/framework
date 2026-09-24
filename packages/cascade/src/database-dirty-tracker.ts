@@ -251,6 +251,29 @@ export class DatabaseDirtyTracker {
   }
 
   /**
+   * Replaces the value at a dot-notation path (no deep merge), mirroring
+   * `model.set()` so stale nested keys are detected as removed.
+   */
+  public setAtPath(path: string, value: unknown): void {
+    const segments = path.split(".");
+    let container = this.currentRaw as Record<string, unknown>;
+
+    for (let index = 0; index < segments.length - 1; index += 1) {
+      const segment = segments[index] as string;
+
+      if (!isPlainObject(container[segment]) && !Array.isArray(container[segment])) {
+        container[segment] = {};
+      }
+
+      container = container[segment] as Record<string, unknown>;
+    }
+
+    container[segments[segments.length - 1] as string] = this.cloneData(value);
+    this.currentFlattened = this.flattenData(this.currentRaw);
+    this.updateDirtyState();
+  }
+
+  /**
    * Explicitly removes one or more columns from the current data.
    *
    * Supports both single column names and arrays of column names.
@@ -399,7 +422,7 @@ export class DatabaseDirtyTracker {
         return;
       }
 
-      const segment = segments[index];
+      const segment = segments[index] as string;
       if (segment === undefined) {
         return;
       }

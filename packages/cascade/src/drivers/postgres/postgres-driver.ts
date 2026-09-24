@@ -30,20 +30,19 @@ import type {
 import type { DriverBlueprintContract } from "../../contracts/driver-blueprint.contract";
 import type { MigrationDriverContract } from "../../contracts/migration-driver.contract";
 import type { QueryBuilderContract } from "../../contracts/query-builder.contract";
-import type { SyncAdapterContract } from "../../contracts/sync-adapter.contract";
+import type { SyncAdapterContract, SyncInstruction } from "../../contracts/sync-adapter.contract";
 import { TransactionRollbackError } from "../../errors/transaction-rollback.error";
 import { UnsupportedUpdateOperationError } from "../../errors/unsupported-update-operation.error";
 import { SQLSerializer } from "../../migration/sql-serializer";
 import { SqlDatabaseDirtyTracker } from "../../sql-database-dirty-tracker";
 import type { ModelDefaults } from "../../types";
 import { type DatabaseDriver } from "../../utils/connect-to-database";
-import { isValidDateValue } from "../../utils/is-valid-date-value";
+import { convertPostgresValue, type PostgresColumnTypes } from "./postgres-type-converters";
 import { PostgresBlueprint } from "./postgres-blueprint";
 import { PostgresDialect } from "./postgres-dialect";
 import { PostgresMigrationDriver } from "./postgres-migration-driver";
 import { PostgresQueryBuilder } from "./postgres-query-builder";
 import { PostgresSQLSerializer } from "./postgres-sql-serializer";
-import { PostgresSyncAdapter } from "./postgres-sync-adapter";
 import { assertPostgresUpdate } from "./postgres-update-validator";
 import type { PostgresPoolConfig, PostgresQueryResult, PostgresTransactionOptions } from "./types";
 
@@ -103,6 +102,7 @@ export function buildPostgresPoolConfig(config: PostgresPoolConfig): PgPoolConfi
     // TCP keep-alive so a NAT/firewall/OS doesn't silently drop an idle
     // connection out from under the pool — see PostgresPoolConfig.keepAlive.
     keepAlive: config.keepAlive ?? true,
+    maxUses: config.maxUses,
     application_name: config.application_name ?? "cascade",
     ssl: config.ssl,
   };
@@ -168,6 +168,13 @@ const transactionOwners = new WeakMap<object, PostgresDriver>();
  * await driver.disconnect();
  * ```
  */
+/** Summarise bound parameters as count and types, never values. */
+function describeParams(params: unknown[]): string {
+  const types = params.map((param) => (param === null ? "null" : typeof param));
+
+  return `Params: ${params.length} (${types.join(", ")})`;
+}
+
 export class PostgresDriver implements DriverContract {
   /**
    * Driver name identifier.
@@ -238,6 +245,9 @@ export class PostgresDriver implements DriverContract {
    * @see PostgresPoolConfig.nativeArrayColumns
    */
   private readonly _nativeArrayColumns: ReadonlySet<string>;
+
+  /** Column `dataTypeID`s per result row, filled by `query()` for `deserialize()`. */
+  private readonly rowColumnTypes = new WeakMap<object, PostgresColumnTypes>();
 
   /** Unique keys per table, resolved from `pg_index` for upsert conflict targets. */
   private readonly _uniqueKeys = new Map<string, ReadonlyArray<UniqueKey>>();
@@ -505,6 +515,17 @@ export class PostgresDriver implements DriverContract {
   }
 
   /**
+   * Drop the cached unique keys and re-read the native-array columns.
+   *
+   * Called by the migration driver after DDL so an in-process migration is
+   * visible to the serializer and to upserts without reconnecting.
+   */
+  public async invalidateSchemaCaches(): Promise<void> {
+    this._uniqueKeys.clear();
+    await this.loadNativeArrayColumns();
+  }
+
+  /**
    * Introspect the live schema for native-array columns so array values bind
    * correctly with zero app configuration.
    *
@@ -572,43 +593,16 @@ export class PostgresDriver implements DriverContract {
    * @returns Deserialized JavaScript object
    */
   public deserialize(data: Record<string, unknown>): Record<string, unknown> {
-    // PostgreSQL pg driver handles most type conversions automatically
-    // Special handling can be added here if needed
+    // Column types come from the pg result `fields`, recorded per row by
+    // `query()`. A row that did not come from `query()` is left as pg
+    // returned it rather than guessed from its values (K1:B29).
+    const columnTypes = this.rowColumnTypes.get(data);
+    if (!columnTypes) return data;
+
     for (const [key, value] of Object.entries(data)) {
-      // Only re-inflate strings — pg already returns Date objects from DB reads
       if (typeof value !== "string") continue;
 
-      if (isValidDateValue(value)) {
-        data[key] = new Date(value);
-        continue;
-      }
-
-      // pgvector columns are returned as '[n1,n2,...]' strings.
-      // charCodeAt is faster than startsWith/endsWith — no string allocation.
-      // '[' = 91, ']' = 93
-      if (value.charCodeAt(0) === 91 && value.charCodeAt(value.length - 1) === 93) {
-        const parts = value.slice(1, -1).split(",");
-        const nums = new Array<number>(parts.length);
-        let isNumericVector = parts.length > 0;
-
-        for (let i = 0; i < parts.length; i++) {
-          // `parts[i]` is `string | undefined` under noUncheckedIndexedAccess even
-          // though `i < parts.length`. `+undefined` is NaN, which the finite check
-          // below already rejects — so `?? ""` keeps the coercion total without
-          // changing which inputs count as a numeric vector (+"" is 0, but an
-          // empty segment cannot occur for i < length).
-          const n = +(parts[i] ?? ""); // unary + is the fastest string-to-number coercion
-          if (!Number.isFinite(n)) {
-            isNumericVector = false;
-            break; // early-exit — not a numeric vector, leave value untouched
-          }
-          nums[i] = n;
-        }
-
-        if (isNumericVector) {
-          data[key] = nums;
-        }
-      }
+      data[key] = convertPostgresValue(value, columnTypes.get(key));
     }
 
     return data;
@@ -743,7 +737,12 @@ export class PostgresDriver implements DriverContract {
         modifiedCount: result.rowCount ?? 0,
       };
     } catch (error) {
-      console.log("PG Query Error in:", sql, params);
+      log.error({
+        module: "database.postgres",
+        action: "update.error",
+        message: `${sql} | ${describeParams(params)}`,
+        context: { sql, paramCount: params.length },
+      });
 
       throw error;
     }
@@ -1078,7 +1077,12 @@ export class PostgresDriver implements DriverContract {
 
     // Build UPDATE clause for ON CONFLICT
     // Update all columns except the conflict columns (they stay the same)
-    const updateColumns = columns.filter((col) => !conflictColumns.includes(col));
+    // `created_at` belongs to the insert only; an existing row keeps its own (K1:B26).
+    const createdAtColumn =
+      (options?.createdAtColumn as string | undefined) ?? this.modelDefaults.createdAtColumn;
+    const updateColumns = columns.filter(
+      (col) => !conflictColumns.includes(col) && col !== createdAtColumn,
+    );
     const setClauses = updateColumns
       .map((col, i) => {
         const valueIndex = columns.indexOf(col) + 1;
@@ -1419,13 +1423,144 @@ export class PostgresDriver implements DriverContract {
   /**
    * Get the sync adapter for bulk denormalized updates.
    *
+   * Sync instructions arrive in the portable Mongo shape (`$set` with a `field.$`
+   * positional key, `$pull`, `$unset`, dotted filter keys), so they are translated
+   * to jsonb SQL here instead of being handed to `updateMany`, which would quote
+   * `"tags.$"` as a column name.
+   *
    * @returns Sync adapter instance
    */
   public syncAdapter(): SyncAdapterContract {
     if (!this._syncAdapter) {
-      this._syncAdapter = new PostgresSyncAdapter(this);
+      const executeOne = (instruction: SyncInstruction) => this.executeSyncInstruction(instruction);
+
+      this._syncAdapter = {
+        executeOne,
+        executeArrayUpdate: executeOne,
+        executeBatch: async (instructions) => {
+          let affected = 0;
+
+          for (const instruction of instructions) {
+            affected += await executeOne(instruction);
+          }
+
+          return affected;
+        },
+      };
     }
     return this._syncAdapter;
+  }
+
+  /**
+   * Execute one sync instruction as a jsonb UPDATE.
+   *
+   * @param instruction - Sync instruction in the portable Mongo shape
+   * @returns Number of affected rows
+   */
+  private async executeSyncInstruction(instruction: SyncInstruction): Promise<number> {
+    const { sql, params } = this.buildSyncStatement(instruction);
+    const result = await this.query(sql, params);
+
+    return result.rowCount ?? 0;
+  }
+
+  /**
+   * Translate a sync instruction to a jsonb UPDATE statement.
+   *
+   * @param instruction - Sync instruction
+   * @returns SQL and parameters
+   * @throws Error for update operators a sync cannot express
+   */
+  private buildSyncStatement(instruction: SyncInstruction): { sql: string; params: unknown[] } {
+    const params: unknown[] = [];
+    const bind = (value: unknown): string => {
+      params.push(value);
+      return this.dialect.placeholder(params.length);
+    };
+    const quote = (name: string) => this.dialect.quoteIdentifier(name);
+    const elementMatch = (idField: string, idValue: unknown, operator: string) =>
+      `(e->>${bind(idField)}::text) ${operator} ${bind(String(idValue))}::text`;
+
+    const clauses: string[] = [];
+
+    for (const [key, value] of Object.entries(instruction.update)) {
+      if (key === "$set") {
+        for (const [path, embed] of Object.entries(value as Record<string, unknown>)) {
+          if (path.endsWith(".$")) {
+            const column = quote(path.slice(0, -2));
+            const { identifierField, identifierValue } = instruction;
+
+            if (!identifierField || identifierValue === undefined) {
+              throw new Error(`Positional update on "${path}" requires an identifier field/value.`);
+            }
+
+            const match = elementMatch(identifierField, identifierValue, "=");
+            clauses.push(
+              `${column} = (SELECT COALESCE(jsonb_agg(CASE WHEN ${match} THEN ${bind(JSON.stringify(embed))}::jsonb ELSE e END), '[]'::jsonb) FROM jsonb_array_elements(${column}::jsonb) e)`,
+            );
+          } else if (path.includes(".")) {
+            const [head, ...rest] = path.split(".");
+            const column = quote(head as string);
+            clauses.push(
+              `${column} = jsonb_set(COALESCE(${column}::jsonb, '{}'::jsonb), ${bind(rest)}::text[], ${bind(JSON.stringify(embed))}::jsonb)`,
+            );
+          } else {
+            clauses.push(`${quote(path)} = ${bind(JSON.stringify(embed))}::jsonb`);
+          }
+        }
+      } else if (key === "$pull") {
+        for (const [field, criteria] of Object.entries(value as Record<string, unknown>)) {
+          const column = quote(field);
+          const entries = Object.entries(criteria as Record<string, unknown>);
+          const [idField, idValue] = entries[0] ?? [];
+
+          if (entries.length !== 1 || !idField) {
+            throw new Error(`$pull on "${field}" must match a single identifier field.`);
+          }
+
+          const match = elementMatch(idField, idValue, "IS DISTINCT FROM");
+          clauses.push(
+            `${column} = (SELECT COALESCE(jsonb_agg(e), '[]'::jsonb) FROM jsonb_array_elements(${column}::jsonb) e WHERE ${match})`,
+          );
+        }
+      } else if (key === "$unset") {
+        for (const field of Object.keys(value as Record<string, unknown>)) {
+          clauses.push(`${quote(field)} = NULL`);
+        }
+      } else {
+        throw new Error(`Unsupported sync update operator "${key}" on the Postgres driver.`);
+      }
+    }
+
+    if (clauses.length === 0) {
+      throw new Error("No update operations specified for the sync instruction.");
+    }
+
+    const conditions: string[] = [];
+
+    for (const [key, value] of Object.entries(instruction.filter)) {
+      if (!key.includes(".")) {
+        conditions.push(`${quote(key)} = ${bind(value)}`);
+        continue;
+      }
+
+      const [head, ...rest] = key.split(".");
+      const column = quote(head as string);
+      const path = bind(rest);
+
+      conditions.push(
+        instruction.isArrayUpdate && head === instruction.arrayField
+          ? `EXISTS (SELECT 1 FROM jsonb_array_elements(${column}::jsonb) e WHERE (e #>> ${path}::text[]) = ${bind(String(value))}::text)`
+          : `(${column}::jsonb #>> ${path}::text[]) = ${bind(String(value))}::text`,
+      );
+    }
+
+    const where = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
+
+    return {
+      sql: `UPDATE ${quote(instruction.targetTable)} SET ${clauses.join(", ")}${where}`,
+      params,
+    };
   }
 
   /**
@@ -1483,6 +1618,19 @@ export class PostgresDriver implements DriverContract {
    * @param params - Query parameters
    * @returns Query result
    */
+  // TODO(K1:B19): scheduler-based purge job for TTL indexes is deferred.
+  private recordColumnTypes(result: PostgresQueryResult): void {
+    if (!result.fields?.length || !result.rows?.length) return;
+
+    const columnTypes: PostgresColumnTypes = new Map(
+      result.fields.map((field) => [field.name, field.dataTypeID] as const),
+    );
+
+    for (const row of result.rows) {
+      if (row && typeof row === "object") this.rowColumnTypes.set(row, columnTypes);
+    }
+  }
+
   public async query<T = Record<string, unknown>>(
     sql: string,
     params: unknown[] = [],
@@ -1492,14 +1640,9 @@ export class PostgresDriver implements DriverContract {
 
     const startTime = this.config.logging ? performance.now() : 0;
 
-    let paramsString = "";
-    if (this.config.logging && params.length > 0) {
-      paramsString = JSON.stringify(params);
-      if (paramsString.length > 300) {
-        paramsString = paramsString.substring(0, 300) + "...";
-      }
-      paramsString = ` | Params: ${paramsString}`;
-    }
+    // Bound values can hold password hashes and tokens, so only their
+    // count and types are logged.
+    const paramsString = this.config.logging && params.length > 0 ? ` | ${describeParams(params)}` : "";
 
     try {
       let result;
@@ -1508,7 +1651,7 @@ export class PostgresDriver implements DriverContract {
           module: "database.postgres",
           action: "query.executing",
           message: `${sql}${paramsString}`,
-          context: { params, sql },
+          context: { sql, paramCount: params.length },
         });
       }
       if (txClient) {
@@ -1534,9 +1677,11 @@ export class PostgresDriver implements DriverContract {
           module: "database.postgres",
           action: "query.executed",
           message: `[${duration}ms] ${sql}${paramsString}`,
-          context: { params, sql, duration },
+          context: { sql, paramCount: params.length, duration },
         });
       }
+
+      this.recordColumnTypes(result as PostgresQueryResult);
 
       return result as PostgresQueryResult<T>;
     } catch (error) {
@@ -1548,7 +1693,7 @@ export class PostgresDriver implements DriverContract {
           message: `[${duration}ms] ${sql}${paramsString}`,
           context: {
             sql,
-            params,
+            paramCount: params.length,
             error: error instanceof Error ? error.message : String(error),
           },
         });

@@ -50,8 +50,15 @@ export type OperationType =
   | "truncateTable"
   | "createTimestamps"
   | "rawStatement"
+  | "dataStep"
   | "setSchemaValidation"
   | "removeSchemaValidation";
+
+/**
+ * One executable step of a migration, in authored order: a serialized SQL
+ * statement, or a queued data step (`withConnection` callback).
+ */
+export type MigrationStep = string | { readonly data: () => Promise<unknown> };
 
 /**
  * Pending operation to be executed when migration runs.
@@ -761,6 +768,9 @@ export abstract class Migration implements MigrationContract {
    */
   protected driver!: MigrationDriverContract;
 
+  /** Collection-only run (dry run / SQL export): `withConnection` must not touch the database. */
+  private dryRunMode = false;
+
   /**
    * Migration defaults from the resolved DataSource.
    * @internal
@@ -944,6 +954,16 @@ export abstract class Migration implements MigrationContract {
   }
 
   /**
+   * Mark this instance as collection-only (dry run / SQL export): `withConnection`
+   * skips its callback so nothing touches the live database.
+   *
+   * @internal
+   */
+  public setDryRun(dryRun: boolean): void {
+    this.dryRunMode = dryRun;
+  }
+
+  /**
    * Get the migration driver.
    *
    * @returns The migration driver instance
@@ -1003,13 +1023,43 @@ export abstract class Migration implements MigrationContract {
    * ```
    */
   public toSQL(): string[] {
-    const serializer = this.driver.driver.getSQLSerializer();
-    const statements = serializer.serializeAll(
-      this.pendingOperations,
-      this.table,
+    // Data steps have no SQL form: they are listed as comments so dry runs and
+    // exports show where they would run, and never execute.
+    return this.toSteps().map((step) =>
+      typeof step === "string" ? step : "-- data step (withConnection) skipped",
     );
+  }
+
+  /**
+   * Like `toSQL()`, but keeps queued data steps (`withConnection` callbacks) in
+   * authored order between the SQL statements, so the runner executes
+   * add column → backfill → set NOT NULL in the order they were written.
+   * Clears the pending queue.
+   *
+   * @internal
+   */
+  public toSteps(): MigrationStep[] {
+    const serializer = this.driver.driver.getSQLSerializer();
+    const steps: MigrationStep[] = [];
+    let schemaRun: PendingOperation[] = [];
+
+    const flush = () => {
+      steps.push(...serializer.serializeAll(schemaRun, this.table));
+      schemaRun = [];
+    };
+
+    for (const op of this.pendingOperations) {
+      if (op.type === "dataStep") {
+        flush();
+        steps.push({ data: op.payload as () => Promise<unknown> });
+      } else {
+        schemaRun.push(op);
+      }
+    }
+
+    flush();
     this.pendingOperations.length = 0;
-    return statements;
+    return steps;
   }
 
   /**
@@ -1188,6 +1238,10 @@ export abstract class Migration implements MigrationContract {
         await this.driver.createTimestampColumns(this.table);
         break;
 
+      case "dataStep":
+        await (op.payload as () => Promise<unknown>)();
+        break;
+
       case "rawStatement":
         await this.driver.raw(async (client: any) => {
           const sql = op.payload as string;
@@ -1196,8 +1250,10 @@ export abstract class Migration implements MigrationContract {
             // PostgreSQL, MySQL - client is the driver instance
             await client.query(sql);
           } else if (typeof client.command === "function") {
-            // MongoDB - client is the Db instance
-            await client.command({ $eval: sql });
+            // MongoDB - `$eval` was removed in MongoDB 4.2, so it can never work.
+            throw new Error(
+              "raw() is SQL-only and is not supported on MongoDB. Use withConnection() for direct driver access.",
+            );
           } else {
             throw new Error(
               "Unsupported database driver for statement execution",
@@ -1337,6 +1393,17 @@ export abstract class Migration implements MigrationContract {
         payload: index,
       });
     }
+  }
+
+  /**
+   * Add a pending vector index (queues `createVectorIndex`).
+   *
+   * Called by ColumnBuilder when .vectorIndex() is chained.
+   *
+   * @internal
+   */
+  public addPendingVectorIndex(column: string, options: Omit<VectorIndexOptions, "column">): void {
+    this.vectorIndex(column, options as VectorIndexOptions);
   }
 
   /**
@@ -2866,7 +2933,15 @@ export abstract class Migration implements MigrationContract {
   public async withConnection<T>(
     callback: (connection: unknown) => Promise<T>,
   ): Promise<T> {
-    return this.driver.raw(callback);
+    // The callback is queued behind the schema operations declared before it and
+    // runs in authored order at execution time. Dry runs and SQL exports never
+    // run it. Its result is therefore always `undefined` here.
+    this.pendingOperations.push({
+      type: "dataStep",
+      payload: () => this.driver.raw(callback),
+    });
+
+    return undefined as T;
   }
 
   /**
@@ -2877,7 +2952,7 @@ export abstract class Migration implements MigrationContract {
    *
    * Use `withConnection()` instead if you need direct driver access.
    *
-   * Works with PostgreSQL, MySQL, etc. For MongoDB, uses $eval command.
+   * SQL-only (PostgreSQL, MySQL, etc.). On MongoDB it throws; use `withConnection()`.
    *
    * @param sql - SQL statement to execute
    * @returns This migration for chaining
@@ -3703,6 +3778,18 @@ Migration.alter = function alterMigration(
           for (const fk of detached.sink.pendingForeignKeys as any[]) {
             fk.column = columnName;
             this.addForeignKeyOperation(fk);
+          }
+
+          // Transfer index side effects (.unique() / .index())
+          for (const idx of detached.sink.pendingIndexes) {
+            idx.columns = idx.columns.map((col) => (col === "__placeholder__" ? columnName : col));
+            this.addPendingIndex(idx);
+          }
+
+          // Transfer vector index side effects (.vectorIndex())
+          for (const vIdx of detached.sink.pendingVectorIndexes ?? []) {
+            vIdx.column = columnName;
+            this.vectorIndex(vIdx.column, vIdx.options);
           }
         }
       }

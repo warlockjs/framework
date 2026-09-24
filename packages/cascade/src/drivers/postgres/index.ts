@@ -12,5 +12,4 @@ export * from "./postgres-driver";
 export * from "./postgres-migration-driver";
 export * from "./postgres-query-builder";
 export * from "./postgres-query-parser";
-export * from "./postgres-sync-adapter";
 export * from "./types";

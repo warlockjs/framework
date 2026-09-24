@@ -1,5 +1,5 @@
 import { invalidRule, VALID_RULE, type SchemaRule } from "@warlock.js/seal";
-import { resolveModelClass } from "../../model/register-model";
+import { requireModelClass } from "../../model/register-model";
 import type { ExistsRuleOptions } from "../types";
 
 /**
@@ -14,7 +14,7 @@ export const existsRule: SchemaRule<ExistsRuleOptions> = {
   async validate(value: any, context) {
     const { Model, query, column } = this.context.options;
 
-    const ResolvedModelClass = resolveModelClass(Model);
+    const ResolvedModelClass = requireModelClass(Model);
 
     // Explicit column wins, otherwise look up by the related model's primary key
     const lookupColumn = column ?? ResolvedModelClass.primaryKey;

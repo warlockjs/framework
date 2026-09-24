@@ -16,8 +16,8 @@ type EmbedOptions = {
 
 declare module "@warlock.js/seal" {
   interface ValidatorV {
-    embed(model: ChildModel<any> | string, options?: EmbedOptions): EmbedModelValidator;
-    embedMany(model: ChildModel<any> | string, options?: EmbedOptions): EmbedModelValidator;
+    embed(model?: ChildModel<any> | string, options?: EmbedOptions): EmbedModelValidator;
+    embedMany(model?: ChildModel<any> | string, options?: EmbedOptions): EmbedModelValidator;
   }
 }
 
@@ -31,9 +31,20 @@ export const embedValidator: SealPlugin = {
 
   install() {
     // Inject embed() method into v factory
-    v.embed = (model: ChildModel<any> | string, options?: EmbedOptions) =>
-      new EmbedModelValidator().model(model).embed(options?.embed);
-    v.embedMany = (model: ChildModel<any> | string, options?: EmbedOptions) =>
-      new EmbedModelValidator().models(model).embed(options?.embed);
+    // without a model, a bare validator is returned (call .model()/.models() later)
+    v.embed = (model?: ChildModel<any> | string, options?: EmbedOptions) => {
+      const validator = new EmbedModelValidator();
+
+      return (model ? validator.model(model, options?.errorMessage) : validator).embed(
+        options?.embed,
+      );
+    };
+    v.embedMany = (model?: ChildModel<any> | string, options?: EmbedOptions) => {
+      const validator = new EmbedModelValidator();
+
+      return (model ? validator.models(model, options?.errorMessage) : validator).embed(
+        options?.embed,
+      );
+    };
   },
 };

@@ -82,7 +82,7 @@ describe("MongoDB pipeline stages", () => {
 
     expect(pipeline).toContainEqual({
       $vectorSearch: {
-        index: "embedding_index",
+        index: "embedding_vector_idx",
         path: "embedding",
         queryVector: [0.1, 0.2],
         numCandidates: 30,

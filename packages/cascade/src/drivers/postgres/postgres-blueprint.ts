@@ -47,7 +47,7 @@ export class PostgresBlueprint implements DriverBlueprintContract {
     const result = await this.driver.query<{ table_name: string }>(
       `SELECT table_name 
        FROM information_schema.tables 
-       WHERE table_schema = 'public' 
+       WHERE table_schema = current_schema() 
        AND table_type = 'BASE TABLE'
        ORDER BY table_name`,
     );
@@ -68,7 +68,7 @@ export class PostgresBlueprint implements DriverBlueprintContract {
     }>(
       `SELECT indexname, indexdef
        FROM pg_indexes
-       WHERE schemaname = 'public'
+       WHERE schemaname = current_schema()
        AND tablename = $1`,
       [table],
     );
@@ -121,7 +121,7 @@ export class PostgresBlueprint implements DriverBlueprintContract {
     const result = await this.driver.query<{ column_name: string }>(
       `SELECT column_name
        FROM information_schema.columns
-       WHERE table_schema = 'public'
+       WHERE table_schema = current_schema()
        AND table_name = $1
        ORDER BY ordinal_position`,
       [table],
@@ -140,7 +140,7 @@ export class PostgresBlueprint implements DriverBlueprintContract {
     const result = await this.driver.query<{ exists: boolean }>(
       `SELECT EXISTS (
         SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
+        WHERE table_schema = current_schema() 
         AND table_name = $1
       )`,
       [table],

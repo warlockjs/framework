@@ -177,6 +177,28 @@ export function resolveModelClass(model: ModelRef): ChildModel<Model> {
 }
 
 /**
+ * Like `resolveModelClass`, but throws a descriptive error when a string
+ * ref isn't registered instead of returning `undefined`.
+ */
+export function requireModelClass(model: ModelRef): ChildModel<Model> {
+  if (typeof model === "string") {
+    const found = getModelFromRegistry(model);
+
+    if (!found) {
+      const registered = [...modelsRegistry.keys()].join(", ") || "none";
+
+      throw new Error(
+        `Model "${model}" is not registered (did you forget @RegisterModel()?). Registered: ${registered}`,
+      );
+    }
+
+    return found;
+  }
+
+  return resolveModelClass(model);
+}
+
+/**
  * Like `resolveModelClass`, but returns `undefined` instead of asserting
  * a non-null result when a string ref isn't in the registry. Use this
  * at call sites that already handle the missing-model case explicitly

@@ -7,6 +7,7 @@ import {
   getModelFromRegistry,
   registerModelInRegistry,
   removeModelFromRegistery,
+  requireModelClass,
 } from "../../../src/model/register-model";
 
 describe("Model Registry", () => {
@@ -223,6 +224,20 @@ describe("Model Registry", () => {
 
       expect(getModelFromRegistry("CustomTag")).toBe(Tag);
       expect(getModelFromRegistry("Tag")).toBeUndefined();
+    });
+  });
+
+  describe("requireModelClass()", () => {
+    it("should throw a descriptive error for an unregistered name", () => {
+      @RegisterModel()
+      class Usr2 extends Model {
+        static table = "usr2";
+      }
+
+      expect(() => requireModelClass("Usr")).toThrow(
+        /Model "Usr" is not registered.*Registered: Usr2/,
+      );
+      expect(requireModelClass("Usr2")).toBe(Usr2);
     });
   });
 });

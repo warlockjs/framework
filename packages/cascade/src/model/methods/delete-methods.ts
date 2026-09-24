@@ -4,10 +4,6 @@ import type { RemoverResult } from "../../contracts";
 import { sanitizeFilter } from "../../utils/sanitize-filter";
 import type { ChildModel, Model } from "../model";
 
-// The builders (mongo and postgres) both implement delete()/deleteOne(), but the
-// shared query-builder contract does not declare them yet.
-type DeletableQuery = { delete(): Promise<number>; deleteOne(): Promise<number> };
-
 export async function destroyModel(
   model: Model,
   options?: { strategy?: DeleteStrategy; skipEvents?: boolean },
@@ -29,12 +25,12 @@ export async function deleteRecords(
   }
 
   // Through the query builder so global scopes (tenant, soft delete) apply.
-  return (ModelClass.query().where(sanitized) as unknown as DeletableQuery).delete();
+  return ModelClass.query().where(sanitized).delete();
 }
 
 /** Delete every row visible to the model's global scopes. Explicit on purpose. */
 export async function deleteAllRecords(ModelClass: ChildModel<any>): Promise<number> {
-  return (ModelClass.query() as unknown as DeletableQuery).delete();
+  return ModelClass.query().delete();
 }
 
 export async function deleteOneRecord(
@@ -47,5 +43,5 @@ export async function deleteOneRecord(
     query.where(sanitizeFilter(filter));
   }
 
-  return (query as unknown as DeletableQuery).deleteOne();
+  return query.deleteOne();
 }

@@ -144,7 +144,7 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
     const result = await this.driver.query<{ exists: boolean }>(
       `SELECT EXISTS (
         SELECT FROM information_schema.tables
-        WHERE table_schema = 'public'
+        WHERE table_schema = current_schema()
         AND table_name = $1
       )`,
       [table],
@@ -177,7 +177,7 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
         is_nullable,
         column_default
       FROM information_schema.columns
-      WHERE table_schema = 'public'
+      WHERE table_schema = current_schema()
       AND table_name = $1
       ORDER BY ordinal_position`,
       [table],
@@ -203,7 +203,7 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
     const result = await this.driver.query<{ table_name: string }>(
       `SELECT table_name
        FROM information_schema.tables
-       WHERE table_schema = 'public'
+       WHERE table_schema = current_schema()
        ORDER BY table_name`,
     );
 
@@ -650,7 +650,8 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
    * Create a TTL index (not natively supported in PostgreSQL).
    *
    * Note: PostgreSQL doesn't have native TTL indexes like MongoDB.
-   * This creates a partial index and requires a scheduled job for cleanup.
+   * This creates a plain index (a `NOW()` predicate is not IMMUTABLE, so a
+   * partial index cannot be built) and requires a scheduled job for cleanup.
    *
    * @param table - Table name
    * @param column - Date column
@@ -661,14 +662,14 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
     column: string,
     expireAfterSeconds: number,
   ): Promise<void> {
-    // Create a partial index for expired rows (for efficient cleanup queries)
+    // Plain index that keeps the purge `DELETE ... WHERE column < ...` efficient
     const quotedTable = this.driver.dialect.quoteIdentifier(table);
     const quotedColumn = this.driver.dialect.quoteIdentifier(column);
     const indexName = `idx_${table}_ttl_${column}`;
     const quotedIndexName = this.driver.dialect.quoteIdentifier(indexName);
 
     await this.execute(
-      `CREATE INDEX ${quotedIndexName} ON ${quotedTable} (${quotedColumn}) WHERE ${quotedColumn} < NOW() - INTERVAL '${expireAfterSeconds} seconds'`,
+      `CREATE INDEX ${quotedIndexName} ON ${quotedTable} (${quotedColumn})`,
     );
 
     // Note: User must set up a scheduled job (pg_cron, etc.) to:
@@ -693,7 +694,7 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
    */
   public async listIndexes(table: string): Promise<TableIndexInformation[]> {
     const result = await this.driver.query<{ indexname: string; indexdef: string }>(
-      `SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = 'public' AND tablename = $1`,
+      `SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = current_schema() AND tablename = $1`,
       [table],
     );
 
@@ -995,6 +996,12 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
    */
   private async execute(sql: string, params: unknown[] = []): Promise<void> {
     await this.driver.query(sql, params);
+
+    // DDL changes what the driver's connect-time caches (native-array columns,
+    // unique keys) describe, so refresh them.
+    if (/^\s*(CREATE|ALTER|DROP)\b/i.test(sql)) {
+      await this.driver.invalidateSchemaCaches();
+    }
   }
 
   /**

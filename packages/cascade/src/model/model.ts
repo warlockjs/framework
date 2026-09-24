@@ -396,7 +396,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * }
    * ```
    */
-  public static incrementIdBy?: number = 1;
+  public static incrementIdBy?: number;
 
   /**
    * Randomly generate the increment amount.
@@ -875,7 +875,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * Get model id
    */
   public get id(): number | string {
-    return this.get("id");
+    return this.get(this.self().primaryKey);
   }
 
   /**
@@ -898,7 +898,9 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * ```
    */
   public get uuid(): string {
-    return this.get("id");
+    const value = this.get(this.self().primaryKey);
+
+    return value === undefined || value === null ? value : String(value);
   }
 
   /**

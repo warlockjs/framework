@@ -438,7 +438,7 @@ export class MongoMigrationDriver implements MigrationDriverContract {
    * Create a vector search index for AI embeddings.
    *
    * Note: This requires MongoDB Atlas with Vector Search enabled.
-   * For self-hosted MongoDB, this will create a regular index on the field.
+   * Throws off-Atlas: a plain index cannot serve `$vectorSearch`.
    */
   public async createVectorIndex(
     table: string,
@@ -447,36 +447,31 @@ export class MongoMigrationDriver implements MigrationDriverContract {
   ): Promise<void> {
     const collection = this.db.collection(table);
 
-    // Try to create Atlas vector search index first
-    try {
-      // Check if we're on Atlas by looking for vectorSearch indexes
-      const searchIndexes = await (collection as any).listSearchIndexes?.()?.toArray?.();
-      if (Array.isArray(searchIndexes)) {
-        // We're on Atlas - create a vector search index
-        await (collection as any).createSearchIndex({
-          name: options.name ?? `${column}_vector_idx`,
-          definition: {
-            mappings: {
-              dynamic: false,
-              fields: {
-                [column]: {
-                  type: "knnVector",
-                  dimensions: options.dimensions,
-                  similarity: options.similarity ?? "cosine",
-                },
-              },
-            },
-          },
-        });
-        return;
-      }
-    } catch {
-      // Not on Atlas or doesn't support search indexes
-    }
+    const name = options.name ?? `${column}_vector_idx`;
 
-    // Fallback: Create a regular index on the vector field
-    // This won't provide vector search capabilities but ensures the field is indexed
-    await collection.createIndex({ [column]: 1 }, { name: options.name ?? `${column}_vector_idx` });
+    try {
+      await (collection as any).createSearchIndex({
+        name,
+        type: "vectorSearch",
+        definition: {
+          fields: [
+            {
+              type: "vector",
+              path: column,
+              numDimensions: options.dimensions,
+              similarity: options.similarity ?? "cosine",
+            },
+          ],
+        },
+      });
+    } catch (error) {
+      // A silent B-tree fallback can't serve $vectorSearch, so fail loudly.
+      throw new Error(
+        `Could not create vector search index "${name}" (requires MongoDB Atlas Vector Search): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   /**

@@ -484,6 +484,36 @@ export class QueryBuilder<T = unknown> {
     return this;
   }
 
+  /** OR field IN values. */
+  public orWhereIn(field: string, values: unknown[]): this {
+    this.addOperation("orWhereIn", { field, values });
+    return this;
+  }
+
+  /** OR field NOT IN values. */
+  public orWhereNotIn(field: string, values: unknown[]): this {
+    this.addOperation("orWhereNotIn", { field, values });
+    return this;
+  }
+
+  /** OR field IS NULL. */
+  public orWhereNull(field: string): this {
+    this.addOperation("orWhereNull", { field });
+    return this;
+  }
+
+  /** OR field IS NOT NULL. */
+  public orWhereNotNull(field: string): this {
+    this.addOperation("orWhereNotNull", { field });
+    return this;
+  }
+
+  /** OR field BETWEEN low AND high. */
+  public orWhereBetween(field: string, range: [unknown, unknown]): this {
+    this.addOperation("orWhereBetween", { field, range });
+    return this;
+  }
+
   /** WHERE field NOT BETWEEN low AND high. */
   public whereNotBetween(field: string, range: [unknown, unknown]): this {
     this.addOperation("whereNotBetween", { field, range });
@@ -527,24 +557,28 @@ export class QueryBuilder<T = unknown> {
     return pattern instanceof RegExp ? { pattern: pattern.source, isRegExp: true } : { pattern };
   }
 
-  /** Starts with a prefix. */
+  /** Starts with a prefix (the value is literal text, `%` / `_` / `\` included). */
   public whereStartsWith(field: string, value: string | number): this {
-    return this.whereLike(field, `${value}%`);
+    this.addOperation("whereLike", { field, pattern: `${value}%`, value: String(value), mode: "startsWith" });
+    return this;
   }
 
   /** Does NOT start with a prefix. */
   public whereNotStartsWith(field: string, value: string | number): this {
-    return this.whereNotLike(field, `${value}%`);
+    this.addOperation("whereNotLike", { field, pattern: `${value}%`, value: String(value), mode: "startsWith" });
+    return this;
   }
 
-  /** Ends with a suffix. */
+  /** Ends with a suffix (the value is literal text, `%` / `_` / `\` included). */
   public whereEndsWith(field: string, value: string | number): this {
-    return this.whereLike(field, `%${value}`);
+    this.addOperation("whereLike", { field, pattern: `%${value}`, value: String(value), mode: "endsWith" });
+    return this;
   }
 
   /** Does NOT end with a suffix. */
   public whereNotEndsWith(field: string, value: string | number): this {
-    return this.whereNotLike(field, `%${value}`);
+    this.addOperation("whereNotLike", { field, pattern: `%${value}`, value: String(value), mode: "endsWith" });
+    return this;
   }
 
   // ════════════════════════════════════════════════════════
@@ -596,7 +630,7 @@ export class QueryBuilder<T = unknown> {
    */
   public whereTime(field: string, value: string): this {
     this.addOperation("whereRaw", {
-      expression: `TIME(${field}) = ?`,
+      expression: `TIME(${this.quoteColumn(field)}) = ?`,
       bindings: [value],
     });
     return this;
@@ -609,7 +643,7 @@ export class QueryBuilder<T = unknown> {
    */
   public whereDay(field: string, value: number): this {
     this.addOperation("whereRaw", {
-      expression: `EXTRACT(DAY FROM ${field}) = ?`,
+      expression: `EXTRACT(DAY FROM ${this.quoteColumn(field)}) = ?`,
       bindings: [value],
     });
     return this;
@@ -618,7 +652,7 @@ export class QueryBuilder<T = unknown> {
   /** Month extracted from a date field (1–12). */
   public whereMonth(field: string, value: number): this {
     this.addOperation("whereRaw", {
-      expression: `EXTRACT(MONTH FROM ${field}) = ?`,
+      expression: `EXTRACT(MONTH FROM ${this.quoteColumn(field)}) = ?`,
       bindings: [value],
     });
     return this;
@@ -627,7 +661,7 @@ export class QueryBuilder<T = unknown> {
   /** Year extracted from a date field. */
   public whereYear(field: string, value: number): this {
     this.addOperation("whereRaw", {
-      expression: `EXTRACT(YEAR FROM ${field}) = ?`,
+      expression: `EXTRACT(YEAR FROM ${this.quoteColumn(field)}) = ?`,
       bindings: [value],
     });
     return this;
@@ -667,7 +701,7 @@ export class QueryBuilder<T = unknown> {
    */
   public whereJsonLength(path: string, operator: WhereOperator, value: number): this {
     this.addOperation("whereRaw", {
-      expression: `jsonb_array_length(${path}) ${operator} ?`,
+      expression: `jsonb_array_length(${this.quoteColumn(path)}) ${operator} ?`,
       bindings: [value],
     });
     return this;
@@ -709,12 +743,12 @@ export class QueryBuilder<T = unknown> {
 
   /** WHERE id = value. */
   public whereId(value: string | number): this {
-    return this.where("id", value);
+    return this.where(this.modelClass?.primaryKey ?? "id", value);
   }
 
   /** WHERE id IN values. */
   public whereIds(values: Array<string | number>): this {
-    return this.whereIn("id", values);
+    return this.whereIn(this.modelClass?.primaryKey ?? "id", values);
   }
 
   /** WHERE uuid = value. */
@@ -741,7 +775,11 @@ export class QueryBuilder<T = unknown> {
 
   /** Full-text search (OR). */
   public orWhereFullText(fields: string | string[], query: string): this {
-    return this.whereFullText(fields, query);
+    this.addOperation("orWhereFullText", {
+      fields: Array.isArray(fields) ? fields : [fields],
+      query,
+    });
+    return this;
   }
 
   /** Alias for whereFullText with a single field. */
@@ -754,10 +792,11 @@ export class QueryBuilder<T = unknown> {
    * MongoDB-style convenience shorthand.
    */
   public textSearch(query: string, filters?: WhereObject): this {
-    if (filters) {
-      for (const [key, value] of Object.entries(filters)) this.where(key, value as never);
-    }
-    return this;
+    // The base builder cannot know which fields to search; silently returning
+    // every row is worse than failing, so drivers must override.
+    throw new Error(
+      `textSearch("${query}") is not supported by this query builder; use whereFullText(fields, query).`,
+    );
   }
 
   // ════════════════════════════════════════════════════════
@@ -1237,7 +1276,7 @@ export class QueryBuilder<T = unknown> {
     aggregate: "sum" | "avg" | "min" | "max" | "count" | "first" | "last",
     alias: string,
   ): this {
-    return this.selectRaw({ [alias]: `${aggregate.toUpperCase()}(${field})` });
+    return this.selectRaw({ [alias]: `${aggregate.toUpperCase()}(${field === "*" ? field : this.quoteColumn(field)})` });
   }
 
   /** Existence check as a projected boolean field. */
@@ -1304,12 +1343,12 @@ export class QueryBuilder<T = unknown> {
 
   /** String concatenation as a projected field. */
   public selectConcat(fields: Array<string | RawExpression>, alias: string): this {
-    return this.selectRaw({ [alias]: fields.join(" || ") });
+    return this.selectRaw({ [alias]: fields.map((field) => this.quoteOperand(field)).join(" || ") });
   }
 
   /** COALESCE (first non-null) as a projected field. */
   public selectCoalesce(fields: Array<string | RawExpression>, alias: string): this {
-    return this.selectRaw({ [alias]: `COALESCE(${fields.join(", ")})` });
+    return this.selectRaw({ [alias]: `COALESCE(${fields.map((field) => this.quoteOperand(field)).join(", ")})` });
   }
 
   /** Window function expression. */
@@ -1415,8 +1454,29 @@ export class QueryBuilder<T = unknown> {
   }
 
   /** Order ascending by a date column (oldest first). */
-  public oldest(column = "createdAt"): this {
+  public oldest(column = this.defaultCreatedAtColumn()): this {
     return this.orderBy(column, "asc");
+  }
+
+  /** The model's created-at column, falling back to `createdAt` without a model. */
+  protected defaultCreatedAtColumn(): string {
+    return (this.modelClass?.createdAtColumn as string | undefined) ?? "createdAt";
+  }
+
+  /**
+   * Quote a column reference for raw SQL fragments.
+   * The base builder is dialect-agnostic and returns it untouched; SQL drivers override.
+   */
+  protected quoteColumn(field: string): string {
+    return field;
+  }
+
+  /** Quote an operand only when it is a plain column name; expressions and literals pass through. */
+  protected quoteOperand(operand: unknown): string {
+    if (typeof operand === "string" && /^[A-Za-z_]\w*(\.[A-Za-z_]\w*)*$/.test(operand)) {
+      return this.quoteColumn(operand);
+    }
+    return String(operand);
   }
 
   // ════════════════════════════════════════════════════════

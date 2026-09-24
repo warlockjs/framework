@@ -412,7 +412,7 @@ describe("PostgresQueryBuilder", () => {
 
         expect(queryBuilder.operations).toHaveLength(1);
         expect(queryBuilder.operations[0].type).toBe("whereRaw");
-        expect(queryBuilder.operations[0].data.expression).toContain("EXTRACT(DAY FROM createdAt)");
+        expect(queryBuilder.operations[0].data.expression).toContain('EXTRACT(DAY FROM "createdAt")');
       });
     });
 
@@ -423,7 +423,7 @@ describe("PostgresQueryBuilder", () => {
         expect(queryBuilder.operations).toHaveLength(1);
         expect(queryBuilder.operations[0].type).toBe("whereRaw");
         expect(queryBuilder.operations[0].data.expression).toContain(
-          "EXTRACT(MONTH FROM createdAt)",
+          'EXTRACT(MONTH FROM "createdAt")',
         );
       });
     });
@@ -435,7 +435,7 @@ describe("PostgresQueryBuilder", () => {
         expect(queryBuilder.operations).toHaveLength(1);
         expect(queryBuilder.operations[0].type).toBe("whereRaw");
         expect(queryBuilder.operations[0].data.expression).toContain(
-          "EXTRACT(YEAR FROM createdAt)",
+          'EXTRACT(YEAR FROM "createdAt")',
         );
       });
     });

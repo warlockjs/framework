@@ -8,7 +8,7 @@ import {
   type AggregateExpression,
 } from "../../expressions/aggregate-expressions";
 import type { ColumnExpression } from "../../expressions/column-expressions";
-import { escapeRegex, resolveLikePattern } from "../../utils/escape-regex";
+import { escapeRegex } from "../../utils/escape-regex";
 import type { MongoQueryBuilder } from "./mongodb-query-builder";
 import { isPipelineStageObject } from "./pipeline-stage-object";
 import type { Operation, PipelineStage } from "./types";
@@ -63,6 +63,18 @@ export type MongoQueryParserOptions = {
   /** Factory method for creating sub-builders (used for callbacks) */
   createSubBuilder: () => MongoQueryBuilder;
 };
+
+/**
+ * Compile a LIKE argument to regex source with the same wildcards as SQL/pg:
+ * `%` matches any run of characters and `_` exactly one. Every other regex
+ * metacharacter in a string is escaped, so `a.b*` matches literally. An explicit
+ * `RegExp` is developer-authored and used verbatim.
+ */
+export function resolveMongoLikePattern(pattern: RegExp | string): string {
+  if (pattern instanceof RegExp) return pattern.source;
+
+  return escapeRegex(pattern).replace(/%+/g, ".*").replace(/_/g, ".");
+}
 
 /**
  * Parses query builder operations into MongoDB aggregation pipeline.
@@ -182,6 +194,11 @@ export class MongoQueryParser {
       if (renameStage) {
         pipeline.push(renameStage);
       }
+
+      // $lookup is a left join; an inner join drops the rows with no match.
+      if (stage === "$lookup" && builtStage.$lookup && operations[0]?.data?.type === "inner") {
+        pipeline.push({ $match: { [builtStage.$lookup.as]: { $ne: [] } } });
+      }
     };
 
     for (const op of this.orderStages(this.operations)) {
@@ -210,7 +227,48 @@ export class MongoQueryParser {
       emit(currentStage!, currentBuffer);
     }
 
-    return pipeline;
+    return this.hoistVectorSearch(pipeline);
+  }
+
+  /**
+   * Atlas requires `$vectorSearch` as the first stage. Any `$match` emitted
+   * before it (where clauses, scopes) moves into its `filter` instead.
+   */
+  private hoistVectorSearch(pipeline: any[]): any[] {
+    const index = pipeline.findIndex((stage) => stage.$vectorSearch);
+
+    if (index <= 0) {
+      return pipeline;
+    }
+
+    // similarTo() already carries the limit, so a `$limit` recorded before it is redundant.
+    const before = pipeline.slice(0, index).filter((stage) => !stage.$limit);
+
+    if (!before.every((stage) => stage.$match)) {
+      throw new UnsupportedQueryOperationError(
+        "similarTo",
+        "mongodb",
+        "$vectorSearch must be the first pipeline stage; only where() filters can precede similarTo().",
+      );
+    }
+
+    const vectorStage = pipeline[index].$vectorSearch;
+    const filters = [
+      ...before.map((stage) => stage.$match),
+      ...(vectorStage.filter ? [vectorStage.filter] : []),
+    ];
+
+    return [
+      {
+        $vectorSearch: {
+          ...vectorStage,
+          ...(filters.length === 0
+            ? {}
+            : { filter: filters.length === 1 ? filters[0] : { $and: filters } }),
+        },
+      },
+      ...pipeline.slice(index + 1),
+    ];
   }
 
   /**
@@ -898,18 +956,23 @@ export class MongoQueryParser {
         return this.buildOperatorCondition(field, operator, value);
 
       case "whereIn":
+      case "orWhereIn":
         return { [field]: { $in: value || op.data.values } };
 
       case "whereNotIn":
+      case "orWhereNotIn":
         return { [field]: { $nin: value || op.data.values } };
 
       case "whereNull":
+      case "orWhereNull":
         return { [field]: null };
 
       case "whereNotNull":
+      case "orWhereNotNull":
         return { [field]: { $ne: null } };
 
       case "whereBetween":
+      case "orWhereBetween":
         return {
           [field]: {
             $gte: op.data.range[0],
@@ -1106,7 +1169,7 @@ export class MongoQueryParser {
       return data.pattern;
     }
 
-    return resolveLikePattern(data.pattern);
+    return resolveMongoLikePattern(data.pattern);
   }
 
   /**
@@ -1140,10 +1203,10 @@ export class MongoQueryParser {
         return { [field]: operator === "between" ? bounds : { $not: bounds } };
       }
       case "like":
-        return { [field]: { $regex: resolveLikePattern(value as string), $options: "i" } };
+        return { [field]: { $regex: resolveMongoLikePattern(value as string), $options: "i" } };
       case "notLike":
       case "not like":
-        return { [field]: { $not: { $regex: resolveLikePattern(value as string), $options: "i" } } };
+        return { [field]: { $not: { $regex: resolveMongoLikePattern(value as string), $options: "i" } } };
       case "startsWith":
         return { [field]: { $regex: `^${escapeRegex(String(value))}`, $options: "i" } };
       case "notStartsWith":
@@ -1387,13 +1450,13 @@ export class MongoQueryParser {
 
   private startOfDay(date: Date): Date {
     const copy = new Date(date);
-    copy.setHours(0, 0, 0, 0);
+    copy.setUTCHours(0, 0, 0, 0);
     return copy;
   }
 
   private endOfDay(date: Date): Date {
     const copy = new Date(date);
-    copy.setHours(23, 59, 59, 999);
+    copy.setUTCHours(23, 59, 59, 999);
     return copy;
   }
 
@@ -1759,8 +1822,7 @@ export class MongoQueryParser {
           return { $sample: { size: op.data.limit } };
 
         case "orderByRaw":
-          // TODO: Handle raw expressions
-          break;
+          throw new Error("orderByRaw() is not supported by the MongoDB driver; use orderBy() instead.");
       }
     }
 

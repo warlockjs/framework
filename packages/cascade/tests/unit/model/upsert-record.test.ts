@@ -14,8 +14,7 @@ class Article extends Model {
 
 describe("B9: upsert", () => {
   const driver = createMockDriver();
-  // The shared mock driver doesn't stub findOneAndUpdate, which upsert relies on.
-  (driver as any).findOneAndUpdate = vi.fn().mockResolvedValue({ id: 1, email: "a@b.c", name: "n" });
+  vi.mocked(driver.findOneAndUpdate).mockResolvedValue({ id: 1, email: "a@b.c", name: "n" });
   vi.spyOn(Article, "getDataSource").mockReturnValue(createMockDataSource({ driver }));
   vi.spyOn(Article, "getDriver").mockReturnValue(driver);
 

@@ -481,9 +481,13 @@ export class MongoDbDriver implements DriverContract {
     options?: Record<string, unknown>,
   ): Promise<T | null> {
     const collection = this.getDatabaseInstance().collection(table);
-    const result = await collection.findOneAndReplace(filter, document as Record<string, unknown>);
+    const mongoOptions = this.withSession<FindOneAndUpdateOptions>(options);
+    const result = await collection.findOneAndReplace(filter, document as Record<string, unknown>, {
+      ...mongoOptions,
+      returnDocument: "after",
+    });
 
-    return result?.value as T | null;
+    return result as T | null;
   }
 
   /**
@@ -792,33 +796,29 @@ export class MongoDbDriver implements DriverContract {
     let result!: T;
 
     try {
-      await session.startTransaction({
-        ...this.transactionOptions,
-        ...(options as TransactionOptions),
-      });
-
       // Tag the session with this driver so another data source's queries
       // running inside the callback never pick it up.
       transactionOwners.set(session, this);
 
-      // Run the callback INSIDE the async context (not enter-after-await) so
-      // every query it starts uses the transaction session.
-      await databaseTransactionContext.run({ session, afterCommit: [] }, async () => {
-        try {
-          // Execute callback
-          result = await fn(ctx);
+      // `withTransaction` commits/aborts itself and retries the whole callback on
+      // TransientTransactionError / UnknownTransactionCommitResult (write
+      // conflicts), so `fn` may run more than once: keep it free of external
+      // side effects. Each attempt runs INSIDE the async context so every query
+      // it starts uses the transaction session, with a fresh afterCommit queue.
+      await session.withTransaction(
+        async () => {
+          await databaseTransactionContext.run({ session, afterCommit: [] }, async () => {
+            result = await fn(ctx);
 
-          // Auto-commit on success
-          await session.commitTransaction();
-
-          // Read the queue while still inside the transaction context
-          committedCallbacks = databaseTransactionContext.takeAfterCommit();
-        } catch (error) {
-          // Auto-rollback on any error (including explicit rollback)
-          await session.abortTransaction().catch(() => undefined);
-          throw error;
-        }
-      });
+            // Read the queue while still inside the transaction context
+            committedCallbacks = databaseTransactionContext.takeAfterCommit();
+          });
+        },
+        {
+          ...this.transactionOptions,
+          ...(options as TransactionOptions),
+        },
+      );
     } finally {
       // Guaranteed session cleanup
       await session.endSession().catch(() => undefined);
@@ -961,12 +961,19 @@ export class MongoDbDriver implements DriverContract {
    *
    * @throws {Error} If MongoDB is running as a standalone instance
    */
-  private async ensureReplicaSetAvailable(): Promise<void> {
-    try {
-      const admin = this.database!.admin();
-      const status = await admin.serverStatus();
+  private replicaSetChecked = false;
 
-      if (!status.repl) {
+  private async ensureReplicaSetAvailable(): Promise<void> {
+    if (this.replicaSetChecked) {
+      return;
+    }
+
+    try {
+      // `hello` needs no special privilege (unlike `serverStatus`) and the
+      // topology does not change for the life of the connection: check once.
+      const hello = (await this.database!.admin().command({ hello: 1 })) as Record<string, unknown>;
+
+      if (!hello.setName && hello.msg !== "isdbgrid") {
         throw new Error(
           "MongoDB transactions require a replica set or sharded cluster. " +
             "Standalone MongoDB instances do not support transactions.\n\n" +
@@ -976,6 +983,8 @@ export class MongoDbDriver implements DriverContract {
             "  - Or use MongoDB Atlas (cloud) which provides replica sets by default",
         );
       }
+
+      this.replicaSetChecked = true;
     } catch (error: any) {
       if (error.message?.includes("replica set")) {
         throw error;

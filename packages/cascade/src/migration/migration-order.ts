@@ -4,16 +4,24 @@ import { compareCreatedAt } from "./parse-created-at";
 type Orderable = {
   createdAt?: string;
   migrationName: string;
+  order?: number;
 };
 
 /**
  * Comparator for applying migrations — oldest first.
  *
  * Priority:
- *   1. `createdAt` timestamp (older = earlier)
- *   2. Alphabetical by migration name (last resort)
+ *   1. `order` override (lower = earlier, default 0)
+ *   2. `createdAt` timestamp (older = earlier)
+ *   3. Alphabetical by migration name (last resort)
  */
 export function sortMigrations(a: Orderable, b: Orderable): number {
+  const byOrder = (a.order ?? 0) - (b.order ?? 0);
+
+  if (byOrder !== 0) {
+    return byOrder;
+  }
+
   const byCreatedAt = compareCreatedAt(a.createdAt, b.createdAt);
 
   if (byCreatedAt !== undefined) {

@@ -1,6 +1,6 @@
 import type { Mutator } from "@warlock.js/seal";
 import { type ChildModel, Model } from "../../model/model";
-import { getModelFromRegistry } from "../../model/register-model";
+import { requireModelClass } from "../../model/register-model";
 
 type DatabaseModelMutatorOptions = {
   model: ChildModel<any> | string;
@@ -10,23 +10,24 @@ export const databaseModelMutator: Mutator<DatabaseModelMutatorOptions> = async 
   value,
   context,
 ) => {
-  let { model: ModelClass } = context?.options || {};
+  const { model } = context?.options || {};
 
-  if (typeof ModelClass === "string") {
-    ModelClass = getModelFromRegistry(ModelClass)!;
+  if (!model) {
+    throw new Error("Model option is required");
   }
 
-  if (!ModelClass) {
-    throw new Error(`Model ${ModelClass} not found in registry`);
-  }
+  const ModelClass = requireModelClass(model);
 
   if (value instanceof Model) return value;
 
-  if (typeof value === "object" && value?.id) {
-    value = Number(value.id);
+  if (value && typeof value === "object") {
+    const key = ModelClass.primaryKey || "id";
+    value = value[key] ?? value.id;
   }
 
-  if (typeof value !== "number") return value;
+  if (typeof value !== "number" && typeof value !== "string") return value;
+
+  if (value === "") return value;
 
   return await ModelClass.find(value);
 };
@@ -37,20 +38,30 @@ export const databaseModelsMutator: Mutator<DatabaseModelMutatorOptions> = async
 ) => {
   if (!Array.isArray(value)) return value;
 
-  let { model: ModelClass } = context?.options || {};
+  const { model } = context?.options || {};
 
-  if (typeof ModelClass === "string") {
-    ModelClass = getModelFromRegistry(ModelClass)!;
+  if (!model) {
+    throw new Error("Model option is required");
   }
 
-  if (!ModelClass) {
-    throw new Error(`Model ${ModelClass} not found in registry`);
-  }
+  const ModelClass = requireModelClass(model);
 
   // first, if all values are list of models, then return them.
   if (value.every((item) => item instanceof Model)) return value;
 
-  const ids = value.map((item) => item?.id || item).filter((item) => item !== undefined);
+  const key = ModelClass.primaryKey || "id";
 
-  return await ModelClass.query().whereIn("id", ids).get();
+  const ids = value
+    .map((item) => (item && typeof item === "object" ? (item[key] ?? item.id) : item))
+    .filter((item) => item !== undefined && item !== null);
+
+  const uniqueIds = [...new Set(ids)];
+
+  const found = await ModelClass.query().whereIn(key, uniqueIds).get();
+
+  // a missing id must fail validation instead of being silently dropped;
+  // returning the raw value makes the models rule reject it
+  if (found.length !== uniqueIds.length) return value;
+
+  return found;
 };

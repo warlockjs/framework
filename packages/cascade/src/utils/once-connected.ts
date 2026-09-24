@@ -2,6 +2,17 @@ import type { DataSource } from "../data-source/data-source";
 import { dataSourceRegistry } from "../data-source/data-source-registry";
 
 /**
+ * Whether the given source is the registry's actual default (not just the `isDefault` option flag).
+ */
+function isRegistryDefault(ds: DataSource): boolean {
+  try {
+    return dataSourceRegistry.get() === ds;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Execute a callback once the driver is connected.
  *
  * If the driver is already connected, the callback is executed immediately.
@@ -119,7 +130,7 @@ export function onceConnected(
     const matches =
       typeof targetDataSource === "string"
         ? targetDataSource === "default"
-          ? ds.isDefault
+          ? isRegistryDefault(ds)
           : ds.name === targetDataSource
         : ds === targetDataSource;
 
@@ -252,7 +263,7 @@ export function onceDisconnected(
     const matches =
       typeof targetDataSource === "string"
         ? targetDataSource === "default"
-          ? ds.isDefault
+          ? isRegistryDefault(ds)
           : ds.name === targetDataSource
         : ds === targetDataSource;
 

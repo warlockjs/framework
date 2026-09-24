@@ -72,6 +72,7 @@ export function createMockDriver(options: MockDriverOptions = {}): DriverContrac
     insert: vi.fn().mockResolvedValue(insertResult),
     insertMany: vi.fn().mockResolvedValue({ documents: [], insertedCount: 0 }),
     update: vi.fn().mockResolvedValue(updateResult),
+    findOneAndUpdate: vi.fn(),
     updateMany: vi.fn().mockResolvedValue({ modifiedCount: 0 }),
     replace: vi.fn().mockResolvedValue(replaceResult),
     delete: vi.fn().mockResolvedValue(deleteResult),

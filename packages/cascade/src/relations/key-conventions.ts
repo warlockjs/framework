@@ -15,7 +15,15 @@
  */
 
 import { toSnakeCase } from "@mongez/reinforcements";
-import type { RelationDefaults } from "../types";
+import type { NamingConvention, RelationDefaults } from "../types";
+
+/**
+ * Relation defaults plus the column casing of the owning data source. Callers
+ * that omit `namingConvention` keep the historical snake_case behaviour.
+ */
+export type KeyConventionOptions = RelationDefaults & {
+  namingConvention?: NamingConvention;
+};
 
 const DEFAULT_FK_SUFFIX = "_id";
 const DEFAULT_PIVOT_ORDER: NonNullable<RelationDefaults["pivotTableNamingOrder"]> = "alphabetical";
@@ -55,6 +63,23 @@ function snake(input: string): string {
   return toSnakeCase(normalised).toLowerCase();
 }
 
+/**
+ * Build a key column name from a model/relation name, honouring the data
+ * source's naming convention: `user_id` (snake_case) or `userId` (camelCase).
+ * An explicit `foreignKeySuffix` is always used verbatim.
+ */
+function keyName(input: string, options?: KeyConventionOptions): string {
+  const base = snake(input);
+
+  if (options?.namingConvention === "camelCase") {
+    const camel = base.replace(/_([a-z\d])/g, (_, char: string) => char.toUpperCase());
+
+    return `${camel}${options.foreignKeySuffix ?? "Id"}`;
+  }
+
+  return `${base}${options?.foreignKeySuffix ?? DEFAULT_FK_SUFFIX}`;
+}
+
 // ============================================================================
 // PUBLIC — DEFAULT FOREIGN-KEY INFERENCE
 // ============================================================================
@@ -76,9 +101,9 @@ function snake(input: string): string {
  */
 export function inferBelongsToForeignKey(
   relationName: string,
-  options?: RelationDefaults,
+  options?: KeyConventionOptions,
 ): string {
-  return `${snake(relationName)}${options?.foreignKeySuffix ?? DEFAULT_FK_SUFFIX}`;
+  return keyName(relationName, options);
 }
 
 /**
@@ -95,9 +120,9 @@ export function inferBelongsToForeignKey(
  */
 export function inferHasForeignKey(
   selfModelName: string,
-  options?: RelationDefaults,
+  options?: KeyConventionOptions,
 ): string {
-  return `${snake(selfModelName)}${options?.foreignKeySuffix ?? DEFAULT_FK_SUFFIX}`;
+  return keyName(selfModelName, options);
 }
 
 /**
@@ -114,8 +139,8 @@ export function inferHasForeignKey(
  * inferPivotKey("Post") // "post_id" — pivot column post_tags.post_id
  * inferPivotKey("Tag")  // "tag_id"  — pivot column post_tags.tag_id
  */
-export function inferPivotKey(modelName: string, options?: RelationDefaults): string {
-  return `${snake(modelName)}${options?.foreignKeySuffix ?? DEFAULT_FK_SUFFIX}`;
+export function inferPivotKey(modelName: string, options?: KeyConventionOptions): string {
+  return keyName(modelName, options);
 }
 
 /**

@@ -285,8 +285,10 @@ export class PostgresSQLSerializer extends SQLSerializer {
         (column.defaultValue as any).__type === "CURRENT_TIMESTAMP"
       ) {
         defaultVal = "NOW()";
-      } else if (typeof column.defaultValue === "string") {
-        defaultVal = `'${column.defaultValue}'`;
+      } else if (column.isRawDefault === false) {
+        defaultVal = `'${String(column.defaultValue).replace(/'/g, "''")}'`;
+      } else if (typeof column.defaultValue === "boolean") {
+        defaultVal = column.defaultValue ? "TRUE" : "FALSE";
       } else {
         defaultVal = String(column.defaultValue);
       }
@@ -412,7 +414,7 @@ export class PostgresSQLSerializer extends SQLSerializer {
     const indexName = `idx_${table}_ttl_${column}`;
     const quotedIndexName = this.dialect.quoteIdentifier(indexName);
 
-    return `CREATE INDEX ${quotedIndexName} ON ${quotedTable} (${quotedColumn}) WHERE ${quotedColumn} < NOW() - INTERVAL '${expireAfterSeconds} seconds'`;
+    return `CREATE INDEX ${quotedIndexName} ON ${quotedTable} (${quotedColumn})`;
   }
 
   // ============================================================================

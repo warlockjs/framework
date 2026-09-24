@@ -15,9 +15,7 @@ export function setFieldValue(model: Model, field: string, value: unknown): Mode
   const path = String(field);
   set(model.data, path, value);
 
-  const partial: Record<string, unknown> = {};
-  set(partial, path, value);
-  model.dirtyTracker.mergeChanges(partial);
+  model.dirtyTracker.setAtPath(path, value);
 
   return model;
 }

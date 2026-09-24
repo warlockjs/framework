@@ -480,7 +480,10 @@ describe("QueryBuilder (base) — filter security", () => {
     const qb = new QueryBuilder().whereStartsWith("name", "a.b");
 
     expect(qb.operations).toEqual([
-      { type: "whereLike", data: { field: "name", pattern: "a.b%" } },
+      {
+        type: "whereLike",
+        data: { field: "name", pattern: "a.b%", value: "a.b", mode: "startsWith" },
+      },
     ]);
   });
 });

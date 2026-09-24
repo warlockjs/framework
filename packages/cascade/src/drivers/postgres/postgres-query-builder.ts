@@ -8,6 +8,7 @@
  */
 
 import type { GenericObject } from "@mongez/reinforcements";
+import { log } from "@warlock.js/logger";
 import type {
   ChunkCallback,
   CursorPaginationOptions,
@@ -19,6 +20,7 @@ import type {
   PaginationResult,
   QueryBuilderContract,
   RawExpression,
+  WhereObject,
   UnwindOptions,
 } from "../../contracts/query-builder.contract";
 import type { DataSource } from "../../data-source/data-source";
@@ -557,6 +559,37 @@ export class PostgresQueryBuilder<T = unknown>
   // WHERE — POSTGRES-SPECIFIC (driver.dialect required)
   // ============================================================================
 
+  /** Quote raw-SQL column references through the Postgres dialect. */
+  protected override quoteColumn(field: string): string {
+    return this.driver.dialect.quoteIdentifier(field);
+  }
+
+  /** Full-text search across the whole row, plus optional equality filters. */
+  public override textSearch(query: string, filters?: WhereObject): this {
+    const table = this.driver.dialect.quoteIdentifier(this.table);
+    this.addOperation("whereRaw", {
+      expression: `to_tsvector('english', ${table}::text) @@ plainto_tsquery('english', ?)`,
+      bindings: [query],
+    });
+    if (filters) {
+      for (const [key, value] of Object.entries(filters)) this.where(key, value as never);
+    }
+    return this;
+  }
+
+  /** Full-text search (OR). */
+  public override orWhereFullText(fields: string | string[], query: string): this {
+    const list = Array.isArray(fields) ? fields : [fields];
+    const vectors = list
+      .map((f) => `to_tsvector('english', ${this.driver.dialect.quoteIdentifier(f)})`)
+      .join(" || ");
+    this.addOperation("orWhereRaw", {
+      expression: `(${vectors}) @@ plainto_tsquery('english', ?)`,
+      bindings: [query],
+    });
+    return this;
+  }
+
   /** Array field contains a value (or object with key). */
   public whereArrayContains(field: string, value: unknown, key?: string): this {
     const quotedField = this.driver.dialect.quoteIdentifier(field);
@@ -823,8 +856,12 @@ export class PostgresQueryBuilder<T = unknown>
       this.operations = [];
       return records;
     } catch (error) {
-      console.log("Error while executing:", query, bindings);
-      console.log("Query Builder Error:", error);
+      log.error({
+        module: "database.postgres",
+        action: "query-builder.error",
+        message: `${query} | Params: ${bindings.length}`,
+        context: { sql: query, paramCount: bindings.length },
+      });
       throw error;
     }
   }
@@ -877,16 +914,48 @@ export class PostgresQueryBuilder<T = unknown>
     return this.where("id", id).first<TResult>();
   }
 
-  /** Count matching rows. */
-  public async count(): Promise<number> {
+  /**
+   * Collect the operations that decide WHICH rows match (filters, joins,
+   * grouping, distinct), after rewriting scopes and has/whereHas.
+   */
+  private collectMatchOps(): Op[] {
     this.applyPendingScopes();
-    const countOps: PostgresParserOperation[] = toParserOps([
-      ...this.operations.filter((op) => op.type.includes("where") || op.type.includes("join")),
-      { type: "selectRaw", data: { expression: 'COUNT(*) AS "count"' } },
-    ]);
+    this.applyHasRelations();
 
-    const parser = new PostgresQueryParser({ table: this.table, operations: countOps });
-    const { query = "", bindings = [] } = parser.parse();
+    return this.operations.filter((op) =>
+      /where|join|has|groupby|having|distinct|select/i.test(op.type),
+    );
+  }
+
+  /** Count matching rows (grouped / distinct queries count their result rows). */
+  public async count(): Promise<number> {
+    const matchOps = this.collectMatchOps();
+    const isShaped = matchOps.some((op) => /groupby|distinct/i.test(op.type));
+
+    let query: string;
+    let bindings: unknown[];
+
+    if (isShaped) {
+      const hasSelect = matchOps.some((op) => /select/i.test(op.type));
+      const isDistinct = matchOps.some((op) => op.type === "distinct");
+      const innerOps = toParserOps(
+        hasSelect || isDistinct
+          ? matchOps
+          : [...matchOps, { type: "selectRaw", data: { expression: "1" } }],
+      );
+      const inner = new PostgresQueryParser({ table: this.table, operations: innerOps }).parse();
+      query = `SELECT COUNT(*) AS "count" FROM (${inner.query}) AS "__count"`;
+      bindings = inner.bindings ?? [];
+    } else {
+      const countOps = toParserOps([
+        ...matchOps.filter((op) => !/select/i.test(op.type)),
+        { type: "selectRaw", data: { expression: 'COUNT(*) AS "count"' } },
+      ]);
+      const parsed = new PostgresQueryParser({ table: this.table, operations: countOps }).parse();
+      query = parsed.query ?? "";
+      bindings = parsed.bindings ?? [];
+    }
+
     const result = await this.driver.query<{ count: string }>(query, bindings);
     return parseInt(result.rows[0]?.count ?? "0", 10);
   }
@@ -961,8 +1030,24 @@ export class PostgresQueryBuilder<T = unknown>
 
   /** Check whether any matching rows exist. */
   public async exists(): Promise<boolean> {
-    const count = await this.limit(1).count();
-    return count > 0;
+    const matchOps = this.collectMatchOps();
+
+    // Grouped / distinct shapes need the full count semantics
+    if (matchOps.some((op) => /groupby|distinct/i.test(op.type))) {
+      return (await this.count()) > 0;
+    }
+
+    const probeOps = toParserOps([
+      ...matchOps.filter((op) => !/select/i.test(op.type)),
+      { type: "selectRaw", data: { expression: "1" } },
+      { type: "limit", data: { value: 1 } },
+    ]);
+    const { query = "", bindings = [] } = new PostgresQueryParser({
+      table: this.table,
+      operations: probeOps,
+    }).parse();
+    const result = await this.driver.query(query, bindings);
+    return result.rows.length > 0;
   }
 
   /** Check whether NO matching rows exist. */
@@ -984,7 +1069,7 @@ export class PostgresQueryBuilder<T = unknown>
   // ─── Aggregation shortcuts via latest/oldest ─────────────────
 
   /** Get latest records ordered by a column. */
-  public async latest(column = "createdAt"): Promise<T[]> {
+  public async latest(column = this.defaultCreatedAtColumn()): Promise<T[]> {
     return this.orderBy(column, "desc").get();
   }
 
@@ -1001,7 +1086,8 @@ export class PostgresQueryBuilder<T = unknown>
     const updateSql =
       `UPDATE ${this.driver.dialect.quoteIdentifier(this.table)} ` +
       `SET ${this.driver.dialect.quoteIdentifier(field)} = COALESCE(${this.driver.dialect.quoteIdentifier(field)}, 0) + ${amountPlaceholder} ` +
-      (filterSql ? `WHERE ${filterSql.replace("WHERE ", "")} ` : "") +
+      // One row only (matches Mongo and the single returned value).
+      `WHERE ctid IN (SELECT ctid FROM ${this.driver.dialect.quoteIdentifier(this.table)} ${filterSql} LIMIT 1 FOR UPDATE SKIP LOCKED) ` +
       `RETURNING ${this.driver.dialect.quoteIdentifier(field)}`;
     const result = await this.driver.query<Record<string, number>>(updateSql, [
       ...filterParams,

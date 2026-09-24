@@ -24,6 +24,33 @@ export function getModelEvents<TModel extends Model>(
   return events as ModelEvents<TModel>;
 }
 
+/**
+ * Emit a static event to the class's listeners and then to every ancestor
+ * class's listeners up to `Model`, so a listener registered on a shared base
+ * (`class AppModel extends Model`) fires for its subclasses too. Ancestors are
+ * only read, never given an emitter they don't already have.
+ */
+export async function emitStaticEvent<TContext = unknown>(
+  ModelClass: any,
+  event: ModelEventName,
+  model: any,
+  context: TContext,
+): Promise<void> {
+  await ModelClass.events().emit(event, model, context);
+
+  let ancestor = Object.getPrototypeOf(ModelClass);
+
+  while (ancestor && ancestor !== Function.prototype) {
+    const events = modelEventsRegistry.get(ancestor);
+
+    if (events) {
+      await events.emit(event, model, context);
+    }
+
+    ancestor = Object.getPrototypeOf(ancestor);
+  }
+}
+
 export function cleanupModelEvents(ModelClass: any): void {
   modelEventsRegistry.delete(ModelClass);
   removeModelFromRegistery(ModelClass.name);

@@ -199,18 +199,6 @@ export function defineModel<
     public static deleteStrategy: DeleteStrategy | undefined = options.deleteStrategy;
 
     /**
-     * Strict mode for unknown fields. Defaults to `"strip"` to match the base
-     * `Model` static default.
-     */
-    public static strictMode: StrictMode = options.strictMode || "strip";
-
-    /**
-     * Auto-generate sequential IDs (NoSQL only). Defaults to `true` to match
-     * the base `Model` static default.
-     */
-    public static autoGenerateId: boolean = options.autoGenerateId ?? true;
-
-    /**
      * Random increment for auto-generated IDs. When undefined, falls through
      * to the data-source default.
      */
@@ -221,6 +209,16 @@ export function defineModel<
      * undefined, falls through to the data-source default.
      */
     public static initialId: number | undefined = options.initialId;
+  }
+
+  // Only set when provided: the base Model owns the framework fallback,
+  // and an own `undefined` would shadow it and block data-source defaults.
+  if (options.strictMode !== undefined) {
+    DefinedModel.strictMode = options.strictMode;
+  }
+
+  if (options.autoGenerateId !== undefined) {
+    DefinedModel.autoGenerateId = options.autoGenerateId;
   }
 
   // Apply custom instance properties (getters/setters/methods)

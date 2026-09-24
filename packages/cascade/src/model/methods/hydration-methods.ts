@@ -1,11 +1,40 @@
+import { clone } from "@mongez/reinforcements";
+import { DateValidator } from "@warlock.js/seal";
 import { RelationHydrator, type ModelSnapshot, type SerializedRelation } from "../../relations/relation-hydrator";
 import type { ChildModel, Model } from "../model";
+
+/**
+ * Drivers re-inflate any ISO-looking string into a Date. Only fields the model
+ * schema declares as dates may be converted, so put every other string back.
+ */
+function restoreUndeclaredDateStrings<TModel extends Model>(
+  ModelClass: ChildModel<TModel>,
+  original: Record<string, string>,
+  data: Record<string, unknown>,
+): void {
+  const shape = ModelClass.schema?.schema ?? {};
+
+  for (const [key, value] of Object.entries(original)) {
+    if (data[key] instanceof Date && !(shape[key] instanceof DateValidator)) {
+      data[key] = value;
+    }
+  }
+}
 
 export function hydrateModel<TModel extends Model = Model>(
   ModelClass: ChildModel<TModel>,
   data: Record<string, unknown>,
 ): TModel {
-  const model = new ModelClass(ModelClass.getDriver().deserialize(data));
+  const strings: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(data)) {
+    if (typeof value === "string") strings[key] = value;
+  }
+
+  const deserialized = ModelClass.getDriver().deserialize(data);
+  restoreUndeclaredDateStrings(ModelClass, strings, deserialized);
+
+  const model = new ModelClass(deserialized);
   model.isNew = false;
   return model;
 }
@@ -44,7 +73,7 @@ export function serializeModel(model: Model) {
 }
 
 export function cloneModel<TModel extends Model>(model: TModel): TModel {
-  const clonedData = JSON.parse(JSON.stringify(model.data));
+  const clonedData = clone(model.data);
   const ModelClass = model.self();
   const clonedModel = new ModelClass(clonedData) as TModel;
 

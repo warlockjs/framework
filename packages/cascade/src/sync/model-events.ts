@@ -7,6 +7,7 @@
  * @module cascade-next/sync/model-events
  */
 
+import events from "@mongez/events";
 import type { ChildModel, Model } from "../model/model";
 
 /**
@@ -25,6 +26,26 @@ export const ModelSyncEventType = {
 export type ModelSyncEventTypeName = (typeof ModelSyncEventType)[keyof typeof ModelSyncEventType];
 
 /**
+ * Resolve the identity used in event names.
+ *
+ * Class names collide across packages (e.g. auth's `User` and an app `User`),
+ * so key on the table plus the data source when available and fall back to
+ * the class name only for models without a table.
+ */
+function getModelEventKey(modelClass: ChildModel<Model>): string {
+  const table = modelClass.table;
+
+  if (!table) {
+    return modelClass.name;
+  }
+
+  const source = modelClass.dataSource;
+  const sourceName = typeof source === "string" ? source : source?.name;
+
+  return sourceName ? `${sourceName}:${table}` : table;
+}
+
+/**
  * Get the event name for a model update.
  *
  * @param modelClass - The model class
@@ -37,7 +58,7 @@ export type ModelSyncEventTypeName = (typeof ModelSyncEventType)[keyof typeof Mo
  * ```
  */
 export function getModelUpdatedEvent(modelClass: ChildModel<Model>): string {
-  return `${MODEL_EVENT_PREFIX}.${modelClass.name}.${ModelSyncEventType.UPDATED}`;
+  return `${MODEL_EVENT_PREFIX}.${getModelEventKey(modelClass)}.${ModelSyncEventType.UPDATED}`;
 }
 
 /**
@@ -53,7 +74,7 @@ export function getModelUpdatedEvent(modelClass: ChildModel<Model>): string {
  * ```
  */
 export function getModelDeletedEvent(modelClass: ChildModel<Model>): string {
-  return `${MODEL_EVENT_PREFIX}.${modelClass.name}.${ModelSyncEventType.DELETED}`;
+  return `${MODEL_EVENT_PREFIX}.${getModelEventKey(modelClass)}.${ModelSyncEventType.DELETED}`;
 }
 
 /**
@@ -71,4 +92,38 @@ export function getModelDeletedEvent(modelClass: ChildModel<Model>): string {
  */
 export function getModelEvent(modelName: string, eventType: ModelSyncEventTypeName): string {
   return `${MODEL_EVENT_PREFIX}.${modelName}.${eventType}`;
+}
+
+/**
+ * Legacy event name for a model: `model.<ClassName>.<event>`.
+ *
+ * @deprecated Use the table-keyed name from `getModelUpdatedEvent` / `getModelDeletedEvent`.
+ * The class-name form is still emitted in 5.21 for compatibility and will be removed later.
+ */
+export function getLegacyModelEvent(
+  modelClass: ChildModel<Model>,
+  eventType: ModelSyncEventTypeName,
+): string {
+  return getModelEvent(modelClass.name, eventType);
+}
+
+/**
+ * Trigger a model sync event under both names: the deprecated class-name form first,
+ * then the table-keyed form. The second is skipped when both names are identical,
+ * so a listener on either form fires exactly once.
+ */
+export async function triggerModelEvent(
+  modelClass: ChildModel<Model>,
+  eventType: ModelSyncEventTypeName,
+  ...args: unknown[]
+): Promise<void> {
+  const legacy = getLegacyModelEvent(modelClass, eventType);
+  const current = getModelEvent(getModelEventKey(modelClass), eventType);
+
+  // Deprecated class-name form, kept for 5.21 compatibility.
+  await events.triggerAll(legacy, ...args);
+
+  if (current !== legacy) {
+    await events.triggerAll(current, ...args);
+  }
 }

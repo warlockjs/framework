@@ -1,13 +1,15 @@
 import { invalidRule, VALID_RULE, type SchemaRule } from "@warlock.js/seal";
 import { type ChildModel, Model } from "./../../model/model";
-import { getModelFromRegistry } from "./../../model/register-model";
+import { requireModelClass } from "./../../model/register-model";
 
 export const databaseModelRule: SchemaRule = {
   name: "databaseModel",
   defaultErrorMessage: "The :input must be a valid :model model",
   async validate(value, context) {
     if (value instanceof Model === false) {
-      this.context.attributesList.model = this.context.options.model?.name;
+      const { model } = this.context.options;
+
+      this.context.attributesList.model = typeof model === "string" ? model : model?.name;
       return invalidRule(this, context);
     }
 
@@ -19,12 +21,12 @@ export const databaseModelsRule: SchemaRule<{ model: ChildModel<any> | string }>
   name: "databaseModels",
   defaultErrorMessage: "The :input must be a list of valid :model",
   async validate(value, context) {
-    let { model } = this.context.options;
-    if (typeof model === "string") {
-      model = getModelFromRegistry(model)!;
-    }
+    const { model } = this.context.options;
 
-    this.context.attributesList.model = model.name;
+    // keep the original name for messages; throws when a string ref is unregistered
+    const ModelClass = requireModelClass(model);
+
+    this.context.attributesList.model = typeof model === "string" ? model : ModelClass.name;
 
     if (!Array.isArray(value)) return invalidRule(this, context);
 

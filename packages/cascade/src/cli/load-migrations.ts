@@ -1,20 +1,9 @@
 import fastGlob from "fast-glob";
 import path from "path";
 import { pathToFileURL } from "url";
-import { migrationRunner } from "../migration/migration-runner";
+import { inferMigrationName, migrationRunner } from "../migration/migration-runner";
 
 const DEFAULT_PATTERN = "./migrations/**/*.{ts,js,mjs,cjs}";
-
-/**
- * Resolve the migration name from a filename. Mirrors warlock-core's
- * convention: drop the extension, strip a trailing `-migration` /
- * `_migration` suffix.
- */
-function inferNameFromFile(file: string): string {
-  const basename = path.basename(file).split(".")[0] ?? "";
-
-  return basename.replace(/-migration$/, "").replace(/_migration$/, "");
-}
 
 /**
  * Extract a leading `MM-DD-YYYY_HH-MM-SS` (or `DD-MM-YYYY_HH-MM-SS`)
@@ -73,6 +62,9 @@ export async function loadMigrations(pattern?: string): Promise<number> {
     onlyFiles: true,
   });
 
+  // name -> file, so a collision can name both paths.
+  const filesByName = new Map<string, string>();
+
   for (const file of files) {
     const fileUrl = pathToFileURL(file).href;
 
@@ -93,8 +85,20 @@ export async function loadMigrations(pattern?: string): Promise<number> {
     }
 
     if (!MigrationClass.migrationName) {
-      MigrationClass.migrationName = inferNameFromFile(file);
+      MigrationClass.migrationName = inferMigrationName(file);
     }
+
+    const name = MigrationClass.migrationName;
+    const previousFile = filesByName.get(name);
+
+    if (previousFile && previousFile !== file) {
+      throw new Error(
+        `Cascade CLI: duplicate migration name "${name}":\n  - ${previousFile}\n  - ${file}\n` +
+          `Rename one of the files, or set a unique static 'migrationName'.`,
+      );
+    }
+
+    filesByName.set(name, file);
 
     if (!MigrationClass.createdAt) {
       const createdAt = inferCreatedAtFromFile(file);

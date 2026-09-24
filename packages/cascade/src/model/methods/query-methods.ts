@@ -10,6 +10,7 @@ import type { DataSource } from "../../data-source/data-source";
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
 import { sanitizeFilter } from "../../utils/sanitize-filter";
 import type { ChildModel, GlobalScopeDefinition, Model } from "../model";
+import { emitStaticEvent } from "./static-event-methods";
 import { warnUndeclaredSensitiveFields } from "./serialization-methods";
 
 export function buildQuery<TModel extends Model>(
@@ -31,9 +32,25 @@ export function buildQuery<TModel extends Model>(
   queryBuilder.relationDefinitions = ModelClass.relations;
   queryBuilder.modelClass = ModelClass;
 
-  ModelClass.events().emitFetching(queryBuilder, {
-    table: ModelClass.table,
-    modelClass: ModelClass,
+  let fetchStartedAt = Date.now();
+
+  // Emitted from the builder's execute path (awaited), not at construction, so
+  // listener changes apply before the query runs and a throwing listener fails
+  // the query instead of becoming an unhandled rejection.
+  queryBuilder.onFetching(async () => {
+    fetchStartedAt = Date.now();
+
+    await emitStaticEvent(ModelClass, "fetching", queryBuilder, {
+      table: ModelClass.table,
+      modelClass: ModelClass,
+    });
+  });
+
+  queryBuilder.onHydrating(async (records: any[], context: any) => {
+    await emitStaticEvent(ModelClass, "hydrating", records as any, {
+      query: queryBuilder,
+      hydrateCallback: context?.hydrateCallback,
+    });
   });
 
   queryBuilder.hydrate((data: any) => {
@@ -44,8 +61,12 @@ export function buildQuery<TModel extends Model>(
   // builder construction path (Model.query, Model.newQueryBuilder, custom
   // subclassed builders). This hook only handles the model-level `fetched`
   // event emission.
-  queryBuilder.onFetched(async (models: any[]) => {
-    await ModelClass.events().emit("fetched", models as any, {});
+  queryBuilder.onFetched(async (models: any[], context: any) => {
+    await emitStaticEvent(ModelClass, "fetched", models as any, {
+      query: queryBuilder,
+      rawRecords: context?.rawRecords ?? [],
+      duration: context?.duration ?? Date.now() - fetchStartedAt,
+    });
   });
 
   return queryBuilder;
@@ -267,19 +288,26 @@ export async function performAtomic<TModel extends Model>(
   return result.modifiedCount + (result.upsertedCount ?? 0);
 }
 
+/**
+ * Update a row by id through the model writer: the row is loaded (scopes
+ * apply), merged, and saved, so the schema, strictMode, casting, `updatedAt`
+ * and events all apply. Returns 1 when a row was saved, 0 when none is visible.
+ */
 export async function updateById<TModel extends Model>(
   ModelClass: ChildModel<TModel>,
   id: string | number,
   data: Record<string, unknown>,
 ): Promise<number> {
-  const scoped = await scopeWriteFilter(ModelClass, { [ModelClass.primaryKey]: id }, true);
+  const model = await ModelClass.query().where(ModelClass.primaryKey, id).first();
 
-  if (!scoped) {
+  if (!model) {
     return 0;
   }
 
-  const result = await ModelClass.getDriver().update(ModelClass.table, scoped, { $set: data });
-  return result.modifiedCount;
+  model.merge(data);
+  await model.save();
+
+  return 1;
 }
 
 export async function findAndUpdateRecords<TModel extends Model>(
@@ -288,8 +316,30 @@ export async function findAndUpdateRecords<TModel extends Model>(
   update: AtomicUpdate,
   options?: Omit<AtomicUpdateOptions, "trustedFilter">,
 ): Promise<TModel[]> {
-  await performAtomic(ModelClass, filter, update, { ...options, trustedFilter: false });
-  return await ModelClass.query().where(filter).get();
+  const primaryKey = ModelClass.primaryKey;
+  const safeFilter = sanitizeFilter(filter);
+
+  // Capture the matching ids first: the update usually changes the very field
+  // the filter matches on, so re-querying with the filter would find nothing.
+  const ids = await ModelClass.query().where(safeFilter).pluck(primaryKey);
+
+  if (ids.length === 0) {
+    if (!options?.upsert) {
+      return [];
+    }
+
+    await performAtomic(ModelClass, safeFilter, update, { ...options, trustedFilter: true });
+    return await ModelClass.query().where(safeFilter).get();
+  }
+
+  await performAtomic(
+    ModelClass,
+    { [primaryKey]: { $in: ids } },
+    update,
+    { ...options, trustedFilter: true },
+  );
+
+  return await ModelClass.query().whereIn(primaryKey, ids).get();
 }
 
 export async function findOneAndUpdateRecord<TModel extends Model>(

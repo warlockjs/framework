@@ -38,6 +38,11 @@ export type PostgresOperationType =
   | "whereNotNull"
   | "whereBetween"
   | "whereNotBetween"
+  | "orWhereIn"
+  | "orWhereNotIn"
+  | "orWhereNull"
+  | "orWhereNotNull"
+  | "orWhereBetween"
   | "whereLike"
   | "whereNotLike"
   | "whereColumn"
@@ -343,11 +348,26 @@ export class PostgresQueryParser {
       case "whereNotIn":
         this.processWhereIn(data, true);
         break;
+      case "orWhereIn":
+        this.processWhereIn(data, false, "OR");
+        break;
+      case "orWhereNotIn":
+        this.processWhereIn(data, true, "OR");
+        break;
       case "whereNull":
         this.processWhereNull(data, false);
         break;
       case "whereNotNull":
         this.processWhereNull(data, true);
+        break;
+      case "orWhereNull":
+        this.processWhereNull(data, false, "OR");
+        break;
+      case "orWhereNotNull":
+        this.processWhereNull(data, true, "OR");
+        break;
+      case "orWhereBetween":
+        this.processWhereBetween(data, false, "OR");
         break;
       case "whereBetween":
         this.processWhereBetween(data, false);
@@ -649,28 +669,38 @@ export class PostgresQueryParser {
     const operator = (data.operator as WhereOperator) ?? "=";
     const value = data.value;
 
-    // Delegate to specialised processors for operators that need it
+    // Delegate to specialised processors for operators that need it. The
+    // `boolean` connective is forwarded so `orWhere(f, "in", …)` stays an OR.
+    const range = value as [unknown, unknown];
+    const like = { field, pattern: value as string };
+
     switch (operator) {
       case "between":
-        return this.processWhereBetween({ field, range: value as [unknown, unknown] }, false);
+        return this.processWhereBetween({ field, range }, false, boolean);
       case "notBetween":
-        return this.processWhereBetween({ field, range: value as [unknown, unknown] }, true);
+        return this.processWhereBetween({ field, range }, true, boolean);
       case "in":
-        return this.processWhereIn({ field, values: value as unknown[] }, false);
+        return this.processWhereIn({ field, values: value as unknown[] }, false, boolean);
       case "notIn":
-        return this.processWhereIn({ field, values: value as unknown[] }, true);
+        return this.processWhereIn({ field, values: value as unknown[] }, true, boolean);
       case "like":
       case "ilike":
+        return this.processWhereLike(like, false, boolean);
       case "startsWith":
       case "endsWith":
-        return this.processWhereLike({ field, pattern: value as string }, false);
+        return this.processWhereLike(like, false, boolean, operator);
       case "notLike":
+        return this.processWhereLike(like, true, boolean);
       case "notStartsWith":
+        return this.processWhereLike(like, true, boolean, "startsWith");
       case "notEndsWith":
-        return this.processWhereLike({ field, pattern: value as string }, true);
+        return this.processWhereLike(like, true, boolean, "endsWith");
       case "exists":
-        // EXISTS expects value to be a raw sub-query string
-        return this.addWhereClause(`EXISTS (${value})`, boolean);
+        // Raw strings are never inlined into SQL (injection); a sub-query must
+        // arrive as an already-parameterised builder, not text.
+        throw new Error(
+          'PostgresQueryParser: where(field, "exists", value) does not accept a raw SQL string; use a query builder or callback',
+        );
     }
 
     const quotedField = this.parseColumnIdentifier(field, this.table, this.alias);
@@ -756,7 +786,11 @@ export class PostgresQueryParser {
   /**
    * Process WHERE IN / NOT IN.
    */
-  private processWhereIn(data: Record<string, unknown>, negate: boolean): void {
+  private processWhereIn(
+    data: Record<string, unknown>,
+    negate: boolean,
+    boolean: "AND" | "OR" = "AND",
+  ): void {
     const field = data.field as string;
     const values = data.values as unknown[];
 
@@ -764,23 +798,31 @@ export class PostgresQueryParser {
     const operator = negate ? "!= ALL" : "= ANY";
     const placeholder = this.addParam(values);
 
-    this.addWhereClause(`${quotedField} ${operator}(${placeholder})`, "AND");
+    this.addWhereClause(`${quotedField} ${operator}(${placeholder})`, boolean);
   }
 
   /**
    * Process WHERE NULL / NOT NULL.
    */
-  private processWhereNull(data: Record<string, unknown>, negate: boolean): void {
+  private processWhereNull(
+    data: Record<string, unknown>,
+    negate: boolean,
+    boolean: "AND" | "OR" = "AND",
+  ): void {
     const field = data.field as string;
     const quotedField = this.parseColumnIdentifier(field, this.table, this.alias);
     const clause = negate ? `${quotedField} IS NOT NULL` : `${quotedField} IS NULL`;
-    this.addWhereClause(clause, "AND");
+    this.addWhereClause(clause, boolean);
   }
 
   /**
    * Process WHERE BETWEEN / NOT BETWEEN.
    */
-  private processWhereBetween(data: Record<string, unknown>, negate: boolean): void {
+  private processWhereBetween(
+    data: Record<string, unknown>,
+    negate: boolean,
+    boolean: "AND" | "OR" = "AND",
+  ): void {
     const field = data.field as string;
     const range = data.range as [unknown, unknown];
 
@@ -789,22 +831,71 @@ export class PostgresQueryParser {
     const placeholder2 = this.addParam(range[1]);
     const keyword = negate ? "NOT BETWEEN" : "BETWEEN";
 
-    this.addWhereClause(`${quotedField} ${keyword} ${placeholder1} AND ${placeholder2}`, "AND");
+    this.addWhereClause(`${quotedField} ${keyword} ${placeholder1} AND ${placeholder2}`, boolean);
   }
 
   /**
    * Process WHERE LIKE / NOT LIKE.
+   *
+   * Cross-driver semantics (matches MongoDB): `%` is the only wildcard, `_`
+   * and backslash are literal, and a pattern with no `%` matches as a
+   * substring. `startsWith` / `endsWith` anchor the escaped text explicitly.
+   * A `RegExp` has no SQL equivalent and is rejected.
    */
-  private processWhereLike(data: Record<string, unknown>, negate: boolean): void {
+  private processWhereLike(
+    data: Record<string, unknown>,
+    negate: boolean,
+    boolean: "AND" | "OR" = "AND",
+    modeArg?: "startsWith" | "endsWith",
+  ): void {
     const field = data.field as string;
-    const pattern = data.pattern as string;
+    const mode = modeArg ?? (data.mode as "startsWith" | "endsWith" | undefined);
+
+    // A RegExp maps to the POSIX case-insensitive match operators
+    if (data.isRegExp === true || (data.pattern as unknown) instanceof RegExp) {
+      const source =
+        (data.pattern as unknown) instanceof RegExp
+          ? (data.pattern as unknown as RegExp).source
+          : String(data.pattern);
+      const regexField = this.parseColumnIdentifier(field, this.table, this.alias);
+      const regexPlaceholder = this.addParam(source);
+
+      return this.addWhereClause(
+        `${regexField} ${negate ? "!~*" : "~*"} ${regexPlaceholder}`,
+        boolean,
+      );
+    }
+    // Mode ops carry the raw user value; `pattern` is only the display shape
+    const pattern = String(mode && data.value !== undefined ? data.value : data.pattern);
 
     const quotedField = this.parseColumnIdentifier(field, this.table, this.alias);
     const { operator } = this.dialect.likePattern(pattern, true);
-    const placeholder = this.addParam(pattern);
+    // Escape `\` and `_` (literal). `%` stays the wildcard of a plain LIKE
+    // pattern, but startsWith / endsWith values are literal text, so it is
+    // escaped there too.
+    let escaped = pattern.replace(/\\/g, "\\\\").replace(/_/g, "\\_");
+
+    if (mode) {
+      escaped = escaped.replace(/%/g, "\\%");
+    }
+
+    let finalPattern = escaped;
+
+    if (mode === "startsWith") {
+      finalPattern = `${escaped}%`;
+    } else if (mode === "endsWith") {
+      finalPattern = `%${escaped}`;
+    } else if (!escaped.includes("%")) {
+      finalPattern = `%${escaped}%`;
+    }
+
+    const placeholder = this.addParam(finalPattern);
     const keyword = negate ? `NOT ${operator}` : operator;
 
-    this.addWhereClause(`${quotedField} ${keyword} ${placeholder}`, "AND");
+    // Mode variants state the escape character explicitly
+    const escapeClause = mode ? " ESCAPE '\\'" : "";
+
+    this.addWhereClause(`${quotedField} ${keyword} ${placeholder}${escapeClause}`, boolean);
   }
 
   /**
@@ -830,10 +921,15 @@ export class PostgresQueryParser {
     const value = data.value;
 
     const quotedPath = this.parseColumnIdentifier(path, this.table, this.alias);
-    const jsonValue = JSON.stringify(value);
     const operator = negate ? "NOT @>" : "@>";
+    const placeholder = this.addParam(JSON.stringify(value));
 
-    this.addWhereClause(`${quotedPath} ${operator} '${escapeSqlLiteral(jsonValue)}'::jsonb`, "AND");
+    this.addWhereClause(`${quotedPath} ${operator} ${placeholder}::jsonb`, "AND");
+  }
+
+  /** Text search config name; anything but a plain identifier falls back to english. */
+  private safeLanguage(language: unknown): string {
+    return typeof language === "string" && /^[a-z_]+$/i.test(language) ? language : "english";
   }
 
   /**
@@ -842,14 +938,21 @@ export class PostgresQueryParser {
   private processWhereFullText(data: Record<string, unknown>): void {
     const fields = data.fields as string[];
     const query = data.query as string;
+    const language = this.safeLanguage(data.language);
+    const weights = (data.weights as Record<string, string> | undefined) ?? {};
 
-    // Build tsvector from fields
+    // Same expression as `createFullTextIndex`, so the GIN index is used and a
+    // NULL column doesn't null the whole vector.
     const tsVectors = fields
-      .map((f) => `to_tsvector('english', ${this.dialect.quoteIdentifier(f)})`)
+      .map((f) => {
+        const weight = /^[A-D]$/.test(weights[f] ?? "") ? weights[f] : "A";
+
+        return `setweight(to_tsvector('${language}', COALESCE(${this.dialect.quoteIdentifier(f)}, '')), '${weight}')`;
+      })
       .join(" || ");
 
     const placeholder = this.addParam(query);
-    this.addWhereClause(`(${tsVectors}) @@ plainto_tsquery('english', ${placeholder})`, "AND");
+    this.addWhereClause(`(${tsVectors}) @@ plainto_tsquery('${language}', ${placeholder})`, "AND");
   }
 
   /**

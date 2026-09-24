@@ -234,11 +234,9 @@ async function assignIdBlock<TModel extends Model>(
  * touching the database, then flush each chunk with a single
  * `driver.insertMany` call.
  *
- * The writer reuse is achieved by giving each bulk writer a private capturing
- * view of the driver (prototype-linked, `insert` overridden): running
- * `writer.save({ skipEvents, skipSync })` exercises the real prep but records
- * the prepared document instead of issuing N single-row inserts. The shared
- * driver is never mutated, so concurrent `save()` calls are unaffected.
+ * The writer reuse goes through `DatabaseWriter.prepareForInsert()`, the same
+ * pipeline `save()` uses for an insert, so the shared driver is never mutated
+ * and concurrent `save()` calls are unaffected.
  *
  * @param ModelClass - The model class to create records for.
  * @param chunks - Pre-chunked rows.
@@ -251,17 +249,6 @@ async function createManyBulk<
   const dataSource = ModelClass.getDataSource();
   const driver = dataSource.driver;
   const table = ModelClass.table;
-
-  // Capturing view of the driver, private to the bulk writers: it records the
-  // prepared (validated/casted/timestamped/id-generated) document instead of
-  // inserting it, while the shared driver instance is never mutated.
-  const capturingDriver = Object.create(driver, {
-    insert: {
-      value: async (_table: string, document: Record<string, unknown>): Promise<InsertResult> => {
-        return { document };
-      },
-    },
-  });
 
   const created: TModel[] = [];
 
@@ -279,12 +266,11 @@ async function createManyBulk<
       // data with casts/timestamps/defaults/generated ids.
       const preparedDocuments = await Promise.all(
         models.map(async (model) => {
-          const writer = new DatabaseWriter(model);
-          // Redirect only THIS writer to the capturing view (no seam exists in
-          // DatabaseWriter for "prepare but don't write").
-          (writer as unknown as { driver: unknown }).driver = capturingDriver;
-          await writer.save({ skipEvents: true, skipSync: true });
-          return { ...model.data } as Record<string, unknown>;
+          const document = await new DatabaseWriter(model).prepareForInsert({
+            skipEvents: true,
+            skipSync: true,
+          });
+          return { ...document } as Record<string, unknown>;
         }),
       );
 

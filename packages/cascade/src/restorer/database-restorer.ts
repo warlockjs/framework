@@ -7,6 +7,8 @@ import type {
 import type { DataSource } from "../data-source/data-source";
 import type { Model } from "../model/model";
 import type { DeleteStrategy } from "../types";
+import { triggerModelEvent } from "../sync/model-events";
+import { DatabaseWriter } from "../writer/database-writer";
 
 /**
  * Database restorer service that orchestrates model restoration.
@@ -128,6 +130,7 @@ export class DatabaseRestorer implements RestorerContract {
       // Remove from trash table
       await this.driver.delete(this.resolveTrashTable(), {
         [this.primaryKey]: id,
+        originalTable: this.table,
       });
     } else if (strategy === "soft") {
       // Record still exists, just unset deletedAt (don't insert - would create duplicate!)
@@ -147,6 +150,8 @@ export class DatabaseRestorer implements RestorerContract {
     if (!skipEvents) {
       await model.emitEvent("restored");
     }
+
+    await this.triggerSync(model);
 
     return {
       success: true,
@@ -251,6 +256,8 @@ export class DatabaseRestorer implements RestorerContract {
           if (!skipEvents) {
             await model.emitEvent("restored");
           }
+
+          await this.triggerSync(model);
         } else {
           // No conflict, restore with original ID
           const model = new (this.ctor as any)(restoredData) as Model;
@@ -284,12 +291,14 @@ export class DatabaseRestorer implements RestorerContract {
           if (!skipEvents) {
             await model.emitEvent("restored");
           }
+
+          await this.triggerSync(model);
         }
 
         // Remove from trash (only for trash strategy)
         if (strategy === "trash") {
           const trashTable = this.resolveTrashTable();
-          const trashFilter = { [this.primaryKey]: id };
+          const trashFilter = { [this.primaryKey]: id, originalTable: this.table };
           await this.driver.delete(trashTable, trashFilter);
         }
 
@@ -348,6 +357,7 @@ export class DatabaseRestorer implements RestorerContract {
         const trashQuery = await this.driver
           .queryBuilder(trashTable)
           .where(this.primaryKey, id)
+          .where("originalTable", this.table)
           .first<Record<string, unknown>>();
 
         return trashQuery;
@@ -469,32 +479,36 @@ export class DatabaseRestorer implements RestorerContract {
   /**
    * Assign a new ID to the record data.
    *
-   * For MongoDB: Generates new ObjectId for `_id`, keeps `id` if it exists
-   * For SQL: Removes `id` to let database auto-increment
+   * For MongoDB: drops the old `_id` and `id`, then runs the record through the
+   * writer's insert preparation so the new `id` comes from the same generator
+   * a normal save uses (validation and events are skipped; this is a restore)
+   * For SQL: Removes the primary key to let database auto-increment
    *
    * @param recordData - The record data
    * @returns Record data with new ID assigned
    * @private
    */
   private async assignNewId(recordData: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const isMongoDb = this.driver.name === "mongodb";
     const newData = { ...recordData };
 
-    if (isMongoDb) {
-      // MongoDB: Generate new ObjectId for _id
-      if (this.primaryKey === "_id") {
-        // Remove _id to let MongoDB generate new one
-        delete newData._id;
-      } else if (this.primaryKey === "id") {
-        // Remove id to let ID generator create new one
-        delete newData.id;
-      }
-    } else {
+    if (this.driver.name !== "mongodb") {
       // SQL: Remove primary key to let database auto-increment
       delete newData[this.primaryKey];
+
+      return newData;
     }
 
-    return newData;
+    // MongoDB: let the driver mint a new _id and the writer generate a new id.
+    // The generator skips records that already carry an `id`, so drop both.
+    delete newData._id;
+    delete newData.id;
+
+    const model = new (this.ctor as any)(newData) as Model;
+
+    return await new DatabaseWriter(model).prepareForInsert({
+      skipEvents: true,
+      skipValidation: true,
+    });
   }
 
   /**
@@ -518,5 +532,25 @@ export class DatabaseRestorer implements RestorerContract {
     }
 
     return `${this.table}Trash`;
+  }
+
+  /**
+   * Re-run sync for a restored record so embedded copies come back up to date.
+   * Failures are swallowed: the restore itself already succeeded.
+   * TODO(5.22, K2:B10): move this fan-out to a retry/queue-backed path.
+   *
+   * @private
+   */
+  private async triggerSync(model: Model): Promise<void> {
+    try {
+      await triggerModelEvent(
+        this.ctor as any,
+        "updated",
+        model,
+        Object.keys(model.data as Record<string, unknown>),
+      );
+    } catch {
+      // sync failures never fail a restore
+    }
   }
 }

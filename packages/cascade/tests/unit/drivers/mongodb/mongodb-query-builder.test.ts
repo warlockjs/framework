@@ -905,11 +905,11 @@ describe("MongoQueryBuilder", () => {
     });
 
     describe("orderByRaw()", () => {
-      it("should add raw order expression", () => {
-        queryBuilder.orderByRaw({ $meta: "textScore" });
-
-        expect(queryBuilder.operations).toHaveLength(1);
-        expect(queryBuilder.operations[0].type).toBe("orderByRaw");
+      it("should throw instead of silently ignoring the expression", () => {
+        expect(() => queryBuilder.orderByRaw({ $meta: "textScore" })).toThrow(
+          "orderByRaw() is not supported",
+        );
+        expect(queryBuilder.operations).toHaveLength(0);
       });
     });
 
@@ -979,11 +979,11 @@ describe("MongoQueryBuilder", () => {
     });
 
     describe("cursor()", () => {
-      it("should add cursor operation", () => {
-        queryBuilder.cursor("abc123", undefined);
-
-        expect(queryBuilder.operations).toHaveLength(1);
-        expect(queryBuilder.operations[0].type).toBe("cursor");
+      it("should throw instead of silently ignoring the cursor", () => {
+        expect(() => queryBuilder.cursor("abc123", undefined)).toThrow(
+          "cursor() is not supported",
+        );
+        expect(queryBuilder.operations).toHaveLength(0);
       });
     });
   });

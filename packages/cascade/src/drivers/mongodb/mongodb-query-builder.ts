@@ -678,6 +678,36 @@ export class MongoQueryBuilder<T = unknown>
     return this;
   }
 
+  /** OR variant of `whereIn`. */
+  public orWhereIn(field: string, values: unknown[]): this {
+    this.operationsHelper.addMatchOperation("orWhereIn", { field, values });
+    return this;
+  }
+
+  /** OR variant of `whereNotIn`. */
+  public orWhereNotIn(field: string, values: unknown[]): this {
+    this.operationsHelper.addMatchOperation("orWhereNotIn", { field, values });
+    return this;
+  }
+
+  /** OR variant of `whereNull`. */
+  public orWhereNull(field: string): this {
+    this.operationsHelper.addMatchOperation("orWhereNull", { field });
+    return this;
+  }
+
+  /** OR variant of `whereNotNull`. */
+  public orWhereNotNull(field: string): this {
+    this.operationsHelper.addMatchOperation("orWhereNotNull", { field });
+    return this;
+  }
+
+  /** OR variant of `whereBetween` (inclusive range). */
+  public orWhereBetween(field: string, range: [unknown, unknown]): this {
+    this.operationsHelper.addMatchOperation("orWhereBetween", { field, range });
+    return this;
+  }
+
   /**
    * Filters documents where a field's value is NOT within the given range.
    * @param field - The field name to check
@@ -1383,11 +1413,9 @@ export class MongoQueryBuilder<T = unknown>
    * @param bindings - Optional parameter bindings
    */
   public orderByRaw(expression: RawExpression, bindings?: unknown[]): this {
-    this.operationsHelper.addSortOperation("orderByRaw", {
-      expression,
-      bindings,
-    });
-    return this;
+    void expression;
+    void bindings;
+    throw new Error("orderByRaw() is not supported by the MongoDB driver; use orderBy() instead.");
   }
 
   /**
@@ -1458,8 +1486,9 @@ export class MongoQueryBuilder<T = unknown>
    * @param before - Cursor value for backward pagination
    */
   public cursor(after?: unknown, before?: unknown): this {
-    this.operationsHelper.addMatchOperation("cursor", { after, before });
-    return this;
+    void after;
+    void before;
+    throw new Error("cursor() is not supported by the MongoDB driver; use where() with limit() instead.");
   }
 
   // ============================================================================
@@ -1871,6 +1900,11 @@ export class MongoQueryBuilder<T = unknown>
     cloned.disabledGlobalScopes = new Set(this.disabledGlobalScopes);
     cloned.scopesApplied = this.scopesApplied;
 
+    // Relation state — without it paginate()/chunk() lose `.with(...)`.
+    cloned.eagerLoadRelations = new Map(this.eagerLoadRelations);
+    cloned.joinRelations = new Map(this.joinRelations);
+    cloned.relationDefinitions = this.relationDefinitions;
+
     (cloned as any).__operationsHelper = (this as any).__operationsHelper;
     return cloned;
   }
@@ -2237,14 +2271,12 @@ export class MongoQueryBuilder<T = unknown>
   public async increment(field: string, amount: number = 1): Promise<number> {
     const filter = this.buildFilter();
 
-    const result = await this.collection.findOneAndUpdate(
+    // Through the driver so the active transaction session applies.
+    const result = await this.dataSource.driver.findOneAndUpdate<Record<string, unknown>>(
+      this.table,
       filter,
-      {
-        $inc: { [field]: amount },
-      },
-      {
-        returnDocument: "after",
-      },
+      { $inc: { [field]: amount } },
+      { returnDocument: "after" },
     );
 
     return get(result, field, 0);
@@ -2771,7 +2803,7 @@ export class MongoQueryBuilder<T = unknown>
       "$vectorSearch",
       "vectorSearch",
       {
-        index: `${column}_index`,
+        index: `${column}_vector_idx`,
         path: column,
         queryVector: embedding,
         numCandidates: limit * 10, // Atlas recommendation: 10–20x the limit

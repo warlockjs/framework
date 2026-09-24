@@ -1,6 +1,6 @@
 import { get } from "@mongez/reinforcements";
 import { invalidRule, VALID_RULE, type SchemaRule } from "@warlock.js/seal";
-import { resolveModelClass } from "../../model/register-model";
+import { requireModelClass } from "../../model/register-model";
 import type { UniqueRuleOptions } from "../types";
 
 /**
@@ -30,7 +30,7 @@ export const uniqueRule: SchemaRule<UniqueRuleOptions> = {
       query,
     } = this.context.options;
 
-    const ResolvedModelClass = resolveModelClass(Model);
+    const ResolvedModelClass = requireModelClass(Model);
 
     const dbQuery = ResolvedModelClass.query();
 
@@ -42,6 +42,22 @@ export const uniqueRule: SchemaRule<UniqueRuleOptions> = {
       if (exceptVal !== undefined) {
         dbQuery.where(except, "!=", exceptVal);
       }
+    }
+
+    // A persisted model never collides with its own row on update.
+    const currentModel = context.rootContext?.model;
+
+    if (
+      currentModel &&
+      currentModel.isNew === false &&
+      currentModel.constructor === ResolvedModelClass &&
+      currentModel.trustedPrimaryKey !== undefined
+    ) {
+      dbQuery.where(
+        (ResolvedModelClass as any).primaryKey || "id",
+        "!=",
+        currentModel.trustedPrimaryKey,
+      );
     }
 
     if (exceptColumnName !== undefined) {

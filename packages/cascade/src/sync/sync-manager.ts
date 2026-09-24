@@ -321,17 +321,6 @@ export class SyncManager {
       // Emit syncing event
       await this.emitSyncingEvent(instruction);
 
-      // Recursively collect instructions for next level
-      if (SyncContextManager.canSyncDeeper(options.currentDepth, config.maxSyncDepth)) {
-        const nextLevelInstructions = await this.collectNextLevelInstructions(
-          instruction,
-          embedData,
-          changedFields,
-          config,
-          options,
-        );
-        instructions.push(...nextLevelInstructions);
-      }
     }
 
     return instructions;
@@ -376,49 +365,6 @@ export class SyncManager {
     }
 
     return instructions;
-  }
-
-  /**
-   * Collects instructions for the next level in the sync chain.
-   *
-   * @param parentInstruction - The parent instruction
-   * @param embedData - Embedded data from parent
-   * @param changedFields - Changed fields
-   * @param parentConfig - Parent sync config
-   * @param parentOptions - Parent instruction options
-   * @returns Array of next-level sync instructions
-   */
-  private async collectNextLevelInstructions(
-    parentInstruction: SyncInstruction,
-    embedData: Record<string, unknown>,
-    changedFields: string[],
-    parentConfig: SyncConfig,
-    parentOptions: SyncInstructionOptions,
-  ): Promise<SyncInstruction[]> {
-    const targetModelClass = parentConfig.targetModelClass;
-    const targetSyncConfigs = this.getSyncConfigsForModel(targetModelClass);
-
-    if (targetSyncConfigs.length === 0) {
-      return [];
-    }
-
-    const nextOptions: SyncInstructionOptions = {
-      currentDepth: parentOptions.currentDepth + 1,
-      syncChain: SyncContextManager.extendChain(parentOptions.syncChain, targetModelClass.name),
-      maxDepth: Math.min(parentConfig.maxSyncDepth, parentOptions.maxDepth),
-      preventCircular: parentOptions.preventCircular && parentConfig.preventCircularSync,
-    };
-
-    // Get the ID from embed data for next level
-    const sourceId = embedData[parentConfig.identifierField] as string | number;
-
-    return await this.collectInstructions({
-      sourceId,
-      updatedData: embedData,
-      changedFields,
-      syncConfigs: targetSyncConfigs,
-      options: nextOptions,
-    });
   }
 
   /**
@@ -532,8 +478,9 @@ export class SyncManager {
   }
 
   /**
-   * Executes sync instructions with batch optimization.
-   * Groups by depth and target table for optimal batching.
+   * Executes sync instructions, once each, through the driver's dialect-aware
+   * sync adapter. Instructions run in depth order and each one records its own
+   * outcome, so one failing instruction never re-runs the ones that succeeded.
    *
    * @param instructions - Array of sync instructions
    * @returns Sync result
@@ -553,112 +500,49 @@ export class SyncManager {
       return result;
     }
 
-    // Group instructions by depth for sequential execution
-    const instructionsByDepth = this.groupByDepth(instructions);
+    const adapter = this.driver.syncAdapter();
 
-    for (const [depth, depthInstructions] of instructionsByDepth) {
+    for (const [depth, depthInstructions] of this.groupByDepth(instructions)) {
       result.depthReached = Math.max(result.depthReached, depth);
 
-      // Further group by target table for better batching
-      const instructionsByTable = this.groupByTable(depthInstructions);
-
-      for (const [table, tableInstructions] of instructionsByTable) {
+      for (const instruction of depthInstructions) {
         try {
-          // Try batch execution first (all instructions for this table)
-          await this.executeBatch(tableInstructions, result);
-        } catch (batchError) {
-          // Fallback to individual execution on batch failure
-          console.warn(
-            `Batch execution failed for table ${table} at depth ${depth}, falling back to individual execution`,
-          );
-          await this.executeIndividual(tableInstructions, result);
+          const affected = await adapter.executeBatch([instruction]);
+
+          const context = SyncContextManager.createContext(instruction, affected);
+          result.contexts.push(context);
+          result.succeeded++;
+
+          await this.emitSyncedEvent(context);
+        } catch (error) {
+          result.failed++;
+
+          const errorMessage = this.formatSyncError(instruction, error);
+          const syncError = new Error(errorMessage);
+
+          // Preserve original error stack if available
+          if (error instanceof Error && error.stack) {
+            syncError.stack = error.stack;
+          }
+
+          result.errors.push({ instruction, error: syncError });
+
+          console.error(`Sync operation failed:`, {
+            sourceModel: instruction.sourceModel,
+            sourceId: instruction.sourceId,
+            targetModel: instruction.targetModel,
+            targetTable: instruction.targetTable,
+            depth: instruction.depth,
+            chain: SyncContextManager.formatChain(instruction.chain),
+            filter: instruction.filter,
+            error: errorMessage,
+          });
         }
       }
     }
 
     result.success = result.failed === 0;
     return result;
-  }
-
-  /**
-   * Executes instructions in batch.
-   *
-   * @param instructions - Instructions to execute
-   * @param result - Result object to update
-   */
-  private async executeBatch(instructions: SyncInstruction[], result: SyncResult): Promise<void> {
-    for (const instruction of instructions) {
-      try {
-        const updateResult = await this.driver.updateMany(
-          instruction.targetTable,
-          instruction.filter,
-          instruction.update,
-        );
-
-        const context = SyncContextManager.createContext(instruction, updateResult.modifiedCount);
-        result.contexts.push(context);
-        result.succeeded++;
-
-        await this.emitSyncedEvent(context);
-      } catch (error) {
-        throw error; // Re-throw for batch fallback
-      }
-    }
-  }
-
-  /**
-   * Executes instructions individually (fallback).
-   * Provides detailed error reporting for each failed instruction.
-   *
-   * @param instructions - Instructions to execute
-   * @param result - Result object to update
-   */
-  private async executeIndividual(
-    instructions: SyncInstruction[],
-    result: SyncResult,
-  ): Promise<void> {
-    for (const instruction of instructions) {
-      try {
-        const updateResult = await this.driver.updateMany(
-          instruction.targetTable,
-          instruction.filter,
-          instruction.update,
-        );
-
-        const context = SyncContextManager.createContext(instruction, updateResult.modifiedCount);
-        result.contexts.push(context);
-        result.succeeded++;
-
-        await this.emitSyncedEvent(context);
-      } catch (error) {
-        result.failed++;
-
-        const errorMessage = this.formatSyncError(instruction, error);
-        const syncError = new Error(errorMessage);
-
-        // Preserve original error stack if available
-        if (error instanceof Error && error.stack) {
-          syncError.stack = error.stack;
-        }
-
-        result.errors.push({
-          instruction,
-          error: syncError,
-        });
-
-        // Log detailed error for debugging
-        console.error(`Sync operation failed:`, {
-          sourceModel: instruction.sourceModel,
-          sourceId: instruction.sourceId,
-          targetModel: instruction.targetModel,
-          targetTable: instruction.targetTable,
-          depth: instruction.depth,
-          chain: SyncContextManager.formatChain(instruction.chain),
-          filter: instruction.filter,
-          error: errorMessage,
-        });
-      }
-    }
   }
 
   /**
@@ -700,26 +584,6 @@ export class SyncManager {
 
     // Sort by depth (ascending) for sequential execution
     return new Map([...grouped.entries()].sort((a, b) => a[0] - b[0]));
-  }
-
-  /**
-   * Groups instructions by target table for batch optimization.
-   *
-   * @param instructions - Instructions to group
-   * @returns Map of table name to instructions
-   */
-  private groupByTable(instructions: SyncInstruction[]): Map<string, SyncInstruction[]> {
-    const grouped = new Map<string, SyncInstruction[]>();
-
-    for (const instruction of instructions) {
-      const table = instruction.targetTable;
-      if (!grouped.has(table)) {
-        grouped.set(table, []);
-      }
-      grouped.get(table)!.push(instruction);
-    }
-
-    return grouped;
   }
 
   /**
@@ -782,24 +646,6 @@ export class SyncManager {
    */
   private getSyncConfigs(): SyncConfig[] {
     const syncWith = (this.sourceModel as any).syncWith;
-
-    if (!syncWith || !Array.isArray(syncWith)) {
-      return [];
-    }
-
-    return syncWith.map((builder: any) =>
-      typeof builder.build === "function" ? builder.build() : builder,
-    );
-  }
-
-  /**
-   * Gets sync configurations for a specific model.
-   *
-   * @param modelClass - The model class
-   * @returns Array of sync configurations
-   */
-  private getSyncConfigsForModel(modelClass: ChildModel<Model>): SyncConfig[] {
-    const syncWith = (modelClass as any).syncWith;
 
     if (!syncWith || !Array.isArray(syncWith)) {
       return [];
