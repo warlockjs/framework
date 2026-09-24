@@ -1,6 +1,6 @@
 ---
 name: orchestrate-contexts
-description: "Orchestrate contexts — contextManager in @warlock.js/context; use when you need to orchestrate contexts."
+description: 'Orchestrate multiple Context<TStore> instances via the contextManager singleton — register, buildStores, runAll, enterAll, clearAll. Triggers: `contextManager`, `register`, `buildStores`, `runAll`, `enterAll`, `clearAll`, `unregister`, `getContext`, `hasContext`; "run multiple contexts active for the same scope", "register contexts at boot", "avoid nested run() calls for request + database + tenant"; typical import `import { contextManager } from "@warlock.js/context"`. Skip: defining a single context class — `@warlock.js/context/define-context/SKILL.md`; native `AsyncLocalStorage` nesting, `cls-hooked` namespaces.'
 ---
 
 # Orchestrate contexts — `contextManager`

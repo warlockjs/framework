@@ -1,6 +1,6 @@
 ---
 name: define-context
-description: "Define a context in @warlock.js/context; use when you need to define context."
+description: 'Extend Context<TStore> to define an AsyncLocalStorage-backed typed context — implement buildStore, use run / enter / update / get / set / getStore / clear / hasContext. Triggers: `Context`, `Context<TStore>`, `buildStore`, `run`, `enter`, `update`, `get`, `set`, `getStore`, `clear`, `hasContext`; "share user/tenant/trace id across async calls", "AsyncLocalStorage typed wrapper", "request-scoped store without thread-through"; typical import `import { Context } from "@warlock.js/context"`. Skip: orchestrating multiple contexts — `@warlock.js/context/orchestrate-contexts/SKILL.md`; native `AsyncLocalStorage`, `cls-hooked`, `nest-context`, React Context.'
 ---
 
 # Define a context
