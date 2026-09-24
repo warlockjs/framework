@@ -1,6 +1,6 @@
 ---
 name: manage-failed-jobs
-description: "Failed jobs in @warlock.js/queue; use when you need to manage failed jobs."
+description: 'Inspect and retry failed `@warlock.js/queue` jobs: `failedJobs({ queue, start, end })` returns `FailedJob[]` (`id`, `name`, `payload`, `attemptsMade`, `failedReason`, `stacktrace`, `failedAt`, `retry()`), `retryFailedJob(id, { queue })` (throws `FailedJobNotFoundError`), and the bull-board UI — `warlock add bull-board` (requires: ["queue"], so it installs queue first when missing) writes a `dashboard: { enabled, path, middleware }` block to `src/config/queue.ts`; a guard middleware is required in production or boot throws `QueueDashboardUnguardedError`. Manual `queueDashboard(server, { basePath, queues, middleware })` also available — needs `@bull-board/api` + `@bull-board/fastify`, loaded only on call, missing ones throw `QueueDashboardDependencyError`. Triggers: `failedJobs`, `retryFailedJob`, `queueDashboard`, `bull-board`, `dashboard.enabled`, `QueueDashboardUnguardedError`; "list failed jobs", "retry a failed job", "queue dashboard", "job admin UI". Skip: defining retries — `@warlock.js/queue/define-jobs/SKILL.md`.'
 ---
 
 # Failed jobs
