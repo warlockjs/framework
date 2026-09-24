@@ -223,6 +223,12 @@ export default storageOptions;
 
 Same shape — TS validates the union; runtime picks the `default` key.
 
+## Multi-server settings (5.20.0)
+
+- `http.rateLimit` — `@fastify/rate-limit` options (`redis`, `nameSpace`, ...); `enabled: false` disables.
+- `socket.adapter` — adapter factory for cross-server broadcast.
+- `cache.silenceSingleServerWarning`, `storage.silenceSingleServerWarning`, `socket.silenceSingleServerWarning` — silence the production warnings for in-memory cache, local storage, and adapter-less sockets.
+
 ## Per-env knobs
 
 For one-off switches gated on environment, the canonical pattern is `Application.isProduction` (also `isDevelopment`, `isTest`):

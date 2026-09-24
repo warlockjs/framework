@@ -69,13 +69,18 @@ Lifecycle:
 
 1. **Method not eligible** (GET / HEAD) → pass through.
 2. **No `Idempotency-Key` header** → pass through (the primitive is opt-in by the client).
-3. **Key + same body within TTL** (default 24h) → replays the cached response with `Idempotent-Replay: true`. Handler does NOT re-run.
+3. **Key already in flight** (concurrent duplicate) → 409 with `Retry-After`. The key is reserved create-only before the handler runs (`reservationTtl`, default 60s, or `http.idempotency.reservationTtl`). A 5xx frees the reservation; if the cache is down it fails open. Use a shared cache (redis/pg) across servers.
+3b. **Key + same body within TTL** (default 24h) → replays the cached response with `Idempotent-Replay: true`. Handler does NOT re-run.
 4. **Key + different body** → 422 `IdempotencyKeyConflict`. Client bug — same key must mean same intent.
 5. **Cache miss** → runs handler; on response sent, caches `{ status, body, bodyHash }` for TTL.
 
 Server errors (5xx) are not cached — clients can retry past a 5xx. 4xx responses ARE cached (they're deterministic outcomes of the request).
 
 **Client side, this only works if the client reuses the same key across retries.** Generate once at "intent to submit" time, persist it across the retry loop, drop it on confirmed success or final failure.
+
+## Rate limit across servers
+
+`http.rateLimit` passes `@fastify/rate-limit` options through — set `redis` for a store shared by all servers; `enabled: false` turns the global limiter off. The per-route `middleware.rateLimit()` counters stay in-process.
 
 ## `maxBodySize` vs the global `http.bodyLimit`
 

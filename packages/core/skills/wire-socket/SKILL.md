@@ -66,6 +66,10 @@ const socketOptions: SocketOptions = {
 };
 ```
 
+### Multiple servers — `socket.adapter` (5.20.0)
+
+`adapter` is a factory receiving the new server and returning what `io.adapter()` accepts (e.g. `@socket.io/redis-adapter`). Polling clients need sticky sessions on the load balancer. Production without an adapter warns once; silence with `silenceSingleServerWarning: true`.
+
 ## Reaching the server — `app.socket` vs `getSocketServer()`
 
 Two ways to get the `socket.io` `Server` instance:

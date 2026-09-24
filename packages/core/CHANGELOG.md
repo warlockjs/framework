@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.20.0
+
+### Added
+
+- `storage.putIfAbsent(file, location, options?)` and `storage.supportsPutIfAbsent()` — an atomic create-only write. Returns the `StorageFile`, or `null` when something already exists at `location`. Unlike `put`, a string argument is **content**, not a path. Local driver writes a temp file then hard-links it; S3/R2 send `If-None-Match: *`. DigitalOcean Spaces does not expose it. Drivers without it throw `StorageCapabilityError`.
+- `http.rateLimit` now passes `@fastify/rate-limit` options through (`redis` for a store shared across servers, `nameSpace`, `keyGenerator`, `allowList`, ...). `http.rateLimit.enabled: false` turns the global limiter off. The per-route `middleware.rateLimit()` stays in-process.
+- `socket.adapter` — an adapter factory (e.g. `@socket.io/redis-adapter`) applied via `io.adapter()` for broadcasting across servers. Polling clients need sticky sessions.
+- Production single-server warnings, once at boot, when the default cache driver is in-memory, the default storage driver is local, or sockets have no `socket.adapter`. Silence with `cache.silenceSingleServerWarning`, `storage.silenceSingleServerWarning`, `socket.silenceSingleServerWarning`.
+- `middleware.idempotency({ reservationTtl })` (also `http.idempotency.reservationTtl`, default `60` seconds) — how long the in-flight reservation lives.
+- Docs: "Running on multiple servers" guide.
+
+### Changed
+
+- `middleware.idempotency()` reserves the key (create-only) before the handler runs. A concurrent duplicate now gets **409 + `Retry-After`** instead of running twice. A 5xx response frees the key so the client can retry. If the cache is down the middleware fails open.
+
+### Fixed
+
+- The repository cache is also cleared after the DB transaction commits (cascade `afterCommit`), fixing stale reads when a concurrent read re-cached the old row between the model event and `COMMIT`.
+
 ## 5.19.1 - 2026-09-23
 
 ### Changed

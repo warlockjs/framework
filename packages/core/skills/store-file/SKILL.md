@@ -124,6 +124,16 @@ const info = await storage.metadata("uploads/photo.jpg");   // { size, mimeType,
 const bytes = await storage.size("uploads/photo.jpg");
 ```
 
+### Create-only — `putIfAbsent` (5.20.0)
+
+```ts
+if (storage.supportsPutIfAbsent()) {
+  const created = await storage.putIfAbsent("content", "locks/job.txt"); // StorageFile | null
+}
+```
+
+Atomic; `null` = already exists. A string is **content** (unlike `put`). Local: temp file + hard link; S3/R2: `If-None-Match: *`; not on Spaces. Unsupported drivers throw `StorageCapabilityError`. In production a local default disk warns about single-server use — silence with `storage.silenceSingleServerWarning`.
+
 ### Delete / copy / move
 
 ```ts
