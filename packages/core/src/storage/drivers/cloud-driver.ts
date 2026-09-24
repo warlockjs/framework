@@ -395,6 +395,75 @@ export abstract class CloudDriver<
   }
 
   /**
+   * Atomically put a file only if the key does not exist (S3 conditional
+   * write, `If-None-Match: *`).
+   *
+   * HTTP 412 (PreconditionFailed) and 409 (ConditionalRequestConflict, a
+   * concurrent conditional write in flight) mean "already exists" and return
+   * `null`. Every other error throws.
+   */
+  public async putIfAbsent(
+    file: Buffer | string,
+    location: string,
+    options?: PutOptions,
+  ): Promise<CloudStorageFileData | null> {
+    const body = typeof file === "string" ? Buffer.from(file) : file;
+
+    return this.withRetry(async () => {
+      const { PutObjectCommand } = S3Client;
+
+      location = this.applyPrefix(location);
+
+      const hash = this.calculateHash(body);
+      const mimeType = options?.mimeType || this.guessMimeType(location);
+
+      const command = new PutObjectCommand({
+        Bucket: this.options.bucket,
+        Key: location,
+        Body: body,
+        ContentType: mimeType,
+        CacheControl: options?.cacheControl,
+        ContentDisposition: options?.contentDisposition,
+        Metadata: options?.metadata,
+        ACL: options?.visibility === "public" ? "public-read" : undefined,
+        IfNoneMatch: "*",
+      });
+
+      let result;
+
+      try {
+        result = await this.client.send(command);
+      } catch (error: any) {
+        const status = error?.$metadata?.httpStatusCode;
+
+        if (
+          status === 412 ||
+          status === 409 ||
+          error?.name === "PreconditionFailed" ||
+          error?.name === "ConditionalRequestConflict"
+        ) {
+          return null;
+        }
+
+        throw error;
+      }
+
+      return {
+        path: location,
+        url: this.url(location),
+        size: body.length,
+        hash,
+        mimeType,
+        driver: this.name,
+        bucket: this.options.bucket!,
+        region: this.options.region!,
+        etag: result.ETag,
+        versionId: result.VersionId,
+      };
+    }, "putIfAbsent");
+  }
+
+  /**
    * Put file from a readable stream (for large files)
    * Uses S3 multipart upload for efficient streaming
    */

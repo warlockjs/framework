@@ -5,6 +5,7 @@ import path from "path";
 import type { Readable } from "stream";
 import type { UploadedFile } from "../http";
 import { StorageFile } from "./storage-file";
+import { StorageCapabilityError } from "./utils/storage-capability-error";
 import { StorageNotInitializedError } from "./utils/storage-not-initialized-error";
 import type {
   DeleteManyResult,
@@ -134,6 +135,38 @@ export class ScopedStorage implements ScopedStorageContract {
     const buffer = await this.toBuffer(file);
     const data = await this.activeDriver.put(buffer, location, options);
     return StorageFile.fromData(data, this.activeDriver);
+  }
+
+  /**
+   * Atomically store a file only if nothing exists at `location`.
+   *
+   * Of N concurrent callers for one location exactly one gets a `StorageFile`;
+   * the rest get `null` and write nothing. `null` means only "already exists" -
+   * every other failure throws, as `put()` does.
+   *
+   * @throws StorageCapabilityError when the driver has no `putIfAbsent`
+   */
+  public async putIfAbsent(
+    file: Buffer | string,
+    location: string,
+    options?: PutOptions,
+  ): Promise<StorageFile | null> {
+    const driver = this.activeDriver;
+
+    if (typeof driver.putIfAbsent !== "function") {
+      throw new StorageCapabilityError("putIfAbsent", driver.name);
+    }
+
+    const data = await driver.putIfAbsent(file, location, options);
+
+    return data ? StorageFile.fromData(data, driver) : null;
+  }
+
+  /**
+   * Whether the active driver implements `putIfAbsent()`
+   */
+  public supportsPutIfAbsent(): boolean {
+    return typeof this.activeDriver.putIfAbsent === "function";
   }
 
   /**

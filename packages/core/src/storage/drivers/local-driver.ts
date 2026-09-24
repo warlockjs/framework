@@ -7,9 +7,9 @@ import {
 } from "@warlock.js/fs";
 import { ltrim } from "@mongez/reinforcements";
 import crypto from "crypto";
-import { createReadStream, createWriteStream } from "fs";
-import { copyFile, readFile, readdir, rename, stat, writeFile } from "fs/promises";
-import { dirname, join, resolve } from "path";
+import { createReadStream, createWriteStream, promises as fsPromises } from "fs";
+import { copyFile, readFile, readdir, rename, stat, unlink, writeFile } from "fs/promises";
+import { basename, dirname, join, resolve } from "path";
 import type { Readable } from "stream";
 import { pipeline } from "stream/promises";
 import { UploadedFile } from "../../http";
@@ -134,6 +134,66 @@ export class LocalDriver implements StorageDriverContract {
     const hash = this.calculateHash(fileBuffer);
 
     await writeFile(absolutePath, new Uint8Array(fileBuffer));
+
+    // Invalidate any stale cached metadata for this location.
+    this._metadata.delete(location);
+
+    const stats = await stat(absolutePath);
+    const mimeType = options?.mimeType || this.guessMimeType(location);
+
+    return {
+      path: location,
+      url: this.url(location),
+      size: stats.size,
+      hash,
+      mimeType,
+      driver: this.name,
+    };
+  }
+
+  /**
+   * Atomically put a file only if nothing exists at `location`.
+   *
+   * Content is written to a temp file in the same directory, then hard-linked
+   * to the target. `link()` fails with EEXIST if the target exists, so exactly
+   * one concurrent caller wins, the object never appears half-written, and the
+   * check is atomic on NFS too. Returns `null` only on EEXIST; other errors throw.
+   */
+  public async putIfAbsent(
+    file: Buffer | string,
+    location: string,
+    options?: PutOptions,
+  ): Promise<StorageFileData | null> {
+    const absolutePath = this.getAbsolutePath(location);
+    const directory = dirname(absolutePath);
+
+    await ensureDirectoryAsync(directory);
+
+    // Unlike put(), a string here is CONTENT, never a source path (matches
+    // the cloud driver): the objects this protects are small JSON bodies.
+    const fileBuffer = typeof file === "string" ? Buffer.from(file) : file;
+    const hash = this.calculateHash(fileBuffer);
+
+    const tempPath = join(
+      directory,
+      `.${basename(absolutePath)}.${crypto.randomBytes(8).toString("hex")}.tmp`,
+    );
+
+    try {
+      await writeFile(tempPath, new Uint8Array(fileBuffer));
+
+      try {
+        await fsPromises.link(tempPath, absolutePath);
+      } catch (error: any) {
+        if (error?.code === "EEXIST") {
+          return null;
+        }
+
+        throw error;
+      }
+    } finally {
+      await unlink(tempPath).catch(() => undefined);
+    }
 
     // Invalidate any stale cached metadata for this location.
     this._metadata.delete(location);

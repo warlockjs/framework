@@ -14,6 +14,7 @@ export * from "./types";
 export * from "./utils/contain-path";
 export * from "./utils/mime";
 export * from "./utils/safe-fetch";
+export * from "./utils/storage-capability-error";
 export * from "./utils/storage-error";
 export * from "./utils/storage-not-initialized-error";
 

@@ -31,6 +31,18 @@ export class DOSpacesDriver extends CloudDriver<CloudStorageDriverOptions> {
   public readonly name = "spaces";
 
   /**
+   * Intentionally NOT supported: unsupported until verified that Spaces
+   * honours `If-None-Match: *` atomically. Overriding with `undefined` makes
+   * `supportsPutIfAbsent()` false for this driver. The inherited method is
+   * shadowed with an own `undefined` property, so it is absent at runtime.
+   */
+  public constructor(options: CloudStorageDriverOptions) {
+    super(options);
+
+    (this as { putIfAbsent?: unknown }).putIfAbsent = undefined;
+  }
+
+  /**
    * Get Spaces endpoint URL
    *
    * Spaces endpoint format: https://{region}.digitaloceanspaces.com

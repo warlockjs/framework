@@ -729,6 +729,21 @@ export interface StorageDriverContract {
   ): Promise<StorageFileData>;
 
   /**
+   * Atomically store a file only if nothing exists at `location`.
+   *
+   * OPTIONAL: drivers that cannot guarantee atomic create-if-absent must
+   * leave it undefined. Of N concurrent callers for one location exactly one
+   * gets file data; the rest get `null` and write nothing. `null` means ONLY
+   * "already exists" - every other failure throws. A string `file` is the
+   * CONTENT (unlike `put()`, where a string is a source path).
+   */
+  putIfAbsent?(
+    file: Buffer | string,
+    location: string,
+    options?: PutOptions,
+  ): Promise<StorageFileData | null>;
+
+  /**
    * Store a file from a readable stream
    *
    * Optimized for large files - streams directly without full buffering.
@@ -999,6 +1014,23 @@ export interface ScopedStorageContract {
     location: string,
     options?: PutOptions,
   ): Promise<StorageFile>;
+
+  /**
+   * Atomically store a file only if nothing exists at `location`.
+   *
+   * @returns StorageFile, or `null` when the location already exists
+   * @throws StorageCapabilityError when the driver lacks `putIfAbsent`
+   */
+  putIfAbsent(
+    file: Buffer | string,
+    location: string,
+    options?: PutOptions,
+  ): Promise<StorageFile | null>;
+
+  /**
+   * Whether the active driver implements `putIfAbsent()`
+   */
+  supportsPutIfAbsent(): boolean;
 
   /**
    * Store a file from stream

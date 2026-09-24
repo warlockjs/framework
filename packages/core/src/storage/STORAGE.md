@@ -376,6 +376,26 @@ storage.off("afterPut", handler);
 
 ---
 
+## Atomic Create-If-Absent (`putIfAbsent`)
+
+```typescript
+if (storage.supportsPutIfAbsent()) {
+  const file = await storage.putIfAbsent(buffer, "locks/job-42.json");
+
+  if (!file) {
+    // Someone else already created it — nothing of ours was written
+  }
+}
+```
+
+- Of N concurrent callers for one location, exactly one gets a `StorageFile`; the rest get `null`.
+- `null` means **only** "already exists". Every other failure throws, like `put()`.
+- On success it emits `beforePut`/`afterPut` (both after the write); on `null` it emits nothing.
+- Drivers: **local** (temp file + hard link, EEXIST → `null`), **s3** / **r2** (`If-None-Match: *`; HTTP 412/409 → `null`).
+- **spaces** does not support it (unsupported until verified). Calling it on a driver without support throws `StorageCapabilityError`.
+
+---
+
 ## Driver Selection
 
 ```typescript

@@ -13,6 +13,7 @@ import { S3Driver } from "./drivers/s3-driver";
 import { ScopedStorage } from "./scoped-storage";
 import { StorageFile } from "./storage-file";
 import { safeFetchToBuffer } from "./utils/safe-fetch";
+import { StorageCapabilityError } from "./utils/storage-capability-error";
 import { StorageNotInitializedError } from "./utils/storage-not-initialized-error";
 import type {
   CloudStorageDriverContract,
@@ -458,6 +459,56 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
 
     if (!result.size) {
       result.size = buffer.length;
+    }
+
+    return StorageFile.fromData(result, driver);
+  }
+
+  /**
+   * Atomically store a file only if nothing exists at `location`.
+   *
+   * Emits the same beforePut/afterPut events as `put()` when the file is
+   * written; emits nothing when the location already exists (`null`).
+   * Because the outcome is unknown until the driver returns, both events
+   * fire after the write, for the winner only.
+   *
+   * @throws StorageCapabilityError when the driver has no `putIfAbsent`
+   */
+  public override async putIfAbsent(
+    file: Buffer | string,
+    location: string,
+    options?: PutOptions,
+  ): Promise<StorageFile | null> {
+    const driver = this.activeDriver;
+
+    if (typeof driver.putIfAbsent !== "function") {
+      throw new StorageCapabilityError("putIfAbsent", driver.name);
+    }
+
+    const result = await driver.putIfAbsent(file, location, options);
+
+    if (!result) {
+      return null;
+    }
+
+    const size = typeof file === "string" ? Buffer.byteLength(file) : file.length;
+
+    await this.emit<StoragePutEventPayload>("beforePut", {
+      driver: driver.name,
+      location,
+      timestamp: new Date(),
+      size,
+    });
+
+    await this.emit<StoragePutEventPayload>("afterPut", {
+      driver: driver.name,
+      location,
+      timestamp: new Date(),
+      file: result,
+    });
+
+    if (!result.size) {
+      result.size = size;
     }
 
     return StorageFile.fromData(result, driver);
