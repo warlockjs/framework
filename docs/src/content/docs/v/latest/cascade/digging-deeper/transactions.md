@@ -136,25 +136,26 @@ await sendOrderConfirmationEmail(order);
 
 Model lifecycle events (`onSaving`, `onCreated`, `onDeleted`, ...) fire as they normally would inside a transaction. If you have an `onCreated` listener that emails the user, **the email goes out even if the transaction later rolls back**.
 
-For that reason, side effects that should respect transaction outcome belong **after** the transaction, not in lifecycle listeners. Or queue them inside the transaction and dispatch on commit:
+For that reason, side effects that should respect transaction outcome belong in `afterCommit()`.
+
+### `afterCommit(fn)`
 
 ```ts
-const tasks: Array<() => Promise<void>> = [];
+import { afterCommit } from "@warlock.js/cascade";
 
-User.events().onCreated(async user => {
-  tasks.push(() => sendWelcomeEmail(user.get("email")));
+User.events().onCreated(user => {
+  afterCommit(() => sendWelcomeEmail(user.get("email")));
 });
 
-await transaction(async ctx => {
-  await User.create({ ... });
-  // tasks accumulates here, but doesn't execute yet
-});
-
-// After commit, drain the queue
-for (const task of tasks) await task();
+Product.events().onSaved(() => afterCommit(() => regenerateSitemap()));
 ```
 
-A proper outbox / job queue is the production-quality version of this pattern; in-memory closures work for simple cases.
+- **Inside a transaction**, `fn` is queued and runs after the **outermost** COMMIT, in the order queued, awaited one by one. If the transaction rolls back (or the COMMIT fails), the queued callbacks are discarded.
+- **Outside a transaction**, `fn` runs on the next microtask. The caller does not await it.
+- **Errors** thrown by a callback are logged. They never change the transaction result and never stop the remaining callbacks.
+- Callbacks run after the transaction context has exited, so any database work they do is outside the finished transaction.
+
+Good fits: cache clears, sitemap regeneration, emails, webhooks. `afterCommit` is in-memory, so a crash between COMMIT and the callback loses it; when the side effect must survive that, use an outbox / job queue.
 
 ## Patterns
 

@@ -190,6 +190,10 @@ A peek for the curious — most users never need to think about this.
 - **Storage**: a single table (`warlock_cache` by default). One row per cache entry.
 - **TTL**: `expires_at TIMESTAMPTZ`. Reads filter via `WHERE expires_at IS NULL OR expires_at > now()` (lazy expiry).
 - **Tags**: `tags TEXT[]` with a GIN index. `similar()` uses the native `tags && $1` overlap operator — much faster than walking meta-keys.
+- **Atomic ops**: `increment` is one upsert that keeps `expires_at`; `pull` is `DELETE … RETURNING`; `update` is a compare-and-set with bounded retries (the callback may run more than once). All are safe across servers.
+- **Tags**: the tag index row is updated with a one-statement JSON-array merge.
+- **Expiry clock**: `expires_at` is computed on the database clock, so app-server clock skew doesn't shift TTLs.
+- **Pruning**: expired rows are removed by `prune(limit = 1000)`, which returns the number deleted. `set()` also runs it in the background on about 1 in 200 writes; call it yourself from a scheduled job on unique-key-heavy workloads.
 - **`onConflict: "create"`**: race-safe via `INSERT ... ON CONFLICT (key) DO UPDATE ... WHERE expires_at < now() RETURNING value`. Reclaims expired rows automatically; blocks live ones.
 - **`onConflict: "update"`**: `UPDATE ... WHERE expires_at IS NULL OR expires_at > now() RETURNING value`.
 - **Similarity**: `1 - (embedding <=> $1::vector) AS score ORDER BY embedding <=> $1::vector LIMIT $N`. The `<=>` operator is pgvector's cosine distance; converting via `1 - distance` gives the similarity score we return as `score`.

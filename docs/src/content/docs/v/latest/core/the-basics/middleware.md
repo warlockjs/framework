@@ -224,10 +224,12 @@ middleware.maxBodySize("2mb");
 | `middleware.rateLimit({ max, duration })` | Per-route cap on top of the global plugin                                  | 429 + `Retry-After`    |
 | `middleware.concurrencyLimit(n)`          | Cap in-flight requests; no queue, fast reject                              | 429 + `Retry-After: 1` |
 | `middleware.maxBodySize("2mb")`           | Per-route `Content-Length` cap (in addition to `http.bodyLimit` global)    | 413                    |
-| `middleware.idempotency()`                | Dedupe writes by `Idempotency-Key`; same key + same body → cached replay   | 422 on conflict        |
+| `middleware.idempotency()`                | Dedupe writes by `Idempotency-Key`; same key + same body → cached replay   | 409 in flight, 422 on body mismatch |
 | `middleware.maintenance()`                | App-wide 503 toggle via `http.maintenance.enabled` (with allowlist bypass) | 503 + `Retry-After`    |
 | `middleware.ipFilter({ allow })`          | Allowlist / denylist by client IP, IPv4 CIDRs supported, fail-closed       | 403                    |
 | `middleware.cache(opts)`                  | Cache + replay successful JSON responses; `tags` opts into `cache.tags([...]).invalidate()` eviction | n/a                    |
+
+Idempotency reserves the key before your handler runs, so a concurrent duplicate gets **409 + `Retry-After`** instead of running twice. A 5xx frees the key; if the cache is down it fails open. Tune the reservation with `middleware.idempotency({ reservationTtl })` (default 60 seconds). `middleware.rateLimit()` counters are per process — see [Running on multiple servers](../digging-deeper/multiple-servers.md).
 
 Composed example — a tight cap on logins, a concurrency cap + idempotency on AI calls:
 

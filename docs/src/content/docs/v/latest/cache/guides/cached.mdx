@@ -100,26 +100,31 @@ When you use the positional `cached(fn, prefix)` / `cached(fn, prefix, ttl)` for
 | Args shape | Key |
 |------------|-----|
 | No args | `prefix` |
-| All primitives (`string`, `number`, `boolean`, `bigint`, `null`, `undefined`) | `${prefix}.${args.join(".")}` |
-| Any object / array arg | `${prefix}.${JSON.stringify(args)}` |
-| Serialization throws (circular refs, `BigInt` nested in an object) | `CacheConfigurationError` |
+| Any args | `${prefix}.${hash}` — the first 16 hex chars of the sha1 of a stable JSON encoding of the args |
+| `Map`, `Set`, functions, symbols, class instances, circular refs | `CacheConfigurationError` |
+
+The hash keeps distinct args on distinct keys: `profile("1.private", "")` and `profile("1", "private")`, or `{ q: "x" }` and `("q", "x")`, never share an entry. Object keys are sorted, `Date` becomes an ISO string, `undefined` and `null` are distinct, and `bigint` is encoded as a decimal string.
 
 **Examples:**
 
 ```ts
-getUser(42)                           // "user.42"
-getUser("john")                       // "user.john"
-getOrder(42, "abc")                   // "orders.42.abc"
-getBy("john", null)                   // "user.john.null"
-searchBy({ q: "hello" })              // 'search.[{"q":"hello"}]'
+getUser()                             // "user"
+getUser(42)                           // "user.<16 hex chars>"
+searchBy({ q: "hello" })              // "search.<16 hex chars>"
 ```
+
+The exact hash is not part of the contract. Don't build keys by hand; use `.invalidate(...args)`.
+
+:::caution Upgrading to 5.20
+The auto-key format changed (it was dot-joined args). Entries written by earlier versions are never read again, so every `cached()` call misses once and repopulates. Old entries expire by TTL, or `flush()` clears them.
+:::
 
 ## Caveats
 
 - **Order matters.** `getOrder(42, "abc")` and `getOrder("abc", 42)` produce different keys.
-- **`Date` → ISO string** via `JSON.stringify`. Two `Date` objects at the same millisecond share a key — correct.
-- **`Map` / `Set` serialize to `{}`** via `JSON.stringify` — that's a footgun. Reach for the options form with a custom `key` fn.
-- **Very large args** produce very large keys. Fine on Redis, terrible on file driver (absurd directory paths).
+- **`Date` → ISO string.** Two `Date` objects at the same millisecond share a key — correct.
+- **`Map`, `Set` and class instances throw.** They can't be encoded stably. Use the options form with a custom `key` fn.
+- `.invalidate()` uses the configured `driver`, the same one the wrapper reads and writes.
 
 When the auto-key isn't right, use the options form. `key` can project whatever subset of the args actually identifies the cached value.
 
@@ -218,10 +223,9 @@ await Promise.all(Array.from({ length: 100 }, () => getter(42)));
 
 ## Troubleshooting
 
-- **`CacheConfigurationError: could not derive an auto-key from args`** — your args include something JSON.stringify can't handle (circular ref, `BigInt` nested in an object). Switch to the options form with a custom `key` fn that picks JSON-safe fields.
+- **`CacheConfigurationError: could not derive an auto-key from args`** — your args include something that can't be encoded stably (circular ref, `Map`, `Set`, function, class instance). Switch to the options form with a custom `key` fn that picks JSON-safe fields.
 - **Two calls with the same args hit the source function** — driver default TTL is `Infinity` only if you haven't set one. Check `options.<driver>.ttl`, or pass a TTL via the shorthand.
 - **`.invalidate()` doesn't seem to work** — verify you're calling it with the same args shape the wrapper was called with. The key function needs matching inputs to produce the same key.
-- **Huge cache keys on the file driver** — the auto-key `JSON.stringify` path grows unbounded. Use a custom `key` fn to project only what identifies the value.
 
 ## Related Documentation
 

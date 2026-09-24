@@ -31,7 +31,7 @@ Reach for `cache.lock()` when:
 
 Don't use `lock` for:
 - **Memoizing a function's result** — use [`cached()`](/v/latest/cache/cached/) or [`remember()`](/v/latest/cache/stampede-prevention/) instead.
-- **Cross-process `update()` coordination** — the upcoming Redis `WATCH`/`MULTI` path will be the better fit; today, wrapping `update` in a lock works but is heavier than needed.
+- **Cross-server `update()` coordination** — `update()` is already an atomic compare-and-set on `redis` and `pg`; see [Atomic Operations](/v/latest/cache/atomic-operations/). No lock needed.
 
 ## The return shape
 
@@ -81,7 +81,9 @@ await cache.lock(
 );
 ```
 
-`owner` is stored as the lock's value. Default is `pid.<process.pid>`. Use a custom owner when debugging stuck locks — you can `cache.get(lockKey)` and see exactly which worker is holding it.
+The stored lock value is `<owner>#<token>`. The owner defaults to `pid.<process.pid>`, and the token is a random string generated per acquisition. Use a custom owner when debugging stuck locks — `cache.get(lockKey)` returns `worker.payments-2#<token>`, so you can see which worker is holding it. Compare on the `<owner>#` prefix, never on the bare owner.
+
+Release is an ownership-checked compare-and-delete (atomic on memory, Redis and Postgres). If your TTL expires and another caller acquires the key, your release leaves their lock alone.
 
 ### 3. Options form — per-call driver override
 
@@ -98,6 +100,10 @@ Routes the whole op (acquire + release) through the named driver without mutatin
 ## TTL is required
 
 Unlike `set()` or `remember()`, `lock()` requires a TTL. This is deliberate — forgotten locks are one of the classic bugs in distributed systems ("the job crashed and now nothing can ever run again"). The TTL is your safety net: even if the process crashes before `fn` completes, the lock auto-releases after TTL.
+
+The TTL must be finite and positive. `0`, `Infinity`, negative or `NaN` values throw `CacheConfigurationError` before anything is written, because a lock that never expires blocks every server once its holder crashes. Numeric strings are seconds (`"90"` = 90 s) and sub-second values round up to 1 s. There is no renewal or fencing, so the TTL has to cover the worst-case duration of `fn`.
+
+If `fn` succeeds but the release fails (for example a Redis blip), the failure is logged and `fn`'s result is still returned; the lock then expires by its TTL.
 
 Pick a TTL longer than the work you expect. If the TTL elapses before `fn` finishes, another process can acquire the lock and run concurrently — that defeats the whole purpose.
 
@@ -172,20 +178,21 @@ async function runDailyReport(date: string) {
 
 | Driver | Support | Semantics |
 |--------|:-:|-----------|
-| `redis` | ✅ Native | Redis `SET … NX EX` — cross-process atomic |
-| `memory` | ✅ Emulated | In-process only |
-| `memoryExtended` | ✅ Emulated | In-process only |
+| `redis` | ✅ Native | Redis `SET … NX EX` — cross-server atomic; release via Lua compare-and-delete |
+| `pg` | ✅ Native | `INSERT … ON CONFLICT` — cross-server atomic; release via one `DELETE … WHERE value = …` |
+| `memory` | ✅ Synchronous check-and-insert | Exclusive within one process |
+| `memoryExtended` | ✅ Synchronous check-and-insert | Exclusive within one process |
 | `lru` | ✅ Emulated | In-process only |
-| `file` | ✅ Emulated | Single-host only; not safe across multiple servers |
+| `file` | ✅ Exclusive create | Single-host only; not safe across multiple servers |
 | `null` | ✅ Always acquires | No-op driver — `fn` always runs, no coordination |
 
-On non-Redis drivers, "distributed" means "across callers in the same process." For true cross-server locking, use Redis.
+On non-shared drivers, "distributed" means "across callers in the same process." To lock across servers, use `redis` or `pg`.
 
 ## Things NOT to do
 
 - **Don't call `lock()` recursively on the same key** — v1 is non-re-entrant. The inner call sees the outer call's lock and returns `{ acquired: false }`.
 - **Don't release the lock inside `fn`** — `lock()` auto-releases. A manual `cache.remove(lockKey)` inside `fn` would release early and let another process jump in while your work is still running.
-- **Don't forget the TTL** — TypeScript won't compile without it, but if you're tempted to use `"1y"` as "infinite," think again about what happens when the process crashes mid-work.
+- **Don't try to pass a TTL that never expires** — `0` and `Infinity` are refused. If you're tempted to use `"1y"` as "infinite," think again about what happens when the process crashes mid-work.
 - **Don't use `lock()` for memoization** — use [`cached()`](/v/latest/cache/cached/) or [`remember()`](/v/latest/cache/stampede-prevention/).
 
 ## Troubleshooting

@@ -101,3 +101,32 @@ See [Configuration](../essentials/configuration.mdx) for more on graceful shutdo
 :::tip
 Enable `preventOverlap()` for any job whose callback you also invoke outside the scheduler — boot-time recovery, admin tools, retried failures from another path. For jobs that only run via the scheduler's own loop, it's a no-op (and that's fine — it's free, defensive documentation).
 :::
+
+## Running on One Server
+
+`preventOverlap()` only guards a single process. When several app instances run the same schedule, add `onOneServer()` so exactly one of them runs each tick:
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+scheduler.addJob(job("nightly-report", buildReport).daily().at("02:00").onOneServer());
+
+scheduler.addJob(
+  job("sync", sync).everyMinutes(5).onOneServer({ lockTtl: "10m", key: "sync-v2" }),
+);
+```
+
+For every tick, the servers race to create a cache entry keyed `scheduler.<key ?? name>.<scheduledTickEpochMs>`. The server that creates it runs the job; the others skip that tick and emit `job:skip`.
+
+That entry is a **claim**, not a lock: it is create-only, has a TTL, and is never released. Because it is never released, a server whose timer fires late — after the winner already finished — still loses, so a tick never runs twice.
+
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `lockTtl` | `min(interval, 1h)`, 60s floor (1h for cron jobs) | How long the claim lives |
+| `key` | the job name | Stable key shared by every server |
+
+### Requirements
+
+- A **shared cache driver** (redis or pg). The memory driver is per-process, so it only dedupes within one process.
+- `@warlock.js/cache` is an optional peer dependency — install it when you use `onOneServer()`.
+- A job name or a `key`. `onOneServer()` throws if it has neither, because the claim key must be identical on every server.

@@ -64,6 +64,18 @@ await cache.set("campaign", data, {
 
 Passing both is rejected at the call site — two ways to say the same thing silently drift over time.
 
+### TTL parsing rules
+
+- A number is **seconds**. Fractions round **up** to whole seconds, so `0.5` is 1 second, never "no expiry".
+- A bare numeric string is also **seconds**: `"3600"` (for example from an env var) is one hour.
+- Duration strings (`"500ms"`, `"30m"`, `"7d"`) are converted to seconds and rounded up, so `"500ms"` is 1 second.
+- `0` and `Infinity` mean no expiry. `NaN`, negative numbers and unparseable strings throw `CacheConfigurationError`.
+- `cache.lock()` is stricter: it refuses any TTL that never expires. See [Locks](/v/latest/cache/lock/).
+
+:::caution Upgrading to 5.20
+Numeric TTL strings used to be read as milliseconds (`"3600"` was 3 s), and `"500ms"` floored to `0` (never expires). Check any TTL that comes from configuration.
+:::
+
 ## Conditional writes — `onConflict`
 
 Controls what happens when the key already exists (or doesn't).
@@ -155,7 +167,7 @@ cache.setCacheConfigurations({
 
 ## Distributed locking recipe
 
-A **distributed lock** makes sure only one process runs a block of code at a time, even across multiple servers. The `onConflict: "create"` pattern is the portable way to build one — Redis-native on Redis, single-process elsewhere.
+A **distributed lock** makes sure only one process runs a block of code at a time, even across multiple servers. The `onConflict: "create"` pattern is the portable way to build one — native on Redis and Postgres (cross-server), single-process elsewhere. For real work prefer [`cache.lock()`](/v/latest/cache/lock/): it refuses a TTL that never expires and releases only its own lock, so a slow holder can't delete its successor's.
 
 ```ts
 async function withLock<T>(
@@ -177,6 +189,7 @@ async function withLock<T>(
   try {
     return await work();
   } finally {
+    // Not successor-safe: if the TTL expired, this deletes the next holder's lock.
     await cache.remove(key);
   }
 }

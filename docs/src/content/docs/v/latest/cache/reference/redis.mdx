@@ -17,6 +17,10 @@ slug: v/latest/cache/redis
 
 ## Limitations
 - Requires Redis server setup
+- Redis Cluster is not supported
+- `flush()` without a `globalPrefix` runs `FLUSHDB` and clears the whole connected database; set a `globalPrefix` to flush only your keys
+- `removeNamespace("users")` matches `users` and `users.*` only (never `users2.*`) and deletes in batched `UNLINK`
+- `increment` (`INCRBY`), `pull` (`GETDEL`) and `update` (Lua compare-and-set) are atomic across servers, and keep the key's TTL
 - Slightly more operational overhead than memory/file
 
 ## Alternatives

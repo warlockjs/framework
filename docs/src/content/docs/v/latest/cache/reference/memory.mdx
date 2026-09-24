@@ -16,7 +16,9 @@ In-memory storage with optional automatic eviction when a size limit is reached.
 
 ## Limitations
 - Data is lost on restart
-- Not shared between processes or servers
+- Not shared between processes or servers — with more than one server use [Redis](/v/latest/cache/redis/) or [Postgres](/v/latest/cache/pg/)
+- Keys are stored flat: `get("users")` after `set("users.1", …)` is a miss, and `maxSize` counts entries (evicting in LRU order)
+- `increment`, `pull` and `update` are atomic within the process only
 - Memory growth: Without `maxSize`, cache can grow indefinitely (use `maxSize` or [LRU Memory Cache Driver](/v/latest/cache/lru-memory/) for automatic eviction)
 
 ## Alternatives

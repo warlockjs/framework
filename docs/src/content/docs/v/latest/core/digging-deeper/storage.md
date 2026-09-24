@@ -198,6 +198,18 @@ const bytes = await storage.size("uploads/photo.jpg");
 
 `get()` is fine for small files (images, JSON, PDFs). For anything multi-MB, prefer `getStream()` and pipe — you don't want a 200 MB video sitting in the heap.
 
+## Create-only writes — `putIfAbsent`
+
+```ts
+const file = await storage.putIfAbsent("<urlset/>", "sitemaps/index.xml");
+
+if (file === null) {
+  // something already exists at that location
+}
+```
+
+`putIfAbsent(file, location, options?)` writes atomically and only if nothing exists. It returns the `StorageFile`, or `null` when the location is taken. Unlike `put`, a string is treated as **content**, not a path. The local driver writes a temp file and hard-links it; S3 and R2 send `If-None-Match: *`. DigitalOcean Spaces doesn't support it. Check `storage.supportsPutIfAbsent()` first — a driver without it throws `StorageCapabilityError`.
+
 ## Delete, copy, move
 
 ```ts
@@ -588,6 +600,7 @@ Then anywhere you have an `Upload`, you can `upload.storageFile().contents()`, `
 
 ## See also
 
+- **[Running on multiple servers](./multiple-servers.md)** — why local storage is a single-server choice (`storage.silenceSingleServerWarning`).
 - **[File uploads](./file-uploads.md)** — the `UploadedFile.save(...)` pattern and validation.
 - **[Image processing](./image-processing.md)** — the `Image` class for transforms before saving.
 - **[Recipe: Upload to S3](../recipes/upload-to-s3.md)** — end-to-end cloud upload flow.

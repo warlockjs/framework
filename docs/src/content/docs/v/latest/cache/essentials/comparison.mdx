@@ -80,11 +80,11 @@ await cache.remember('key', 3600, async () => {
 
 ### Atomic Operations
 
-**@warlock.js/cache:** ✅ Redis-native atomic operations, cross-driver conditional writes
+**@warlock.js/cache:** ✅ Cross-server atomic `increment`/`pull`/`update` on Redis and Postgres (in-process on the others), cross-driver conditional writes
 ```ts
 await cache.increment('counter');                                         // Redis INCRBY
 await cache.set('lock', 'val', { onConflict: 'create', ttl: '30s' });     // Redis SET … NX, emulated elsewhere
-await cache.update<User>('user.1', (u) => ({ ...u, seen: Date.now() })); // chain-locked read-modify-write
+await cache.update<User>('user.1', (u) => ({ ...u, seen: Date.now() })); // compare-and-set on Redis/Postgres, chain-locked elsewhere
 ```
 
 **ioredis:** ✅ Low-level atomic commands (must use directly)

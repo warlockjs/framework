@@ -202,10 +202,10 @@ await tagged.increment("user.123.views");
 
 ### How Tags Work Internally
 
-1. When you store a key with tags, the cache also stores tag-to-key relationships
-2. Each tag maintains a list of all keys associated with it
-3. When you invalidate tags, the cache looks up all keys for those tags and removes them
-4. Tag relationship keys are stored permanently (no TTL)
+1. When you store a key with tags, the driver adds the key to each tag's index with a set primitive (`tagAdd`), so concurrent tagged writes never drop members.
+2. Each tag keeps the un-prefixed keys associated with it. Redis uses a native SET inside the prefix; Postgres merges into a JSON array on one row; the memory, LRU and mock drivers use a separate store that eviction and expiry never touch. The file driver keeps a serialized list.
+3. When you invalidate tags, the cache reads the members and deletes exactly those, then drops the index.
+4. Tag indexes have no TTL. Each tagged write also prunes up to 20 dead members, and `remove()` / `pull()` detach the key from its tags.
 
 ### Performance Impact
 
@@ -224,9 +224,11 @@ await tagged.increment("user.123.views");
 
 ## Limitations
 
-1. **Tag relationships stored in cache**: Uses the same driver as your cache data
-2. **No tag hierarchy**: Tags are flat (no parent-child relationships)
-3. **Synchronous tag lookup**: Tag relationships must be readable for invalidation to work
+1. **Tag relationships stored in cache**: Uses the same driver as your cache data. On the memory drivers the index lives in a separate store, so `maxSize` or LRU capacity can no longer evict it.
+2. **Tags are global across scopes**: a `cache.namespace(...)` handle does not isolate tags.
+3. **Tags written before 5.17 are orphaned**: invalidate can't reach them; they expire by TTL or `flush()`
+4. **No tag hierarchy**: Tags are flat (no parent-child relationships)
+5. **Synchronous tag lookup**: Tag relationships must be readable for invalidation to work
 
 ## Troubleshooting
 

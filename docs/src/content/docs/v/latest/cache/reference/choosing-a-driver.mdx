@@ -47,8 +47,12 @@ durability, scale, and capabilities. This page helps you pick.
 | `null` | n/a | n/a | n/a | n/a | returns `[]` | n/a |
 
 ¹ Lists are stored as a single JSON entry and mutated read-modify-write on every
-driver today. Native Redis list commands (`LPUSH` / `LRANGE` / `LTRIM`) are
-planned for v2.1.
+driver today (serialized per key inside one process). Native Redis list
+commands (`LPUSH` / `LRANGE` / `LTRIM`) are planned.
+
+**Counters, `pull()` and `update()` across servers (5.20):** atomic on `redis`
+and `pg`; per-process on the in-memory drivers and `file`. See
+[Atomic operations](/v/latest/cache/guides/atomic-operations/).
 
 :::note `update()` / `merge()` support
 The [`file`](/v/latest/cache/file/) driver throws `CacheUnsupportedError` for

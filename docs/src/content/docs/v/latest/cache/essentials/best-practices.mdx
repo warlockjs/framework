@@ -9,7 +9,7 @@ Guidelines and recommendations for using @warlock.js/cache effectively.
 
 ### Use `remember()` for Expensive Operations
 
-Always use `remember()` for database queries, API calls, or expensive computations to prevent cache stampedes:
+Always use `remember()` for database queries, API calls, or expensive computations to prevent cache stampedes. `0`, `false` and `""` are cached like any other value; only `null` counts as a miss:
 
 ```ts
 // ✅ GOOD: Prevents stampedes
@@ -145,7 +145,7 @@ cache.setCacheConfigurations({
 
 ### Use Redis for Distributed Systems
 
-Always use Redis driver in production with multiple servers:
+Always use the Redis (or Postgres) driver in production with multiple servers. The memory drivers are per-process; see [Running on multiple servers](#running-on-multiple-servers):
 
 ```ts
 // ✅ GOOD: Shared cache across servers
@@ -249,6 +249,24 @@ cache.setCacheConfigurations({
 });
 ```
 
+
+## Running on multiple servers
+
+When more than one process serves traffic, every process gets its own `memory`, `memoryExtended`, `lru` and `file` cache. Use `redis` or `pg` for anything that must agree across servers.
+
+| Need | Use | Why |
+| --- | --- | --- |
+| Rate-limit or login-throttle counters | `increment()` on `redis` or `pg` | `INCRBY` / a single upsert, TTL kept; on memory each server counts separately, so the limit is N× looser |
+| One-time tokens | `pull()` on `redis` or `pg` | `GETDEL` / `DELETE … RETURNING` hands the value to one caller |
+| Shared read-modify-write | `update()` / `merge()` on `redis` or `pg` | Compare-and-set with retries; keep the callback free of side effects |
+| One server runs a job | `cache.lock()` on `redis` or `pg` | Finite TTL required; release only removes your own lock |
+| Tag invalidation | `redis` or `pg` | The index is shared, so one server's `invalidate()` reaches every server's entries |
+
+Also remember:
+
+- **Stampede protection is per process.** `remember()`, `swr()` and `cached()` share one in-flight computation within a process only; N servers can still compute once each on a cold miss. Wrap the work in `cache.lock()` when it must run once globally.
+- **Set a `globalPrefix`** when the Redis database is shared. Without one, `flush()` runs `FLUSHDB` and clears the whole database.
+- **Redis Cluster is not supported.**
 
 ## Performance Tips
 

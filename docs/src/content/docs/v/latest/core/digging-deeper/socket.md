@@ -98,6 +98,10 @@ export default {
 
 **Editing the config tears the server down — but does *not* hot-apply new options.** The socket connector watches `src/config/socket.ts`. On a change, the dev server calls the connector's `restart()`, which runs `shutdown()` then `start()`. Here's the catch: the Socket.IO server is built in `boot()`, and `restart()` never calls `boot()`. So saving the config disconnects open sockets and shuts the old server down, but a fresh server with your new options is **not** stood back up until a full dev-server restart. This is a current limitation — restart the dev server to apply config changes.
 
+### Multiple servers
+
+Set `adapter` to a factory that returns a Socket.IO adapter, e.g. `@socket.io/redis-adapter`, so broadcasts reach clients on every server. Polling clients need sticky sessions on your load balancer. In production without an adapter Warlock warns once; silence with `silenceSingleServerWarning: true`. See [Running on multiple servers](./multiple-servers.md).
+
 ## Registering listeners — `main.ts`
 
 The right place to wire `io.on("connection", …)` is your module's `main.ts`. The framework auto-loads `main.ts` once per module at boot, after connectors are up. The socket instance is ready by then.
