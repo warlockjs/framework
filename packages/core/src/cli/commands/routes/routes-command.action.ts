@@ -1,5 +1,6 @@
 import { router } from "../../../router/router";
 import type { CommandActionData } from "../../../commands/types";
+import { bootForDiagnostics } from "../doctor/boot-for-diagnostics";
 import { printRoutesTable } from "./format-routes-table";
 import { filterRouteRows, sortRouteRows, toRouteRow } from "./route-row";
 
@@ -26,7 +27,15 @@ function stringOption(value: string | number | boolean | undefined): string | un
  *
  * @param data - Parsed CLI args (`options.method` / `path` / `name` / `json`).
  */
-export function routesCommandAction({ options }: CommandActionData): void {
+export async function routesCommandAction({ options }: CommandActionData): Promise<void> {
+  // The preload is config-only and imports no route modules; load them the same
+  // way the server does at boot.
+  const context = await bootForDiagnostics();
+
+  for (const failure of context.moduleFailures) {
+    console.error(`Failed to load ${failure.file}: ${failure.message}`);
+  }
+
   const rows = sortRouteRows(
     filterRouteRows(router.list().map(toRouteRow), {
       method: stringOption(options.method),

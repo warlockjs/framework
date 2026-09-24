@@ -221,25 +221,13 @@ export class FilterApplicator {
     // Multiple columns (OR condition)
     else if (columns) {
       if (operator === "=") {
-        const conditions: any = {};
-        for (const col of columns) {
-          conditions[col] = value;
-        }
-        query.orWhere(conditions);
+        this.anyOf(query, columns, (q, col) => q.where(col, value));
       } else if (operator === "like") {
         // (col0 LIKE value OR col1 LIKE value OR ...), OR'd with prior conditions —
         // the object form of orWhere() only ever emits "=", so "like" needs the
         // callback/group form to keep the operator instead of silently degrading
         // to equality (D1).
-        query.orWhere((sub: QueryBuilderContract) => {
-          columns.forEach((col, index) => {
-            if (index === 0) {
-              sub.where(col, "like", value);
-            } else {
-              sub.orWhere(col, "like", value);
-            }
-          });
-        });
+        this.anyOf(query, columns, (q, col) => q.where(col, "like", value));
       } else {
         // Every other operator silently degraded to equality via the object form
         // of orWhere() — refuse instead of returning a correct-looking, wrong query.
@@ -249,6 +237,30 @@ export class FilterApplicator {
         );
       }
     }
+  }
+
+  /**
+   * Apply a condition across several columns as ONE grouped OR: `(a OR b OR ...)`.
+   * The group is ANDed with the rest of the query, so a tenant filter
+   * (`org_id = 5`) can never be widened by a multi-column search. Never emit a
+   * top-level `orWhere` for multi-column filters.
+   */
+  private anyOf(
+    query: QueryBuilderContract,
+    columns: string[],
+    apply: (q: QueryBuilderContract, col: string) => void,
+  ) {
+    query.where((group: QueryBuilderContract) => {
+      columns.forEach((col, index) => {
+        const build = (q: QueryBuilderContract) => apply(q, col);
+
+        if (index === 0) {
+          group.where(build);
+        } else {
+          group.orWhere(build);
+        }
+      });
+    });
   }
 
   // ============================================================================
@@ -288,12 +300,7 @@ export class FilterApplicator {
     if (column) {
       query.where(column, boolValue);
     } else if (columns) {
-      const conditions: any = {};
-      for (const col of columns) {
-        conditions[col] = boolValue;
-      }
-
-      query.orWhere(conditions);
+      this.anyOf(query, columns, (q, col) => q.where(col, boolValue));
     }
   }
 
@@ -305,12 +312,7 @@ export class FilterApplicator {
     if (column) {
       query.where(column, intValue);
     } else if (columns) {
-      const conditions: any = {};
-      for (const col of columns) {
-        conditions[col] = intValue;
-      }
-
-      query.orWhere(conditions);
+      this.anyOf(query, columns, (q, col) => q.where(col, intValue));
     }
   }
 
@@ -324,10 +326,8 @@ export class FilterApplicator {
     if (column) {
       query.where(column, "!=", intValue);
     } else if (columns) {
-      // Use multiple orWhere calls for OR logic across columns
-      for (const col of columns) {
-        query.orWhere(col, "!=", intValue);
-      }
+      // Grouped OR across columns
+      this.anyOf(query, columns, (q, col) => q.where(col, "!=", intValue));
     }
   }
 
@@ -342,9 +342,7 @@ export class FilterApplicator {
     if (column) {
       query.where(column, operator, intValue);
     } else if (columns) {
-      for (const col of columns) {
-        query.orWhere(col, operator, intValue);
-      }
+      this.anyOf(query, columns, (q, col) => q.where(col, operator, intValue));
     }
   }
 
@@ -358,10 +356,8 @@ export class FilterApplicator {
     if (column) {
       query.whereIn(column, values);
     } else if (columns) {
-      // Use multiple orWhere calls with whereIn for each column
-      for (const col of columns) {
-        query.orWhere((q: any) => q.whereIn(col, values));
-      }
+      // Grouped OR of whereIn across columns
+      this.anyOf(query, columns, (q, col) => q.whereIn(col, values));
     }
   }
 
@@ -375,12 +371,7 @@ export class FilterApplicator {
     if (column) {
       query.where(column, numValue);
     } else if (columns) {
-      const conditions: any = {};
-      for (const col of columns) {
-        conditions[col] = numValue;
-      }
-
-      query.orWhere(conditions);
+      this.anyOf(query, columns, (q, col) => q.where(col, numValue));
     }
   }
 
@@ -394,10 +385,8 @@ export class FilterApplicator {
     if (column) {
       query.whereIn(column, values);
     } else if (columns) {
-      // Use multiple orWhere calls with whereIn for each column
-      for (const col of columns) {
-        query.orWhere((q: any) => q.whereIn(col, values));
-      }
+      // Grouped OR of whereIn across columns
+      this.anyOf(query, columns, (q, col) => q.whereIn(col, values));
     }
   }
 
@@ -411,12 +400,7 @@ export class FilterApplicator {
     if (column) {
       query.where(column, floatValue);
     } else if (columns) {
-      const conditions: any = {};
-      for (const col of columns) {
-        conditions[col] = floatValue;
-      }
-
-      query.orWhere(conditions);
+      this.anyOf(query, columns, (q, col) => q.where(col, floatValue));
     }
   }
 
@@ -428,9 +412,7 @@ export class FilterApplicator {
     if (column) {
       query.whereNull(column);
     } else if (columns) {
-      for (const col of columns) {
-        query.orWhere({ [col]: null });
-      }
+      this.anyOf(query, columns, (q, col) => q.whereNull(col));
     }
   }
 
@@ -439,9 +421,7 @@ export class FilterApplicator {
       query.whereNotNull(column);
     } else if (columns) {
       // Use whereNotNull for each column
-      for (const col of columns) {
-        query.orWhere((q: any) => q.whereNotNull(col));
-      }
+      this.anyOf(query, columns, (q, col) => q.whereNotNull(col));
     }
   }
 
@@ -610,9 +590,7 @@ export class FilterApplicator {
     if (column) {
       query.whereDate(column, dateValue);
     } else if (columns) {
-      for (const col of columns) {
-        query.orWhere((q: any) => q.whereDate(col, dateValue));
-      }
+      this.anyOf(query, columns, (q, col) => q.whereDate(col, dateValue));
     }
   }
 
@@ -632,13 +610,10 @@ export class FilterApplicator {
         query.whereDateBefore(column, dateValue);
       }
     } else if (columns) {
-      for (const col of columns) {
-        if (operator === ">" || operator === ">=") {
-          query.orWhere((q: any) => q.whereDateAfter(col, dateValue));
-        } else {
-          query.orWhere((q: any) => q.whereDateBefore(col, dateValue));
-        }
-      }
+      const after = operator === ">" || operator === ">=";
+      this.anyOf(query, columns, (q, col) =>
+        after ? q.whereDateAfter(col, dateValue) : q.whereDateBefore(col, dateValue),
+      );
     }
   }
 
@@ -662,9 +637,7 @@ export class FilterApplicator {
     if (column) {
       query.whereDateBetween(column, [start, end]);
     } else if (columns) {
-      for (const col of columns) {
-        query.orWhere((q: any) => q.whereDateBetween(col, [start, end]));
-      }
+      this.anyOf(query, columns, (q, col) => q.whereDateBetween(col, [start, end]));
     }
   }
 
@@ -681,10 +654,8 @@ export class FilterApplicator {
     if (column) {
       query.whereIn(column, dates);
     } else if (columns) {
-      // Use multiple orWhere calls with whereIn for each column
-      for (const col of columns) {
-        query.orWhere((q: any) => q.whereIn(col, dates));
-      }
+      // Grouped OR of whereIn across columns
+      this.anyOf(query, columns, (q, col) => q.whereIn(col, dates));
     }
   }
 
@@ -703,12 +674,7 @@ export class FilterApplicator {
     if (column) {
       query.where(column, dateValue);
     } else if (columns) {
-      const conditions: any = {};
-      for (const col of columns) {
-        conditions[col] = dateValue;
-      }
-
-      query.orWhere(conditions);
+      this.anyOf(query, columns, (q, col) => q.where(col, dateValue));
     }
   }
 
@@ -724,9 +690,7 @@ export class FilterApplicator {
     if (column) {
       query.where(column, operator, dateValue);
     } else if (columns) {
-      for (const col of columns) {
-        query.orWhere(col, operator, dateValue);
-      }
+      this.anyOf(query, columns, (q, col) => q.where(col, operator, dateValue));
     }
   }
 
@@ -742,9 +706,7 @@ export class FilterApplicator {
     if (column) {
       query.whereBetween(column, [start, end]);
     } else if (columns) {
-      for (const col of columns) {
-        query.orWhere((q: any) => q.whereBetween(col, [start, end]));
-      }
+      this.anyOf(query, columns, (q, col) => q.whereBetween(col, [start, end]));
     }
   }
 
@@ -761,10 +723,8 @@ export class FilterApplicator {
     if (column) {
       query.whereIn(column, dates);
     } else if (columns) {
-      // Use multiple orWhere calls with whereIn for each column
-      for (const col of columns) {
-        query.orWhere((q: any) => q.whereIn(col, dates));
-      }
+      // Grouped OR of whereIn across columns
+      this.anyOf(query, columns, (q, col) => q.whereIn(col, dates));
     }
   }
 

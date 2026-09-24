@@ -7,10 +7,9 @@ import { routesDiffCommandAction } from "./routes/routes-diff.action";
  * sibling of `warlock doctor`). Filter with `--method` / `--path` / `--name`,
  * or emit the normalized rows as JSON with `--json`.
  *
- * Preload plan: load config + bootstrap app code so route modules register on
- * the router singleton, but start NO connectors — listing routes must never
- * open a database/cache/socket connection. Because the route-module loader is
- * fail-loud, a route file that throws on import surfaces here instead of being
+ * The preload is config-only and imports no route modules; the action loads them
+ * through `bootForDiagnostics()`, the same loader the server uses at boot. A
+ * route file that throws on import is reported on stderr instead of being
  * silently omitted from the table.
  */
 export const routesCommand = command({

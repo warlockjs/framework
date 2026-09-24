@@ -3,6 +3,7 @@ import path from "node:path";
 import { appPath } from "../../../../utils";
 import type { CommandActionData } from "../../../../commands/types";
 import { migrationAlterStub, migrationStub } from "../templates/stubs";
+import { migrationTimestamp } from "../../../../generations/features/shared/migration-timestamp";
 import { parseColumnDsl } from "./column-dsl-parser";
 import { parseName } from "../utils/name-parser";
 import { ensureDirectoryAsync, putFileAsync, setDryRun } from "../utils/writer";
@@ -21,8 +22,7 @@ export async function createMigrationFile(
   const entity = parseName(entityName);
 
   // Generate timestamp: MM-DD-YYYY_HH-MM-SS
-  const now = new Date();
-  const timestamp = `${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}-${now.getFullYear()}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}`;
+  const timestamp = migrationTimestamp();
 
   const migrationFileName = `${timestamp}-${entity.kebab}.migration.ts`;
   const migrationsPath = path.join(appPath(), moduleName, "models", entity.kebab, "migrations");

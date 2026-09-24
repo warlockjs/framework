@@ -63,6 +63,28 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
   protected filterBy: FilterRules = {};
 
   /**
+   * Columns a client may sort by (`orderBy` / `sortBy` / `cursorColumn`) when the
+   * options come from a request. `id` and the declared `filterBy` keys are always
+   * allowed; anything else is ignored.
+   * @protected
+   */
+  protected sortable: string[] = [];
+
+  /**
+   * Columns a client may request through `select`. Empty by default: a client
+   * `select` is ignored unless the repository whitelists the columns here.
+   * @protected
+   */
+  protected selectable: string[] = [];
+
+  /**
+   * Hard cap on `limit` / `perPage` for every list, all and cursor query.
+   * @default 100
+   * @protected
+   */
+  protected maxPerPage = 100;
+
+  /**
    * Get adapter instance (lazy-loaded)
    * Resolution order:
    * 1. Use injected adapter from constructor
@@ -279,6 +301,15 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     };
   }
 
+  /**
+   * Attach the active scope to the options. It travels under its own key (after
+   * the caller's options, so it can't be overridden) and is applied as a real
+   * `where` by `applyOptionsToQuery`, independent of `filterBy`.
+   */
+  protected withActive<O extends object>(options?: O): O & { activeScope: Record<string, any> } {
+    return { ...(options as O), activeScope: this.getIsActiveFilter() };
+  }
+
   // ============================================================================
   // FINDING METHODS
   // ============================================================================
@@ -346,6 +377,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     const opts = this.prepareOptions(options);
 
     this.applyOptionsToQuery(query, opts);
+    this.applyLookupFilters(query, opts);
 
     return query.limit(1).first();
   }
@@ -442,8 +474,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    */
   public async firstActive(options?: TypedRepositoryOptions<F>): Promise<T | null> {
     return this.first({
-      ...this.getIsActiveFilter(),
-      ...options,
+      ...this.withActive(options),
     } as TypedRepositoryOptions<F>);
   }
 
@@ -455,8 +486,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    */
   public async firstActiveCached(options?: TypedRepositoryOptions<F>): Promise<T | null> {
     return this.firstCached({
-      ...this.getIsActiveFilter(),
-      ...options,
+      ...this.withActive(options),
     } as TypedRepositoryOptions<F>);
   }
 
@@ -498,8 +528,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    */
   public async lastActive(options?: TypedRepositoryOptions<F>): Promise<T | null> {
     return this.last({
-      ...this.getIsActiveFilter(),
-      ...options,
+      ...this.withActive(options),
     } as TypedRepositoryOptions<F>);
   }
 
@@ -511,8 +540,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    */
   public async lastActiveCached(options?: TypedRepositoryOptions<F>): Promise<T | null> {
     return this.lastCached({
-      ...this.getIsActiveFilter(),
-      ...options,
+      ...this.withActive(options),
     } as TypedRepositoryOptions<F>);
   }
 
@@ -562,7 +590,9 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     options?: RepositoryOptions,
   ): Promise<PaginationResult<T> | CursorPaginationResult<T>> {
     const query = this.newQuery();
-    const opts = this.prepareOptions(options as TypedRepositoryOptions<F>);
+    const opts = this.sanitizeControls(
+      this.prepareOptions(options as TypedRepositoryOptions<F>),
+    ) as TypedRepositoryOptions<F>;
     const paginationMode = opts.paginationMode || "pages";
 
     // applyOptionsToQuery handles cursor phase 1 (WHERE + ORDER BY) internally
@@ -624,8 +654,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     options?: TypedRepositoryOptions<F>,
   ): Promise<PaginationResult<T> | CursorPaginationResult<T>> {
     return this._listImpl({
-      ...this.getIsActiveFilter(),
-      ...options,
+      ...this.withActive(options),
     });
   }
 
@@ -636,7 +665,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * @public
    */
   public async allActive(options?: TypedAllRepositoryOptions<F>): Promise<T[]> {
-    return this.all(this.asTypedAll({ ...this.getIsActiveFilter(), ...options }));
+    return this.all(this.asTypedAll(this.withActive(options)));
   }
 
   // ============================================================================
@@ -710,6 +739,135 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
   // ============================================================================
 
   /**
+   * Option keys that control the query rather than filter it.
+   */
+  private static readonly controlKeys = new Set([
+    "paginationMode",
+    "paginate",
+    "page",
+    "limit",
+    "perPage",
+    "defaultLimit",
+    "select",
+    "simpleSelect",
+    "deselect",
+    "orderBy",
+    "sortBy",
+    "sortDirection",
+    "cursor",
+    "direction",
+    "cursorColumn",
+    "purgeCache",
+    "perform",
+    "activeScope",
+  ]);
+
+  /**
+   * Columns `orderBy` / `sortBy` / `cursorColumn` may target.
+   */
+  protected getSortableColumns(): Set<string> {
+    return new Set(["id", ...this.sortable, ...Object.keys(this.filterBy || {})]);
+  }
+
+  /**
+   * Split client-controllable control options from filters: `limit` is capped by
+   * `maxPerPage`, sort / cursor columns must be whitelisted (`sortable`, `filterBy`
+   * keys or `id`) and `select` must be within `selectable`. Anything else is
+   * dropped, so `list({ ...request.all() })` cannot steer the query.
+   */
+  protected sanitizeControls(options: RepositoryOptions): RepositoryOptions {
+    const safe: RepositoryOptions = { ...options };
+    const raw = safe as Record<string, any>;
+    const allowed = this.getSortableColumns();
+
+    const requested = Number(raw.limit ?? raw.perPage);
+    delete raw.perPage;
+
+    if (Number.isFinite(requested) && requested > 0) {
+      safe.limit = Math.min(Math.floor(requested), this.maxPerPage);
+    } else {
+      delete raw.limit;
+    }
+
+    if (safe.defaultLimit) {
+      safe.defaultLimit = Math.min(safe.defaultLimit, this.maxPerPage);
+    }
+
+    if (safe.cursorColumn !== undefined && !allowed.has(safe.cursorColumn)) {
+      delete raw.cursorColumn;
+    }
+
+    if (safe.sortBy !== undefined && !allowed.has(safe.sortBy)) {
+      delete raw.sortBy;
+    }
+
+    if (safe.orderBy && safe.orderBy !== "random") {
+      const orderColumns = Array.isArray(safe.orderBy)
+        ? [safe.orderBy[0]]
+        : typeof safe.orderBy === "object"
+          ? Object.keys(safe.orderBy)
+          : [];
+
+      if (orderColumns.some((column) => !allowed.has(column))) {
+        delete raw.orderBy;
+      }
+    }
+
+    if (safe.select) {
+      const selectable = new Set(this.selectable);
+      const columns = (Array.isArray(safe.select) ? safe.select : []).filter((column) =>
+        selectable.has(column),
+      );
+
+      if (columns.length > 0) {
+        safe.select = columns;
+      } else {
+        delete raw.select;
+      }
+    }
+
+    return safe;
+  }
+
+  /**
+   * Read the active scope only when it is exactly what `getIsActiveFilter()`
+   * produces, so a client can't smuggle an arbitrary `where` through it.
+   */
+  protected readActiveScope(options: RepositoryOptions): Record<string, any> | undefined {
+    const scope = (options as Record<string, any>).activeScope;
+
+    if (!scope || typeof scope !== "object") return undefined;
+
+    const expected = this.getIsActiveFilter();
+
+    return JSON.stringify(scope) === JSON.stringify(expected) ? expected : undefined;
+  }
+
+  /**
+   * Apply plain `{ column: scalar }` lookups that are not declared in `filterBy`
+   * as equality wheres. Used by `first` (and so `exists`, `findOrCreate`,
+   * `updateOrCreate`) so an undeclared key is never silently dropped and can't
+   * match the wrong row.
+   */
+  protected applyLookupFilters(query: QueryBuilderContract<T>, options: RepositoryOptions) {
+    for (const [key, value] of Object.entries(options)) {
+      if (
+        RepositoryManager.controlKeys.has(key) ||
+        key in (this.filterBy || {}) ||
+        value === undefined
+      ) {
+        continue;
+      }
+
+      if (value !== null && typeof value === "object") {
+        throw new Error(`[Repository] Lookup "${key}" must be a scalar value.`);
+      }
+
+      query.where(key, value);
+    }
+  }
+
+  /**
    * Apply repository options to query
    * @param query - Query builder instance
    * @param options - Repository options
@@ -719,6 +877,9 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     query: QueryBuilderContract<T>,
     options: RepositoryOptions,
   ): RepositoryOptions {
+    // Options here come from application code and are honoured as-is. Client
+    // input is sanitized only at the list-family entry (`_listImpl`).
+
     // ── Cursor phase 1: WHERE + ORDER BY ──────────────────────────────────────
     // Must run first so the cursor column is always the PRIMARY sort key.
     // Any orderBy appended below becomes a harmless secondary sort key.
@@ -757,6 +918,15 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
         dateFormat: "DD-MM-YYYY",
         dateTimeFormat: "DD-MM-YYYY HH:mm:ss",
       });
+    }
+
+    // Active scope: a real where, never routed through `filterBy`.
+    const activeScope = this.readActiveScope(options);
+
+    if (activeScope) {
+      for (const [column, value] of Object.entries(activeScope)) {
+        query.where(column, value);
+      }
     }
 
     // Apply select
@@ -927,7 +1097,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     callback: ChunkCallback<T>,
     options?: TypedRepositoryOptions<F>,
   ): Promise<void> {
-    return this.chunk(size, callback, this.asTyped({ ...this.getIsActiveFilter(), ...options }));
+    return this.chunk(size, callback, this.asTyped(this.withActive(options)));
   }
 
   // ============================================================================
@@ -995,8 +1165,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
   ): Promise<PaginationResult<T> | CursorPaginationResult<T>> {
     return this._listImpl({
       orderBy: ["id", "desc"],
-      ...this.getIsActiveFilter(),
-      ...options,
+      ...this.withActive(options),
     });
   }
 
@@ -1019,8 +1188,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
   ): Promise<PaginationResult<T> | CursorPaginationResult<T>> {
     return this._listImpl({
       orderBy: ["id", "asc"],
-      ...this.getIsActiveFilter(),
-      ...options,
+      ...this.withActive(options),
     });
   }
 
@@ -1151,7 +1319,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * @public
    */
   public async countActive(options?: TypedRepositoryOptions<F>): Promise<number> {
-    return await this.count(this.asTyped({ ...this.getIsActiveFilter(), ...options }));
+    return await this.count(this.asTyped(this.withActive(options)));
   }
 
   /**
@@ -1193,7 +1361,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * @public
    */
   public async countActiveCached(options?: TypedRepositoryOptions<F>): Promise<number> {
-    return await this.countCached(this.asTyped({ ...this.getIsActiveFilter(), ...options }));
+    return await this.countCached(this.asTyped(this.withActive(options)));
   }
 
   // ============================================================================
@@ -1236,7 +1404,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * @returns Promise resolving to the filtered numeric average
    * @public
    */
-  public async avg(field: string, options?: TypedRepositoryOptions<F>): Promise<number> {
+  public async avg(field: string, options?: TypedRepositoryOptions<F>): Promise<number | null> {
     const query = this.newQuery();
     const opts = this.prepareOptions(options);
 
@@ -1256,7 +1424,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * @returns Promise resolving to the filtered minimum value
    * @public
    */
-  public async min(field: string, options?: TypedRepositoryOptions<F>): Promise<number> {
+  public async min(field: string, options?: TypedRepositoryOptions<F>): Promise<number | null> {
     const query = this.newQuery();
     const opts = this.prepareOptions(options);
 
@@ -1276,7 +1444,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * @returns Promise resolving to the filtered maximum value
    * @public
    */
-  public async max(field: string, options?: TypedRepositoryOptions<F>): Promise<number> {
+  public async max(field: string, options?: TypedRepositoryOptions<F>): Promise<number | null> {
     const query = this.newQuery();
     const opts = this.prepareOptions(options);
 
@@ -1400,6 +1568,19 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     }
 
     return cacheKey;
+  }
+
+  /**
+   * Whether a value holds a function at any depth (cycle-safe).
+   */
+  protected containsFunction(value: any, seen = new WeakSet<object>()): boolean {
+    if (typeof value === "function") return true;
+
+    if (value === null || typeof value !== "object" || seen.has(value)) return false;
+
+    seen.add(value);
+
+    return Object.values(value).some((item) => this.containsFunction(item, seen));
   }
 
   /**
@@ -1552,7 +1733,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * @public
    */
   public async allActiveCached(options?: TypedAllRepositoryOptions<F>): Promise<T[]> {
-    return await this.allCached(this.asTypedAll({ ...this.getIsActiveFilter(), ...options }));
+    return await this.allCached(this.asTypedAll(this.withActive(options)));
   }
 
   /**
@@ -1567,6 +1748,13 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     }
 
     const opts = this.prepareOptions(options);
+
+    // Function values (callback filters) stringify to their name, so two different
+    // callbacks would share one cache entry and leak each other's rows. Function
+    // bodies cannot be keyed, so skip the cache unless the caller supplied a key.
+    if (!opts.cacheKey && this.containsFunction(opts)) {
+      return (await this._listImpl(options)) as PaginationResult<T>;
+    }
 
     const cacheKey = this.cacheKey("list", opts);
 
@@ -1598,7 +1786,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * @public
    */
   public async listActiveCached(options?: TypedRepositoryOptions<F>): Promise<PaginationResult<T>> {
-    return await this.listCached(this.asTyped({ ...this.getIsActiveFilter(), ...options }));
+    return await this.listCached(this.asTyped(this.withActive(options)));
   }
 
   /**

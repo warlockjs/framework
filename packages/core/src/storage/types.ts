@@ -1016,6 +1016,16 @@ export interface ScopedStorageContract {
   ): Promise<StorageFile>;
 
   /**
+   * Upload a local file by path. `put()` never treats a string as a path, so
+   * this is the only way to store a file from the server's filesystem.
+   *
+   * @param localPath - Path of the local file to upload
+   * @param location - Destination path in storage
+   * @param options - Storage options
+   */
+  putFromPath(localPath: string, location: string, options?: PutOptions): Promise<StorageFile>;
+
+  /**
    * Atomically store a file only if nothing exists at `location`.
    *
    * @returns StorageFile, or `null` when the location already exists

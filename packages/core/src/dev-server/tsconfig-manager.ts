@@ -44,40 +44,43 @@ export class TSConfigManager {
     }
 
     return Object.keys(this.aliases).some((alias) => {
-      // Remove /* from alias pattern for matching
-      const aliasPattern = alias.replace("/*", "");
-
-      if (!path.startsWith(aliasPattern)) {
+      if (!this.matchesAliasPattern(alias, path)) {
         return false;
       }
 
-      // Check if this is a real alias or just an external package mapping
       const aliasTargets = this.aliases[alias];
       if (!Array.isArray(aliasTargets) || aliasTargets.length === 0) {
         return false;
       }
 
-      // If the alias starts with @, it's likely an external package alias
-      // Example: "@warlock.js/core" -> "@warlock.js/core" (external package)
-      if (aliasPattern.startsWith("@")) {
+      // A package mapped onto itself is an external package, not a local alias
+      // Example: "@warlock.js/core" -> "@warlock.js/core"
+      // (self-referencing local ones like src/* -> src/* are still aliases)
+      if (!alias.endsWith("/*") && aliasTargets.every((target) => target === alias)) {
         return false;
       }
 
-      // Otherwise, it's a real path alias (including self-referencing ones like src/* -> src/*)
-      // Example: "app/*" -> "src/app/*" (real alias)
-      // Example: "src/*" -> "src/*" (self-referencing alias, still valid)
       return true;
     });
+  }
+
+  /**
+   * Check if an import path matches a tsconfig paths pattern
+   * (exact match, or `prefix/*` matching anything under `prefix/`)
+   */
+  private matchesAliasPattern(alias: string, importPath: string): boolean {
+    if (alias.endsWith("/*")) {
+      return importPath.startsWith(alias.slice(0, -1));
+    }
+
+    return importPath === alias;
   }
 
   /**
    * Get the alias key that matches the given import path
    */
   public getMatchingAlias(path: string): string | null {
-    const aliasKey = Object.keys(this.aliases).find((alias) => {
-      const aliasPattern = alias.replace("/*", "");
-      return path.startsWith(aliasPattern);
-    });
+    const aliasKey = Object.keys(this.aliases).find((alias) => this.matchesAliasPattern(alias, path));
 
     return aliasKey || null;
   }

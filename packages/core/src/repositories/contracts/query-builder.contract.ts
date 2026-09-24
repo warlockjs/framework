@@ -350,7 +350,7 @@ export interface QueryBuilderContract<T> {
    * @example
    * await query.where("status", "paid").avg("total")
    */
-  avg(field: string): Promise<number>;
+  avg(field: string): Promise<number | null>;
 
   /**
    * Minimum value of a field across all matching records.
@@ -358,7 +358,7 @@ export interface QueryBuilderContract<T> {
    * @param field - Field name
    * @returns Promise resolving to the minimum value (0 when no records match)
    */
-  min(field: string): Promise<number>;
+  min(field: string): Promise<number | null>;
 
   /**
    * Maximum value of a field across all matching records.
@@ -366,7 +366,7 @@ export interface QueryBuilderContract<T> {
    * @param field - Field name
    * @returns Promise resolving to the maximum value (0 when no records match)
    */
-  max(field: string): Promise<number>;
+  max(field: string): Promise<number | null>;
 
   /**
    * Group matching records by one or more fields and compute aggregates.

@@ -1,6 +1,7 @@
 import { colors } from "@mongez/copper";
 import path from "node:path";
 import type { CommandActionData } from "../../../../commands/types";
+import { migrationTimestamp } from "../../../../generations/features/shared/migration-timestamp";
 import { migrationStub, modelStub } from "../templates/stubs";
 import { parseModulePath, singularName } from "../utils/name-parser";
 import { componentExists, moduleExists, resolveModulePath } from "../utils/path-resolver";
@@ -61,11 +62,11 @@ export async function generateModel(data: CommandActionData): Promise<void> {
   await putFileAsync(path.join(modelDir, "index.ts"), indexContent);
 
   // Generate migration
-  const timestamp = new Date().toISOString().replace(/[-:T]/g, "_").split(".")[0];
+  const timestamp = migrationTimestamp();
   const migrationPath = path.join(
     modelDir,
     "migrations",
-    `${timestamp}_${name.kebab}.migration.ts`,
+    `${timestamp}-${name.kebab}.migration.ts`,
   );
 
   const migrationContent = migrationStub(name, {
@@ -78,7 +79,7 @@ export async function generateModel(data: CommandActionData): Promise<void> {
   console.log(colors.gray(`\nNext steps:`));
   console.log(colors.gray(`  1. Update model schema in ${name.kebab}.model.ts`));
   console.log(
-    colors.gray(`  2. Update migration in migrations/${timestamp}_${name.kebab}.migration.ts`),
+    colors.gray(`  2. Update migration in migrations/${timestamp}-${name.kebab}.migration.ts`),
   );
   console.log(colors.gray(`  3. Run migration: warlock migrate`));
 }

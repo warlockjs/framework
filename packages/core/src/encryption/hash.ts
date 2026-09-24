@@ -2,6 +2,8 @@ import crypto from "crypto";
 import { config } from "../config";
 import { type EncryptionConfigurations } from "./types";
 
+const MIN_HMAC_KEY_BYTES = 16;
+
 /**
  * Creates a deterministic HMAC-SHA256 hash of the given string.
  *
@@ -27,6 +29,12 @@ export function hmacHash(plainText: string): string {
   if (!hmacKey) {
     throw new Error(
       "Missing HMAC key. Set 'encryption.hmacKey' (or 'encryption.key') in your config.",
+    );
+  }
+
+  if (!/^(?:[0-9a-fA-F]{2})+$/.test(hmacKey) || hmacKey.length / 2 < MIN_HMAC_KEY_BYTES) {
+    throw new Error(
+      "Invalid HMAC key. 'encryption.hmacKey' (or 'encryption.key') must be an even-length hex string of at least 16 bytes. Generate one with: openssl rand -hex 32",
     );
   }
 

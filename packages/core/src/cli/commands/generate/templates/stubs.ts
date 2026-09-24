@@ -543,7 +543,7 @@ ${withResource ? `  public static resource = ${name.singular.pascal}Resource;` :
  * Repository template stub
  */
 export function repositoryStub(name: Name): string {
-  return `import type { FilterByOptions, RepositoryOptions } from "@warlock.js/core";
+  return `import type { FilterRules, RepositoryOptions, TypedRepositoryOptions } from "@warlock.js/core";
 import { RepositoryManager } from "@warlock.js/core";
 import { ${name.singular.pascal} } from "../models/${name.singular.kebab}";
 
@@ -551,16 +551,16 @@ type ${name.singular.pascal}ListFilter = {
   // Repository list filters
 };
 
-export type ${name.singular.pascal}ListOptions = RepositoryOptions & ${name.singular.pascal}ListFilter;
+export type ${name.singular.pascal}ListOptions = TypedRepositoryOptions<${name.singular.pascal}ListFilter>;
 
 export class ${name.plural.pascal}Repository extends RepositoryManager<${name.singular.pascal}, ${name.singular.pascal}ListFilter> {
   public source = ${name.singular.pascal};
 
-  protected defaultOptions: RepositoryOptions = this.withDefaultOptions({});
+  protected defaultOptions: Partial<RepositoryOptions> = {};
 
-  protected filterBy: FilterByOptions = this.withDefaultFilters({
+  protected filterBy: FilterRules = {
     name: "like",
-  });
+  };
 }
 
 export const ${name.plural.camel}Repository = new ${name.plural.pascal}Repository();
@@ -571,10 +571,10 @@ export const ${name.plural.camel}Repository = new ${name.plural.pascal}Repositor
  * Resource template stub
  */
 export function resourceStub(name: Name): string {
-  return `import { Resource } from "@warlock.js/core";
+  return `import { Resource, type ResourceSchema } from "@warlock.js/core";
 
 export class ${name.singular.pascal}Resource extends Resource {
-  public schema = {
+  public static schema: ResourceSchema = {
     id: "int",
     name: "string",
     // TODO: Define resource schema

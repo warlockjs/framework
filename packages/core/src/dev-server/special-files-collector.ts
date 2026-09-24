@@ -1,4 +1,11 @@
 import { FileManager } from "./file-manager";
+import {
+  isConfigFile,
+  isEventFile,
+  isLocaleFile,
+  isMainFile,
+  isRouteFile,
+} from "./special-file-patterns";
 
 export type SpecialFileType = "config" | "main" | "route" | "event" | "locale";
 
@@ -84,11 +91,3 @@ export class SpecialFilesCollector {
   }
 }
 
-const isConfigFile = (path: string) => /^src\/config\/.*\.(ts|tsx)$/.test(path);
-const isMainFile = (path: string) =>
-  /^src\/app\/[^/]+\/main\.(ts|tsx)$/.test(path) ||
-  path === "src/app/main.ts" ||
-  path === "src/app/main.tsx";
-const isRouteFile = (path: string) => /^src\/app\/[^/]+\/routes\.(ts|tsx)$/.test(path);
-const isEventFile = (path: string) => /^src\/app\/[^/]+\/events\/[^/]+\.(ts|tsx)$/.test(path);
-const isLocaleFile = (path: string) => /^src\/app\/[^/]+\/utils\/locales\.(ts|tsx)$/.test(path);

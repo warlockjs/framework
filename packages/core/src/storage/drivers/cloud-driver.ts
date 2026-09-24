@@ -886,6 +886,11 @@ export abstract class CloudDriver<
       // Apply storage prefix
       directory = this.applyPrefix(directory);
 
+      // A directory prefix must end in "/" so "images" doesn't match "images-old/…"
+      if (directory && directory !== "/" && !directory.endsWith("/")) {
+        directory = `${directory}/`;
+      }
+
       const command = new ListObjectsV2Command({
         Bucket: this.options.bucket,
         Prefix: directory,

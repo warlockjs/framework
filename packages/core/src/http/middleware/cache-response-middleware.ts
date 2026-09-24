@@ -92,17 +92,23 @@ async function parseCacheOptions(cacheOptions: CacheMiddlewareOptions | string, 
     };
   }
 
-  if (typeof cacheOptions.cacheKey === "function") {
-    cacheOptions.cacheKey = await cacheOptions.cacheKey(request);
-  }
+  // Everything below resolves into a fresh per-request object; the options
+  // the factory closed over are shared across all requests and users, so they
+  // must never be written to.
+  const resolvedCacheKey =
+    typeof cacheOptions.cacheKey === "function"
+      ? await cacheOptions.cacheKey(request)
+      : cacheOptions.cacheKey;
 
   const tags = resolveCacheTags(cacheOptions.tags, request);
 
   const finalCacheOptions = {
     ...defaultCacheOptions,
     ...cacheOptions,
-    tags,
-  } as ParsedCacheOptions;
+    cacheKey: resolvedCacheKey,
+    tags: [...tags],
+    omit: cacheOptions.omit ? [...cacheOptions.omit] : undefined,
+  } as unknown as ParsedCacheOptions;
 
   if (finalCacheOptions.withLocale) {
     const locale = request.getLocaleCode();

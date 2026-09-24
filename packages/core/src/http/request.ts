@@ -22,7 +22,13 @@ import { CookieJarUnavailableError, RequestUserMovedError } from "./errors";
 import { createRequestStore } from "./middleware/inject-request-context";
 import { Response } from "./response";
 import { buildTracingContext, deriveTraceId, dispatchPhase, isTracingEnabled } from "./tracing";
-import type { DecodedAccessToken, RequestEvent, RequestLocals } from "./types";
+import type {
+  DecodedAccessToken,
+  HttpConfigurations,
+  PartialMiddleware,
+  RequestEvent,
+  RequestLocals,
+} from "./types";
 import { UploadedFile } from "./uploaded-file";
 
 type StandardHeaders = {
@@ -573,6 +579,17 @@ export class Request<RequestValidation = any> {
   }
 
   /**
+   * True when any path segment of a bracket/dot key could reach a prototype
+   * (`__proto__`, `constructor`, `prototype`). Such keys are dropped before
+   * any branch of {@link parseBody} writes them.
+   */
+  protected hasUnsafeSegment(key: string): boolean {
+    return key
+      .split(/[[\].]+/)
+      .some(segment => segment === "__proto__" || segment === "constructor" || segment === "prototype");
+  }
+
+  /**
    * Apply the `key[]` array marker to a parsed value.
    *
    * The subtlety this exists to remove: a key declared `[]` should ALWAYS be an
@@ -620,6 +637,10 @@ export class Request<RequestValidation = any> {
         }
 
         key = rtrim(key, "[]");
+
+        // every path segment this key can write must be safe, whichever
+        // branch below ends up writing it (set(), bucket, entry or body)
+        if (this.hasUnsafeSegment(key)) continue;
 
         // check if the key is has a square brackets, then convert it into object
         // i.e user[email] => user: {email: "value"}
@@ -1021,14 +1042,33 @@ export class Request<RequestValidation = any> {
    * @internal Framework orchestration — do not call from app code.
    */
   protected collectMiddlewares(): Middleware[] {
-    const middlewaresList: Middleware[] = [];
+    const route = this.route;
+    const configured = config.key("http.middleware") as HttpConfigurations["middleware"];
 
-    // collect route middlewares
-    if (this.route.middleware) {
-      middlewaresList.push(...this.route.middleware);
+    const matchesRoute = (target?: PartialMiddleware) =>
+      Boolean(
+        target &&
+          ((route.path && target.routes?.includes(route.path)) ||
+            (route.name && target.namedRoutes?.includes(route.name))),
+      );
+
+    // app-wide middlewares first, then the `only` ones matching this route
+    const global: Middleware[] = [...(configured?.all || [])];
+
+    if (matchesRoute(configured?.only)) {
+      global.push(...(configured?.only?.middleware || []));
     }
 
-    return middlewaresList;
+    // `except` removes app-wide middlewares from the matching routes
+    const excluded = matchesRoute(configured?.except) ? configured?.except?.middleware || [] : [];
+
+    // global first, then route middlewares, deduplicated by reference
+    return [
+      ...new Set([
+        ...global.filter(middleware => !excluded.includes(middleware)),
+        ...(route.middleware || []),
+      ]),
+    ];
   }
 
   /**

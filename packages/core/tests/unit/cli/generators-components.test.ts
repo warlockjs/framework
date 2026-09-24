@@ -74,7 +74,7 @@ describe("generateModel — output", () => {
     expect(model).toContain('public static table = "users"');
     expect(index).toContain('export * from "./user.model"');
     expect(migrations).toHaveLength(1);
-    expect(migrations[0]).toMatch(/_user\.migration\.ts$/);
+    expect(migrations[0]).toMatch(/-user\.migration\.ts$/);
   });
 
   it("singularizes a plural entity name for the class and model folder", async () => {
@@ -148,7 +148,7 @@ describe("generateResource — output", () => {
       "utf-8",
     );
 
-    expect(resource).toContain('import { Resource } from "@warlock.js/core"');
+    expect(resource).toContain('import { Resource, type ResourceSchema } from "@warlock.js/core"');
     expect(resource).toContain("export class UserResource extends Resource");
   });
 });

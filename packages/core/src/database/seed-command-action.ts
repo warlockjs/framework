@@ -30,10 +30,17 @@ export type SeedCommandOverrides = {
   clock?: SeedClock;
 };
 
-async function clearAllTables(datasource: DataSource) {
+/**
+ * Truncate every table except cascade's migrations tracking table — wiping it
+ * would make the next `warlock migrate` re-run every migration.
+ */
+export async function clearAllTables(datasource: DataSource) {
+  const migrationsTable = datasource.migrations?.table ?? "_migrations";
   const tables = await datasource.driver.blueprint.listTables();
 
   for (const table of tables) {
+    if (table === migrationsTable) continue;
+
     await datasource.driver.truncateTable(table, { cascade: true });
   }
 }
@@ -138,10 +145,6 @@ export async function seedCommandAction(
     return;
   }
 
-  if (fresh) {
-    await clearAllTables(datasource);
-  }
-
   if (list) {
     const seedFiles = await listSeedsFiles();
 
@@ -168,6 +171,10 @@ export async function seedCommandAction(
       `Total Seeds: ${colors.blueBright(seeds.length)}, enabled: ${colors.greenBright(seeds.filter((seed) => seed.enabled !== false).length)}, disabled: ${colors.redBright(seeds.filter((seed) => seed.enabled === false).length)}`,
     );
     return;
+  }
+
+  if (fresh) {
+    await clearAllTables(datasource);
   }
 
   const seeds = path

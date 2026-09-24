@@ -24,6 +24,11 @@ export async function registerHttpPlugins(server: FastifyInstance) {
     limits: {
       // file size could be up to 10MB
       fileSize: config.get("http.fileUploadLimit", 10 * 1024 * 1024),
+      // every file part is buffered in memory (`attachFieldsToBody`), so cap the counts too;
+      // hitting any limit makes @fastify/multipart throw an error with statusCode 413
+      files: config.get("http.multipart.files", 10),
+      fields: config.get("http.multipart.fields", 100),
+      fieldSize: config.get("http.multipart.fieldSize", 1024 * 1024),
     },
   });
 

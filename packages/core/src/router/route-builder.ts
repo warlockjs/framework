@@ -228,6 +228,15 @@ export class RouteBuilder {
    * Merge options with moreOptions
    */
   protected withOptions(options: RouteOptions = {}) {
-    return merge(this.moreOptions, options);
+    const merged = merge(this.moreOptions, options);
+
+    // builder middleware runs first, then the verb/nested ones (deduplicated by reference)
+    const middleware = [...(this.moreOptions.middleware || []), ...(options.middleware || [])];
+
+    if (middleware.length > 0) {
+      merged.middleware = [...new Set(middleware)];
+    }
+
+    return merged;
   }
 }

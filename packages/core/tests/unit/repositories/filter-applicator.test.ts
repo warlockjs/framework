@@ -88,6 +88,25 @@ function apply(filters: FilterRules, data: any, options: FilterOptions = noOptio
   return query;
 }
 
+/**
+ * Expand a multi-column group — `where(group => group.where(c0).orWhere(c1)...)`
+ * — into the flat list of per-column conditions it builds.
+ */
+function expandGroup(query: RecordingQuery) {
+  const groupCallback = query.callTo("where")?.args[0] as (q: RecordingQuery) => void;
+  expect(typeof groupCallback).toBe("function");
+
+  const group = new RecordingQuery();
+  groupCallback(group);
+
+  return group.calls.map(({ method, args }) => {
+    const column = new RecordingQuery();
+    (args[0] as (q: RecordingQuery) => void)(column);
+
+    return { method, args: column.calls[0].args };
+  });
+}
+
 describe("FilterApplicator — value gating", () => {
   it("skips a filter whose value is undefined", () => {
     const query = apply({ status: "=" }, {});
@@ -118,10 +137,14 @@ describe("FilterApplicator — boolean coercion", () => {
     }
   });
 
-  it("maps a boolean over multiple columns to an orWhere object", () => {
+  it("maps a boolean over multiple columns to ONE grouped OR, never a top-level orWhere", () => {
     const query = apply({ flag: ["bool", ["a", "b"]] }, { flag: 0 });
 
-    expect(query.callTo("orWhere")?.args).toEqual([{ a: false, b: false }]);
+    expect(query.methodNames).not.toContain("orWhere");
+    expect(expandGroup(query)).toEqual([
+      { method: "where", args: ["a", false] },
+      { method: "orWhere", args: ["b", false] },
+    ]);
   });
 });
 
@@ -280,20 +303,13 @@ describe("FilterApplicator — multi-column 'like' (D1 regression)", () => {
       { search: "%coffee%" },
     );
 
-    const orWhereCall = query.callTo("orWhere");
-    expect(orWhereCall).toBeDefined();
-    expect(typeof orWhereCall!.args[0]).toBe("function");
-
-    // Regression: previously this was `orWhere({ name: value, description: value })`,
-    // i.e. exact equality across both columns instead of like semantics.
-    expect(orWhereCall!.args[0]).not.toEqual({ name: "%coffee%", description: "%coffee%" });
-
-    // Run the callback against a fresh sub-query to assert the built shape.
-    const sub = new RecordingQuery();
-    (orWhereCall!.args[0] as (q: RecordingQuery) => void)(sub);
-
-    expect(sub.callTo("where")?.args).toEqual(["name", "like", "%coffee%"]);
-    expect(sub.callTo("orWhere")?.args).toEqual(["description", "like", "%coffee%"]);
+    // Regression (D1): previously `orWhere({ name, description })`, i.e. equality.
+    // Tenant regression: the group must be ANDed (`where`), never a top-level orWhere.
+    expect(query.methodNames).not.toContain("orWhere");
+    expect(expandGroup(query)).toEqual([
+      { method: "where", args: ["name", "like", "%coffee%"] },
+      { method: "orWhere", args: ["description", "like", "%coffee%"] },
+    ]);
   });
 
   it("throws naming the rule and the operator for a genuinely unsupported multi-column operator", () => {

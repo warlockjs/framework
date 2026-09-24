@@ -4,10 +4,24 @@ import type { MailConfigurations, MailersConfig, MailMode, SMTPConfigurations } 
  * Default mail configurations
  */
 const defaultConfigurations: Partial<SMTPConfigurations> = {
-  secure: true,
   tls: true,
   driver: "smtp",
 };
+
+/**
+ * Merge defaults into an SMTP config.
+ * `secure` is derived from the port when not set explicitly:
+ * 465 uses implicit TLS, every other port (e.g. 587) uses STARTTLS.
+ */
+function withSmtpDefaults(config: MailConfigurations): SMTPConfigurations {
+  const merged = { ...defaultConfigurations, ...config } as SMTPConfigurations;
+
+  if (merged.secure === undefined) {
+    merged.secure = Number(merged.port) === 465;
+  }
+
+  return merged;
+}
 
 /**
  * Current mail mode
@@ -111,10 +125,7 @@ export function getDefaultMailConfig(): MailConfigurations {
   if (!config) return {} as MailConfigurations;
   if ("driver" in config && config.driver === "ses") return config;
 
-  return {
-    ...defaultConfigurations,
-    ...config,
-  } as SMTPConfigurations;
+  return withSmtpDefaults(config);
 }
 
 /**
@@ -132,10 +143,7 @@ export function getMailerConfig(name: string): MailConfigurations | undefined {
 
   if ("driver" in config && config.driver === "ses") return config;
 
-  return {
-    ...defaultConfigurations,
-    ...config,
-  } as SMTPConfigurations;
+  return withSmtpDefaults(config);
 }
 
 /**
@@ -152,10 +160,7 @@ export function resolveMailConfig(options: {
       return options.config;
     }
 
-    return {
-      ...defaultConfigurations,
-      ...options.config,
-    } as SMTPConfigurations;
+    return withSmtpDefaults(options.config);
   }
 
   if (options.mailer) {

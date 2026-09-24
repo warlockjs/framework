@@ -238,6 +238,12 @@ export type PaginationMode = "pages" | "cursor";
  */
 export type RepositoryOptions = {
   /**
+   * Explicit cache key for `listCached()`. Required to cache a call whose
+   * options contain callback filters, which cannot be keyed safely.
+   */
+  cacheKey?: string;
+
+  /**
    * Pagination mode - "pages" for traditional pagination, "cursor" for cursor-based
    * @default "pages"
    */

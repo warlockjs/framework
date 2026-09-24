@@ -13,6 +13,8 @@ import path from "path";
 import { assertNoReservedConnectorNames } from "../connectors/assert-no-reserved-connector-names";
 import { assertUniqueConnectorNames } from "../connectors/assert-unique-connector-names";
 import type { Connector, ConnectorBuildContext, ConnectorEsbuildPatch } from "../connectors/types";
+import { configKeyFromPath } from "../config/config-key-from-path";
+import { isEventFile, isLocaleFile, isMainFile, isRouteFile } from "../dev-server/special-file-patterns";
 import { tsconfigManager } from "../dev-server/tsconfig-manager";
 import { appPath, rootPath, warlockPath } from "../utils";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
@@ -33,7 +35,7 @@ import {
 } from "./promote-dist";
 import { resolveBuildConfig, type ResolvedBuildConfig } from "./resolve-build-config";
 import { tsconfigPathAliases } from "./tsconfig-path-aliases";
-import { toCamelCase, toKebabCase } from "@mongez/reinforcements";
+import { toKebabCase } from "@mongez/reinforcements";
 
 /**
  * Recreates `require`, `__filename` and `__dirname` at the top of an ESM bundle.
@@ -374,7 +376,12 @@ export class ProductionBuilder {
    * Generate bootstrap.ts - ensures bootstrap() runs first and sets production environment
    */
   private async generateBootstrap(): Promise<void> {
-    let content = `import { bootstrap, Application } from "@warlock.js/core";
+    // ESM hoists imports, so the app bootstrap must be the first import to run first
+    const appBootstrapImport = (await fileExistsAsync(appPath("bootstrap.ts")))
+      ? "import './../../src/app/bootstrap';\n"
+      : "";
+
+    const content = `${appBootstrapImport}import { bootstrap, Application } from "@warlock.js/core";
 
 // Set production environment
 Application.setRuntimeStrategy("production");
@@ -383,9 +390,6 @@ Application.setEnvironment("production");
 // Bootstrap the application
 bootstrap();
 `;
-    if (await fileExistsAsync(appPath("bootstrap.ts"))) {
-      content += "import './../../src/app/bootstrap';\n";
-    }
 
     await putFileAsync(path.join(this.productionDir, "bootstrap.ts"), content);
   }
@@ -422,37 +426,21 @@ bootstrap();
   }
 
   /**
-   * Glob for module files matching a pattern
+   * Glob `src/app` and keep the files the shared dev-server predicate accepts,
+   * so production discovers exactly what the dev collector does.
    * Returns relative paths from .warlock/production/ to src/app/
    */
-  private async globModule(fileName: string): Promise<string[]> {
-    const pattern = `**/${fileName}.{ts,tsx}`;
-    const appDirectory = appPath();
-
-    const files = await glob(pattern, {
-      cwd: appDirectory,
+  private async globModule(matches: (relativePath: string) => boolean): Promise<string[]> {
+    const files = await glob("**/*.{ts,tsx}", {
+      cwd: appPath(),
       absolute: false,
     });
 
-    // Convert to relative paths from .warlock/production/ to src/app/
-    // e.g., "users/main" -> "../../src/app/users/main"
-    return files.map((file) => "../../src/app/" + file.replace(/\.(ts|tsx)$/, ""));
-  }
-
-  /**
-   * Glob for files in a specific directory pattern
-   * Returns relative paths from .warlock/production/ to src/app/
-   */
-  private async globModuleDirectory(directory: string): Promise<string[]> {
-    const pattern = `**/${directory}/*.{ts,tsx}`;
-    const appDirectory = appPath();
-
-    const files = await glob(pattern, {
-      cwd: appDirectory,
-      absolute: false,
-    });
-
-    return files.map((file) => "../../src/app/" + file.replace(/\.(ts|tsx)$/, ""));
+    // e.g., "users/main.ts" -> "../../src/app/users/main"
+    return files
+      .filter((file) => matches("src/app/" + file))
+      .sort()
+      .map((file) => "../../src/app/" + file.replace(/\.(ts|tsx)$/, ""));
   }
 
   /**
@@ -461,12 +449,19 @@ bootstrap();
   private async generateConfigLoader(): Promise<void> {
     const configDirectory = path.join(process.cwd(), "src/config");
 
-    const files = await glob("*.{ts,tsx}", {
+    const files = await glob("**/*.{ts,tsx}", {
       cwd: configDirectory,
       absolute: false,
     });
 
-    const configNames = files.map((f) => f.replace(/\.(ts|tsx)$/, ""));
+    // Same key rule as the dev config loader: the raw path, never camel-cased
+    const configNames = files
+      .map((f) => ({
+        path: f.replace(/\.(ts|tsx)$/, ""),
+        key: configKeyFromPath("src/config/" + f),
+      }))
+      .filter((entry): entry is { path: string; key: string } => entry.key !== undefined)
+      .sort((a, b) => a.path.localeCompare(b.path));
 
     // Only `@warlock.js/core` — the one package the app itself declares. See
     // `assertGeneratedImportsAreDeclared`: `@mongez/config` is core's own
@@ -479,15 +474,21 @@ bootstrap();
     const configSetCalls: string[] = [];
     const executors: string[] = [];
 
-    for (const configName of configNames) {
-      const properConfigName = toCamelCase(configName);
-      const varName = `${properConfigName}Config`;
-      configImports.push(`import ${varName} from "../../src/config/${configName}";`);
-      configSetCalls.push(`setConfig("${properConfigName}", ${varName});`);
-      executors.push(`await configSpecialHandlers.execute("${properConfigName}", ${varName});`);
-    }
+    configNames.forEach(({ path: configPath, key }, index) => {
+      // Index-based identifier: keys like "rate-limit" or "mail/smtp" are not valid names
+      const varName = `config${index}`;
+      configImports.push(`import ${varName} from "../../src/config/${configPath}";`);
+      configSetCalls.push(`setConfig(${JSON.stringify(key)}, ${varName});`);
+      executors.push(`await configSpecialHandlers.execute(${JSON.stringify(key)}, ${varName});`);
+    });
 
-    let content = [
+    // ESM hoists imports, so prestart must be the first import to run first
+    const prestartImports = (await fileExistsAsync(appPath("prestart.ts")))
+      ? ["import './../../src/app/prestart';"]
+      : [];
+
+    const content = [
+      ...prestartImports,
       ...imports,
       "",
       "// Config imports",
@@ -501,10 +502,6 @@ bootstrap();
       "",
     ].join("\n");
 
-    if (await fileExistsAsync(appPath("prestart.ts"))) {
-      content += "import './../../src/app/prestart';\n";
-    }
-
     await putFileAsync(path.join(this.productionDir, "config-loader.ts"), content);
   }
 
@@ -513,7 +510,7 @@ bootstrap();
    * @returns true if file was generated with content
    */
   private async generateLocales(): Promise<boolean> {
-    const files = await this.globModule("utils/locales");
+    const files = await this.globModule(isLocaleFile);
     if (files.length === 0) return false;
     await this.generateImportsFile(files, "locales.ts");
     return true;
@@ -524,7 +521,7 @@ bootstrap();
    * @returns true if file was generated with content
    */
   private async generateEvents(): Promise<boolean> {
-    const files = await this.globModuleDirectory("events");
+    const files = await this.globModule(isEventFile);
     if (files.length === 0) return false;
     await this.generateImportsFile(files, "events.ts");
     return true;
@@ -535,7 +532,7 @@ bootstrap();
    * @returns true if file was generated with content
    */
   private async generateMain(): Promise<boolean> {
-    const files = await this.globModule("main");
+    const files = await this.globModule(isMainFile);
     if (files.length === 0) return false;
     await this.generateImportsFile(files, "main.ts");
     return true;
@@ -546,7 +543,7 @@ bootstrap();
    * @returns true if file was generated with content
    */
   private async generateRoutes(): Promise<boolean> {
-    const files = await this.globModule("routes");
+    const files = await this.globModule(isRouteFile);
     if (files.length === 0) return false;
     await this.generateImportsFile(files, "routes.ts");
     return true;

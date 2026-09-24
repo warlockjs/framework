@@ -1,4 +1,3 @@
-import { fileExistsAsync } from "@warlock.js/fs";
 import { createReadStream } from "fs";
 import fs from "fs/promises";
 import path from "path";
@@ -107,7 +106,8 @@ export class ScopedStorage implements ScopedStorageContract {
    * Accepts multiple input types and stores the file at the specified location.
    * Returns a `StorageFile` instance for further operations.
    *
-   * @param file - File content as Buffer, string path, UploadedFile, or Readable stream
+   * @param file - File content as Buffer, string content, UploadedFile, or Readable stream.
+   *   A string is ALWAYS stored as content; use `putFromPath()` to upload a local file
    * @param location - Destination path in storage (e.g., "uploads/images/photo.jpg")
    * @param options - Optional storage options
    * @returns StorageFile instance with cached metadata
@@ -135,6 +135,24 @@ export class ScopedStorage implements ScopedStorageContract {
     const buffer = await this.toBuffer(file);
     const data = await this.activeDriver.put(buffer, location, options);
     return StorageFile.fromData(data, this.activeDriver);
+  }
+
+  /**
+   * Store a file read from a local filesystem path.
+   *
+   * Explicit counterpart to `put()`, where a string is always content.
+   * Only pass trusted paths, never user input.
+   *
+   * @param localPath - Path of the local file to upload
+   * @param location - Destination path in storage
+   * @param options - Optional storage options
+   */
+  public async putFromPath(
+    localPath: string,
+    location: string,
+    options?: PutOptions,
+  ): Promise<StorageFile> {
+    return this.put(await fs.readFile(localPath), location, options);
   }
 
   /**
@@ -829,12 +847,8 @@ export class ScopedStorage implements ScopedStorageContract {
       return this.streamToBuffer(file as Readable);
     }
 
-    // String content
+    // A string is always content, never a path (see putFromPath for files)
     if (typeof file === "string") {
-      if (await fileExistsAsync(file)) {
-        return fs.readFile(file);
-      }
-
       return Buffer.from(file);
     }
 

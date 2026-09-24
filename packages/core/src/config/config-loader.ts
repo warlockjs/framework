@@ -2,6 +2,7 @@ import config from "@mongez/config";
 import { colors } from "@mongez/copper";
 import { pathToFileURL } from "node:url";
 import type { FileManager } from "../dev-server/file-manager";
+import { configKeyFromPath } from "./config-key-from-path";
 import { configSpecialHandlers } from "./config-special-handlers";
 
 /**
@@ -60,13 +61,7 @@ export class ConfigLoader {
   }
 
   private getConfigName(relativePath: string): string {
-    const match = relativePath.match(/^src\/config\/(.+)\.(ts|tsx)$/);
-
-    if (!match) {
-      throw new Error(`Invalid config file path: ${relativePath}`);
-    }
-
-    const configName = match[1];
+    const configName = configKeyFromPath(relativePath);
 
     if (!configName) {
       throw new Error(`Invalid config file path: ${relativePath}`);

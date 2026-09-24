@@ -82,7 +82,7 @@ export async function storagePutAction({ args, options }: CommandActionData): Pr
 
     console.log(`  Uploading : ${path.basename(absolutePath)} → ${storagePath}`);
 
-    const file = await store.put(absolutePath, storagePath);
+    const file = await store.putFromPath(absolutePath, storagePath);
 
     console.log(`\n  ✔  Uploaded: ${file.url}`);
   }

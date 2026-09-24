@@ -65,6 +65,53 @@ function createResponse() {
   return { response, simulateSend };
 }
 
+describe("cacheMiddleware — per-request key isolation", () => {
+  beforeEach(async () => {
+    cache.setCacheConfigurations({
+      default: "memory",
+      logging: false,
+      drivers: { memory: MemoryCacheDriver },
+      options: { memory: {} },
+    });
+
+    await cache.init();
+  });
+
+  afterEach(async () => {
+    await cache.disconnect();
+  });
+
+  it("gives different users different keys/responses and never mutates the options", async () => {
+    const options = {
+      cacheKey: (request: Request) => `profile:${(request as unknown as { userId: string }).userId}`,
+      withLocale: false,
+      ttl: 60,
+      tags: (request: Request) => [`u:${(request as unknown as { userId: string }).userId}`],
+    };
+    const snapshot = { ...options };
+    const middleware = cacheMiddleware(options);
+
+    const alice = { ...createRequest("/me"), userId: "alice" } as unknown as Request;
+    const bob = { ...createRequest("/me"), userId: "bob" } as unknown as Request;
+
+    const first = createResponse();
+    await middleware({ request: alice, response: first.response } as never);
+    await first.simulateSend({ request: alice, statusCode: 200, parsedBody: { name: "alice" } });
+
+    const second = createResponse();
+    await middleware({ request: bob, response: second.response } as never);
+
+    expect(second.response.replay).not.toHaveBeenCalled();
+
+    await second.simulateSend({ request: bob, statusCode: 200, parsedBody: { name: "bob" } });
+
+    await expect(cache.get("profile:alice")).resolves.toMatchObject({ data: { name: "alice" } });
+    await expect(cache.get("profile:bob")).resolves.toMatchObject({ data: { name: "bob" } });
+    expect(options).toEqual(snapshot);
+    expect(typeof options.cacheKey).toBe("function");
+  });
+});
+
 describe("cacheMiddleware — tags", () => {
   beforeEach(async () => {
     cache.setCacheConfigurations({

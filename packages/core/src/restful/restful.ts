@@ -5,6 +5,8 @@ import type { Request, Response } from "../http";
 import type { QueryBuilderContract, RepositoryManager } from "../repositories";
 import type { HttpContext, RestfulMiddleware, RouteResource } from "../router";
 
+const warnedUnvalidated = new WeakSet<object>();
+
 export abstract class Restful<T extends Model> implements RouteResource {
   /**
    * Middleware for each method
@@ -56,7 +58,9 @@ export abstract class Restful<T extends Model> implements RouteResource {
    */
   public async list({ request, response }: HttpContext) {
     try {
-      if (await this.callMiddleware("list", request, response)) return;
+      const middlewareOutput = await this.callMiddleware("list", request, response);
+
+      if (middlewareOutput) return middlewareOutput;
 
       const responseDocument: GenericObject = {};
 
@@ -88,7 +92,9 @@ export abstract class Restful<T extends Model> implements RouteResource {
    */
   public async get({ request, response }: HttpContext) {
     try {
-      if (await this.callMiddleware("get", request, response)) return;
+      const middlewareOutput = await this.callMiddleware("get", request, response);
+
+      if (middlewareOutput) return middlewareOutput;
 
       const record = await this.find(request.input("id"));
 
@@ -101,6 +107,8 @@ export abstract class Restful<T extends Model> implements RouteResource {
       });
     } catch (error) {
       log.error("restful", "get", error);
+
+      throw error;
     }
   }
 
@@ -109,6 +117,10 @@ export abstract class Restful<T extends Model> implements RouteResource {
    */
   public async create({ request, response }: HttpContext) {
     try {
+      const middlewareOutput = await this.callMiddleware("create", request, response);
+
+      if (middlewareOutput) return middlewareOutput;
+
       const model = this.repository.newModel();
       const beforeCreate = await this.beforeCreate(request, response, model);
 
@@ -122,7 +134,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
         return beforeSave;
       }
 
-      const record = await this.repository.create(request.all());
+      const record = await this.repository.create(this.payload("create", request));
 
       const createOutput = await this.onCreate(request, response, record);
 
@@ -157,6 +169,10 @@ export abstract class Restful<T extends Model> implements RouteResource {
    */
   public async update({ request, response }: HttpContext) {
     try {
+      const middlewareOutput = await this.callMiddleware("update", request, response);
+
+      if (middlewareOutput) return middlewareOutput;
+
       // Find record
       const record = await this.find(request.input("id"));
 
@@ -179,10 +195,10 @@ export abstract class Restful<T extends Model> implements RouteResource {
 
       const oldRecord = record.clone();
 
-      await record.save(request.allExceptParams());
+      await record.save(this.payload("update", request));
 
-      this.onUpdate(request, response, record, oldRecord);
-      this.onSave(request, response, record, oldRecord);
+      await this.onUpdate(request, response, record, oldRecord);
+      await this.onSave(request, response, record, oldRecord);
 
       if (this.returnOn.update === "records") {
         return this.list({ request, response });
@@ -193,6 +209,8 @@ export abstract class Restful<T extends Model> implements RouteResource {
       });
     } catch (error) {
       log.error("restful", "update", error);
+
+      throw error;
     }
   }
 
@@ -201,6 +219,10 @@ export abstract class Restful<T extends Model> implements RouteResource {
    */
   public async patch({ request, response }: HttpContext) {
     try {
+      const middlewareOutput = await this.callMiddleware("patch", request, response);
+
+      if (middlewareOutput) return middlewareOutput;
+
       const record = await this.find(request.input("id"));
 
       if (!record) {
@@ -211,13 +233,22 @@ export abstract class Restful<T extends Model> implements RouteResource {
 
       const oldRecord = record.clone();
 
-      await this.beforePatch(request, response, record, oldRecord);
-      await this.beforeSave(request, response, record, oldRecord);
+      const beforePatch = await this.beforePatch(request, response, record, oldRecord);
 
-      await record.save(request.heavyExceptParams());
+      if (beforePatch) {
+        return beforePatch;
+      }
 
-      this.onPatch(request, response, record, oldRecord);
-      this.onSave(request, response, record, oldRecord);
+      const beforeSave = await this.beforeSave(request, response, record, oldRecord);
+
+      if (beforeSave) {
+        return beforeSave;
+      }
+
+      await record.save(this.payload("patch", request));
+
+      await this.onPatch(request, response, record, oldRecord);
+      await this.onSave(request, response, record, oldRecord);
 
       if (this.returnOn.patch === "records") {
         return this.list({ request, response });
@@ -228,6 +259,8 @@ export abstract class Restful<T extends Model> implements RouteResource {
       });
     } catch (error) {
       log.error("restful", "patch", error);
+
+      throw error;
     }
   }
 
@@ -242,7 +275,9 @@ export abstract class Restful<T extends Model> implements RouteResource {
         return response.notFound();
       }
 
-      if (await this.callMiddleware("delete", request, response, record)) return;
+      const middlewareOutput = await this.callMiddleware("delete", request, response, record);
+
+      if (middlewareOutput) return middlewareOutput;
 
       await this.beforeDelete(request, response, record);
 
@@ -410,6 +445,33 @@ export abstract class Restful<T extends Model> implements RouteResource {
     _oldRecord?: T,
   ): Promise<any> {
     //
+  }
+
+  /**
+   * Data to persist: only the validated input.
+   * Without a validation schema the raw input is kept (legacy behaviour)
+   * and a one-time warning names the resource.
+   */
+  protected payload(action: "create" | "update" | "patch", request: Request): GenericObject {
+    const validation = (this as any).validation;
+
+    if (validation?.all || validation?.[action]) {
+      return request.validated();
+    }
+
+    if (!warnedUnvalidated.has(this.constructor)) {
+      warnedUnvalidated.add(this.constructor);
+
+      log.warn(
+        "restful",
+        "validation",
+        this.constructor.name + " has no validation schema: " + action + " persists unvalidated request input. Define a validation schema to persist only validated fields.",
+      );
+    }
+
+    if (action === "create") return request.all();
+
+    return action === "update" ? request.allExceptParams() : request.heavyExceptParams();
   }
 
   /**

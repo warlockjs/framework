@@ -3,6 +3,8 @@ import {
   type CacheData,
   type CacheDriver,
   type CacheKey,
+  type CacheSetOptions,
+  type CacheTtl,
 } from "@warlock.js/cache";
 import { Model } from "@warlock.js/cascade";
 
@@ -72,14 +74,11 @@ export class DatabaseCacheDriver
   /**
    * {@inheritdoc}
    */
-  public async set(key: CacheKey, value: any, ttl?: number) {
+  public async set(key: CacheKey, value: any, ttlOrOptions?: CacheTtl | CacheSetOptions) {
     const parsedKey = this.parseKey(key);
+    const { ttl, tags } = this.resolveSetOptions(ttlOrOptions);
 
     this.log("caching", parsedKey);
-
-    if (ttl === undefined) {
-      ttl = this.ttl;
-    }
 
     // Extract namespace: all parts except the last (e.g., "users.id.1" -> "users.id")
     const keyParts = parsedKey.split(".");
@@ -104,6 +103,10 @@ export class DatabaseCacheDriver
         ttl,
         expiresAt: this.getExpiresAt(ttl) || null,
       });
+    }
+
+    if (tags && tags.length > 0) {
+      await this.applyTags(key, tags);
     }
 
     this.log("cached", parsedKey);

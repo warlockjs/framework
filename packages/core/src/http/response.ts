@@ -25,6 +25,7 @@ import type { Route } from "../router";
 import { StorageFile } from "../storage";
 import { renderReact } from "./../react";
 import type { Request } from "./request";
+import { flushPendingCookies } from "./flush-pending-cookies";
 import { streamReactResponse, type PipeableReactStream } from "./stream-react-response";
 import type { ResponseEvent, ResponseSSEController, ResponseStreamController } from "./types";
 import type { XMLable } from "./xmlable";
@@ -637,6 +638,7 @@ export class Response {
     // Write headers to start the stream
     // Note: We use raw here because we need chunked encoding control
     // This is the only valid use case for bypassing Fastify's abstraction
+    this.flushPendingCookies();
     this.baseResponse.raw.writeHead(this.statusCode, this.getHeaders() as any);
 
     return {
@@ -739,6 +741,8 @@ export class Response {
       callback(this);
     }
 
+    this.flushPendingCookies();
+
     return streamReactResponse({
       raw: this.baseResponse.raw,
       statusCode: this.statusCode,
@@ -801,6 +805,7 @@ export class Response {
     const disconnectHandlers: Array<() => void> = [];
 
     // Write headers to start the stream
+    this.flushPendingCookies();
     this.baseResponse.raw.writeHead(this.statusCode, this.getHeaders() as any);
 
     // Detect client disconnect â€” set isEnded silently and invoke cleanup handlers.
@@ -964,6 +969,17 @@ export class Response {
   /**
    * Get the response headers
    */
+  /**
+   * Serialise cookies parked by `response.cookie()` into the `set-cookie`
+   * header. Must run right before any raw `writeHead`, which bypasses
+   * `@fastify/cookie`'s `onSend` flush.
+   */
+  public flushPendingCookies() {
+    flushPendingCookies(this.baseResponse);
+
+    return this;
+  }
+
   public getHeaders() {
     return this.baseResponse.getHeaders();
   }

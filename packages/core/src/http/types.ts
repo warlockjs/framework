@@ -204,6 +204,30 @@ export interface HttpConfigurations {
    */
   fileUploadLimit?: number;
   /**
+   * Multipart limits, hitting any of them answers 413.
+   * Every uploaded file is buffered in memory, keep these small.
+   */
+  multipart?: {
+    /**
+     * Max number of files per request
+     *
+     * @default 10
+     */
+    files?: number;
+    /**
+     * Max number of non-file fields per request
+     *
+     * @default 100
+     */
+    fields?: number;
+    /**
+     * Max size in bytes of a single non-file field value
+     *
+     * @default 1MB
+     */
+    fieldSize?: number;
+  };
+  /**
    * Global Fastify body size limit in bytes.
    *
    * Applies to every request body (JSON, form-urlencoded, raw). For per-route

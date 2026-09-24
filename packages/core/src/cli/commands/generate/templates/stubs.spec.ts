@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { pluralName } from "../utils/name-parser";
-import { crudRepositoryStub, crudSeedStub } from "./stubs";
+import { crudRepositoryStub, crudSeedStub, repositoryStub, resourceStub } from "./stubs";
 
 /**
  * Every `@warlock.js/core` type a generated file NAMES must also be IMPORTED,
@@ -72,5 +72,34 @@ describe("crudSeedStub — a fresh seed stub is inert (c1fece2e)", () => {
     const code = source.replace(/\/\/.*$/gm, "");
     expect(code).toMatch(/enabled:\s*false/);
     expect(code).not.toMatch(/enabled:\s*true/);
+  });
+});
+
+/**
+ * C4 B2/B3: generate.resource emitted an instance `schema` (serialized to `{}`),
+ * generate.repository imported a non-existent `FilterByOptions` and called
+ * non-existent `withDefaultOptions()` / `withDefaultFilters()`.
+ */
+describe("repositoryStub / resourceStub use real exports", () => {
+  const repo = repositoryStub(pluralName("post"));
+  const resource = resourceStub(pluralName("post"));
+
+  it("repositoryStub does not reference removed APIs", () => {
+    expect(repo).not.toContain("FilterByOptions");
+    expect(repo).not.toContain("withDefaultOptions");
+    expect(repo).not.toContain("withDefaultFilters");
+  });
+
+  it("repositoryStub imports only names core exports", () => {
+    const names = (repo.match(/import type \{([^}]*)\} from "@warlock\.js\/core"/)?.[1] ?? "")
+      .split(",")
+      .map((n) => n.trim())
+      .filter(Boolean);
+    expect(names).toEqual(["FilterRules", "RepositoryOptions", "TypedRepositoryOptions"]);
+  });
+
+  it("resourceStub declares a static schema", () => {
+    expect(resource).toContain("public static schema");
+    expect(resource).not.toMatch(/^\s*public schema/m);
   });
 });

@@ -658,8 +658,9 @@ export class LocalDriver implements StorageDriverContract {
       return file;
     }
 
+    // A string is always content, never a source path
     if (typeof file === "string") {
-      return readFile(file);
+      return Buffer.from(file);
     }
 
     return file.buffer();

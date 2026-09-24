@@ -133,7 +133,7 @@ export class Resource implements ResourceContract {
    * Raw resource schema — field declarations as written by the developer.
    * Used by doc generators for introspection.
    */
-  public static schema: ResourceSchema = {};
+  public static schema: Record<string, ResourceFieldConfig | string> = {};
 
   /**
    * Normalized schema — all string cast types and tuples converted to
@@ -146,7 +146,7 @@ export class Resource implements ResourceContract {
    * Converts string cast types (including suffixes) and tuples into pre-built builders.
    * Other entry types (ResourceConstructor, resolver functions, ResourceArraySchema) are kept as-is.
    */
-  public static normalizeSchema(schema: ResourceSchema): Record<string, ResourceFieldConfig> {
+  public static normalizeSchema(schema: Record<string, ResourceFieldConfig | string>): Record<string, ResourceFieldConfig> {
     const parsed: Record<string, ResourceFieldConfig> = {};
 
     for (const [key, value] of Object.entries(schema)) {
@@ -211,7 +211,7 @@ export class Resource implements ResourceContract {
    */
   protected transformOutput() {
     const localeCode = useRequestStore()?.request?.locale;
-    const parsedSchema = (this.constructor as typeof Resource).parsedSchema;
+    const parsedSchema = this.resolveParsedSchema();
 
     for (const [outputKey, outputSettings] of Object.entries(parsedSchema)) {
       const inputValue = this.get(outputKey);
@@ -221,6 +221,36 @@ export class Resource implements ResourceContract {
         this.set(outputKey, outputValue);
       }
     }
+  }
+
+  /**
+   * Resolve the normalized schema of THIS class.
+   * `@RegisterResource()` is optional: when the class has no own `parsedSchema`
+   * (a static field is inherited from the base as `{}`), normalize its own
+   * static `schema` (or an instance `schema` field) once and cache it on the class.
+   */
+  protected resolveParsedSchema(): Record<string, ResourceFieldConfig> {
+    const ctor = this.constructor as typeof Resource;
+
+    if (Object.hasOwn(ctor, "parsedSchema")) {
+      return ctor.parsedSchema;
+    }
+
+    const instanceSchema = (this as unknown as { schema?: Record<string, ResourceFieldConfig | string> }).schema;
+    const schema = instanceSchema ?? ctor.schema;
+
+    if (!schema || Object.keys(schema).length === 0) {
+      throw new Error(
+        `Resource "${ctor.name}" has no schema. Declare \`static schema = { ... }\` on the class.`,
+      );
+    }
+
+    const parsed = Resource.normalizeSchema(schema);
+
+    // Instance schemas are per-class by convention, so caching on the class is safe
+    ctor.parsedSchema = parsed;
+
+    return parsed;
   }
 
   /**

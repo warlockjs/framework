@@ -285,21 +285,21 @@ export class CascadeQueryBuilder<T extends Model> implements QueryBuilderContrac
   /**
    * {@inheritDoc QueryBuilderContract.avg}
    */
-  public async avg(field: string): Promise<number> {
+  public async avg(field: string): Promise<number | null> {
     return this.query.avg(field);
   }
 
   /**
    * {@inheritDoc QueryBuilderContract.min}
    */
-  public async min(field: string): Promise<number> {
+  public async min(field: string): Promise<number | null> {
     return this.query.min(field);
   }
 
   /**
    * {@inheritDoc QueryBuilderContract.max}
    */
-  public async max(field: string): Promise<number> {
+  public async max(field: string): Promise<number | null> {
     return this.query.max(field);
   }
 
