@@ -1,6 +1,6 @@
 ---
 name: define-policies
-description: "Define policies (ABAC) in @warlock.js/access; use when you need to define policies."
+description: 'ABAC conditions in `@warlock.js/access` — `definePolicy(permission, (user, resource, ctx) => boolean)` adds an instance-level rule (ownership / tenant / state) on top of the RBAC grant, evaluated when an authorization check carries a `resource`. TRIGGER: `definePolicy`, "ownership check", "only their own", "can edit this specific record", "ABAC", "policy", "resource-level permission", `authorize(user, perm, { resource })`. Skip: plain grant checks — `@warlock.js/access/check-permissions/SKILL.md`.'
 ---
 
 # Define policies (ABAC)
