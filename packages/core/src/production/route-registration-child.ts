@@ -83,13 +83,12 @@ function isOptionalRuntimeStrategy(value: unknown): value is RuntimeStrategy | u
 }
 
 async function sendAndExit(message: unknown, exitCode = 0): Promise<never> {
-  const send = process.send;
-  if (typeof send !== "function") {
+  if (typeof process.send !== "function") {
     throw new Error("Route registration child requires an IPC channel.");
   }
 
   await new Promise<void>((resolve, reject) => {
-    send(message, (error) => (error ? reject(error) : resolve()));
+    process.send!(message, (error) => (error ? reject(error) : resolve()));
   });
   process.disconnect?.();
   process.exit(exitCode);

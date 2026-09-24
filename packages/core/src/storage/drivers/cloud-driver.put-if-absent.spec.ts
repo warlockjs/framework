@@ -33,9 +33,8 @@ describe("CloudDriver.putIfAbsent()", () => {
     const result = await driver.putIfAbsent("hello", "a/b.txt");
 
     expect(result?.etag).toBe("e");
-    expect(send.mock.calls[0][0].input).toMatchObject({
-      Key: "a/b.txt",
-      IfNoneMatch: "*",
+    expect(send.mock.calls.at(0)?.at(0)).toMatchObject({
+      input: { Key: "a/b.txt", IfNoneMatch: "*" },
     });
   });
 

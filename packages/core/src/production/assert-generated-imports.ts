@@ -93,6 +93,10 @@ export function resolvePackageName(specifier: string): string | undefined {
   const segments = specifier.split("/");
   const packageName = specifier.startsWith("@") ? segments.slice(0, 2).join("/") : segments[0];
 
+  if (!packageName) {
+    return undefined;
+  }
+
   if (builtinModules.includes(packageName)) {
     return undefined;
   }

@@ -37,8 +37,11 @@ describe("CascadeAdapter.registerEvents cache invalidation", () => {
 
     databaseTransactionContext.enter({ session: {} });
 
+    const created = handlers.created;
+    if (!created) throw new Error("Cascade adapter did not register the created handler.");
+
     // The transaction writes; the model event fires BEFORE commit.
-    handlers.created({});
+    created({});
     expect(cache.size).toBe(0);
 
     // A concurrent reader misses the cache and caches the OLD committed row.
