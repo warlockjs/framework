@@ -4,6 +4,7 @@ import { fileExistsAsync, unlinkAsync } from "@warlock.js/fs";
 import { Application } from "../application";
 import { connectorsManager } from "../connectors/connectors-manager";
 import { ConnectorLifecyclePhase } from "../connectors/types";
+import { router } from "../router/router";
 import { warlockConfigManager } from "../warlock-config";
 import { BootPreconditionError } from "./boot-precondition-error";
 import { devLogInfo, devLogSection, devLogWarn, devServeLog } from "./dev-logger";
@@ -13,6 +14,7 @@ import type { IncomingReloadTimings } from "./layer-executor";
 import { LayerExecutor } from "./layer-executor";
 import { printReadyBlock } from "./ready-block";
 import { restartDevServer } from "./restart-dev-server";
+import { publishCurrentRouteTypes } from "./route-types-publisher";
 import { devServerShortcuts } from "./shortcuts";
 import type { StartDevServerOptions } from "./start-development-server";
 import { typeGenerator } from "./type-generator";
@@ -81,6 +83,10 @@ export class DevelopmentServer {
       // Late-phase connectors (http, socket) bind after app code has
       // registered routes/listeners.
       await connectorsManager.startPhase(ConnectorLifecyclePhase.Late);
+
+      // Web installs its page table from its late connector. Generate only
+      // after that installation so `href()` and the declaration table agree.
+      await publishCurrentRouteTypes(process.cwd(), router.getNamedApiRoutes());
 
       this.layerExecutor = new LayerExecutor(
         filesOrchestrator.getDependencyGraph(),
@@ -183,6 +189,11 @@ export class DevelopmentServer {
         batch.changed,
         batch.timings,
       );
+
+      // `executeBatchReload` includes route re-imports and affected connector
+      // restarts. Publishing earlier could freeze a partial page/API view.
+      // This also refreshes deletion-only batches after their cleanup/restart.
+      await publishCurrentRouteTypes(process.cwd(), router.getNamedApiRoutes());
 
       typeGenerator.executeTypingsGenerator([...batch.added, ...batch.changed, ...batch.deleted]);
 

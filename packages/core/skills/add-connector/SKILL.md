@@ -127,6 +127,10 @@ public readonly build: ConnectorBuildContribution = {
 
 - `generate(context)` runs before esbuild. It may write into `context.productionDir`, append generated-entry imports, and return a narrow esbuild patch (`jsx`, `jsxImportSource`, `define`, `external`, or `loader`). Generated files are dependency-checked again before bundling.
 - `emit(context)` runs after esbuild and before `.warlock/production` is removed; use it for artifacts esbuild does not produce, such as a client bundle or manifest.
+- When the app configures Web, `context.namedApiRoutes` is a fresh readonly
+  registration snapshot. Each record has only `name`, `path`, and `method`;
+  it is safe for generated browser declarations but is absent for Core-only
+  apps. It never exposes handlers, middleware, schemas, or source paths.
 - Hooks are awaited sequentially in configured array order. A throw names the connector and fails the build.
 - The `build` object is closed to these two hooks. Construct plugins, pipelines, and aliases inside a hook via dynamic import so build-only dependencies do not enter the connector's runtime import graph.
 - Contributor esbuild patches merge before the user's `build` config; user values win. `define` and `loader` merge by key, while `external` concatenates and deduplicates.

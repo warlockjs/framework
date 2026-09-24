@@ -10,6 +10,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Production build contributions receive a fresh registration-only
+  `ConnectorBuildContext.namedApiRoutes` snapshot when Web is configured. It
+  contains only named API `name`, `path`, and `method` records, never handlers,
+  middleware, schemas, or source paths.
+
 - `storage.putIfAbsent(file, location, options?)` and `storage.supportsPutIfAbsent()` — an atomic create-only write. Returns the `StorageFile`, or `null` when something already exists at `location`. Unlike `put`, a string argument is **content**, not a path. Local driver writes a temp file then hard-links it; S3/R2 send `If-None-Match: *`. DigitalOcean Spaces does not expose it. Drivers without it throw `StorageCapabilityError`.
 - `http.rateLimit` now passes `@fastify/rate-limit` options through (`redis` for a store shared across servers, `nameSpace`, `keyGenerator`, `allowList`, ...). `http.rateLimit.enabled: false` turns the global limiter off. The per-route `middleware.rateLimit()` stays in-process.
 - `socket.adapter` — an adapter factory (e.g. `@socket.io/redis-adapter`) applied via `io.adapter()` for broadcasting across servers. Polling clients need sticky sessions.
@@ -19,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Refined connector build guidance and grouped skill discovery.
 - `middleware.idempotency()` reserves the key (create-only) before the handler runs. A concurrent duplicate now gets **409 + `Retry-After`** instead of running twice. A 5xx response frees the key so the client can retry. If the cache is down the middleware fails open.
 
 ### Fixed

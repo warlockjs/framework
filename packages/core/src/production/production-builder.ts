@@ -22,6 +22,8 @@ import { dedupe, runEmitContributions, runGenerateContributions } from "./build-
 import { writeDistBuildManifestAsync } from "./dist-build-manifest";
 import { nativeNodeModulesPlugin } from "./esbuild-plugins";
 import { assertEsbuildBinaryIsLinked } from "./esbuild-preflight";
+import { collectRouteRegistrationSnapshot } from "./route-registration-snapshot";
+import { clearOwnedRouteTypes } from "../dev-server/route-types-publisher";
 import {
   commitDistAsync,
   createTempOutputDir,
@@ -117,6 +119,9 @@ export class ProductionBuilder {
    */
   private contributedEsbuild: ConnectorEsbuildPatch = {};
 
+  /** Browser-safe API metadata captured in a fresh registration-only child. */
+  private namedApiRoutes?: readonly import("../router/types").NamedApiRoute[];
+
   /**
    * Main build entry point
    *
@@ -177,6 +182,7 @@ export class ProductionBuilder {
       await this.assertGeneratedImports();
 
       // Step 4.5: Drain the connectors' `generate` contributions
+      await this.captureNamedApiRoutesForWeb();
       const contributed = await this.runGenerateContributions();
 
       // Step 4.6: Re-assert over what the contributors just wrote.
@@ -276,7 +282,22 @@ export class ProductionBuilder {
       productionDir: this.productionDir,
       appRoot: rootPath(),
       options: this.options,
+      namedApiRoutes: this.namedApiRoutes,
     };
+  }
+
+  /**
+   * Web route declarations need application API registration, which cannot be
+   * inferred from generated files. Capture it once in a disposable child before
+   * contributors write build artifacts; no connector lifecycle runs there.
+   */
+  private async captureNamedApiRoutesForWeb(): Promise<void> {
+    if (!this.connectors.some((connector) => connector.name === "web")) {
+      await clearOwnedRouteTypes(rootPath());
+      return;
+    }
+
+    this.namedApiRoutes = (await collectRouteRegistrationSnapshot({ cwd: rootPath() })).routes;
   }
 
   /**

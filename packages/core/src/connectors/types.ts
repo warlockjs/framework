@@ -1,4 +1,5 @@
 import type { BuildOptions } from "esbuild";
+import type { NamedApiRoute } from "../router/types";
 import type { ResolvedBuildConfig } from "../production/resolve-build-config";
 
 /**
@@ -82,6 +83,8 @@ export type ConnectorBuildContext = {
   appRoot: string;
   /** The build config after framework defaults and user overrides */
   options: ResolvedBuildConfig;
+  /** Fresh registration-only snapshot, present only when the Web connector is configured. */
+  readonly namedApiRoutes?: readonly NamedApiRoute[];
 };
 
 /**
