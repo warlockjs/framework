@@ -2,6 +2,7 @@ import { Context, contextManager } from "@warlock.js/context";
 
 interface TransactionContextStore {
   session?: unknown;
+  afterCommit?: Array<() => void | Promise<void>>;
 }
 
 /**
@@ -30,6 +31,29 @@ class DatabaseTransactionContext extends Context<TransactionContextStore> {
    */
   public setSession(session: unknown): void {
     this.set("session", session);
+  }
+
+  /**
+   * Queue a callback to run once the active transaction commits
+   */
+  public addAfterCommit(fn: () => void | Promise<void>): void {
+    const queue = this.get("afterCommit") ?? [];
+
+    queue.push(fn);
+
+    this.set("afterCommit", queue);
+  }
+
+  /**
+   * Take (and empty) the queued after-commit callbacks.
+   * Must be called before `exit()`, which clears the store.
+   */
+  public takeAfterCommit(): Array<() => void | Promise<void>> {
+    const queue = this.get("afterCommit") ?? [];
+
+    this.set("afterCommit", []);
+
+    return queue;
   }
 
   /**

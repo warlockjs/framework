@@ -13,6 +13,7 @@
 import { colors } from "@mongez/copper";
 import { log } from "@warlock.js/logger";
 import { databaseTransactionContext } from "../../context/database-transaction-context";
+import { flushAfterCommit } from "../../transactions/after-commit";
 import type {
   AtomicUpdate,
   CreateDatabaseOptions,
@@ -1315,15 +1316,20 @@ export class PostgresDriver implements DriverContract {
     // touch an already-released client and double-release it).
     let commitStarted = false;
 
+    // Filled only after a successful COMMIT; flushed once the context is gone.
+    let committedCallbacks: Array<() => void | Promise<void>> = [];
+    let result: T;
+
     try {
       // Execute callback
-      const result = await fn(ctx);
+      result = await fn(ctx);
 
       // Auto-commit on success
       commitStarted = true;
       await tx.commit();
 
-      return result;
+      // Read the queue BEFORE exit() clears it
+      committedCallbacks = databaseTransactionContext.takeAfterCommit();
     } catch (error) {
       if (commitStarted) {
         // COMMIT itself failed: the original error propagates unchanged and
@@ -1353,6 +1359,11 @@ export class PostgresDriver implements DriverContract {
       // Guaranteed cleanup
       databaseTransactionContext.exit();
     }
+
+    // Committed and outside the transaction context: run afterCommit() hooks
+    await flushAfterCommit(committedCallbacks);
+
+    return result;
   }
 
   /**

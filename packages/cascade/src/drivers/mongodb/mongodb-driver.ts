@@ -17,6 +17,7 @@ import type {
 } from "mongodb";
 import { EventEmitter } from "node:events";
 import { databaseTransactionContext } from "../../context/database-transaction-context";
+import { flushAfterCommit } from "../../transactions/after-commit";
 import type {
   AtomicUpdate,
   DriverAtomicUpdateOptions,
@@ -696,16 +697,27 @@ export class MongoDbDriver implements DriverContract {
     databaseTransactionContext.enter({ session });
     let finished = false;
 
-    const finalize = async (operation: () => Promise<void>): Promise<void> => {
+    const finalize = async (
+      operation: () => Promise<void>,
+      committing = false,
+    ): Promise<void> => {
       if (finished) return;
+
+      let committedCallbacks: Array<() => void | Promise<void>> = [];
 
       try {
         await operation();
+
+        if (committing) {
+          committedCallbacks = databaseTransactionContext.takeAfterCommit();
+        }
       } finally {
         finished = true;
         databaseTransactionContext.exit();
         await session.endSession().catch(() => undefined);
       }
+
+      await flushAfterCommit(committedCallbacks);
     };
 
     return {
@@ -718,7 +730,7 @@ export class MongoDbDriver implements DriverContract {
             await session.abortTransaction().catch(() => undefined);
             throw error;
           }
-        });
+        }, true);
       },
       rollback: async () => {
         await finalize(async () => {
@@ -769,6 +781,10 @@ export class MongoDbDriver implements DriverContract {
     const client = this.getClientInstance();
     const session = client.startSession();
 
+    // Filled only after a successful commit; flushed once the context is gone.
+    let committedCallbacks: Array<() => void | Promise<void>> = [];
+    let result: T;
+
     try {
       await session.startTransaction({
         ...this.transactionOptions,
@@ -780,12 +796,13 @@ export class MongoDbDriver implements DriverContract {
 
       try {
         // Execute callback
-        const result = await fn(ctx);
+        result = await fn(ctx);
 
         // Auto-commit on success
         await session.commitTransaction();
 
-        return result;
+        // Read the queue BEFORE exit() clears it
+        committedCallbacks = databaseTransactionContext.takeAfterCommit();
       } catch (error) {
         // Auto-rollback on any error (including explicit rollback)
         await session.abortTransaction().catch(() => undefined);
@@ -798,6 +815,11 @@ export class MongoDbDriver implements DriverContract {
       // Guaranteed session cleanup
       await session.endSession().catch(() => undefined);
     }
+
+    // Committed and outside the transaction context: run afterCommit() hooks
+    await flushAfterCommit(committedCallbacks);
+
+    return result;
   }
 
   /**

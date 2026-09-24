@@ -1,6 +1,7 @@
 // Context
 export * from "./context/database-data-source-context";
 export * from "./context/database-transaction-context";
+export { afterCommit } from "./transactions/after-commit";
 
 // Contracts
 export * from "./contracts/database-driver.contract";
