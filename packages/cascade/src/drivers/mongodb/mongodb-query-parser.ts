@@ -13,6 +13,45 @@ import type { MongoQueryBuilder } from "./mongodb-query-builder";
 import { isPipelineStageObject } from "./pipeline-stage-object";
 import type { Operation, PipelineStage } from "./types";
 
+const isPlainObject = (value: unknown): value is Record<string, any> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+/**
+ * AND one `key: value` condition into `target`. Operators on the same field
+ * with distinct keys are merged (`{ age: { $gt, $lt } }`); any other collision
+ * (same operator, `$expr`, `$nor`, ...) is pushed into `$and` so neither
+ * side is overwritten.
+ */
+const mergeConditionEntry = (target: Record<string, any>, key: string, value: unknown): void => {
+  if (!(key in target)) {
+    target[key] = value;
+    return;
+  }
+
+  if (key === "$and" && Array.isArray(target.$and) && Array.isArray(value)) {
+    target.$and.push(...value);
+    return;
+  }
+
+  const existing = target[key];
+
+  if (
+    !key.startsWith("$") &&
+    isPlainObject(existing) &&
+    isPlainObject(value) &&
+    !Object.keys(value).some((operator) => operator in existing)
+  ) {
+    target[key] = { ...existing, ...value };
+    return;
+  }
+
+  if (!Array.isArray(target.$and)) {
+    target.$and = [];
+  }
+
+  target.$and.push({ [key]: value });
+};
+
 /**
  * Options for configuring the MongoDB query parser.
  */
@@ -622,18 +661,7 @@ export class MongoQueryParser {
           return;
         }
 
-        if (
-          value &&
-          typeof value === "object" &&
-          !Array.isArray(value) &&
-          andFilter[key] &&
-          typeof andFilter[key] === "object" &&
-          !Array.isArray(andFilter[key])
-        ) {
-          andFilter[key] = { ...andFilter[key], ...value };
-        } else {
-          andFilter[key] = value;
-        }
+        mergeConditionEntry(andFilter, key, value);
       });
     };
 
@@ -653,11 +681,13 @@ export class MongoQueryParser {
         return;
       }
       topLevelOrMode = true;
-      while (pendingSimpleWhere.length > 0) {
-        const condition = pendingSimpleWhere.shift();
-        if (condition) {
-          pushOr(condition);
-        }
+      // The conditions queued so far are ANDed together, then ORed with what
+      // follows: `where(a).where(b).orWhere(c)` is `(a AND b) OR c`, not `a OR b OR c`.
+      const pending = pendingSimpleWhere.splice(0).filter(Boolean);
+      if (pending.length === 1) {
+        pushOr(pending[0]);
+      } else if (pending.length > 1) {
+        pushOr({ $and: pending });
       }
     };
 
@@ -832,19 +862,21 @@ export class MongoQueryParser {
       return orClauses.length > 0 ? { $or: orClauses } : null;
     }
 
+    const mergeInto = (condition: any): void => {
+      if (!condition) {
+        return;
+      }
+
+      Object.entries(condition).forEach(([key, value]) => mergeConditionEntry(andFilter, key, value));
+    };
+
     for (const op of matchOps) {
       if (op.type === "where:callback") {
-        const nestedCondition = this.buildCallbackCondition(op.data);
-        if (nestedCondition) {
-          Object.assign(andFilter, nestedCondition);
-        }
+        mergeInto(this.buildCallbackCondition(op.data));
       } else if (op.type === "where:object") {
-        Object.assign(andFilter, op.data);
+        mergeInto(op.data);
       } else {
-        const condition = this.buildWhereCondition(op);
-        if (condition) {
-          Object.assign(andFilter, condition);
-        }
+        mergeInto(this.buildWhereCondition(op));
       }
     }
 
@@ -1090,7 +1122,38 @@ export class MongoQueryParser {
       case "=":
         return { [field]: value };
       case "!=":
+      case "<>":
         return { [field]: { $ne: value } };
+      case "in":
+        return { [field]: { $in: this.assertArrayOperand(operator, value) } };
+      case "notIn":
+      case "not in":
+        return { [field]: { $nin: this.assertArrayOperand(operator, value) } };
+      case "between":
+      case "notBetween":
+      case "not between": {
+        const range = this.assertArrayOperand(operator, value);
+        if (range.length !== 2) {
+          throw new Error(`Operator "${operator}" requires a [min, max] pair.`);
+        }
+        const bounds = { $gte: range[0], $lte: range[1] };
+        return { [field]: operator === "between" ? bounds : { $not: bounds } };
+      }
+      case "like":
+        return { [field]: { $regex: resolveLikePattern(value as string), $options: "i" } };
+      case "notLike":
+      case "not like":
+        return { [field]: { $not: { $regex: resolveLikePattern(value as string), $options: "i" } } };
+      case "startsWith":
+        return { [field]: { $regex: `^${escapeRegex(String(value))}`, $options: "i" } };
+      case "notStartsWith":
+        return { [field]: { $not: { $regex: `^${escapeRegex(String(value))}`, $options: "i" } } };
+      case "endsWith":
+        return { [field]: { $regex: `${escapeRegex(String(value))}$`, $options: "i" } };
+      case "notEndsWith":
+        return { [field]: { $not: { $regex: `${escapeRegex(String(value))}$`, $options: "i" } } };
+      case "exists":
+        return { [field]: { $exists: value !== false } };
       case ">":
         return { [field]: { $gt: value } };
       case ">=":
@@ -1100,8 +1163,16 @@ export class MongoQueryParser {
       case "<=":
         return { [field]: { $lte: value } };
       default:
-        return { [field]: value };
+        throw new Error(`Unsupported where operator "${operator}" on the MongoDB driver.`);
     }
+  }
+
+  private assertArrayOperand(operator: string, value: unknown): unknown[] {
+    if (!Array.isArray(value)) {
+      throw new Error(`Operator "${operator}" requires an array operand.`);
+    }
+
+    return value;
   }
 
   /**

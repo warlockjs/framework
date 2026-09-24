@@ -363,7 +363,7 @@ export async function connectToDatabase<TDriverOptions = any, TClientOptions = a
   // Default values
   const driverType = options.driver ?? "mongodb";
   const dataSourceName = options.name ?? "default";
-  const isDefault = options.isDefault ?? true;
+  const isDefault = options.isDefault ?? !dataSourceRegistry.hasDefault();
 
   // Create driver based on type
   let driver: DriverContract;
@@ -425,7 +425,7 @@ export async function connectToDatabase<TDriverOptions = any, TClientOptions = a
   });
 
   // Register data source
-  dataSourceRegistry.register(dataSource);
+  dataSourceRegistry.register(dataSource, { explicitDefault: options.isDefault === true });
 
   // Connect to the database
   try {

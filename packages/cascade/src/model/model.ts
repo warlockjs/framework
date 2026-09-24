@@ -18,6 +18,7 @@ import type { ModelEventListener, ModelEventName } from "../events/model-events"
 import { ModelEvents } from "../events/model-events";
 import type { PivotOperations } from "../relations/pivot-operations";
 import type { ModelSnapshot } from "../relations/relation-hydrator";
+import { inferBelongsToForeignKey } from "../relations/key-conventions";
 import { attachLoadedRelation, RelationLoader } from "../relations/relation-loader";
 import type {
   LoadedRelationResult,
@@ -706,13 +707,57 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   }
 
   /**
-   * Set relation manually
+   * Set relation manually.
+   *
+   * For a `belongsTo` relation this also writes the foreign-key column on
+   * this model (the declared `foreignKey`, else the inferred `<relation>_id`)
+   * from the related model's owner key, so `post.setRelation("author", user)`
+   * followed by `save()` persists `author_id`. Passing `null` clears the FK.
+   * The FK is left untouched when the related model carries no owner key yet.
+   *
+   * For `hasOne`, `hasMany`, `belongsToMany` and undeclared relations only the
+   * in-memory relation is set; no foreign key is written (the key lives on the
+   * other side or in a pivot table).
    *
    * @param relationName
    * @param relationData
    */
   public setRelation(relationName: string, relationData: LoadedRelationResult): void {
+    const definition = (this.self() as unknown as {
+      relations?: Record<string, RelationDefinition>;
+    }).relations?.[relationName];
+
+    if (definition?.type === "belongsTo" && !Array.isArray(relationData)) {
+      const foreignKey =
+        definition.foreignKey ??
+        inferBelongsToForeignKey(relationName, this.relationDefaultsOrUndefined());
+
+      if (relationData === null) {
+        this.set(foreignKey, null);
+      } else if (relationData) {
+        const related = relationData as Model;
+        const ownerKey = definition.localKey ?? related.self().primaryKey ?? "id";
+        const ownerValue = related.get(ownerKey);
+
+        if (ownerValue !== undefined && ownerValue !== null) {
+          this.set(foreignKey, ownerValue);
+        }
+      }
+    }
+
     attachLoadedRelation(this, relationName, relationData);
+  }
+
+  /**
+   * Relation conventions of this model's data source, or undefined when none
+   * are configured or no data source resolves.
+   */
+  private relationDefaultsOrUndefined() {
+    try {
+      return this.self().getDataSource()?.relationDefaults;
+    } catch {
+      return undefined;
+    }
   }
 
   /**

@@ -95,6 +95,8 @@ class User extends Model {
 // Post relations for nested-loading tests.
 (Post as unknown as { relations: Record<string, RelationDefinition> }).relations = {
   comments: { type: "hasMany", model: "Comment" },
+  reviewer: { type: "belongsTo", model: "Profile" },
+  author: { type: "belongsTo", model: "User" },
 };
 
 // Organization carries a single belongsTo relation so we can exercise the
@@ -495,6 +497,71 @@ describe("relations/relation-loader", () => {
 
       await user.load("posts");
       expect((user.getRelation("posts") as Post[])[0].get("id")).toBe(10);
+      expect(user.isLoaded("posts")).toBe(true);
+    });
+  });
+
+  // ==========================================================================
+  // K3 B4 / B5 / B11
+  // ==========================================================================
+
+  describe("K3 B4: sibling nested paths share one parent load", () => {
+    it("with(posts.comments, posts.reviewer) keeps comments AND reviewer on the same posts", async () => {
+      const users = [new User({ id: 1 })];
+      const posts = [new Post({ id: 10, user_id: 1, reviewer_id: 5 })];
+      const postSpy = vi.spyOn(Post, "query").mockReturnValue(createFakeQuery(posts) as never);
+      vi.spyOn(Comment, "query").mockReturnValue(
+        createFakeQuery([new Comment({ id: 100, post_id: 10 })]) as never,
+      );
+      vi.spyOn(Profile, "query").mockReturnValue(
+        createFakeQuery([new Profile({ id: 5 })]) as never,
+      );
+
+      await new RelationLoader(users, User).load(["posts.comments", "posts.reviewer"]);
+
+      expect(postSpy).toHaveBeenCalledTimes(1);
+      const loaded = users[0].getRelation("posts") as Post[];
+      expect(loaded[0]).toBe(posts[0]);
+      expect((loaded[0].getRelation("comments") as Comment[])[0].get("id")).toBe(100);
+      expect((loaded[0].getRelation("reviewer") as Profile).get("id")).toBe(5);
+    });
+  });
+
+  describe("K3 B5: nested constraint applies to the last segment only", () => {
+    it("with(posts.comments, where approved) does not filter posts", async () => {
+      const users = [new User({ id: 1 })];
+      const postFake = createFakeQuery([new Post({ id: 10, user_id: 1 })]);
+      vi.spyOn(Post, "query").mockReturnValue(postFake as never);
+      const commentFake = createFakeQuery([]);
+      vi.spyOn(Comment, "query").mockReturnValue(commentFake as never);
+
+      await new RelationLoader(users, User).load("posts.comments", {
+        "posts.comments": (q: any) => q.where("approved", true),
+      });
+
+      expect(postFake.calls.some((c) => c.method === "where")).toBe(false);
+      expect(commentFake.calls).toContainEqual({ method: "where", args: ["approved", true] });
+    });
+  });
+
+  describe("K3 B11: setRelation writes the belongsTo foreign key", () => {
+    it("post.setRelation(author, user) sets author_id", () => {
+      const post = new Post({ id: 1 });
+      post.setRelation("author", new User({ id: 42 }));
+      expect(post.get("author_id")).toBe(42);
+      expect((post.getRelation("author") as User).get("id")).toBe(42);
+    });
+
+    it("setRelation(author, null) clears the FK", () => {
+      const post = new Post({ id: 1, author_id: 3 });
+      post.setRelation("author", null);
+      expect(post.get("author_id")).toBeNull();
+    });
+
+    it("hasMany setRelation writes no foreign key", () => {
+      const user = new User({ id: 1 });
+      user.setRelation("posts", [new Post({ id: 9 })]);
+      expect(user.get("post_id")).toBeUndefined();
       expect(user.isLoaded("posts")).toBe(true);
     });
   });

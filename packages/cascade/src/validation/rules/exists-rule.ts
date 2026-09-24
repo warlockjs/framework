@@ -12,13 +12,16 @@ export const existsRule: SchemaRule<ExistsRuleOptions> = {
   name: "exists",
   defaultErrorMessage: "The :input must exist",
   async validate(value: any, context) {
-    const { Model, query, column = context.key } = this.context.options;
+    const { Model, query, column } = this.context.options;
 
     const ResolvedModelClass = resolveModelClass(Model);
 
+    // Explicit column wins, otherwise look up by the related model's primary key
+    const lookupColumn = column ?? ResolvedModelClass.primaryKey;
+
     const dbQuery = ResolvedModelClass.query();
 
-    dbQuery.where(column, value);
+    dbQuery.where(lookupColumn, value);
 
     if (query) {
       await query({

@@ -94,11 +94,11 @@ export class PostgresDialect implements SqlDialectContract {
     const parts: string[] = [];
 
     if (limit !== undefined) {
-      parts.push(`LIMIT ${limit}`);
+      parts.push(`LIMIT ${toSafeInteger(limit, "LIMIT")}`);
     }
 
     if (offset !== undefined) {
-      parts.push(`OFFSET ${offset}`);
+      parts.push(`OFFSET ${toSafeInteger(offset, "OFFSET")}`);
     }
 
     return parts.join(" ");
@@ -119,17 +119,17 @@ export class PostgresDialect implements SqlDialectContract {
     const pathParts = path.split(".");
 
     if (pathParts.length === 1) {
-      return `${quotedColumn}->>'${pathParts[0]}'`;
+      return `${quotedColumn}->>'${escapeSqlLiteral(pathParts[0] as string)}'`;
     }
 
     // For nested paths: data->'user'->>'name' (last one gets text extraction)
     const jsonPath = pathParts
       .slice(0, -1)
-      .map((p) => `'${p}'`)
+      .map((p) => `'${escapeSqlLiteral(p)}'`)
       .join("->");
     const lastKey = pathParts[pathParts.length - 1];
 
-    return `${quotedColumn}->${jsonPath}->>'${lastKey}'`;
+    return `${quotedColumn}->${jsonPath}->>'${escapeSqlLiteral(lastKey as string)}'`;
   }
 
   /**
@@ -148,12 +148,12 @@ export class PostgresDialect implements SqlDialectContract {
     if (path) {
       // Check if a specific path contains the value
       const jsonValue = JSON.stringify({ [path]: value });
-      return `${quotedColumn} @> '${jsonValue}'::jsonb`;
+      return `${quotedColumn} @> '${escapeSqlLiteral(jsonValue)}'::jsonb`;
     }
 
     // Check if the column contains the value (for arrays or objects)
     const jsonValue = JSON.stringify(value);
-    return `${quotedColumn} @> '${jsonValue}'::jsonb`;
+    return `${quotedColumn} @> '${escapeSqlLiteral(jsonValue)}'::jsonb`;
   }
 
   /**
@@ -367,7 +367,7 @@ export class PostgresDialect implements SqlDialectContract {
       case "literal":
         return typeof expression.value === "boolean"
           ? this.booleanLiteral(expression.value)
-          : String(expression.value);
+          : String(toFiniteNumber(expression.value));
       case "raw":
         return expression.expression;
       case "add":
@@ -397,6 +397,42 @@ export class PostgresDialect implements SqlDialectContract {
    * ```
    */
   public dateTruncSql(column: string, unit: "day" | "week" | "month" | "year"): string {
+    if (!["day", "week", "month", "year"].includes(unit)) {
+      throw new Error(`PostgresDialect: invalid date_trunc unit "${unit}"`);
+    }
+
     return `date_trunc('${unit}', ${this.quoteIdentifier(column)})`;
   }
+}
+
+/**
+ * Escape a string for use inside a single-quoted SQL literal (`'` doubled).
+ */
+export function escapeSqlLiteral(value: string): string {
+  return String(value).replace(/'/g, "''");
+}
+
+/**
+ * Coerce a LIMIT/OFFSET value to a non-negative safe integer or throw.
+ * Numeric strings (e.g. from query params) are accepted; anything else is not.
+ */
+function toSafeInteger(value: unknown, label: string): number {
+  const number = typeof value === "string" && /^\d+$/.test(value) ? Number(value) : value;
+
+  if (typeof number !== "number" || !Number.isSafeInteger(number) || number < 0) {
+    throw new Error(`PostgresDialect: ${label} must be a non-negative safe integer`);
+  }
+
+  return number;
+}
+
+/**
+ * Literals in column expressions are emitted verbatim, so only finite numbers pass.
+ */
+function toFiniteNumber(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error("PostgresDialect: column expression literal must be a finite number or boolean");
+  }
+
+  return value;
 }

@@ -15,7 +15,13 @@ import type {
 } from "../../contracts/query-builder.contract";
 import type { SqlDialectContract } from "../sql/sql-dialect.contract";
 
-import { PostgresDialect } from "./postgres-dialect";
+import { escapeSqlLiteral, PostgresDialect } from "./postgres-dialect";
+
+/** Allowed `::cast` type names, e.g. `int`, `numeric(10,2)`, `text[]`. */
+const SAFE_CAST_PATTERN = /^[a-z_][a-z0-9_ ]*(\(\d+(,\d+)?\))?(\[\])?$/i;
+
+/** Allowed orderBy direction, with optional NULLS placement. */
+const SAFE_DIRECTION_PATTERN = /^(asc|desc)(\s+nulls\s+(first|last))?$/i;
 
 /**
  * Operation types supported by the query parser.
@@ -38,6 +44,8 @@ export type PostgresOperationType =
   | "orWhereColumn"
   | "whereExists"
   | "whereNotExists"
+  | "whereNot"
+  | "orWhereNot"
   | "whereDate"
   | "whereDateBefore"
   | "whereDateAfter"
@@ -77,6 +85,9 @@ export type PostgresOperationType =
   | "whereDoesntHave"
   // joinWith operations
   | "selectRelatedColumns"
+  // Builder-level metadata (consumed before parsing)
+  | "joinWith"
+  | "cursor"
   // Other
   | "distinct";
 
@@ -365,6 +376,32 @@ export class PostgresQueryParser {
       case "whereFullText":
         this.processWhereFullText(data);
         break;
+      case "whereNot":
+        this.processNested(data.nested, "AND", true, type);
+        break;
+      case "orWhereNot":
+        this.processNested(data.nested, "OR", true, type);
+        break;
+      // Same semantics as the Mongo driver: the callback conditions are applied
+      // inline (exists) or negated (notExists).
+      case "whereExists":
+        this.processNested(data.subquery, "AND", false, type);
+        break;
+      case "whereNotExists":
+        this.processNested(data.subquery, "AND", true, type);
+        break;
+      case "whereDate":
+        this.processWhereDate(data, "=");
+        break;
+      case "whereDateBefore":
+        this.processWhereDate(data, "<");
+        break;
+      case "whereDateAfter":
+        this.processWhereDate(data, ">");
+        break;
+      case "whereDateBetween":
+        this.processWhereDateBetween(data);
+        break;
 
       // SELECT operations
       case "select":
@@ -450,9 +487,16 @@ export class PostgresQueryParser {
         this.processSelectRelatedColumns(data);
         break;
 
-      default:
-        // Unknown operation - ignore or throw
+      // Builder-level metadata consumed before parsing; carries no SQL of its own
+      case "cursor":
+      case "joinWith":
         break;
+
+      default:
+        // An unknown filter must never silently disappear: write paths
+        // (delete/update) reuse this parser, so a dropped filter widens the
+        // statement to every row.
+        throw new Error(`PostgresQueryParser: unsupported operation type "${type}"`);
     }
   }
 
@@ -596,6 +640,11 @@ export class PostgresQueryParser {
    * single placeholder (between, in, like-variants, exists, etc.).
    */
   private processWhere(data: Record<string, unknown>, boolean: "AND" | "OR"): void {
+    // `where(q => ...)` / `orWhere(q => ...)` record a nested group
+    if (data.nested !== undefined) {
+      return this.processNested(data.nested, boolean, false, "where");
+    }
+
     const field = data.field as string;
     const operator = (data.operator as WhereOperator) ?? "=";
     const value = data.value;
@@ -634,6 +683,58 @@ export class PostgresQueryParser {
     // Simple single-value operator — fall through to generic path
     const placeholder = this.addParam(value);
     this.addWhereClause(`${quotedField} ${this.mapOperator(operator)} ${placeholder}`, boolean);
+  }
+
+  /**
+   * Process a nested group of operations as `(<group>)` / `NOT (<group>)`.
+   *
+   * The group is parsed by a sub-parser; its params are renumbered into this
+   * parser's namespace.
+   */
+  private processNested(
+    nested: unknown,
+    boolean: "AND" | "OR",
+    negate: boolean,
+    opType: string,
+  ): void {
+    const subParser = new PostgresQueryParser({
+      table: this.table,
+      alias: this.alias,
+      dialect: this.dialect,
+      operations: (nested as PostgresParserOperation[] | undefined) ?? [],
+    });
+    subParser.parse();
+
+    if (subParser.whereClauses.length === 0) {
+      throw new Error(`PostgresQueryParser: "${opType}" received an empty condition group`);
+    }
+
+    const renumber = this.absorbSubParserParams(subParser);
+    const group = `(${renumber(subParser.whereClauses.join(" "))})`;
+
+    this.addWhereClause(negate ? `NOT ${group}` : group, boolean);
+  }
+
+  /**
+   * Compare the date portion of a column (time ignored).
+   */
+  private processWhereDate(data: Record<string, unknown>, operator: string): void {
+    const quotedField = this.parseColumnIdentifier(data.field as string, this.table, this.alias);
+    const placeholder = this.addParam(data.value);
+
+    this.addWhereClause(`${quotedField}::date ${operator} ${placeholder}::date`, "AND");
+  }
+
+  /**
+   * Date portion of a column within an inclusive [from, to] range.
+   */
+  private processWhereDateBetween(data: Record<string, unknown>): void {
+    const range = data.range as [unknown, unknown];
+    const quotedField = this.parseColumnIdentifier(data.field as string, this.table, this.alias);
+    const from = this.addParam(range[0]);
+    const to = this.addParam(range[1]);
+
+    this.addWhereClause(`${quotedField}::date BETWEEN ${from}::date AND ${to}::date`, "AND");
   }
 
   /**
@@ -711,7 +812,7 @@ export class PostgresQueryParser {
    */
   private processWhereColumn(data: Record<string, unknown>, boolean: "AND" | "OR"): void {
     const first = data.first as string;
-    const operator = (data.operator as string) ?? "=";
+    const operator = this.mapOperator(((data.operator as string) ?? "=") as WhereOperator);
     const second = data.second as string;
 
     // Both sides may need qualification if unambiguous table is unclear
@@ -732,7 +833,7 @@ export class PostgresQueryParser {
     const jsonValue = JSON.stringify(value);
     const operator = negate ? "NOT @>" : "@>";
 
-    this.addWhereClause(`${quotedPath} ${operator} '${jsonValue}'::jsonb`, "AND");
+    this.addWhereClause(`${quotedPath} ${operator} '${escapeSqlLiteral(jsonValue)}'::jsonb`, "AND");
   }
 
   /**
@@ -840,7 +941,7 @@ export class PostgresQueryParser {
       if (select && select.length > 0) {
         // Pick specific columns: json_agg(json_build_object('id', a."id", ...))
         const fields = select
-          .map((col) => `'${col}', a.${this.dialect.quoteIdentifier(col)}`)
+          .map((col) => `'${escapeSqlLiteral(col)}', a.${this.dialect.quoteIdentifier(col)}`)
           .join(", ");
         innerSelect = `json_agg(json_build_object(${fields}))`;
       } else {
@@ -875,7 +976,7 @@ export class PostgresQueryParser {
           orderBy = ` ORDER BY ${renumber(subParser.orderClauses.join(", "))}`;
         }
         if (subParser.limitValue !== undefined) {
-          limitClause = ` LIMIT ${subParser.limitValue}`;
+          limitClause = ` ${this.dialect.limitOffset(subParser.limitValue)}`;
         }
       }
 
@@ -1069,7 +1170,15 @@ export class PostgresQueryParser {
       }
     }
 
-    return cast ? `(${expression})::${cast}` : expression;
+    if (cast) {
+      if (!SAFE_CAST_PATTERN.test(cast)) {
+        throw new Error(`PostgresQueryParser: unsafe cast type "${cast}"`);
+      }
+
+      return `(${expression})::${cast}`;
+    }
+
+    return expression;
   }
 
   /**
@@ -1120,7 +1229,7 @@ export class PostgresQueryParser {
     for (let i = 0; i < path.length; i++) {
       const isLast = i === path.length - 1;
       const operator = isLast ? "->>" : "->";
-      expression += `${operator}'${path[i]}'`;
+      expression += `${operator}'${escapeSqlLiteral(path[i] as string)}'`;
     }
 
     return expression;
@@ -1155,7 +1264,13 @@ export class PostgresQueryParser {
    */
   private processOrderBy(data: Record<string, unknown>): void {
     const field = data.field as string;
-    const direction = ((data.direction as string) ?? "asc").toUpperCase();
+    const rawDirection = String(data.direction ?? "asc").trim();
+
+    if (!SAFE_DIRECTION_PATTERN.test(rawDirection)) {
+      throw new Error(`PostgresQueryParser: invalid orderBy direction "${rawDirection}"`);
+    }
+
+    const direction = rawDirection.replace(/\s+/g, " ").toUpperCase();
 
     const quotedField = this.parseColumnIdentifier(field, this.table, this.alias);
     this.orderClauses.push(`${quotedField} ${direction}`);
@@ -1199,7 +1314,7 @@ export class PostgresQueryParser {
    */
   private processHaving(data: Record<string, unknown>): void {
     const field = data.field as string;
-    const operator = (data.operator as string) ?? "=";
+    const operator = this.mapOperator(((data.operator as string) ?? "=") as WhereOperator);
     const value = data.value;
 
     const quotedField = this.dialect.quoteIdentifier(field);
@@ -1255,6 +1370,12 @@ export class PostgresQueryParser {
       ilike: "ILIKE",
     };
 
-    return mapping[operator.toLowerCase()] ?? operator;
+    const mapped = mapping[String(operator).toLowerCase()];
+
+    if (mapped === undefined) {
+      throw new Error(`PostgresQueryParser: unsupported operator "${operator}"`);
+    }
+
+    return mapped;
   }
 }

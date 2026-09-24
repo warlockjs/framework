@@ -209,8 +209,38 @@ export class MongoQueryBuilder<T = unknown>
       }
     }
 
-    // Apply: before scopes + user operations + after scopes
-    this.operations = [...beforeOps, ...this.operations, ...afterOps];
+    const isGroupable = (op: any): boolean => op.stage === "$match" && op.mergeable !== false;
+    const scopeOps = [...beforeOps, ...afterOps];
+    const scopeMatches = scopeOps.filter(isGroupable);
+
+    // No filtering scope: nothing can be escaped, keep the ops as they are.
+    if (scopeMatches.length === 0) {
+      this.operations = [...beforeOps, ...this.operations, ...afterOps];
+      this.scopesApplied = true;
+      return;
+    }
+
+    // `(scopes) AND (user conditions)`: each side is its own group so a user
+    // `orWhere` can never widen the scopes (tenant, soft delete).
+    const groupOf = (ops: any[]): any => ({
+      stage: "$match",
+      mergeable: true,
+      type: "where:callback",
+      data: (sub: any) => {
+        sub.operations.push(...ops);
+      },
+    });
+
+    const userMatches = this.operations.filter(isGroupable);
+    const userRest = this.operations.filter((op) => !isGroupable(op));
+
+    this.operations = [
+      groupOf(scopeMatches),
+      ...beforeOps.filter((op) => !isGroupable(op)),
+      ...(userMatches.length > 0 ? [groupOf(userMatches)] : []),
+      ...userRest,
+      ...afterOps.filter((op) => !isGroupable(op)),
+    ];
     this.scopesApplied = true;
   }
 
@@ -1459,6 +1489,9 @@ export class MongoQueryBuilder<T = unknown>
   public groupBy(fields: GroupByInput): this;
   public groupBy(fields: GroupByInput, aggregates: Record<string, RawExpression>): this;
   public groupBy(fields: GroupByInput, aggregates?: Record<string, RawExpression>): this {
+    // Grouped rows are report rows, not model instances
+    this.hydrateCallback = undefined;
+
     if (aggregates) {
       this.operationsHelper.addGroupOperation(
         "groupByWithAggregates",
@@ -1501,6 +1534,9 @@ export class MongoQueryBuilder<T = unknown>
     unit: "day" | "week" | "month" | "year",
     aggregates?: Record<string, RawExpression>,
   ): this {
+    // Grouped rows are report rows, not model instances
+    this.hydrateCallback = undefined;
+
     this.operationsHelper.addGroupOperation(
       "groupByDate",
       { column, unit, aggregates: aggregates ?? {} },
@@ -2061,7 +2097,7 @@ export class MongoQueryBuilder<T = unknown>
    * @param field - The numeric field to average
    * @returns the average value
    */
-  public async avg(field: string): Promise<number> {
+  public async avg(field: string): Promise<number | null> {
     this.groupByRaw({
       _id: null,
       average: { $avg: `$${field}` },
@@ -2070,7 +2106,7 @@ export class MongoQueryBuilder<T = unknown>
     // make sure to clear the data map callback
     this.hydrateCallback = undefined;
 
-    return (await this.getFirst<{ average: number }>())?.average ?? 0;
+    return (await this.getFirst<{ average: number }>())?.average ?? null;
   }
 
   /**
@@ -2078,7 +2114,7 @@ export class MongoQueryBuilder<T = unknown>
    * @param field - The field to find the minimum of
    * @returns the minimum value
    */
-  public async min(field: string): Promise<number> {
+  public async min<V = number>(field: string): Promise<V | null> {
     this.groupByRaw({
       _id: null,
       minimum: { $min: `$${field}` },
@@ -2087,7 +2123,7 @@ export class MongoQueryBuilder<T = unknown>
     // make sure to clear the data map callback
     this.hydrateCallback = undefined;
 
-    return (await this.getFirst<{ minimum: number }>())?.minimum ?? 0;
+    return (await this.getFirst<{ minimum: V }>())?.minimum ?? null;
   }
 
   /**
@@ -2095,7 +2131,7 @@ export class MongoQueryBuilder<T = unknown>
    * @param field - The field to find the maximum of
    * @returns the maximum value
    */
-  public async max(field: string): Promise<number> {
+  public async max<V = number>(field: string): Promise<V | null> {
     this.groupByRaw({
       _id: null,
       maximum: { $max: `$${field}` },
@@ -2104,7 +2140,7 @@ export class MongoQueryBuilder<T = unknown>
     // make sure to clear the data map callback
     this.hydrateCallback = undefined;
 
-    return (await this.getFirst<{ maximum: number }>())?.maximum ?? 0;
+    return (await this.getFirst<{ maximum: V }>())?.maximum ?? null;
   }
 
   /**
@@ -2500,14 +2536,8 @@ export class MongoQueryBuilder<T = unknown>
    * @returns The MongoDB filter object
    */
   protected buildFilter(): Record<string, unknown> {
-    // Get all match operations
-    const matchOperations = this.operations.filter((op) => op.stage === "$match");
-
-    if (matchOperations.length === 0) {
-      return {}; // No filters, match all documents
-    }
-
-    // Build the pipeline and extract the first $match stage
+    // Build the pipeline (this applies pending scopes, even with no user filters)
+    // and extract the first $match stage
     const pipeline = this.buildPipeline();
     const matchStage = pipeline.find((stage) => stage.$match);
 

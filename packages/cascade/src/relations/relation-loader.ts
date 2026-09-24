@@ -190,12 +190,47 @@ export class RelationLoader<TModel extends Model = Model> {
     // Normalize to array
     const relationNames = Array.isArray(relations) ? relations : [relations];
 
-    // Load each relation
+    // Group the paths into a tree keyed by root relation, so a shared prefix
+    // ("posts.comments", "posts.tags") is loaded ONCE and every child path is
+    // loaded onto those same instances instead of overwriting them.
+    const nodes = new Map<
+      string,
+      {
+        constraint?: RelationConstraintCallback;
+        children: string[];
+        childConstraints: RelationConstraints;
+      }
+    >();
+
     for (const relationName of relationNames) {
+      const [root, ...rest] = this.parseNestedRelation(relationName);
+      const key = root ?? relationName;
+
+      if (!nodes.has(key)) {
+        nodes.set(key, { children: [], childConstraints: {} });
+      }
+
+      const node = nodes.get(key)!;
       const constraint = constraints?.[relationName];
       const callbackConstraint = typeof constraint === "function" ? constraint : undefined;
 
-      await this.loadRelation(relationName, callbackConstraint);
+      if (rest.length === 0) {
+        // A constraint belongs to the LAST segment of its path only.
+        if (callbackConstraint) node.constraint = callbackConstraint;
+        continue;
+      }
+
+      const childPath = rest.join(".");
+
+      if (!node.children.includes(childPath)) {
+        node.children.push(childPath);
+      }
+
+      if (callbackConstraint) node.childConstraints[childPath] = callbackConstraint;
+    }
+
+    for (const [root, node] of nodes) {
+      await this.loadRelation(root, node.constraint, node.children, node.childConstraints);
     }
   }
 
@@ -204,14 +239,21 @@ export class RelationLoader<TModel extends Model = Model> {
   // ==========================================================================
 
   /**
-   * Loads a single relation, handling nested relations via dot notation.
+   * Loads a single (root) relation once, then its child paths onto the same
+   * loaded instances.
    *
-   * @param name - The relation name, possibly with dot notation for nesting
-   * @param constraint - Optional constraint callback
+   * @param name - The root relation name
+   * @param constraint - Optional constraint callback, applied to this relation only
+   * @param children - Remaining dot paths below this relation
+   * @param childConstraints - Constraints keyed by the remaining dot paths
    */
-  private async loadRelation(name: string, constraint?: RelationConstraintCallback): Promise<void> {
-    const path = this.parseNestedRelation(name);
-    const rootRelation = path[0];
+  private async loadRelation(
+    name: string,
+    constraint?: RelationConstraintCallback,
+    children: string[] = [],
+    childConstraints: RelationConstraints = {},
+  ): Promise<void> {
+    const rootRelation: string | undefined = name || undefined;
 
     // An empty parse would otherwise reach `getRelationDefinition(undefined)`
     // and fail as `Relation "undefined" is not defined on model "X"` — a
@@ -254,8 +296,8 @@ export class RelationLoader<TModel extends Model = Model> {
     }
 
     // If there are nested relations, load them recursively
-    if (path.length > 1) {
-      await this.loadNestedRelations(rootRelation, path.slice(1), constraint);
+    if (children.length > 0) {
+      await this.loadNestedRelations(rootRelation, children, childConstraints);
     }
   }
 
@@ -490,13 +532,13 @@ export class RelationLoader<TModel extends Model = Model> {
    * Loads nested relations recursively.
    *
    * @param parentRelation - The name of the parent relation
-   * @param remainingPath - The remaining path segments to load
-   * @param constraint - Optional constraint callback
+   * @param remainingPaths - The remaining dot paths to load below the parent
+   * @param constraints - Constraints keyed by those remaining paths
    */
   private async loadNestedRelations(
     parentRelation: string,
-    remainingPath: string[],
-    constraint?: RelationConstraintCallback,
+    remainingPaths: string[],
+    constraints: RelationConstraints,
   ): Promise<void> {
     // Collect all loaded related models from the parent relation
     const relatedModels: Model[] = [];
@@ -525,8 +567,7 @@ export class RelationLoader<TModel extends Model = Model> {
     const nestedLoader = new RelationLoader(relatedModels, RelatedModelClass as ChildModel<Model>);
 
     // Load the next level
-    const nextRelation = remainingPath.join(".");
-    await nestedLoader.load(nextRelation, constraint ? { [nextRelation]: constraint } : undefined);
+    await nestedLoader.load(remainingPaths, constraints);
   }
 
   // ==========================================================================

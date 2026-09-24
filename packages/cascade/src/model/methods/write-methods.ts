@@ -2,6 +2,7 @@ import { DatabaseWriter } from "../../writer/database-writer";
 import type { InsertResult, WriterOptions } from "../../contracts";
 import type { ChildModel, Model, ModelSchema } from "../model";
 import { mergeDriverFields } from "./accessor-methods";
+import { sanitizeFilter } from "../../utils/sanitize-filter";
 import { emitModelEvent } from "./instance-event-methods";
 
 /**
@@ -233,11 +234,11 @@ async function assignIdBlock<TModel extends Model>(
  * touching the database, then flush each chunk with a single
  * `driver.insertMany` call.
  *
- * The writer reuse is achieved by swapping the driver's single-row `insert`
- * for a capturing stub for the lifetime of the bulk operation: running
+ * The writer reuse is achieved by giving each bulk writer a private capturing
+ * view of the driver (prototype-linked, `insert` overridden): running
  * `writer.save({ skipEvents, skipSync })` exercises the real prep but records
- * the prepared document instead of issuing N single-row inserts. The original
- * `insert` is always restored in `finally`.
+ * the prepared document instead of issuing N single-row inserts. The shared
+ * driver is never mutated, so concurrent `save()` calls are unaffected.
  *
  * @param ModelClass - The model class to create records for.
  * @param chunks - Pre-chunked rows.
@@ -250,23 +251,21 @@ async function createManyBulk<
   const dataSource = ModelClass.getDataSource();
   const driver = dataSource.driver;
   const table = ModelClass.table;
-  // Keep the exact original reference so it can be restored verbatim (binding a
-  // copy would, for a spied driver, replace the spy with a non-spy wrapper).
-  const originalInsert = driver.insert;
 
-  // Capture the prepared (validated/casted/timestamped/id-generated) document
-  // instead of inserting it per row, so the writer's prep runs exactly once
-  // per model while the actual write is deferred to a single insertMany.
-  driver.insert = (async (
-    _table: string,
-    document: Record<string, unknown>,
-  ): Promise<InsertResult> => {
-    return { document };
-  }) as typeof driver.insert;
+  // Capturing view of the driver, private to the bulk writers: it records the
+  // prepared (validated/casted/timestamped/id-generated) document instead of
+  // inserting it, while the shared driver instance is never mutated.
+  const capturingDriver = Object.create(driver, {
+    insert: {
+      value: async (_table: string, document: Record<string, unknown>): Promise<InsertResult> => {
+        return { document };
+      },
+    },
+  });
 
   const created: TModel[] = [];
 
-  try {
+  {
     for (const chunk of chunks) {
       const models = chunk.map((item) => new ModelClass(item)) as TModel[];
 
@@ -281,6 +280,9 @@ async function createManyBulk<
       const preparedDocuments = await Promise.all(
         models.map(async (model) => {
           const writer = new DatabaseWriter(model);
+          // Redirect only THIS writer to the capturing view (no seam exists in
+          // DatabaseWriter for "prepare but don't write").
+          (writer as unknown as { driver: unknown }).driver = capturingDriver;
           await writer.save({ skipEvents: true, skipSync: true });
           return { ...model.data } as Record<string, unknown>;
         }),
@@ -311,8 +313,6 @@ async function createManyBulk<
 
       created.push(...models);
     }
-  } finally {
-    driver.insert = originalInsert;
   }
 
   return created;
@@ -345,40 +345,58 @@ export async function upsertRecord<
   options?: Record<string, unknown>,
 ): Promise<TModel> {
   const driver = ModelClass.getDriver();
-  const mergedData = { ...filter, ...data } as Record<string, unknown>;
+  const safeFilter = sanitizeFilter(filter as Record<string, unknown>);
+  const mergedData = { ...safeFilter, ...data } as Record<string, unknown>;
 
   const tempModel = new ModelClass(mergedData as Partial<TSchema>);
   tempModel.isNew = true;
 
+  // One `saving` run against the model itself, so listener changes (slug,
+  // createdBy, ...) land in the data that is written.
   await emitModelEvent(tempModel, "saving", {
     isInsert: true,
     options,
     mode: "upsert",
   });
 
-  const createdAtColumn = ModelClass.createdAtColumn;
-  const updatedAtColumn = ModelClass.updatedAtColumn;
+  // Validation, casting and Mongo id generation, same as `create()`.
+  await new DatabaseWriter(tempModel).prepareForUpsert();
 
-  if (createdAtColumn !== false && createdAtColumn !== undefined) {
-    const createdAtKey = createdAtColumn as string;
-    if (!mergedData[createdAtKey]) {
-      mergedData[createdAtKey] = new Date();
+  const setData: Record<string, unknown> = { ...tempModel.data };
+  const setOnInsert: Record<string, unknown> = {};
+  const now = new Date();
+
+  // Identity and creation time belong to the insert only; an existing row
+  // keeps its own.
+  for (const key of new Set(["id", "_id", ModelClass.primaryKey])) {
+    if (key in setData) {
+      setOnInsert[key] = setData[key];
+      delete setData[key];
     }
   }
 
-  if (updatedAtColumn !== false && updatedAtColumn !== undefined) {
-    const updatedAtKey = updatedAtColumn as string;
-    mergedData[updatedAtKey] = new Date();
+  const createdAtColumn = ModelClass.createdAtColumn;
+  if (createdAtColumn) {
+    setOnInsert[createdAtColumn] = setData[createdAtColumn] ?? now;
+    delete setData[createdAtColumn];
   }
 
-  await emitModelEvent(tempModel, "saving", { filter, data: mergedData, options, mode: "upsert" });
+  const updatedAtColumn = ModelClass.updatedAtColumn;
+  if (updatedAtColumn) {
+    setData[updatedAtColumn] = now;
+  }
 
-  const result = await driver.upsert(ModelClass.table, filter as Record<string, unknown>, mergedData, options);
+  const result = await driver.findOneAndUpdate(
+    ModelClass.table,
+    safeFilter,
+    { $set: setData, $setOnInsert: setOnInsert },
+    { ...options, upsert: true, returnDocument: "after" },
+  );
 
   const model = ModelClass.hydrate(result as Record<string, unknown>) as TModel;
   model.dirtyTracker.reset();
 
-  await emitModelEvent(model, "saved", { filter, data: result, options, mode: "upsert" });
+  await emitModelEvent(model, "saved", { filter: safeFilter, data: result, options, mode: "upsert" });
 
   return model;
 }

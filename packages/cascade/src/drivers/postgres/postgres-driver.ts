@@ -135,6 +135,11 @@ async function loadPg(): Promise<typeof import("pg")> {
 }
 
 /**
+ * Transaction session -> the driver (data source) that opened it.
+ */
+const transactionOwners = new WeakMap<object, PostgresDriver>();
+
+/**
  * PostgreSQL database driver implementing the Cascade DriverContract.
  *
  * Provides connection pooling, CRUD operations, transactions, and
@@ -1115,8 +1120,7 @@ export class PostgresDriver implements DriverContract {
     const quotedTable = this.dialect.quoteIdentifier(table);
     const { whereClause, whereParams } = this.buildWhereClause(filter, 1);
 
-    // Use ctid for single row deletion with RETURNING
-    const sql = `DELETE FROM ${quotedTable} WHERE ctid IN (SELECT ctid FROM ${quotedTable} ${whereClause} LIMIT 1) RETURNING *`;
+    const sql = `${this.singleRowTarget("DELETE FROM " + quotedTable, quotedTable, filter, whereClause)} RETURNING *`;
 
     const result = await this.query<T>(sql, whereParams);
 
@@ -1139,8 +1143,12 @@ export class PostgresDriver implements DriverContract {
     const quotedTable = this.dialect.quoteIdentifier(table);
     const { whereClause, whereParams } = this.buildWhereClause(filter ?? {}, 1);
 
-    // Use ctid for single row deletion
-    const sql = `DELETE FROM ${quotedTable} WHERE ctid IN (SELECT ctid FROM ${quotedTable} ${whereClause} LIMIT 1)`;
+    const sql = this.singleRowTarget(
+      "DELETE FROM " + quotedTable,
+      quotedTable,
+      filter ?? {},
+      whereClause,
+    );
 
     const result = await this.query(sql, whereParams);
 
@@ -1300,14 +1308,15 @@ export class PostgresDriver implements DriverContract {
     // runs on the same session, and a throw still unwinds the whole outer
     // transaction. (Savepoint-based partial rollback is a separate, explicit
     // concern — use `beginTransaction()` directly for that.)
-    if (databaseTransactionContext.hasActiveTransaction()) {
+    if (this.canJoinActiveTransaction()) {
       return fn(ctx);
     }
 
     const tx = await this.beginTransaction(options);
 
-    // Set transaction context for queries within callback
-    databaseTransactionContext.enter({ session: tx.context });
+    // Tag the session with this driver so another data source's queries
+    // running inside the callback never pick it up.
+    transactionOwners.set(tx.context as object, this);
 
     // Tracks whether tx.commit() was reached, so the catch block below can
     // tell a callback failure (client still live, must ROLLBACK) apart from
@@ -1318,8 +1327,11 @@ export class PostgresDriver implements DriverContract {
 
     // Filled only after a successful COMMIT; flushed once the context is gone.
     let committedCallbacks: Array<() => void | Promise<void>> = [];
-    let result: T;
+    let result!: T;
 
+    // Run the callback INSIDE the async context (not enter-after-await) so every
+    // query it starts — even without the client passed — uses the transaction.
+    await databaseTransactionContext.run({ session: tx.context, afterCommit: [] }, async () => {
     try {
       // Execute callback
       result = await fn(ctx);
@@ -1328,7 +1340,7 @@ export class PostgresDriver implements DriverContract {
       commitStarted = true;
       await tx.commit();
 
-      // Read the queue BEFORE exit() clears it
+      // Read the queue while still inside the transaction context
       committedCallbacks = databaseTransactionContext.takeAfterCommit();
     } catch (error) {
       if (commitStarted) {
@@ -1355,10 +1367,8 @@ export class PostgresDriver implements DriverContract {
         }
       }
       throw error;
-    } finally {
-      // Guaranteed cleanup
-      databaseTransactionContext.exit();
     }
+    });
 
     // Committed and outside the transaction context: run afterCommit() hooks
     await flushAfterCommit(committedCallbacks);
@@ -1440,6 +1450,31 @@ export class PostgresDriver implements DriverContract {
   }
 
   /**
+   * Whether an active transaction can be joined: one exists and it is not
+   * owned by a different data source (sessions opened outside `transaction()`
+   * carry no owner tag and are joinable).
+   */
+  private canJoinActiveTransaction(): boolean {
+    const session = databaseTransactionContext.getSession<object>();
+
+    if (!session) return false;
+
+    const owner = transactionOwners.get(session);
+
+    return owner === undefined || owner === this;
+  }
+
+  /**
+   * The ambient transaction session, only when it belongs to this driver's
+   * data source.
+   */
+  private getOwnSession(): unknown {
+    const session = databaseTransactionContext.getSession<object>();
+
+    return session && transactionOwners.get(session) === this ? session : undefined;
+  }
+
+  /**
    * Execute a raw SQL query.
    *
    * Automatically uses the transaction client if one is active.
@@ -1453,7 +1488,7 @@ export class PostgresDriver implements DriverContract {
     params: unknown[] = [],
   ): Promise<PostgresQueryResult<T>> {
     // Check for active transaction client
-    const txClient = databaseTransactionContext.getSession() as PgPoolClient | undefined;
+    const txClient = this.getOwnSession() as PgPoolClient | undefined;
 
     const startTime = this.config.logging ? performance.now() : 0;
 
@@ -1732,14 +1767,40 @@ export class PostgresDriver implements DriverContract {
     const { whereClause, whereParams } = this.buildWhereClause(filter, set.nextIndex);
     params.push(...whereParams);
 
-    let sql = `UPDATE ${quotedTable} SET ${set.clauses.join(", ")} ${whereClause}`;
-
-    // For single row update, use ctid subquery
-    if (limit === 1 && whereClause) {
-      sql = `UPDATE ${quotedTable} SET ${set.clauses.join(", ")} WHERE ctid IN (SELECT ctid FROM ${quotedTable} ${whereClause} LIMIT 1)`;
-    }
+    const head = `UPDATE ${quotedTable} SET ${set.clauses.join(", ")}`;
+    const sql =
+      limit === 1 && whereClause
+        ? this.singleRowTarget(head, quotedTable, filter, whereClause)
+        : `${head} ${whereClause}`;
 
     return { sql, params };
+  }
+
+  /**
+   * Build the `<head> WHERE ...` statement for a single-row UPDATE/DELETE.
+   *
+   * A filter pinned to the primary key (`id = <value>`) already matches at most
+   * one row, so it is used as-is: a ctid subquery would re-check a stale tuple
+   * after waiting on a concurrent write and silently update 0 rows.
+   * Without a PK, the ctid subquery locks its candidate with
+   * `FOR UPDATE SKIP LOCKED` so concurrent callers claim different rows
+   * instead of losing the write.
+   */
+  private singleRowTarget(
+    head: string,
+    quotedTable: string,
+    filter: Record<string, unknown>,
+    whereClause: string,
+  ): string {
+    const id = filter.id;
+    const pinnedToPrimaryKey =
+      id !== undefined && id !== null && (typeof id !== "object" || id instanceof Date);
+
+    if (pinnedToPrimaryKey) {
+      return `${head} ${whereClause}`;
+    }
+
+    return `${head} WHERE ctid IN (SELECT ctid FROM ${quotedTable} ${whereClause} LIMIT 1 FOR UPDATE SKIP LOCKED)`;
   }
 
   // ============================================================

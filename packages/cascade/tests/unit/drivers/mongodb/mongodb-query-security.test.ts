@@ -305,35 +305,47 @@ describe("MongoQueryBuilder — filter security", () => {
   });
 
   describe("delete statics filter sanitization", () => {
-    function fakeModelClass(deleteMany: ReturnType<typeof vi.fn>) {
+    // Deletes go through the scoped query builder; `where` records the
+    // sanitized filter and `remove` stands in for the builder's delete().
+    function fakeModelClass(where: ReturnType<typeof vi.fn>, remove = vi.fn()) {
       return {
+        name: "User",
         table: "users",
-        getDriver: () => ({ deleteMany }),
+        query: () => ({ where, delete: remove }),
       } as never;
     }
 
     it("rejects operator keys in a deleteMany filter", async () => {
-      const deleteMany = vi.fn().mockResolvedValue(0);
+      const remove = vi.fn().mockResolvedValue(0);
+      const where = vi.fn().mockReturnThis();
 
-      await expect(deleteRecords(fakeModelClass(deleteMany), { role: { $ne: "admin" } })).rejects.toThrow(
-        UnsafeFilterError,
-      );
-      expect(deleteMany).not.toHaveBeenCalled();
+      await expect(
+        deleteRecords(fakeModelClass(where, remove), { role: { $ne: "admin" } }),
+      ).rejects.toThrow(UnsafeFilterError);
+      expect(where).not.toHaveBeenCalled();
+      expect(remove).not.toHaveBeenCalled();
     });
 
     it("still forwards plain equality deleteMany filters", async () => {
-      const deleteMany = vi.fn().mockResolvedValue(2);
+      const remove = vi.fn().mockResolvedValue(2);
+      const where = vi.fn().mockReturnThis();
 
-      await expect(deleteRecords(fakeModelClass(deleteMany), { role: "member" })).resolves.toBe(2);
-      expect(deleteMany).toHaveBeenCalledWith("users", { role: "member" });
+      await expect(deleteRecords(fakeModelClass(where, remove), { role: "member" })).resolves.toBe(2);
+      expect(where).toHaveBeenCalledWith({ role: "member" });
+      expect(remove).toHaveBeenCalled();
     });
   });
 
   describe("atomic/find-and-modify statics filter sanitization", () => {
+    // Writes are pinned to scope-visible ids resolved through the scoped query
+    // builder, so the fake exposes two visible rows (ids 1 and 2).
     function fakeModelClass(driver: Record<string, ReturnType<typeof vi.fn>>) {
       return {
+        name: "User",
         table: "users",
+        primaryKey: "id",
         getDriver: () => driver,
+        query: () => ({ where: () => ({ pluck: async () => [1, 2] }) }),
       } as never;
     }
 
@@ -354,7 +366,7 @@ describe("MongoQueryBuilder — filter security", () => {
       ).resolves.toBe(2);
       expect(atomic).toHaveBeenCalledWith(
         "users",
-        { role: "member" },
+        { role: "member", id: { $in: [1, 2] } },
         { $inc: { age: 1 } },
         undefined,
       );
@@ -385,7 +397,7 @@ describe("MongoQueryBuilder — filter security", () => {
       ).resolves.toBeNull();
       expect(findOneAndUpdate).toHaveBeenCalledWith(
         "users",
-        { email: "a@b.c" },
+        { email: "a@b.c", id: 1 },
         { $set: { visited: true } },
         undefined,
       );

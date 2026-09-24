@@ -109,8 +109,8 @@ describe("validation/rules — exists & unique", () => {
       );
 
       expect(result).toEqual({ isValid: true });
-      // Defaults the column to the context key.
-      expect(fake.wheres[0]).toEqual(["email", "a@b.com"]);
+      // Defaults the column to the model primary key, not the context key.
+      expect(fake.wheres[0]).toEqual(["id", "a@b.com"]);
     });
 
     it("is invalid when no document matches", async () => {

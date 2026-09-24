@@ -192,6 +192,53 @@ function toDriverOptions<TOptions extends AtomicUpdateOptions>(
 }
 
 /**
+ * Pin a driver-level write to the rows the model's global scopes (tenant, soft
+ * delete) allow. The driver write APIs take a raw filter and never see scopes,
+ * so the target ids are resolved through the scoped query builder and added to
+ * the filter. `null` means no visible row matches: the write must be a no-op.
+ */
+export async function scopeWriteFilter(
+  ModelClass: ChildModel<any>,
+  filter: Record<string, unknown>,
+  single: boolean,
+): Promise<Record<string, unknown> | null> {
+  const primaryKey = ModelClass.primaryKey;
+  const ids = await ModelClass.query().where(filter).pluck(primaryKey);
+
+  if (ids.length === 0) {
+    return null;
+  }
+
+  return { ...filter, [primaryKey]: single ? ids[0] : { $in: ids } };
+}
+
+/**
+ * Scoped filter for a write that may insert (`upsert`). With no visible match
+ * the driver would insert or, worse, update a row a scope hides (another
+ * tenant's, a soft-deleted one), so a hidden match is refused.
+ */
+export async function scopeUpsertFilter(
+  ModelClass: ChildModel<any>,
+  filter: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const scoped = await scopeWriteFilter(ModelClass, filter, true);
+
+  if (scoped) {
+    return scoped;
+  }
+
+  const hidden = await ModelClass.query().withoutGlobalScopes().where(filter).exists();
+
+  if (hidden) {
+    throw new Error(
+      `${ModelClass.name}: upsert matches a row hidden by a global scope (tenant or soft delete); refusing to touch it.`,
+    );
+  }
+
+  return filter;
+}
+
+/**
  * Run an atomic update and return the number of documents modified plus the
  * number inserted by an `upsert`.
  */
@@ -201,9 +248,18 @@ export async function performAtomic<TModel extends Model>(
   operations: AtomicUpdate,
   options?: AtomicUpdateOptions,
 ): Promise<number> {
+  const resolved = resolveFilter(filter, options);
+  const scoped = options?.upsert
+    ? await scopeUpsertFilter(ModelClass, resolved)
+    : await scopeWriteFilter(ModelClass, resolved, false);
+
+  if (!scoped) {
+    return 0;
+  }
+
   const result = await ModelClass.getDriver().atomic(
     ModelClass.table,
-    resolveFilter(filter, options),
+    scoped,
     operations,
     toDriverOptions(options),
   );
@@ -216,7 +272,13 @@ export async function updateById<TModel extends Model>(
   id: string | number,
   data: Record<string, unknown>,
 ): Promise<number> {
-  const result = await ModelClass.getDriver().update(ModelClass.table, { [ModelClass.primaryKey]: id }, { $set: data });
+  const scoped = await scopeWriteFilter(ModelClass, { [ModelClass.primaryKey]: id }, true);
+
+  if (!scoped) {
+    return 0;
+  }
+
+  const result = await ModelClass.getDriver().update(ModelClass.table, scoped, { $set: data });
   return result.modifiedCount;
 }
 
@@ -236,15 +298,21 @@ export async function findOneAndUpdateRecord<TModel extends Model>(
   update: AtomicUpdate,
   options?: FindOneAndUpdateOptions,
 ): Promise<TModel | null> {
+  const resolved = resolveFilter(filter, options);
+  const scoped = options?.upsert
+    ? await scopeUpsertFilter(ModelClass, resolved)
+    : await scopeWriteFilter(ModelClass, resolved, true);
+
+  if (!scoped) return null;
+
   const result = await ModelClass.getDriver().findOneAndUpdate(
     ModelClass.table,
-    resolveFilter(filter, options),
+    scoped,
     update,
     toDriverOptions(options),
   );
   if (!result) return null;
-  const ctor = ModelClass as any;
-  return new ctor(result);
+  return ModelClass.hydrate(result as Record<string, unknown>) as TModel;
 }
 
 export async function findAndReplaceRecord<TModel extends Model>(
@@ -252,14 +320,13 @@ export async function findAndReplaceRecord<TModel extends Model>(
   filter: Record<string, unknown>,
   document: Record<string, unknown>,
 ): Promise<TModel | null> {
-  const result = await ModelClass.getDriver().replace(
-    ModelClass.table,
-    sanitizeFilter(filter),
-    document,
-  );
+  const scoped = await scopeWriteFilter(ModelClass, sanitizeFilter(filter), true);
+
+  if (!scoped) return null;
+
+  const result = await ModelClass.getDriver().replace(ModelClass.table, scoped, document);
   if (!result) return null;
-  const ctor = ModelClass as any;
-  return new ctor(result);
+  return ModelClass.hydrate(result as Record<string, unknown>) as TModel;
 }
 
 export async function findOneAndDeleteRecord<TModel extends Model>(
@@ -267,8 +334,13 @@ export async function findOneAndDeleteRecord<TModel extends Model>(
   filter: Record<string, unknown>,
   options?: Record<string, unknown>,
 ): Promise<TModel | null> {
-  const driver = ModelClass.getDriver();
-  const result = await driver.findOneAndDelete(ModelClass.table, sanitizeFilter(filter), options);
+  const scoped = await scopeWriteFilter(ModelClass, sanitizeFilter(filter), true);
+
+  if (!scoped) {
+    return null;
+  }
+
+  const result = await ModelClass.getDriver().findOneAndDelete(ModelClass.table, scoped, options);
 
   if (!result) {
     return null;

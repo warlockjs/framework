@@ -1,5 +1,5 @@
 import { Context } from "@warlock.js/context";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { databaseDataSourceContext } from "../../../src/context/database-data-source-context";
 import { DataSource } from "../../../src/data-source/data-source";
 import { dataSourceRegistry } from "../../../src/data-source/data-source-registry";
@@ -7,6 +7,10 @@ import { MissingDataSourceError } from "../../../src/errors/missing-data-source.
 import { createMockDriver } from "../../helpers/mock-driver";
 
 describe("DataSourceRegistry", () => {
+  beforeEach(() => {
+    dataSourceRegistry.clear();
+  });
+
   describe("register()", () => {
     it("should add data source to registry", () => {
       const mockDriver = createMockDriver("postgres");

@@ -57,6 +57,9 @@ export class DatabaseWriter implements WriterContract {
   /** The model instance being persisted */
   private readonly model: Model;
 
+  /** Dirty columns an update validation dropped (strip mode); never written. */
+  private readonly unvalidatedColumns = new Set<string>();
+
   /** Model constructor reference */
   private readonly ctor: ChildModel<Model>;
 
@@ -222,9 +225,22 @@ export class DatabaseWriter implements WriterContract {
     };
 
     // Clone full schema for insert, partial (dirty keys only) for updates.
+    //
+    // An update validates ONLY the dirty columns and merges back only those
+    // keys: columns the schema does not list (migration-added, withCount, ...)
+    // are never touched, so they can no longer be turned into `$unset`.
+    const dataToValidate: Record<string, unknown> = isInsert
+      ? this.model.data
+      : Object.fromEntries(
+          this.model
+            .getDirtyColumns()
+            .filter(column => column in this.model.data)
+            .map(column => [column, this.model.data[column]]),
+        );
+
     const validationSchema = isInsert
       ? this.schema.clone().extend(systemColumns)
-      : this.schema.clone(Object.keys(this.model.data)).extend(systemColumns);
+      : this.schema.clone(Object.keys(dataToValidate)).extend(systemColumns);
 
     // Apply strict mode
     if (this.strictMode === "strip") {
@@ -236,7 +252,7 @@ export class DatabaseWriter implements WriterContract {
     }
 
     // Run validation
-    const result = await v.validate(validationSchema, this.model.data, {
+    const result = await v.validate(validationSchema, dataToValidate, {
       context: {
         model: this.model,
       },
@@ -257,12 +273,36 @@ export class DatabaseWriter implements WriterContract {
     }
 
     // Update model data with validated/casted data
-    this.model.replaceData(result.data);
+    if (isInsert) {
+      this.model.replaceData(result.data);
+    } else {
+      const validated = result.data as Record<string, unknown>;
+
+      for (const column of Object.keys(dataToValidate)) {
+        if (column in validated) {
+          this.model.set(column, validated[column]);
+        } else {
+          // Dropped by strictMode "strip": never write an unvalidated column.
+          this.unvalidatedColumns.add(column);
+        }
+      }
+    }
 
     // Emit validated event
     if (!options.skipEvents) {
       await this.model.emitEvent("validated", { result });
     }
+  }
+
+  /**
+   * Validate, cast and id-generate a not-yet-persisted model for `upsert()`.
+   *
+   * Runs the insert-mode pipeline (schema, casts, strictMode, Mongo `id`) but
+   * does not write; the caller sends the resulting data through the driver.
+   */
+  public async prepareForUpsert(): Promise<void> {
+    await this.validateAndCast(true, {});
+    await this.generateNextId();
   }
 
   /**
@@ -446,7 +486,7 @@ export class DatabaseWriter implements WriterContract {
     // Get dirty columns (modified fields)
     const dirtyColumns = this.model
       .getDirtyColumns()
-      .filter(column => !identityColumns.has(column));
+      .filter(column => !identityColumns.has(column) && !this.unvalidatedColumns.has(column));
 
     if (dirtyColumns.length > 0) {
       operations.$set = {};

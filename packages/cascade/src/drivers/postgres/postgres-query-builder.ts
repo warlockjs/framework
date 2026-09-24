@@ -47,6 +47,22 @@ import { PostgresQueryParser, type PostgresParserOperation } from "./postgres-qu
  * Cast an Op[] to PostgresParserOperation[] — the shapes are compatible since
  * both have `type: string` and `data: Record<string, unknown>`.
  */
+/**
+ * Normalise a MIN/MAX result: null stays null, numeric strings (pg returns
+ * NUMERIC/BIGINT as text) are parsed, anything else (dates, text) is untouched.
+ */
+function parseAggregateValue<V>(value: unknown): V | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value)) {
+    return parseFloat(value) as V;
+  }
+
+  return value as V;
+}
+
 function toParserOps(ops: Op[]): PostgresParserOperation[] {
   return ops as unknown as PostgresParserOperation[];
 }
@@ -274,6 +290,9 @@ export class PostgresQueryBuilder<T = unknown>
   public groupBy(fields: GroupByInput): this;
   public groupBy(fields: GroupByInput, aggregates: Record<string, RawExpression>): this;
   public groupBy(fields: GroupByInput, aggregates?: Record<string, RawExpression>): this {
+    // Grouped rows are report rows, not model instances
+    this.hydrateCallback = undefined;
+
     if (!aggregates) {
       return super.groupBy(fields);
     }
@@ -314,6 +333,9 @@ export class PostgresQueryBuilder<T = unknown>
     unit: "day" | "week" | "month" | "year",
     aggregates?: Record<string, RawExpression>,
   ): this {
+    // Grouped rows are report rows, not model instances
+    this.hydrateCallback = undefined;
+
     const bucketSql = this.driver.dialect.dateTruncSql(column, unit);
 
     // Project the bucket under the column's own name so the result row carries
@@ -501,7 +523,33 @@ export class PostgresQueryBuilder<T = unknown>
       }
     }
 
-    this.operations = [...beforeOps, ...this.operations, ...afterOps];
+    // Relation-existence ops are rewritten later by `applyHasRelations()`, which
+    // only looks at top-level ops, so they stay outside the groups.
+    const HAS_OP_TYPES = new Set(["has", "whereHas", "orWhereHas", "doesntHave", "whereDoesntHave"]);
+    const isFilter = (op: Op): boolean =>
+      /^(or)?where/i.test(op.type) && !HAS_OP_TYPES.has(op.type);
+
+    const scopeFilters = [...beforeOps, ...afterOps].filter(isFilter);
+
+    // No filtering scope: nothing can be escaped, keep the ops as they are.
+    if (scopeFilters.length === 0) {
+      this.operations = [...beforeOps, ...this.operations, ...afterOps];
+      this.scopesApplied = true;
+      return;
+    }
+
+    // `(scopes) AND (user conditions)`: a user `orWhere` must never widen the
+    // scopes (tenant, soft delete).
+    const userFilters = this.operations.filter(isFilter);
+    const userRest = this.operations.filter((op) => !isFilter(op));
+
+    this.operations = [
+      { type: "where", data: { nested: scopeFilters } },
+      ...beforeOps.filter((op) => !isFilter(op)),
+      ...(userFilters.length > 0 ? [{ type: "where", data: { nested: userFilters } }] : []),
+      ...userRest,
+      ...afterOps.filter((op) => !isFilter(op)),
+    ];
     this.scopesApplied = true;
   }
 
@@ -848,32 +896,38 @@ export class PostgresQueryBuilder<T = unknown>
     this.applyPendingScopes();
     // Scalar reads bypass model hydration — the aggregate row is not a model.
     this.hydrateCallback = undefined;
-    const result = await this.selectRaw(`SUM(${field}) as sum`).first<{ sum: string }>();
+    const result = await this.selectRaw(`SUM(${this.driver.dialect.quoteIdentifier(field)}) as sum`).first<{ sum: string }>();
     return parseFloat(result?.sum ?? "0");
   }
 
   /** AVG of a numeric field. */
-  public async avg(field: string): Promise<number> {
+  public async avg(field: string): Promise<number | null> {
     this.applyPendingScopes();
     this.hydrateCallback = undefined;
-    const result = await this.selectRaw(`AVG(${field}) as avg`).first<{ avg: string }>();
-    return parseFloat(result?.avg ?? "0");
+    const result = await this.selectRaw(
+      `AVG(${this.driver.dialect.quoteIdentifier(field)}) as avg`,
+    ).first<{ avg: string | null }>();
+    return result?.avg == null ? null : parseFloat(result.avg);
   }
 
-  /** MIN of a numeric field. */
-  public async min(field: string): Promise<number> {
+  /** MIN of a field; null for an empty set. Numeric columns are parsed, other types returned as-is. */
+  public async min<V = number>(field: string): Promise<V | null> {
     this.applyPendingScopes();
     this.hydrateCallback = undefined;
-    const result = await this.selectRaw(`MIN(${field}) as min`).first<{ min: string }>();
-    return parseFloat(result?.min ?? "0");
+    const result = await this.selectRaw(
+      `MIN(${this.driver.dialect.quoteIdentifier(field)}) as min`,
+    ).first<{ min: unknown }>();
+    return parseAggregateValue<V>(result?.min);
   }
 
-  /** MAX of a numeric field. */
-  public async max(field: string): Promise<number> {
+  /** MAX of a field; null for an empty set. Numeric columns are parsed, other types returned as-is. */
+  public async max<V = number>(field: string): Promise<V | null> {
     this.applyPendingScopes();
     this.hydrateCallback = undefined;
-    const result = await this.selectRaw(`MAX(${field}) as max`).first<{ max: string }>();
-    return parseFloat(result?.max ?? "0");
+    const result = await this.selectRaw(
+      `MAX(${this.driver.dialect.quoteIdentifier(field)}) as max`,
+    ).first<{ max: unknown }>();
+    return parseAggregateValue<V>(result?.max);
   }
 
   /** Get distinct values for a field. */
@@ -919,7 +973,9 @@ export class PostgresQueryBuilder<T = unknown>
   /** COUNT DISTINCT a field. */
   public async countDistinct(field: string): Promise<number> {
     this.hydrateCallback = undefined;
-    const result = await this.selectRaw(`COUNT(DISTINCT ${field}) as count`).first<{
+    const result = await this.selectRaw(
+      `COUNT(DISTINCT ${this.driver.dialect.quoteIdentifier(field)}) as count`,
+    ).first<{
       count: string;
     }>();
     return parseInt(result?.count ?? "0", 10);
@@ -1110,7 +1166,7 @@ export class PostgresQueryBuilder<T = unknown>
     this.applyPendingScopes();
     const { sql: filterSql, params } = this.buildFilter();
     const quotedTable = this.driver.dialect.quoteIdentifier(this.table);
-    const deleteSql = `DELETE FROM ${quotedTable} WHERE ctid IN (SELECT ctid FROM ${quotedTable} ${filterSql} LIMIT 1)`;
+    const deleteSql = `DELETE FROM ${quotedTable} WHERE ctid IN (SELECT ctid FROM ${quotedTable} ${filterSql} LIMIT 1 FOR UPDATE SKIP LOCKED)`;
     const result = await this.driver.query(deleteSql, params);
     return result.rowCount ?? 0;
   }
@@ -1998,8 +2054,12 @@ export class PostgresQueryBuilder<T = unknown>
    * Used by DELETE / UPDATE / increment paths.
    */
   private buildFilter(): { sql: string; params: unknown[] } {
+    // Rewrite has / whereHas / doesntHave / whereDoesntHave into EXISTS
+    // `whereRaw` ops (throws if the relation can't be resolved).
+    this.applyHasRelations();
+
     const whereOps = this.operations.filter(
-      (op) => op.type.includes("where") || op.type.includes("Where"),
+      (op) => op.type === "has" || op.type.includes("where") || op.type.includes("Where"),
     );
 
     if (whereOps.length === 0) return { sql: "", params: [] };

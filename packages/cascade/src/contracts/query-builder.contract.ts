@@ -1892,7 +1892,7 @@ export interface QueryBuilderContract<T = unknown> {
    * @example
    * const avgAge = await User.query().avg('age');
    */
-  avg(field: string): Promise<number>;
+  avg(field: string): Promise<number | null>;
 
   /**
    * Aggregate minimum for the given field.
@@ -1900,7 +1900,7 @@ export interface QueryBuilderContract<T = unknown> {
    * @example
    * const minPrice = await Product.query().min('price');
    */
-  min(field: string): Promise<number>;
+  min<V = number>(field: string): Promise<V | null>;
 
   /**
    * Aggregate maximum for the given field.
@@ -1908,7 +1908,7 @@ export interface QueryBuilderContract<T = unknown> {
    * @example
    * const maxPrice = await Product.query().max('price');
    */
-  max(field: string): Promise<number>;
+  max<V = number>(field: string): Promise<V | null>;
 
   /**
    * Retrieve distinct values for a field.

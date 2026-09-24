@@ -26,6 +26,7 @@ export type DataSourceRegistryListener = (dataSource: DataSource) => void;
 class DataSourceRegistry {
   private readonly sources = new Map<string, DataSource>();
   private defaultSource?: DataSource;
+  private defaultIsExplicit = false;
   private readonly events = new EventEmitter();
 
   /**
@@ -40,17 +41,36 @@ class DataSourceRegistry {
    * - `connected` - When the driver connects (forwarded from driver)
    * - `disconnected` - When the driver disconnects (forwarded from driver)
    *
+   * The first registered source becomes the default. Later sources become the default
+   * only when they explicitly claim it, and two explicit claims throw.
+   *
    * @param options - Data source configuration
+   * @param meta - `explicitDefault` tells whether the caller explicitly requested `isDefault: true`
+   *  (defaults to `options.isDefault`), as opposed to it being implied by being the first source
    * @returns The registered data source instance
    */
-  public register(options: DataSourceOptions): DataSource {
+  public register(options: DataSourceOptions, meta?: { explicitDefault?: boolean }): DataSource {
     const source = new DataSource(options);
+    const explicitDefault = meta?.explicitDefault ?? source.isDefault;
+
+    if (
+      explicitDefault &&
+      this.defaultIsExplicit &&
+      this.defaultSource &&
+      this.defaultSource.name !== source.name
+    ) {
+      throw new Error(
+        `Data source "${source.name}" cannot be the default: "${this.defaultSource.name}" is already the default data source.`,
+      );
+    }
+
     this.sources.set(source.name, source);
 
-    const isNewDefault = source.isDefault || !this.defaultSource;
+    const isNewDefault = explicitDefault || !this.defaultSource;
 
     if (isNewDefault) {
       this.defaultSource = source;
+      this.defaultIsExplicit = explicitDefault;
     }
 
     // Emit registration events
@@ -72,10 +92,18 @@ class DataSourceRegistry {
   }
 
   /**
+   * Determine whether a default data source is already registered.
+   */
+  public hasDefault(): boolean {
+    return this.defaultSource !== undefined;
+  }
+
+  /**
    * Clean up all data sources and default one
    */
   public clear() {
     this.defaultSource = undefined;
+    this.defaultIsExplicit = false;
     this.sources.clear();
   }
 

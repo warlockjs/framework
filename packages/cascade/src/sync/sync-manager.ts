@@ -477,7 +477,10 @@ export class SyncManager {
   ): SyncInstruction {
     const targetModelClass = config.targetModelClass;
     const filter = this.buildFilter(sourceId, config);
-    const update = { $unset: { [config.targetField]: 1 } };
+    // For arrays, remove only the deleted element instead of wiping the whole field
+    const update = config.isMany
+      ? { $pull: { [config.targetField]: { [config.identifierField]: sourceId } } }
+      : { $unset: { [config.targetField]: 1 } };
 
     return {
       targetTable: targetModelClass.table,
@@ -747,19 +750,25 @@ export class SyncManager {
   ): Promise<Record<string, unknown>> {
     // If data is a Model instance, call the embed method on it
     if (data instanceof Model) {
+      const hidden = data.self().hidden ?? [];
+      const withoutHidden = (embedded: Record<string, unknown>): Record<string, unknown> =>
+        Object.fromEntries(Object.entries(embedded).filter(([key]) => !hidden.includes(key)));
+
       if (Array.isArray(config.embedKey)) {
-        return data.only(config.embedKey);
+        return withoutHidden(data.only(config.embedKey));
       }
 
       if (typeof data[config.embedKey as keyof Model] !== "function") {
-        return data[config.embedKey as keyof Model] as Record<string, unknown>;
+        return withoutHidden(data[config.embedKey as keyof Model] as Record<string, unknown>);
       }
-      // Fallback: use embedData() if available
-      if (typeof data.embedData === "function") {
-        return data.embedData;
+
+      // The model declares an explicit `embed` column list
+      if (data.self().embed) {
+        return withoutHidden(data.embedData);
       }
-      // Last resort: return model data
-      return data.data;
+
+      // Default: the model's public (serialised) shape, which strips hidden fields
+      return data.toJSON() as Record<string, unknown>;
     }
 
     // Otherwise, return the data as-is

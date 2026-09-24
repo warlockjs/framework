@@ -119,6 +119,11 @@ async function assertModuleIsLoaded() {
 }
 
 /**
+ * Transaction session -> the driver (data source) that opened it.
+ */
+const transactionOwners = new WeakMap<object, MongoDbDriver>();
+
+/**
  * MongoDB driver implementation that fulfils the Cascade driver contract.
  *
  * It encapsulates the native Mongo client, exposes lifecycle events, and
@@ -694,6 +699,7 @@ export class MongoDbDriver implements DriverContract {
     const session = client.startSession();
 
     await session.startTransaction(this.transactionOptions);
+    transactionOwners.set(session, this);
     databaseTransactionContext.enter({ session });
     let finished = false;
 
@@ -771,7 +777,7 @@ export class MongoDbDriver implements DriverContract {
     // so it sees the outer's writes — a service that opens its own transaction
     // then works both standalone and when called inside an outer transaction
     // (e.g. a seeder). Mirrors `PostgresDriver.transaction`.
-    if (databaseTransactionContext.hasActiveTransaction()) {
+    if (this.canJoinActiveTransaction()) {
       return fn(ctx);
     }
 
@@ -783,7 +789,7 @@ export class MongoDbDriver implements DriverContract {
 
     // Filled only after a successful commit; flushed once the context is gone.
     let committedCallbacks: Array<() => void | Promise<void>> = [];
-    let result: T;
+    let result!: T;
 
     try {
       await session.startTransaction({
@@ -791,26 +797,28 @@ export class MongoDbDriver implements DriverContract {
         ...(options as TransactionOptions),
       });
 
-      // Set transaction context for queries within callback
-      databaseTransactionContext.enter({ session });
+      // Tag the session with this driver so another data source's queries
+      // running inside the callback never pick it up.
+      transactionOwners.set(session, this);
 
-      try {
-        // Execute callback
-        result = await fn(ctx);
+      // Run the callback INSIDE the async context (not enter-after-await) so
+      // every query it starts uses the transaction session.
+      await databaseTransactionContext.run({ session, afterCommit: [] }, async () => {
+        try {
+          // Execute callback
+          result = await fn(ctx);
 
-        // Auto-commit on success
-        await session.commitTransaction();
+          // Auto-commit on success
+          await session.commitTransaction();
 
-        // Read the queue BEFORE exit() clears it
-        committedCallbacks = databaseTransactionContext.takeAfterCommit();
-      } catch (error) {
-        // Auto-rollback on any error (including explicit rollback)
-        await session.abortTransaction().catch(() => undefined);
-        throw error;
-      } finally {
-        // Guaranteed context cleanup
-        databaseTransactionContext.exit();
-      }
+          // Read the queue while still inside the transaction context
+          committedCallbacks = databaseTransactionContext.takeAfterCommit();
+        } catch (error) {
+          // Auto-rollback on any error (including explicit rollback)
+          await session.abortTransaction().catch(() => undefined);
+          throw error;
+        }
+      });
     } finally {
       // Guaranteed session cleanup
       await session.endSession().catch(() => undefined);
@@ -977,12 +985,37 @@ export class MongoDbDriver implements DriverContract {
   }
 
   /**
+   * Whether an active transaction can be joined: one exists and it is not
+   * owned by a different data source (sessions opened outside `transaction()`
+   * carry no owner tag and are joinable).
+   */
+  private canJoinActiveTransaction(): boolean {
+    const session = databaseTransactionContext.getSession<object>();
+
+    if (!session) return false;
+
+    const owner = transactionOwners.get(session);
+
+    return owner === undefined || owner === this;
+  }
+
+  /**
+   * The ambient transaction session, only when it belongs to this driver's
+   * data source.
+   */
+  private getOwnSession(): ClientSession | undefined {
+    const session = databaseTransactionContext.getSession<ClientSession>();
+
+    return session && transactionOwners.get(session) === this ? session : undefined;
+  }
+
+  /**
    * Attach the active transaction session (when available) to Mongo options.
    */
   private withSession<TOptions extends { session?: ClientSession }>(
     options?: Record<string, unknown>,
   ): TOptions | undefined {
-    const session = databaseTransactionContext.getSession<ClientSession>();
+    const session = this.getOwnSession();
 
     if (!session) {
       return options as TOptions | undefined;

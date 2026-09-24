@@ -102,8 +102,13 @@ export class DatabaseRestorer implements RestorerContract {
     delete restoredData.deletedAt;
     delete restoredData.originalTable;
 
-    // 5. Check for ID conflict and handle
-    const finalData = await this.handleIdConflict(restoredData, id, onIdConflict);
+    // 5. Check for ID conflict and handle. A soft-deleted row never left the
+    // table, so it would "conflict" with itself: it keeps its id and is
+    // updated in place.
+    const finalData =
+      strategy === "trash"
+        ? await this.handleIdConflict(restoredData, id, onIdConflict)
+        : restoredData;
 
     // 6. Create temporary model instance for event emission
     // Note: Model is abstract, but at runtime this.ctor is a concrete subclass
@@ -198,7 +203,8 @@ export class DatabaseRestorer implements RestorerContract {
         delete restoredData.originalTable;
 
         // Check for ID conflict
-        const idExists = await this.checkIdExists(id);
+        // Soft rows never left the table; only trash restores can conflict.
+        const idExists = strategy === "trash" && (await this.checkIdExists(id));
         if (idExists) {
           if (onIdConflict === "fail") {
             throw new Error(
