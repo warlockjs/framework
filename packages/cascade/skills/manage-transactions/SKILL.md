@@ -178,6 +178,23 @@ connectToDatabase({
 
 For "side effects must only happen if the transaction succeeded" (publish to a queue, send an email, write to a search index), don't run them inside the transaction. Use the outbox pattern: write a row to an outbox table inside the transaction, dispatch from the outbox in a separate worker after commit.
 
+## Run side effects after commit — `afterCommit(fn)`
+
+Model events (`saved`, `created`, `updated`, `deleted`) fire **inside** the transaction, before COMMIT. For a side effect that must see committed data (cache clear, sitemap regeneration, email, webhook), queue it with `afterCommit`:
+
+```ts
+import { afterCommit } from "@warlock.js/cascade";
+
+Product.events().onSaved(() => afterCommit(() => regenerateSitemap()));
+```
+
+- **Inside a transaction:** `fn` is queued and runs after the **outermost** COMMIT, in order, awaited one by one. Discarded on rollback or a failed COMMIT.
+- **Outside a transaction:** runs on the next microtask (the caller does not await it).
+- **Errors** are logged and never change the transaction result or stop the remaining callbacks.
+- Callbacks run after the transaction context has exited, so DB work inside them is **not** part of the finished transaction.
+
+Use the outbox pattern above instead when the side effect must survive a crash between COMMIT and the callback — `afterCommit` is in-memory.
+
 ## Things NOT to do
 
 - Don't call external APIs (HTTP, queues, file writes) inside a transaction. Long-running side effects extend the lock; failures don't roll back the external call.
