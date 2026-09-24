@@ -1,6 +1,6 @@
 ---
 name: hash-files
-description: "Compute file and content hashes in @warlock.js/fs; use when you need to hash files."
+description: 'Compute hex digests — hashFile / hashFileAsync (streaming for large files), hashFileSmallAsync, hashString, hashBuffer. Defaults to SHA-256; supports sha1 / md5 / sha512. Triggers: `hashFile`, `hashFileAsync`, `hashFileSmallAsync`, `hashString`, `hashBuffer`, `HashAlgorithm`; "fingerprint a file for cache invalidation", "compute SHA-256 checksum", "compare two files for equality", "cache key from request input"; typical import `import { hashFileAsync, hashString } from "@warlock.js/fs"`. Skip: file IO — `@warlock.js/fs/read-and-write-files/SKILL.md`; competing libs `hasha`, `md5-file`, `crypto-hash`; native `node:crypto` `createHash`.'
 ---
 
 # Compute file and content hashes

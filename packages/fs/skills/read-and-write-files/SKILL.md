@@ -1,6 +1,6 @@
 ---
 name: read-and-write-files
-description: "Read and write files in @warlock.js/fs; use when you need to read and write files."
+description: 'Read and write files — getFile / getFileAsync / getJsonFile / putFile (auto-creates parent dirs), plus pathExists / fileExists / directoryExists / lastModified / stats. Triggers: `getFileAsync`, `getJsonFileAsync`, `putFileAsync`, `putJsonFileAsync`, `pathExists`, `fileExists`, `lastModifiedAsync`, `statsAsync`; "read a text file", "write a JSON file", "check if file exists"; typical import `import { getFileAsync, putJsonFileAsync, fileExists } from "@warlock.js/fs"`. Skip: atomic writes — `@warlock.js/fs/write-atomically/SKILL.md`; dirs + copy + delete — `@warlock.js/fs/manage-directories/SKILL.md`; hashing — `@warlock.js/fs/hash-files/SKILL.md`; competing libs `fs-extra`, `jsonfile`, `graceful-fs`; native `node:fs/promises`.'
 ---
 
 # Read and write files
