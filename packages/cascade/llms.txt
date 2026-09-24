@@ -6,19 +6,19 @@
 
 ## Skills
 
-- [aggregate-data](@warlock.js/cascade/aggregate-data/SKILL.md): Use aggregates and groupBy in @warlock.js/cascade; use when you need to aggregate data.
-- [alter-migration](@warlock.js/cascade/alter-migration/SKILL.md): Alter a migration in @warlock.js/cascade; use when you need to alter migration.
+- [aggregate-data](@warlock.js/cascade/aggregate-data/SKILL.md): (no description)
+- [alter-migration](@warlock.js/cascade/alter-migration/SKILL.md): (no description)
 - [cascade-basics](@warlock.js/cascade/cascade-basics/SKILL.md): Start here for @warlock.js/cascade models, data sources, migrations, and query workflows.
-- [configure-delete-strategy](@warlock.js/cascade/configure-delete-strategy/SKILL.md): Use delete strategies in @warlock.js/cascade; use when you need to configure delete strategy.
-- [define-model](@warlock.js/cascade/define-model/SKILL.md): Define a model in @warlock.js/cascade; use when you need to define model.
-- [define-relations](@warlock.js/cascade/define-relations/SKILL.md): Define and query relations in @warlock.js/cascade; use when you need to define relations.
-- [manage-data-sources](@warlock.js/cascade/manage-data-sources/SKILL.md): Manage data sources in @warlock.js/cascade; use when you need to manage data sources.
-- [manage-transactions](@warlock.js/cascade/manage-transactions/SKILL.md): Use transactions in @warlock.js/cascade; use when you need to manage transactions.
-- [paginate-results](@warlock.js/cascade/paginate-results/SKILL.md): Paginate results in @warlock.js/cascade; use when you need to paginate results.
-- [perform-atomic-ops](@warlock.js/cascade/perform-atomic-ops/SKILL.md): Use atomic operations in @warlock.js/cascade; use when you need to perform atomic ops.
-- [query-data](@warlock.js/cascade/query-data/SKILL.md): Query data in @warlock.js/cascade; use when you need to query data.
-- [run-cascade-cli](@warlock.js/cascade/run-cascade-cli/SKILL.md): Run the cascade CLI / Operations API in @warlock.js/cascade; use when you need to run cascade cli.
-- [search-by-vector](@warlock.js/cascade/search-by-vector/SKILL.md): Use vector search in @warlock.js/cascade; use when you need to search by vector.
-- [subscribe-to-model-events](@warlock.js/cascade/subscribe-to-model-events/SKILL.md): Use model events in @warlock.js/cascade; use when you need to subscribe to model events.
-- [track-changes](@warlock.js/cascade/track-changes/SKILL.md): Track changes in @warlock.js/cascade; use when you need to track changes.
-- [write-migration](@warlock.js/cascade/write-migration/SKILL.md): Write a migration in @warlock.js/cascade; use when you need to write migration.
+- [configure-delete-strategy](@warlock.js/cascade/configure-delete-strategy/SKILL.md): (no description)
+- [define-model](@warlock.js/cascade/define-model/SKILL.md): (no description)
+- [define-relations](@warlock.js/cascade/define-relations/SKILL.md): (no description)
+- [manage-data-sources](@warlock.js/cascade/manage-data-sources/SKILL.md): (no description)
+- [manage-transactions](@warlock.js/cascade/manage-transactions/SKILL.md): (no description)
+- [paginate-results](@warlock.js/cascade/paginate-results/SKILL.md): (no description)
+- [perform-atomic-ops](@warlock.js/cascade/perform-atomic-ops/SKILL.md): (no description)
+- [query-data](@warlock.js/cascade/query-data/SKILL.md): (no description)
+- [run-cascade-cli](@warlock.js/cascade/run-cascade-cli/SKILL.md): (no description)
+- [search-by-vector](@warlock.js/cascade/search-by-vector/SKILL.md): (no description)
+- [subscribe-to-model-events](@warlock.js/cascade/subscribe-to-model-events/SKILL.md): (no description)
+- [track-changes](@warlock.js/cascade/track-changes/SKILL.md): (no description)
+- [write-migration](@warlock.js/cascade/write-migration/SKILL.md): (no description)
