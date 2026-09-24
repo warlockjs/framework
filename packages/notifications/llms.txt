@@ -6,12 +6,12 @@
 
 ## Skills
 
-- [configure-notifications](@warlock.js/notifications/configure-notifications/SKILL.md): Configure notifications in @warlock.js/notifications; use when you need to configure notifications.
-- [define-channel](@warlock.js/notifications/define-channel/SKILL.md): defineChannel — custom channels in @warlock.js/notifications; use when you need to define channel.
-- [define-notification](@warlock.js/notifications/define-notification/SKILL.md): defineNotification — reusable multi-channel notification in @warlock.js/notifications; use when you need to define notification.
+- [configure-notifications](@warlock.js/notifications/configure-notifications/SKILL.md): (no description)
+- [define-channel](@warlock.js/notifications/define-channel/SKILL.md): (no description)
+- [define-notification](@warlock.js/notifications/define-notification/SKILL.md): (no description)
 - [notifications-basics](@warlock.js/notifications/notifications-basics/SKILL.md): Start here for @warlock.js/notifications channels, notification definitions, delivery, and application setup.
-- [observe-notifications](@warlock.js/notifications/observe-notifications/SKILL.md): Observe notifications in @warlock.js/notifications; use when you need to observe notifications.
-- [queue-notifications](@warlock.js/notifications/queue-notifications/SKILL.md): Queue notifications (async) in @warlock.js/notifications; use when you need to queue notifications.
-- [send-ad-hoc](@warlock.js/notifications/send-ad-hoc/SKILL.md): notify.<channel> — ad-hoc, per-channel sends in @warlock.js/notifications; use when you need to send ad hoc.
-- [use-in-app](@warlock.js/notifications/use-in-app/SKILL.md): inApp — in-app notification read API in @warlock.js/notifications; use when you need to use in app.
-- [write-notification-migration](@warlock.js/notifications/write-notification-migration/SKILL.md): Write the notifications migration in @warlock.js/notifications; use when you need to write notification migration.
+- [observe-notifications](@warlock.js/notifications/observe-notifications/SKILL.md): (no description)
+- [queue-notifications](@warlock.js/notifications/queue-notifications/SKILL.md): (no description)
+- [send-ad-hoc](@warlock.js/notifications/send-ad-hoc/SKILL.md): (no description)
+- [use-in-app](@warlock.js/notifications/use-in-app/SKILL.md): (no description)
+- [write-notification-migration](@warlock.js/notifications/write-notification-migration/SKILL.md): (no description)
