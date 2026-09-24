@@ -124,6 +124,728 @@
   ],
   "releases": [
     {
+      "version": "5.20.0",
+      "id": "v5-20-0",
+      "date": "September 24, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Cache compatibility changes require an upgrade review:</strong> <code>cached()</code> auto-keys, flat memory keys, finite ownership-safe locks, Redis <code>FLUSHDB</code>, tokenized stored lock values, and numeric TTL normalization all change observable behavior. <code>@warlock.js/web</code> adds generated named-route types and managed sitemap generations; Core, Cache, Cascade, Auth, Scheduler, and Socket.IO add safer multi-instance boundaries. Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>scheduler</code>, <code>postgres</code>, <code>redis</code>, <code>web</code>, <code>sitemap</code>, <code>socket</code> rows); Hasan authorised it on 2026-09-24: \"Go with rec, and tell me whether we should move the matrix run from my machine to Github instead and I report back with failures or keep it on my machine?\".",
+      "matrix": "subset",
+      "matrixRows": [
+        "baseline",
+        "scheduler",
+        "postgres",
+        "redis",
+        "web",
+        "sitemap",
+        "socket"
+      ],
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 29,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Fixed",
+              "n": 25
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>Atomic <code>increment</code>/<code>decrement</code>, <code>pull</code> and <code>update</code></strong>, with a per-driver guarantee:"
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Tag index primitives</strong> on the driver contract: <code>tagAdd</code>, <code>tagMembers</code>, <code>tagRemove</code>. Redis uses a native SET inside the prefix (a legacy JSON index is upgraded on first touch), Postgres a one-statement JSON-array merge on the index row, and the in-memory drivers a separate store that eviction and expiry never touch. <code>file</code> and <code>null</code> keep the serialized fallback. <code>invalidate()</code> deletes exactly the members it read, writes prune up to 20 dead members, <code>remove()</code>/<code>pull()</code> detach the key, and tagged <code>increment</code>/<code>pull</code> use the atomic ops."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>PgCacheDriver.prune(limit = 1000)</code></strong> deletes expired rows in batches and returns the count. <code>set()</code> also runs it in the background on about 1 in 200 writes, so unique-key workloads no longer grow the table forever."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>lock()</code> successor-safe release</strong> (see Fixed). There is no renewal, so the TTL must exceed the worst-case duration of the locked work."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>lock()</code> no longer deletes a successor's lock after its own TTL expired. Release is an ownership-checked compare-and-delete (atomic on the memory, Redis and Postgres drivers), so a slow holder can't free a lock that another caller has since acquired."
+            },
+            {
+              "type": "Fixed",
+              "html": "A failing lock release (for example a Redis blip) no longer replaces <code>fn</code>'s result or error. It is logged, so callers no longer retry a job that had already succeeded."
+            },
+            {
+              "type": "Fixed",
+              "html": "Two concurrent <code>lock()</code> calls in one process could both acquire the lock on the memory, mock and file drivers. <code>onConflict: \"create\"</code> is now a synchronous check-and-insert on memory and an exclusive create on file."
+            },
+            {
+              "type": "Fixed",
+              "html": "Redis <code>flush()</code> without a prefix no longer wipes every database on the server (queues, sessions, other apps)."
+            },
+            {
+              "type": "Fixed",
+              "html": "Redis <code>removeNamespace(\"users\")</code> also deleted <code>users2.*</code> and <code>usersettings.*</code>, and flushing tenant <code>app</code> also deleted <code>app2.*</code> and <code>apple.*</code>. It now matches <code>ns</code> and <code>ns.*</code> only, in batched <code>UNLINK</code> calls rather than one giant <code>DEL</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Redis 5 <code>scanIterator()</code> batches keys per cursor response. <code>removeNamespace()</code> now flattens those batches before deleting them, while retaining compatibility with older clients that yield one key at a time."
+            },
+            {
+              "type": "Fixed",
+              "html": "Redis SWR metadata now lives inside the namespace, so <code>flush()</code> clears it, and a plain <code>set</code> clears it, so a stale <code>staleAt</code> no longer poisons later reads."
+            },
+            {
+              "type": "Fixed",
+              "html": "A failed Redis <code>connect()</code> is rethrown and can be retried; it used to be logged, swallowed and never retried."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>increment()</code>/<code>decrement()</code> dropped the key's TTL on non-Redis drivers, so rate-limit counters could become permanent and block an IP forever. The remaining TTL is now kept."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>pull()</code> could hand a one-time token to two concurrent requests, and <code>update()</code> lost increments across servers (the login throttle and AI budget counters were looser by N×). Both are atomic where the driver allows; see Added."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>remember()</code> recomputed on every call for <code>0</code>, <code>false</code> and <code>\"\"</code>. Only <code>null</code> is a miss now."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>remember</code>, <code>swr</code> and <code>update</code> shared one in-flight map: <code>remember()</code> could return an SWR refresh's <code>undefined</code>, and a <code>remember()</code> could break an <code>update()</code> chain. Each now has its own map. <code>swr()</code> also single-flights a cold miss."
+            },
+            {
+              "type": "Fixed",
+              "html": "With the <code>null</code> driver, <code>remember(\"user.1\")</code> and <code>remember(\"user.2\")</code> ran concurrently and returned user 1's data for user 2. The null driver keeps real keys now."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>cached().invalidate()</code> ignored <code>config.driver</code> and left stale data on the custom driver. Auto-keys no longer fold punctuation, so <code>profile(\"1.private\", \"\")</code> and <code>profile(\"1\", \"private\")</code>, or <code>{ q: \"x\" }</code> and <code>(\"q\", \"x\")</code>, no longer share an entry (request-controlled args could reach another caller's cache entry)."
+            },
+            {
+              "type": "Fixed",
+              "html": "Memory <code>maxSize</code> counted top-level namespaces, so dotted keys cascaded evictions that wiped the whole cache, and with a <code>globalPrefix</code> it never evicted at all. It counts entries now, in LRU order."
+            },
+            {
+              "type": "Fixed",
+              "html": "The memory sweep scanned every key every second, and a stale timer record could delete a newer permanent value. Only finite-TTL entries are swept."
+            },
+            {
+              "type": "Fixed",
+              "html": "The memory, LRU and mock drivers stored objects by reference, so a caller mutating a value corrupted the cache. Values are cloned on write."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>memoryExtended</code> slid <code>expiresAt</code> before checking expiry, so expired entries came back and failed <code>lock()</code> attempts extended the holder's lock forever. Expiry is checked first."
+            },
+            {
+              "type": "Fixed",
+              "html": "File driver: writes are atomic (temp file + rename), and a corrupt or half-written file is a miss instead of deleting the key directory (a reader used to delete the entry being written). An empty key is rejected; it used to resolve to the cache root, so <code>remove()</code> wiped the whole cache directory."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>cache.list().trim(start, -1)</code> emptied the list, so <code>trim(-50, -1)</code> (\"keep the last 50\") deleted everything. <code>trim</code> is LTRIM-inclusive now, and list operations keep the key's TTL."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>ScopedCache.update()</code>/<code>merge()</code> reset a session's remaining TTL on every call. They keep it."
+            },
+            {
+              "type": "Fixed",
+              "html": "Concurrent first use of a driver created duplicate clients and leaked sockets. The manager runs a single in-flight load per driver, and <code>disconnect()</code> closes every loaded driver, not only the current one (shutdown used to hang or leak)."
+            },
+            {
+              "type": "Fixed",
+              "html": "Postgres set <code>expires_at</code> from the app clock but compared against the DB <code>now()</code>, so clock skew shifted TTLs and locks could be born expired. Expiry is computed on the DB clock."
+            },
+            {
+              "type": "Fixed",
+              "html": "Lazy expiry deleted <code>prefix.prefix.key</code> when a <code>globalPrefix</code> was set, so expired entries lingered. It re-parsed the key and didn't await the delete."
+            },
+            {
+              "type": "Fixed",
+              "html": "Concurrent tagged writes dropped keys from the tag index, so <code>tags().invalidate()</code> left stale entries, and the index grew forever. The index is now a set primitive that is never lost and is pruned, and LRU capacity or memory <code>maxSize</code> can no longer evict it."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Development and production publish generated page and named-API route declarations to <code>.warlock/typings/web-routes.d.ts</code>. <code>href</code>, <code>Link</code>, client navigation, and <code>useSubmitForm</code> use those declarations when present while retaining runtime validation before they have been generated."
+            },
+            {
+              "type": "Added",
+              "html": "Public <code>PageLoaderContext</code>, <code>LayoutLoaderContext</code>, <code>AppLoaderContext</code>, and <code>WebConfigurations</code> type exports."
+            },
+            {
+              "type": "Added",
+              "html": "Managed sitemaps: durable generation manifests, optional shared storage, model-driven invalidation after a Cascade transaction commits, conditional HTTP responses, and immutable generation shard URLs. Requests serve the last published generation and never generate an XML document themselves."
+            },
+            {
+              "type": "Changed",
+              "html": "Refined grouped skill discovery guidance for routes, loaders, form submission, and sitemap generation."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/sitemap",
+          "slug": "sitemap",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>SitemapEntry.images</code> emits the Google image sitemap extension, validates absolute HTTP(S) image URLs, and limits each URL to 1,000 images with a caller-visible diagnostic."
+            },
+            {
+              "type": "Added",
+              "html": "<code>SitemapIndexOptions.shardPathPrefix</code> controls public shard links in an index without changing the files written by <code>saveTo()</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "Refined grouped skill discovery guidance and regenerated package llms projections."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 10,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 7
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Production build contributions receive a fresh registration-only <code>ConnectorBuildContext.namedApiRoutes</code> snapshot when Web is configured. It contains only named API <code>name</code>, <code>path</code>, and <code>method</code> records, never handlers, middleware, schemas, or source paths."
+            },
+            {
+              "type": "Added",
+              "html": "<code>storage.putIfAbsent(file, location, options?)</code> and <code>storage.supportsPutIfAbsent()</code> — an atomic create-only write. Returns the <code>StorageFile</code>, or <code>null</code> when something already exists at <code>location</code>. Unlike <code>put</code>, a string argument is <strong>content</strong>, not a path. Local driver writes a temp file then hard-links it; S3/R2 send <code>If-None-Match: *</code>. DigitalOcean Spaces does not expose it. Drivers without it throw <code>StorageCapabilityError</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>http.rateLimit</code> now passes <code>@fastify/rate-limit</code> options through (<code>redis</code> for a store shared across servers, <code>nameSpace</code>, <code>keyGenerator</code>, <code>allowList</code>, ...). <code>http.rateLimit.enabled: false</code> turns the global limiter off. The per-route <code>middleware.rateLimit()</code> stays in-process."
+            },
+            {
+              "type": "Added",
+              "html": "<code>socket.adapter</code> — an adapter factory (e.g. <code>@socket.io/redis-adapter</code>) applied via <code>io.adapter()</code> for broadcasting across servers. Polling clients need sticky sessions."
+            },
+            {
+              "type": "Added",
+              "html": "Production single-server warnings, once at boot, when the default cache driver is in-memory, the default storage driver is local, or sockets have no <code>socket.adapter</code>. Silence with <code>cache.silenceSingleServerWarning</code>, <code>storage.silenceSingleServerWarning</code>, <code>socket.silenceSingleServerWarning</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>middleware.idempotency({ reservationTtl })</code> (also <code>http.idempotency.reservationTtl</code>, default <code>60</code> seconds) — how long the in-flight reservation lives."
+            },
+            {
+              "type": "Added",
+              "html": "Docs: \"Running on multiple servers\" guide."
+            },
+            {
+              "type": "Changed",
+              "html": "Refined connector build guidance and grouped skill discovery."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>middleware.idempotency()</code> reserves the key (create-only) before the handler runs. A concurrent duplicate now gets <strong>409 + <code>Retry-After</code></strong> instead of running twice. A 5xx response frees the key so the client can retry. If the cache is down the middleware fails open."
+            },
+            {
+              "type": "Fixed",
+              "html": "The repository cache is also cleared after the DB transaction commits (cascade <code>afterCommit</code>), fixing stale reads when a concurrent read re-cached the old row between the model event and <code>COMMIT</code>."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            },
+            {
+              "type": "Changed",
+              "html": "Web starter loaders use named functions and public loader-context types while retaining inferred return types in paired setup modules."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>loginThrottleMiddleware</code> now counts failures with an atomic <code>cache.increment</code>. The first failure opens the window with a create-only <code>cache.set</code> carrying the TTL, so counts are exact across servers on the redis/pg cache drivers (concurrent failures are no longer lost to a read-modify-write). Thresholds, window and lockout behaviour are unchanged. The memory cache driver is per-process, so counts there are per-process too."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>afterCommit(fn)</code> — run a side effect only once the transaction has committed. Inside a transaction, <code>fn</code> is queued and runs after the outermost COMMIT (in order, awaited one by one); it is discarded on rollback or a failed COMMIT. Outside a transaction, it runs on the next microtask. Errors are logged and never change the transaction result. Use it in model event listeners (<code>saved</code>, <code>created</code>, ...) for cache clears, sitemap regeneration and emails."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>job.onOneServer({ lockTtl?, key? })</code> — run each tick on exactly one server. Every server races for a create-only, TTL-bounded cache claim keyed <code>scheduler.&lt;key ?? name&gt;.&lt;scheduledTickEpochMs&gt;</code>. The claim is never released, so exactly one server runs each tick even if another server's timer fires late. Losers skip the tick and emit <code>job:skip</code>. Requires a shared cache driver (redis/pg) and a job name or <code>key</code>. <code>@warlock.js/cache</code> is an optional peer dependency. Default claim TTL is <code>min(interval, 1h)</code> with a 60s floor (1h for cron jobs)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Added a package-level skill index and clearer discovery descriptions for grouped agent guidance."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.19.1",
       "id": "v5-19-1",
       "date": "September 24, 2026",
