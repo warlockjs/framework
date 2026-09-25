@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/sitemap",
-  "version": "5.20.1",
+  "version": "5.21.0",
   "description": "A framework-blind sitemap builder: entries in, a valid sitemaps.org document out. Zero runtime dependencies.",
   "type": "module",
   "main": "./src/index.ts",
