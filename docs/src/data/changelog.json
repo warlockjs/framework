@@ -124,6 +124,764 @@
   ],
   "releases": [
     {
+      "version": "5.21.0",
+      "id": "v5-21-0",
+      "date": "September 25, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Page actions and sessions in pages.</strong> Pages can export <code>action</code>/<code>actions</code> and post with <code>&lt;Form&gt;</code> (works without JavaScript; <code>useActionData</code>, <code>FieldError</code>, <code>useIsSubmitting</code>), and read the signed-in user with <code>useUser()</code>, guarded server-side by <code>requireUser</code>/<code>requireGuest</code> from <code>@warlock.js/web/session</code>. <strong>Upgrade review required:</strong> a full framework sweep ships ~140 fixes with behaviour changes across core, cascade, web and auth (see each package changelog). Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>scheduler</code>, <code>postgres</code>, <code>redis</code>, <code>web</code>, <code>sitemap</code>, <code>socket</code> rows); Hasan authorised it on 2026-09-24: \"Don't wait for any other approvals, you have green light to do everything needed to have 5.21 released, don't stop before the release, no complete the push and publish/release\".",
+      "matrix": "subset",
+      "matrixRows": [
+        "baseline",
+        "scheduler",
+        "postgres",
+        "redis",
+        "web",
+        "sitemap",
+        "socket"
+      ],
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 11,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Changed",
+              "n": 5
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Page actions: a page can export <code>action</code> / <code>actions</code> (<code>PageActionNames</code>). <code>&lt;Form&gt;</code> works without JavaScript, shows field errors, redirects and revalidates the page. Client helpers: <code>useActionData()</code>, <code>FieldError</code>, <code>useIsSubmitting()</code>, <code>useSubmitAction()</code>. <code>ActionResponse</code> types the server result. <code>web.forms.redactValues</code> controls which submitted values are redacted from echoed state."
+            },
+            {
+              "type": "Added",
+              "html": "Sessions in pages: <code>web.session</code> resolver, <code>useUser()</code> on the client, <code>requireUser()</code> / <code>requireGuest()</code> in page middleware and loaders (server-only subpath <code>@warlock.js/web/session</code>), <code>safeRedirectTarget()</code> and <code>PageRedirectSignal</code>."
+            },
+            {
+              "type": "Added",
+              "html": "CSS Modules (<code>*.module.css</code>) render on the server with class names matching the client."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> the page cache keeps path case, does not cache the HTML variant under a CSP, and runs app/layout/page middleware before serving a cache hit."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> two filesystem pages that differ only by route-param name (<code>blog/[id]</code> vs <code>blog/[slug]</code>) throw <code>DuplicatePageRoutePathError</code>. Rename one."
+            },
+            {
+              "type": "Changed",
+              "html": "The locale cookie now has a 1-year <code>Max-Age</code>. <code>Link</code> never intercepts <code>download</code>, <code>target</code> other than <code>_self</code>, or modified clicks."
+            },
+            {
+              "type": "Changed",
+              "html": "A <code>*</code> wildcard param is encoded per path segment (<code>/</code> is no longer <code>%2F</code>); the image loader appends <code>&amp;variant=</code> to an existing query and keeps <code>#fragment</code> last."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>useShared()</code> uses <code>useSyncExternalStore</code>, so memoized consumers update after <code>hydrateShared()</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Build gates: Gate C, the unread <code>PUBLIC_</code> env check and <code>*.setup.ts</code> handling are more accurate."
+            },
+            {
+              "type": "Fixed",
+              "html": "Normalize conditional-request header values before sitemap validator comparisons."
+            },
+            {
+              "type": "Fixed",
+              "html": "Register explicit HEAD handlers for sitemap documents and immutable shard URLs."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Changed",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Page sessions: <code>pageSession</code> / <code>sessionMiddleware</code> give pages a renewing session (renewal on by default). <code>session.maxAge</code> bounds the token family from its creation (default <code>\"30d\"</code>); a family past it is revoked and renewal returns <code>null</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>setSessionCookies</code> / <code>clearSessionCookies</code> write HttpOnly, SameSite=Lax, <code>Path=/</code> cookies, ignoring <code>auth.cookie.path</code>. <code>authService.loginWithSessionCookies()</code> logs in and sets them."
+            },
+            {
+              "type": "Added",
+              "html": "<code>resolveRequestUser</code> memoizes on <code>request.locals.session</code>: repeat or concurrent callers in one request share a single verify, DB lookup and renewal (the first caller's options win)."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> <code>loginWithSessionCookies()</code> requires a same-origin <code>Origin</code>/<code>Referer</code> even with no cookies, otherwise it throws <code>CsrfOriginMismatchError</code>. Send the header from non-browser clients."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> <code>authMiddleware</code> takes an ordered header/cookie <code>sources</code> list; a present Authorization header always wins and never falls back to the cookie, so an invalid header now returns <code>401</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "JWTs carry a random <code>jti</code>, so tokens issued in the same second differ."
+            },
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 21,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 17
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>app.shutdownTimeout</code> (default 10s) — an overall shutdown budget. HTTP stops accepting and drains first, then the other connectors stop in reverse priority; if the budget runs out, the hung connector is logged and the process exits with code 1. In shared mode, closing socket.io no longer closes the Fastify server."
+            },
+            {
+              "type": "Added",
+              "html": "<code>putFromPath(localPath, storagePath)</code> on storage — uploads a local file by path."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> <code>put(string)</code> now always stores the string as <strong>content</strong>. To upload a local file, use <code>putFromPath()</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> multipart limit violations now respond <code>413</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> <code>hmacKey</code> is validated — a non-hex key throws instead of silently hashing with an empty key. Set a hex <code>encryption.hmacKey</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> <code>DatabaseLogModel</code> fields are now <code>module</code>/<code>action</code>/<code>content</code>/<code>stack</code>/<code>date</code>; legacy <code>message</code>/<code>trace</code> are still read. Update any code that queries the old fields directly."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> SMTP <code>secure</code> now defaults from the port (465 → implicit TLS) when not set explicitly."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> the page cache keeps the request path's case, and the HTML variant is not cached under a CSP. Middleware (app, layout, page) now runs before a page-cache hit is served."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> <code>list(request.all())</code> honours only a whitelist of control keys, and <code>exists()</code> defaults to the primary key. Pass an explicit column if you relied on another one."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> <code>Restful</code> saves validated data only — fields missing from the validation schema are dropped. Add them to the schema if they must be persisted."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> mail mode defaults to <code>\"development\"</code> (log/preview, no real send) outside production, unless <code>mail.sendInDevelopment === true</code> or <code>setMailMode</code> was called."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> unhandled request errors no longer print via <code>console.error</code>; they reach configured logger channels only. Configure a channel to keep that visibility."
+            },
+            {
+              "type": "Changed",
+              "html": "Logger <code>enabled: false</code> (top-level or per-environment) now silences the channel, and the <code>test</code> environment block is honoured."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>generate.model</code> migration naming is corrected, <code>--with-resource</code> also creates the resource file, and <code>gen.migration</code> refuses to run when the target model file is missing."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock &lt;cmd&gt; -v</code> reaches the command instead of printing the version; <code>--help</code> always rescans plugin and project commands. Resolved CLI <code>option.name</code> is always camelCase."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>image.fromUrl()</code> throws <code>StorageError</code> for private/reserved hosts, disallowed schemes and oversized (&gt;50MiB) or slow (&gt;30s) bodies."
+            },
+            {
+              "type": "Changed",
+              "html": "Routes with <code>rateLimit.errorMessage</code> return that message on <code>429</code>. The upload default prefix format is now <code>DD-MM-YYYY-HH-mm-ss</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>flushPendingCookies</code> throws instead of silently dropping cookies when the parked-cookie symbol is missing. Later <code>bootstrap()</code> calls no longer re-register the unhandled-rejection listener."
+            },
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            },
+            {
+              "type": "Fixed",
+              "html": "The dev health checker now lints projects using <code>eslint.config.ts</code>/<code>.mts</code>/<code>.cts</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "An explicit <code>HEAD</code> route now takes precedence over Fastify's automatic HEAD registration for a <code>GET</code> route at the same path. GET-only routes retain Fastify's implicit HEAD behavior."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 15,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 11
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Migration locks: a migration run takes a lock for its whole duration (Postgres advisory lock <code>warlock:migrations</code>; MongoDB lock document with a 10-minute TTL). A held lock is waited on for up to 60s, then the run throws naming the holder."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> <code>Model.delete()</code> with no filter throws instead of deleting everything. Pass a filter."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> migrations run in authored order; <code>order</code> is the primary sort key, so a migration with a non-zero <code>order</code> changes run/rollback order. Multi-batch rollback sorts batch DESC, then <code>createdAt</code> DESC, and <code>export .down.sql</code> orders newest-first. <code>transactional: false</code> and <code>dataSource</code> are now honoured."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> dry runs (<code>--sql</code>, <code>export-sql</code>, <code>runAll({ dryRun })</code>) write nothing — no <code>up()</code>/<code>down()</code> side effects and no recording."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> <code>isDefault</code> applies only to the first data source."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> model events are emitted under both the class name and the table name (<code>model.&lt;table&gt;.updated</code>, or <code>model.&lt;dataSource&gt;:&lt;table&gt;.updated</code>). Listeners on either name work."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> a unique-constraint violation on insert/update (pg <code>23505</code>, mongo <code>11000</code>) throws <code>DatabaseWriterValidationError</code> (a field error) instead of a raw driver error. The <code>unique</code> rule excludes the model's own row on update."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> <code>unique</code>/<code>exists</code>/<code>databaseModels</code>/embed rules with an unregistered string model name throw a descriptive error (\"did you forget <code>@RegisterModel()</code>?\"). <code>exists()</code> defaults to the primary key, and <code>uuid</code> always returns a string."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> sync runs after commit and logs failures as <code>sync.failed</code>; multi-level sync (<code>.maxDepth()</code>) is removed."
+            },
+            {
+              "type": "Changed",
+              "html": "Mongo: <code>orderByRaw()</code>/<code>cursor()</code> throw instead of being ignored, <code>raw()</code> throws a \"SQL only\" error, <code>whereDate</code>/<code>whereBefore</code>/<code>whereAfter</code> use UTC day boundaries, and transaction callbacks may run more than once (retried on transient errors)."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>defineModel</code> no longer overrides base-class <code>strictMode</code>/<code>autoGenerateId</code> unless supplied. Validation no longer calls <code>console.trace</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            },
+            {
+              "type": "Fixed",
+              "html": "Postgres driver: <code>whereLike</code> with a RegExp (<code>~*</code>/<code>!~*</code>), <code>count()</code>/<code>exists()</code> honour <code>has</code>/<code>whereHas</code>, joins and <code>groupBy</code>/<code>distinct</code>, and <code>whereJsonContains</code> binds a parameter."
+            },
+            {
+              "type": "Fixed",
+              "html": "Migrations: <code>.index()</code>/<code>.unique()</code>/<code>.vectorIndex()</code> inside <code>Migration.alter</code> <code>modify</code> now create the index, and <code>randomIncrement</code> takes effect."
+            },
+            {
+              "type": "Fixed",
+              "html": "Mongo: replica-set detection runs <code>hello</code> once per driver."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/sitemap",
+          "slug": "sitemap",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.20.0",
       "id": "v5-20-0",
       "date": "September 24, 2026",
