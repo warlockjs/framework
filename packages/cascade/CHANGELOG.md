@@ -4,6 +4,31 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.21.0
+
+### Added
+
+- Migration locks: a migration run takes a lock for its whole duration (Postgres advisory lock `warlock:migrations`; MongoDB lock document with a 10-minute TTL). A held lock is waited on for up to 60s, then the run throws naming the holder.
+
+### Changed
+
+- **BREAKING:** `Model.delete()` with no filter throws instead of deleting everything. Pass a filter.
+- **BREAKING:** migrations run in authored order; `order` is the primary sort key, so a migration with a non-zero `order` changes run/rollback order. Multi-batch rollback sorts batch DESC, then `createdAt` DESC, and `export .down.sql` orders newest-first. `transactional: false` and `dataSource` are now honoured.
+- **BREAKING:** dry runs (`--sql`, `export-sql`, `runAll({ dryRun })`) write nothing — no `up()`/`down()` side effects and no recording.
+- **BREAKING:** `isDefault` applies only to the first data source.
+- **BREAKING:** model events are emitted under both the class name and the table name (`model.<table>.updated`, or `model.<dataSource>:<table>.updated`). Listeners on either name work.
+- **BREAKING:** a unique-constraint violation on insert/update (pg `23505`, mongo `11000`) throws `DatabaseWriterValidationError` (a field error) instead of a raw driver error. The `unique` rule excludes the model's own row on update.
+- **BREAKING:** `unique`/`exists`/`databaseModels`/embed rules with an unregistered string model name throw a descriptive error ("did you forget `@RegisterModel()`?"). `exists()` defaults to the primary key, and `uuid` always returns a string.
+- **BREAKING:** sync runs after commit and logs failures as `sync.failed`; multi-level sync (`.maxDepth()`) is removed.
+- Mongo: `orderByRaw()`/`cursor()` throw instead of being ignored, `raw()` throws a "SQL only" error, `whereDate`/`whereBefore`/`whereAfter` use UTC day boundaries, and transaction callbacks may run more than once (retried on transient errors).
+- `defineModel` no longer overrides base-class `strictMode`/`autoGenerateId` unless supplied. Validation no longer calls `console.trace`.
+
+### Fixed
+
+- Postgres driver: `whereLike` with a RegExp (`~*`/`!~*`), `count()`/`exists()` honour `has`/`whereHas`, joins and `groupBy`/`distinct`, and `whereJsonContains` binds a parameter.
+- Migrations: `.index()`/`.unique()`/`.vectorIndex()` inside `Migration.alter` `modify` now create the index, and `randomIncrement` takes effect.
+- Mongo: replica-set detection runs `hello` once per driver.
+
 ## 5.20.1 - 2026-09-24
 
 ### Changed
