@@ -28,8 +28,9 @@ export type McpTransport =
       /** Arguments passed to `command`. */
       args?: string[];
       /**
-       * Environment for the child. When omitted the process environment
-       * is NOT inherited — pass what the server needs explicitly.
+       * Additional environment for the child. Explicit values override the
+       * minimal execution allowlist inherited from the parent (PATH, home,
+       * SystemRoot equivalents). Other host variables are not inherited.
        */
       env?: Record<string, string>;
     }

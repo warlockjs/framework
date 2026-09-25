@@ -270,6 +270,59 @@ describe("stdio transport — real child process round-trip", () => {
     await client.close();
   });
 
+  it("passes only execution essentials and explicit environment to the child", async () => {
+    const secretName = "MCP_ENV_ALLOWLIST_REGRESSION_SECRET";
+    const originalSecret = process.env[secretName];
+    process.env[secretName] = "must-not-reach-child";
+
+    try {
+      const client = createJsonRpcClient({
+        type: "stdio",
+        command: process.execPath,
+        args: [
+          "-e",
+          `process.stdout.write(JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            result: {
+              path: process.env.PATH,
+              home: process.env.HOME ?? process.env.USERPROFILE,
+              systemRoot: process.env.SystemRoot ?? process.env.SYSTEMROOT,
+              explicit: process.env.MCP_SERVER_EXPLICIT,
+              secret: process.env.${secretName},
+            },
+          }) + "\\n")`,
+        ],
+        env: {
+          PATH: "explicit-server-path",
+          MCP_SERVER_EXPLICIT: "available-to-server",
+        },
+      });
+
+      const result = await client.call<{
+        path?: string;
+        home?: string;
+        systemRoot?: string;
+        explicit?: string;
+        secret?: string;
+      }>("environment/check");
+
+      expect(result.path).toBe("explicit-server-path");
+      expect(result.home).toBe(process.env.HOME ?? process.env.USERPROFILE);
+      expect(result.systemRoot).toBe(process.env.SystemRoot ?? process.env.SYSTEMROOT);
+      expect(result.explicit).toBe("available-to-server");
+      expect(result.secret).toBeUndefined();
+
+      await client.close();
+    } finally {
+      if (originalSecret === undefined) {
+        delete process.env[secretName];
+      } else {
+        process.env[secretName] = originalSecret;
+      }
+    }
+  });
+
   it("correlates concurrent requests by id", async () => {
     const client = createJsonRpcClient({
       type: "stdio",

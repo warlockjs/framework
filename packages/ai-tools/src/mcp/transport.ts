@@ -16,6 +16,47 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const JSONRPC_VERSION = "2.0";
 
 /**
+ * The only host environment entries a stdio MCP server inherits. This keeps
+ * executable lookup and platform runtime behaviour intact without exposing
+ * application secrets or arbitrary parent-process configuration to children.
+ */
+const STDIO_ENV_ALLOWLIST = [
+  "PATH",
+  "Path",
+  "HOME",
+  "USERPROFILE",
+  "HOMEDRIVE",
+  "HOMEPATH",
+  "SystemRoot",
+  "SYSTEMROOT",
+  "WINDIR",
+  "ComSpec",
+  "COMSPEC",
+  "PATHEXT",
+] as const;
+
+/**
+ * Build the environment passed to a child MCP stdio server. Never forward
+ * `process.env` wholesale: only the cross-platform execution essentials are
+ * copied, and application-supplied server variables take precedence.
+ */
+function createStdioEnvironment(
+  serverEnvironment?: Record<string, string>,
+): Record<string, string> {
+  const environment: Record<string, string> = {};
+
+  for (const key of STDIO_ENV_ALLOWLIST) {
+    const value = process.env[key];
+
+    if (value !== undefined) {
+      environment[key] = value;
+    }
+  }
+
+  return { ...environment, ...serverEnvironment };
+}
+
+/**
  * A pending in-flight request awaiting its correlated response, keyed by
  * the JSON-RPC `id`. The stdio transport multiplexes many requests over
  * one line-framed pipe, so each resolve/reject is parked here until the
@@ -117,7 +158,7 @@ class StdioTransport implements McpTransportClient {
         // process.env is NOT inherited unless the caller opts in — pass
         // what the server needs explicitly, mirroring the workspace shell
         // policy. `undefined` lets Node default to an empty-ish env.
-        env: transport.env,
+        env: createStdioEnvironment(transport.env),
         stdio: ["pipe", "pipe", "pipe"],
       }) as ChildProcessWithoutNullStreams;
     } catch (cause) {
