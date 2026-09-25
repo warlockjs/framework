@@ -107,6 +107,7 @@ describe("PostgresDriver — connection resilience (ba1193b4)", () => {
     it("registers an 'error' listener on the pool so an idle-client drop can't crash the process", async () => {
       const driver = new PostgresDriver({ database: "test" });
       connect.mockResolvedValue(makeClient());
+      poolQuery.mockResolvedValue({ rows: [], rowCount: 0, fields: [] });
 
       await driver.connect();
 
@@ -116,6 +117,7 @@ describe("PostgresDriver — connection resilience (ba1193b4)", () => {
     it("the registered listener does not throw when invoked with a terminated-connection error", async () => {
       const driver = new PostgresDriver({ database: "test" });
       connect.mockResolvedValue(makeClient());
+      poolQuery.mockResolvedValue({ rows: [], rowCount: 0, fields: [] });
 
       await driver.connect();
 
