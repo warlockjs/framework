@@ -136,7 +136,7 @@ export class LocalDriver implements StorageDriverContract {
     const mimeType = options?.mimeType || this.guessMimeType(location);
 
     return {
-      path: location,
+      path: this.applyPrefix(location),
       url: this.url(location),
       size: stats.size,
       hash,
@@ -194,7 +194,7 @@ export class LocalDriver implements StorageDriverContract {
     const mimeType = options?.mimeType || this.guessMimeType(location);
 
     return {
-      path: location,
+      path: this.applyPrefix(location),
       url: this.url(location),
       size: stats.size,
       hash,
@@ -233,7 +233,7 @@ export class LocalDriver implements StorageDriverContract {
     const mimeType = options?.mimeType || this.guessMimeType(location);
 
     return {
-      path: location,
+      path: this.applyPrefix(location),
       url: this.url(location),
       size: stats.size,
       hash,
@@ -523,7 +523,7 @@ export class LocalDriver implements StorageDriverContract {
     const stats = await stat(toPath);
 
     return {
-      path: to,
+      path: this.applyPrefix(to),
       url: this.url(to),
       size: stats.size,
       hash,
@@ -551,7 +551,7 @@ export class LocalDriver implements StorageDriverContract {
     const stats = await stat(toPath);
 
     return {
-      path: to,
+      path: this.applyPrefix(to),
       url: this.url(to),
       size: stats.size,
       hash,

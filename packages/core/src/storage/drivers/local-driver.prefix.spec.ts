@@ -23,6 +23,18 @@ describe("LocalDriver prefix and streaming", () => {
     expect(driver.url("logo.png")).toContain("/uploads/t1/logo.png");
   });
 
+  it("returns prefix-qualified paths from write operations", async () => {
+    const driver = new LocalDriver({ root, prefix: "t1" });
+
+    expect((await driver.put("one", "one.txt")).path).toBe("t1/one.txt");
+    expect((await driver.putIfAbsent("two", "two.txt"))?.path).toBe("t1/two.txt");
+    expect(
+      (await driver.putStream(Readable.from([Buffer.from("three")]), "three.txt")).path,
+    ).toBe("t1/three.txt");
+    expect((await driver.copy("one.txt", "copy.txt")).path).toBe("t1/copy.txt");
+    expect((await driver.move("copy.txt", "moved.txt")).path).toBe("t1/moved.txt");
+  });
+
   it("does not leak metadata between prefixes", async () => {
     await new LocalDriver({ root, prefix: "a" }).put("A", "logo.png");
     await new LocalDriver({ root, prefix: "b" }).put("BB", "logo.png");
