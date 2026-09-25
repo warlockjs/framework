@@ -1,6 +1,7 @@
 import { router } from "../../../router/router";
 import type { CommandActionData } from "../../../commands/types";
 import { bootForDiagnostics } from "../doctor/boot-for-diagnostics";
+import { withConsoleOnStderr } from "./with-console-on-stderr";
 import { printRoutesTable } from "./format-routes-table";
 import { filterRouteRows, sortRouteRows, toRouteRow } from "./route-row";
 
@@ -29,8 +30,11 @@ function stringOption(value: string | number | boolean | undefined): string | un
  */
 export async function routesCommandAction({ options }: CommandActionData): Promise<void> {
   // The preload is config-only and imports no route modules; load them the same
-  // way the server does at boot.
-  const context = await bootForDiagnostics();
+  // way the server does at boot. With `--json`, stdout carries only the JSON, so
+  // the boot's progress lines go to stderr.
+  const context = options.json
+    ? await withConsoleOnStderr(bootForDiagnostics)
+    : await bootForDiagnostics();
 
   for (const failure of context.moduleFailures) {
     console.error(`Failed to load ${failure.file}: ${failure.message}`);

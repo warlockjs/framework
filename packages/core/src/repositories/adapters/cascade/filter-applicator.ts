@@ -3,7 +3,7 @@ import type {
   QueryBuilderContract,
 } from "@warlock.js/cascade";
 import dayjs from "dayjs";
-import customParseFormat from "dayjs/plugin/customParseFormat";
+import customParseFormat from "dayjs/plugin/customParseFormat.js";
 import { BadRequestError } from "../../../http/errors/errors";
 import type { FilterOptions, FilterRule, FilterRules } from "../../contracts";
 
