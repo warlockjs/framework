@@ -5,6 +5,7 @@ import { isEmpty } from "@mongez/supportive-is";
 import { log } from "@warlock.js/logger";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { container } from "../container";
+import { buildCorsOptions } from "../http/build-cors-options";
 import { Request } from "../http/request";
 import { Response } from "../http/response";
 import { type FastifyInstance } from "../http/server";
@@ -1057,10 +1058,13 @@ export class Router {
     // Every verb production can register. Fastify's implicit HEAD for the GET
     // wildcard is switched off so the HEAD wildcard owns it (the registry falls
     // back to the GET route, exactly as production's implicit HEAD does).
-    // `@fastify/cors` registers its own OPTIONS "*" catch-all; when it is
-    // there, preflight stays with it rather than duplicating the route.
+    // `@fastify/cors` registers its own OPTIONS "*" catch-all whenever
+    // preflight is on. Plugins load after this runs, so `hasRoute` cannot see
+    // it yet: decide from the same options the cors plugin receives.
+    const corsOwnsPreflight = buildCorsOptions().preflight !== false;
+
     for (const method of DEV_DISPATCH_METHODS) {
-      if (method === "OPTIONS" && server.hasRoute({ method: "OPTIONS", url: "*" })) {
+      if (method === "OPTIONS" && (corsOwnsPreflight || server.hasRoute({ method: "OPTIONS", url: "*" }))) {
         continue;
       }
 

@@ -2,9 +2,11 @@
  * Dev/prod router parity (finding C1:B21): HEAD-only, OPTIONS, per-route
  * rateLimit and the 404 body behave under `scanDevServer` as they do in `scan`.
  */
+import fastifyCors from "@fastify/cors";
 import fastifyRateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as corsOptions from "../http/build-cors-options";
 import { buildNotFoundBody } from "./dev-dispatch";
 import { router } from "./router";
 
@@ -52,7 +54,8 @@ describe("dev router parity", () => {
     expect(response.headers["x-route"]).toBe("HEAD:/only-head");
   });
 
-  it("serves an OPTIONS route", async () => {
+  it("serves an OPTIONS route when cors preflight is off", async () => {
+    vi.spyOn(corsOptions, "buildCorsOptions").mockReturnValue({ preflight: false });
     router.options("/opts", (() => undefined) as any);
     server = await devServer();
 
@@ -60,6 +63,26 @@ describe("dev router parity", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.headers["x-route"]).toBe("OPTIONS:/opts");
+  });
+
+  // The real app registers @fastify/cors, which owns OPTIONS "*" and loads
+  // after scanDevServer: a second OPTIONS wildcard crashed dev boot.
+  it("boots beside @fastify/cors and leaves preflight to it", async () => {
+    server = Fastify();
+    router.get("/page", (() => undefined) as any);
+    router.scanDevServer(server);
+    server.register(fastifyCors, { origin: "*" });
+
+    await server.ready();
+
+    const preflight = await server.inject({
+      method: "OPTIONS",
+      url: "/page",
+      headers: { origin: "http://example.test", "access-control-request-method": "GET" },
+    });
+
+    expect(preflight.statusCode).toBe(204);
+    expect(preflight.headers["access-control-allow-origin"]).toBe("*");
   });
 
   it("applies a per-route rateLimit", async () => {
