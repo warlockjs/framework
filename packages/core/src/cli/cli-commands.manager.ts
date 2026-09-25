@@ -528,8 +528,9 @@ export class CLICommandsManager {
         alias: declared.alias ? toCamelCase(declared.alias) : declared.alias,
       };
 
-      if (result[camelName] === undefined && result[declared.name] !== undefined) {
-        result[camelName] = result[declared.name];
+      const declaredValue = result[declared.name];
+      if (result[camelName] === undefined && declaredValue !== undefined) {
+        result[camelName] = declaredValue;
       }
 
       if (opt.defaultValue !== undefined) {

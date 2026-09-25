@@ -52,7 +52,7 @@ export async function downloadFileFromUrl(
     }
 
     if (!extension) {
-      const mime = response.contentType?.split(";")[0].trim().toLowerCase();
+      const mime = response.contentType?.split(";")[0]?.trim().toLowerCase();
       const fromMime = mime ? contentTypeExtensions[mime] : undefined;
       extension = fromMime ? `.${fromMime}` : "";
     }

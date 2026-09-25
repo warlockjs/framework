@@ -205,7 +205,9 @@ class ESLintHealthWorker {
       filePath: file.path,
     });
 
-    if (lintResults.length === 0) {
+    const lintResult = lintResults[0];
+
+    if (!lintResult) {
       return {
         path: file.path,
         relativePath: file.relativePath,
@@ -215,7 +217,6 @@ class ESLintHealthWorker {
       };
     }
 
-    const lintResult = lintResults[0];
     const errors: LintMessage[] = [];
     const warnings: LintMessage[] = [];
 

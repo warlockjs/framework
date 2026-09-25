@@ -35,6 +35,6 @@ describe("ConnectorsManager shutdown deadline", () => {
 
     await vi.advanceTimersByTimeAsync(1);
     expect(exit).toHaveBeenCalledWith(1);
-    expect(error.mock.calls[0][0]).toContain("cache");
+    expect(error.mock.calls[0]?.[0]).toContain("cache");
   });
 });

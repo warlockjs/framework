@@ -8,8 +8,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.21.0
 
+### Added
+
+- `app.shutdownTimeout` (default 10s) — an overall shutdown budget. HTTP stops accepting and drains first, then the other connectors stop in reverse priority; if the budget runs out, the hung connector is logged and the process exits with code 1. In shared mode, closing socket.io no longer closes the Fastify server.
+- `putFromPath(localPath, storagePath)` on storage — uploads a local file by path.
+
+### Changed
+
+- **BREAKING:** `put(string)` now always stores the string as **content**. To upload a local file, use `putFromPath()`.
+- **BREAKING:** multipart limit violations now respond `413`.
+- **BREAKING:** `hmacKey` is validated — a non-hex key throws instead of silently hashing with an empty key. Set a hex `encryption.hmacKey`.
+- **BREAKING:** `DatabaseLogModel` fields are now `module`/`action`/`content`/`stack`/`date`; legacy `message`/`trace` are still read. Update any code that queries the old fields directly.
+- **BREAKING:** SMTP `secure` now defaults from the port (465 → implicit TLS) when not set explicitly.
+- **BREAKING:** the page cache keeps the request path's case, and the HTML variant is not cached under a CSP. Middleware (app, layout, page) now runs before a page-cache hit is served.
+- **BREAKING:** `list(request.all())` honours only a whitelist of control keys, and `exists()` defaults to the primary key. Pass an explicit column if you relied on another one.
+- **BREAKING:** `Restful` saves validated data only — fields missing from the validation schema are dropped. Add them to the schema if they must be persisted.
+- **BREAKING:** mail mode defaults to `"development"` (log/preview, no real send) outside production, unless `mail.sendInDevelopment === true` or `setMailMode` was called.
+- **BREAKING:** unhandled request errors no longer print via `console.error`; they reach configured logger channels only. Configure a channel to keep that visibility.
+- Logger `enabled: false` (top-level or per-environment) now silences the channel, and the `test` environment block is honoured.
+- `generate.model` migration naming is corrected, `--with-resource` also creates the resource file, and `gen.migration` refuses to run when the target model file is missing.
+- `warlock <cmd> -v` reaches the command instead of printing the version; `--help` always rescans plugin and project commands. Resolved CLI `option.name` is always camelCase.
+- `image.fromUrl()` throws `StorageError` for private/reserved hosts, disallowed schemes and oversized (>50MiB) or slow (>30s) bodies.
+- Routes with `rateLimit.errorMessage` return that message on `429`. The upload default prefix format is now `DD-MM-YYYY-HH-mm-ss`.
+- `flushPendingCookies` throws instead of silently dropping cookies when the parked-cookie symbol is missing. Later `bootstrap()` calls no longer re-register the unhandled-rejection listener.
+
 ### Fixed
 
+- The dev health checker now lints projects using `eslint.config.ts`/`.mts`/`.cts`.
 - An explicit `HEAD` route now takes precedence over Fastify's automatic HEAD
   registration for a `GET` route at the same path. GET-only routes retain
   Fastify's implicit HEAD behavior.

@@ -41,7 +41,7 @@ export function parseColumnDsl(input: string): ParsedColumn[] {
 
   return columns.map((colStr) => {
     const parts = colStr.split(":").map((p) => p.trim());
-    const name = parts[0];
+    const name = parts[0] ?? ""; // colStr is non-empty, so split always yields a first part
     const rawType = parts[1] || "string";
     const helper = typeMapping[rawType];
 

@@ -275,7 +275,13 @@ function parseSpec(spec: string): { operator: string; version: string } | undefi
     return undefined;
   }
 
-  return { operator: match[1] ?? "", version: match[2] };
+  const version = match[2];
+
+  if (version === undefined) {
+    return undefined;
+  }
+
+  return { operator: match[1] ?? "", version };
 }
 
 /** Write the resolved bumps back into the package.json object in place. */

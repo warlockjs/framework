@@ -42,7 +42,7 @@ describe("CascadeAdapter.updateMany", () => {
     expect(count).toBe(501);
     expect(chunkSizes).toEqual([500]);
     expect(log).toEqual(["begin", "commit", "begin", "commit"]);
-    expect(records[0].save).toHaveBeenCalledWith({ merge: { b: 2 } });
+    expect(records[0]!.save).toHaveBeenCalledWith({ merge: { b: 2 } });
   });
 
   it("still updates when the model has no transaction support", async () => {
@@ -51,6 +51,6 @@ describe("CascadeAdapter.updateMany", () => {
     delete (model as any).transaction;
 
     expect(await new CascadeAdapter(model as any).updateMany({}, { b: 2 })).toBe(3);
-    expect(records[2].save).toHaveBeenCalled();
+    expect(records[2]!.save).toHaveBeenCalled();
   });
 });

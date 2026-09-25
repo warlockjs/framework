@@ -324,7 +324,7 @@ ${interfaceContent}
     }
 
     const configName = match[1];
-    if (configName === "index") return;
+    if (!configName || configName === "index") return;
 
     devLogInfo(`Config changed: ${configName}, updating...`);
 
