@@ -1,14 +1,14 @@
 ---
 title: "Serve over SSE"
-description: ai.serve in depth — turn an agent, supervisor, or orchestrator into a node:http handler that streams its run to the client as Server-Sent Events, with bearer auth and request/option mapping.
+description: Safely expose a streamable AI primitive as a Node HTTP Server-Sent Events endpoint.
 sidebar:
   order: 5
   label: "Serve over SSE"
 ---
 
-`ai.serve` turns any streamable primitive — an agent, a supervisor, or an orchestrator — into a `node:http` request handler that streams its run to the client as **Server-Sent Events (SSE)**. It is the production-serving primitive (A3): you keep your model, prompt, and session logic in one executable, and `serve` exposes it over HTTP without you hand-writing the streaming, the headers, or the auth check.
+`ai.serve` turns any streamable primitive - an agent, supervisor, or orchestrator - into a `node:http` request handler that streams its run as Server-Sent Events (SSE). It is the production-serving primitive: it supplies the streaming response, safe request defaults, and optional bearer-token protection without hand-writing a transport.
 
-It is distinct from [`ai.mcp.serve`](/v/latest/ai/tools/connect-mcp/#expose-a-warlock-agent-as-an-mcp-server), which exposes a primitive as an MCP server for other MCP clients. `ai.serve` exposes it as a plain HTTP SSE endpoint for any client that speaks `text/event-stream`.
+It is distinct from [`ai.mcp.serve`](/v/latest/ai/tools/connect-mcp/#expose-a-warlock-agent-as-an-mcp-server), which exposes a primitive as an MCP server. `ai.serve` is a plain `text/event-stream` HTTP endpoint.
 
 ## The shape
 
@@ -21,116 +21,133 @@ const agent = ai.agent({ model, instructions: "Be helpful." });
 createServer(ai.serve(agent, { authToken: process.env.AGENT_TOKEN })).listen(8787);
 ```
 
-`ai.serve(executable, options?)` returns a `(req, res) => void` handler. Pass it straight to `createServer`, or mount it inside an existing router. The `executable` need only satisfy `ServableExecutable` — anything whose `stream(input, options)` returns the framework's stream shape qualifies, which every agent, supervisor, and orchestrator already does.
+`ai.serve(executable, options?)` returns a `(req, res) => void` handler. Pass it directly to `createServer` or mount it in an existing router. Any executable whose `stream(input, options)` returns the framework stream shape qualifies; agents, supervisors, and orchestrators already do.
 
-## The request contract
+## Request and size contract
 
-The handler accepts **POST only**; any other method gets `405 { "error": "method_not_allowed" }`. The body is parsed as JSON, and by default the executable's input is `body.input`:
+The handler accepts **POST only**; another method receives `405 { "error": "method_not_allowed" }`. The body must be a JSON object, and the default input is `body.input`:
 
 ```jsonc
-// POST / with Content-Type: application/json
-{
-  "input": "Refund order #1841, it arrived broken.",
-  "sessionId": "user-42",        // forwarded as a stream option (for orchestrators)
-  "history": [/* prior turns */] // forwarded as a stream option
-}
+{ "input": "Refund order #1841, it arrived broken." }
 ```
 
-By default `sessionId` and `history` are passed straight through as per-call stream options, so an orchestrator turn resumes the right session. A body that is not valid JSON gets `400 { "error": "invalid_json" }`. An empty body parses to `{}`.
+The JSON body is untrusted input. In particular, `sessionId` and `history` fields in it are ignored: a client cannot select another conversation or inject prior turns. Invalid JSON receives `400 { "error": "invalid_json" }`; an empty body parses as `{}`.
 
-## The response: an SSE stream
+Requests are limited to **1 MiB (1,048,576 bytes)** by default. An oversized request receives `413 { "error": "payload_too_large" }` before the executable runs. Set `maxBodyBytes` only when the endpoint has a deliberate larger-payload policy:
 
-On a valid request the handler replies `200` with `content-type: text/event-stream; charset=utf-8`, `cache-control: no-cache`, and `connection: keep-alive`, then streams frames:
+```ts
+ai.serve(agent, { maxBodyBytes: 256 * 1024 }); // 256 KiB
+```
 
-1. **One frame per stream event**, named by the event's `type` — e.g. `event: agent.trip.streaming`, with the full event object as JSON `data`.
-2. **A final `result` frame** carrying the run's resolved result (the same value `stream.result` resolves to).
-3. **A terminal `data: [DONE]` frame** the client watches for to stop reading.
+## SSE response
+
+A valid request responds `200` with `content-type: text/event-stream; charset=utf-8`, `cache-control: no-cache`, and `connection: keep-alive`. It emits one SSE frame per stream event, a final `result` frame, and terminal `data: [DONE]`:
 
 ```text
 event: agent.trip.streaming
 data: {"type":"agent.trip.streaming","delta":"Refund"}
 
-event: agent.trip.completed
-data: {"type":"agent.trip.completed"}
-
 event: result
-data: {"data":{"refunded":true},"usage":{"totalTokens":312}}
+data: {"data":{"refunded":true}}
 
 data: [DONE]
 ```
 
-If the run throws while streaming, an `event: error` frame is emitted with `{ "message": "..." }` before the stream closes — `execute()`-style errors never crash the handler.
-
-A minimal browser client:
-
-```ts
-const res = await fetch("/", {
-  method: "POST",
-  headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-  body: JSON.stringify({ input: "Hello" }),
-});
-
-const reader = res.body!.getReader();
-const decoder = new TextDecoder();
-
-for (;;) {
-  const { value, done } = await reader.read();
-  if (done) break;
-  const chunk = decoder.decode(value);
-  if (chunk.includes("[DONE]")) break;
-  // parse `event:` / `data:` lines as they arrive
-}
-```
+If streaming throws, the handler emits an `error` event containing `{ "message": "..." }` and closes the stream.
 
 ## Bearer auth
 
-Set `authToken` and every request must send `Authorization: Bearer <token>`, or it gets `401 { "error": "unauthorized" }` before the body is even read:
+Set `authToken` to require `Authorization: Bearer <token>` on every request. Missing or invalid credentials receive `401 { "error": "unauthorized" }` before the body is read:
 
 ```ts
 ai.serve(agent, { authToken: process.env.AGENT_TOKEN });
 ```
 
-This is the same coarse token control the local dashboard uses — fold it in for any deploy that is reachable off-localhost. Every response (including the error responses) also carries hardening headers: `x-content-type-options: nosniff`, `x-frame-options: DENY`, and `referrer-policy: no-referrer`.
+For equal-length bearer values, token comparison is timing-safe. This is a shared-secret guard, not a replacement for application identity and authorization. Every response also carries `x-content-type-options: nosniff`, `x-frame-options: DENY`, and `referrer-policy: no-referrer`.
 
-## Reshaping the request and options
+## Server-owned sessions and execution options
 
-Two hooks let the endpoint accept a request shape other than the default `{ input, sessionId?, history? }`:
+`serve` owns the execution session context. By default it creates a fresh UUID for every request and supplies no history. Configure `session` to derive an ID and load history from trusted server-side state.
 
 ```ts
 ai.serve(orchestrator, {
   authToken: process.env.AGENT_TOKEN,
 
-  // Map the parsed body to the executable's input.
+  session: {
+    createId: (req) => sessionIdForAuthenticatedRequest(req),
+    loadHistory: ({ sessionId }) => historyStore.load(sessionId),
+  },
+
   toInput: (body) => body.message,
 
-  // Map the parsed body to per-call stream options.
-  toOptions: (body) => ({
-    sessionId: body.conversationId,
-    history: body.turns,
+  toOptions: ({ req, sessionId, history, signal }) => ({
+    tenantId: tenantForAuthenticatedRequest(req),
+    traceSession: sessionId,
+    historyCount: Array.isArray(history) ? history.length : 0,
+    signal,
   }),
 });
 ```
 
-`toInput` defaults to `(body) => body.input`. `toOptions` defaults to forwarding `sessionId` and `history` when present. Override both to bridge an existing API contract onto the executable without changing the executable itself.
+`toInput` receives the parsed request body and defaults to `(body) => body.input`. `toOptions` receives trusted request context instead:
+
+```ts
+type ServeRequestContext = {
+  req: IncomingMessage;
+  sessionId: string;
+  history: unknown;
+  signal: AbortSignal;
+};
+```
+
+The handler always supplies its `sessionId`, `history`, and `signal` to `stream()` after `toOptions` runs, so those execution-critical values remain server-owned.
+
+### Migrate body-based `toOptions`
+
+Move session state out of the body and into `session`; use the callback context for additional trusted options:
+
+```ts
+// Before: client controls the session and history.
+toOptions: (body) => ({ sessionId: body.sessionId, history: body.history })
+
+// After: the server selects them.
+session: {
+  createId: (req) => sessionIdForAuthenticatedRequest(req),
+  loadHistory: ({ sessionId }) => historyStore.load(sessionId),
+},
+toOptions: ({ sessionId, history }) => ({ sessionId, history })
+```
 
 ### Options
 
 | Option | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `authToken` | `string` | — | When set, requires `Authorization: Bearer <token>` on every request, else `401`. |
-| `toInput` | `(body) => TInput` | `body.input` | Map the parsed JSON body to the executable's input. |
-| `toOptions` | `(body) => Record<string, unknown>` | passes `sessionId` / `history` through | Map the parsed body to per-call stream options. |
+| `authToken` | `string` | - | Require `Authorization: Bearer <token>`, else `401`. |
+| `toInput` | `(body) => TInput` | `body.input` | Map parsed JSON to executable input. |
+| `toOptions` | `(context: ServeRequestContext) => Record<string, unknown>` | `() => ({})` | Add trusted per-call stream options. |
+| `session` | `ServeSessionOptions` | Fresh UUID and no history | Own the request session ID and optional server-loaded history. |
+| `maxBodyBytes` | `number` | `1_048_576` (1 MiB) | Maximum JSON request size; oversized bodies get `413`. |
+
+## Client disconnects cancel the run
+
+Each request gets an `AbortSignal` in `ServeRequestContext` and in the options passed to `stream()`. If the client aborts its request or closes the response before the stream finishes, `serve` aborts that signal and stops writing SSE frames. Forward it through work added in `toOptions` so downstream work can stop promptly:
+
+```ts
+toOptions: ({ signal }) => ({ signal })
+```
+
+Cancellation is cooperative: the executable and its provider or dependencies must honor the signal to stop in-flight work.
 
 ## Durable multi-turn serving
 
-`ai.serve` is stateless per request — it streams one run and ends. For durable multi-turn serving, pair it with an [orchestrator](/v/latest/ai/orchestration/run-orchestrator/): the client sends `sessionId` + `history` on each POST, the orchestrator loads and checkpoints session state, and `serve` streams the turn. Because each POST is an independent run, add your own session lock (or rely on the orchestrator's snapshot/checkpoint discipline) if a single session can receive concurrent turns.
+For durable multi-turn serving, pair `serve` with an [orchestrator](/v/latest/ai/orchestration/run-orchestrator/). Configure `session.createId` and `session.loadHistory` from trusted server-side state; the orchestrator then loads and checkpoints its own session state while `serve` streams the turn. Because each POST is independent, add a session lock (or rely on orchestrator snapshot/checkpoint discipline) when one session can receive concurrent turns.
 
-## The building blocks
+## Building blocks
 
-`serve` is assembled from two pure, transport-agnostic helpers you can use directly when you need a custom sink (a different HTTP framework, a WebSocket, a test harness):
+For a custom sink such as another HTTP framework, WebSocket, or test harness, use the transport-agnostic helpers directly:
 
-- **`streamToSSE(stream)`** — an async generator that converts a primitive's event stream into SSE frame strings: a frame per event, then the `result` frame (or an `error` frame if `stream.result` rejects), then `[DONE]`.
-- **`encodeSSE({ event?, data, id? })`** — encode a single SSE frame, splitting multi-line `data` across multiple `data:` lines per the SSE spec.
+- `streamToSSE(stream)` converts a primitive event stream into frame strings: event frames, `result` (or `error`), then `[DONE]`.
+- `encodeSSE({ event?, data, id? })` encodes one SSE frame and splits multi-line data as required by the SSE format.
 
 ```ts
 import { streamToSSE } from "@warlock.js/ai";
@@ -142,7 +159,6 @@ for await (const frame of streamToSSE(agent.stream("Hi"))) {
 
 ## Related
 
-- [Run orchestrator](/v/latest/ai/orchestration/run-orchestrator/) — pair with `serve` for durable, multi-turn HTTP serving.
-- [Connect MCP](/v/latest/ai/tools/connect-mcp/) — `ai.mcp.serve`, the MCP-server counterpart to `ai.serve`.
-- [Log AI calls](/v/latest/ai/observability/log-ai-calls/) — the events `serve` streams are the same lifecycle events you can subscribe to in-process.
-- [Handle errors](/v/latest/ai/reliability/handle-errors/) — how run errors surface; `serve` mirrors them onto an `error` SSE frame.
+- [Run orchestrator](/v/latest/ai/orchestration/run-orchestrator/) - durable multi-turn serving.
+- [Connect MCP](/v/latest/ai/tools/connect-mcp/) - the MCP-server counterpart.
+- [Handle errors](/v/latest/ai/reliability/handle-errors/) - how run errors surface.

@@ -17,7 +17,9 @@ sidebar:
 - **`ModelPricing`** (on the SDK / `model({ pricing })`) is **USD per 1,000,000 tokens** and drives `Usage.cost` on reports.
 - **`BudgetPricing`** (on `budget({ pricing })`) is **USD per 1,000 tokens**, shape `{ inputPer1K, outputPer1K }`, and is consulted only to enforce the cost cap.
 
-They are separate on purpose — the budget's cost math runs trip-by-trip during the run, before any report is built. Keys in both tables must match the running model's name exactly.
+They are separate on purpose — the budget's cost math runs trip-by-trip during the run, before any report is built. A matching `BudgetPricing` entry wins when both are present; otherwise the middleware uses the model's resolved `ModelPricing` (from `model({ pricing })` or SDK-level pricing). Keys in the budget table must match the running model's name exactly.
+
+For a dollar-capped budget, pricing is fail-closed by default: if neither source resolves a price, `execute()` returns a `BudgetExceededError` before the first model call. Its message names the model and points to `onUnpriced: "allow"`; set that option only when you intentionally want to run without enforceable USD accounting.
 
 ```ts
 import { ai } from "@warlock.js/ai";
@@ -90,7 +92,7 @@ if (result.error?.code === "BUDGET_EXCEEDED") {
 }
 ```
 
-Every clause is optional — supply only the dimensions you care about. A contract with no caps is inert. `maxCostUSD` degrades silently to a no-op without a `pricing` entry for the running model; the token and latency clauses keep enforcing regardless.
+Every clause is optional — supply only the dimensions you care about. A contract with no caps is inert. For a dollar cap, an explicit budget price wins; otherwise the model/SDK's resolved `ModelPricing` is used. If neither exists, the budget fails closed before the first call unless `onUnpriced: "allow"` opts out; token and latency clauses continue to enforce independently.
 
 ## Soft fallback — degrade instead of abort
 

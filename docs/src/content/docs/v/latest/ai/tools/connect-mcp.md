@@ -53,7 +53,34 @@ The `server` argument is discriminated by `type`:
 { type: "http", url: "https://mcp.example.com/rpc", headers: { authorization: "Bearer …" } }
 ```
 
-> **stdio env is not inherited.** When you pass `env`, only those keys reach the child — pass what the server needs (e.g. its API token) explicitly. Omit `env` to inherit nothing.
+### stdio environment
+
+stdio servers receive a deliberately small inherited environment so the executable and
+platform runtime can start, without receiving your application's ambient configuration.
+The inherited keys are `PATH`/`Path`, home-directory variables (`HOME`, `USERPROFILE`,
+`HOMEDRIVE`, `HOMEPATH`), and Windows runtime variables (`SystemRoot`/`SYSTEMROOT`,
+`WINDIR`, `ComSpec`/`COMSPEC`, `PATHEXT`). Everything else is omitted, including
+application secrets such as `DATABASE_URL`, `OPENAI_API_KEY`, and tokens in the parent
+process.
+
+Pass `env` to provide only the server-specific values it needs. Explicit values take
+precedence over inherited defaults, including `PATH` when a server needs a particular
+executable location:
+
+```ts
+const github = ai.mcp({
+  type: "stdio",
+  command: "npx",
+  args: ["-y", "@modelcontextprotocol/server-github"],
+  env: {
+    GITHUB_TOKEN: process.env.GITHUB_TOKEN!, // deliberately opt this server into its token
+    PATH: "/opt/mcp-tools/bin",              // overrides inherited PATH for this child
+  },
+});
+```
+
+Do not spread `process.env` into this object: doing so defeats the boundary and forwards
+unrelated secrets to the server. Omit `env` when the server needs no configuration.
 
 ### Client options
 

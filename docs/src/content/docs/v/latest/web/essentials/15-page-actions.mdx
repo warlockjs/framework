@@ -122,7 +122,7 @@ The action's `response` is buffered like a loader's, so `header()` and `cookie()
 
 - `response.redirect(url)`, a redirect (see outcomes below).
 - A value: success, and the page's loaders re-run.
-- A failure helper: `badRequest` (400), `unauthorized` (401), `forbidden` (403), `conflict` (409), `unprocessableEntity` (422), `tooManyRequests` (429). Pass an optional `{ message, errors }`; `errors` may be a Seal array or a `{ field: message }` record.
+- A failure helper: `badRequest` (400), `unauthorized` (401), `forbidden` (403), `conflict` (409), `unprocessableEntity` (422), `tooManyRequests` (429), `serviceUnavailable` (503). Pass an optional `{ message, errors }`; `errors` may be a Seal array or a `{ field: message }` record.
 
 ## Outcomes
 

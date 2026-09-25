@@ -124,6 +124,560 @@
   ],
   "releases": [
     {
+      "version": "5.22.0",
+      "id": "v5-22-0",
+      "date": "September 25, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Page action and session contracts, durable Cascade jobs, and safer AI serving.</strong> Web and Auth add action-specific validated input, session-aware page and layout loaders, buffered logout cookie clearing, and a 503 action helper. Cascade restores PostgreSQL TTL purge jobs after reconnect and retries post-commit sync fan-out; Core preserves configured local-storage path prefixes. AI serving adds server-owned sessions, request limits, disconnect cancellation, safer MCP environment handling, unpriced-model budget rejection, and Core-owned SSRF address classification. Sixteen approved Mongez skills-only patches and grouped agent-kit skills are included. Lockstep release across all 30 packages. Generator matrix scope: <code>none</code>; local-registry package checks and separate fresh-install checks are recorded in the release summary.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>PageConfig</code> accepts <code>action</code> and <code>actions</code> (new <code>PageActionConfig</code> type), so <code>config = { action: { validation } } satisfies PageConfig</code> type-checks."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>PageActionContext&lt;typeof config.action&gt;</code> types <code>request.validated()</code> from the action's Seal validator."
+            },
+            {
+              "type": "Fixed",
+              "html": "An action's <code>response.clearCookie()</code> exists and sends the deleting <code>Set-Cookie</code>, so <code>authService.clearSessionCookies(response)</code> no longer throws in a page action."
+            },
+            {
+              "type": "Fixed",
+              "html": "Page action names flow into the generated route manifest; app and layout loaders type resolved sessions; late session renewal raises <code>SessionResolvedTooLateError</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Page actions can return <code>response.serviceUnavailable()</code> for upstream failures such as mail delivery."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>setSessionCookies</code>, <code>clearSessionCookies</code>, <code>setAuthCookie</code>, <code>clearAuthCookie</code> and <code>loginWithSessionCookies</code> take a <code>CookieWriter</code> (any object with <code>cookie()</code> and <code>clearCookie()</code>), so a page action's <code>response</code> works without a cast."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "PostgreSQL TTL indexes register purge jobs and persist retention rules in index comments so jobs restore after reconnect."
+            },
+            {
+              "type": "Fixed",
+              "html": "Post-commit sync fan-out retries transient failures without failing committed writes."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "USD budgets reject unpriced models by default; <code>onUnpriced: \"allow\"</code> explicitly opts out. Model pricing reaches middleware."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>ai.serve</code> owns session IDs and history, limits request bodies, checks bearer tokens in constant time and aborts on disconnect."
+            },
+            {
+              "type": "Changed",
+              "html": "SSRF address classification reuses the core classifier, including IPv4-mapped IPv6."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Security",
+              "html": "Stdio MCP children receive only a minimal execution environment plus explicitly supplied variables."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Local storage results return paths with the configured prefix for writes and moves."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Cron and time parsing handle absent fields explicitly under strict TypeScript checks."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/sitemap",
+          "slug": "sitemap",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release maintenance and dependency refresh."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.21.0",
       "id": "v5-21-0",
       "date": "September 25, 2026",

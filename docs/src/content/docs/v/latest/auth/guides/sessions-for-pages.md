@@ -52,6 +52,42 @@ const result = await authService.loginWithSessionCookies(request, response, User
 
 It checks Origin (or Referer) before looking at credentials, even when the request has no cookies (login CSRF). A missing or cross-site Origin throws `CsrfOriginMismatchError`. It returns `null` for bad credentials and sets both cookies on success.
 
+## In a page action
+
+The cookie helpers take any `CookieWriter`, meaning any object with `cookie()` and `clearCookie()`. That covers both a controller's `Response` and a page action's `response`, so login and logout work as [page actions](/v/latest/web/essentials/15-page-actions/). The cookies go out with the action's reply.
+
+```ts
+// src/web/auth/login.setup.ts
+export const config = {
+  action: {
+    validation: v.object({ email: v.string().email().required(), password: v.string().required() }),
+  },
+} satisfies PageConfig;
+
+export async function action({ request, response }: PageActionContext<typeof config.action>) {
+  const result = await authService.loginWithSessionCookies(request, response, User, request.validated());
+
+  if (!result) return response.unauthorized({ message: "Invalid email or password." });
+
+  return response.redirect(safeRedirectTarget(request.input("redirect")) ?? "/");
+}
+
+// src/web/account/index.setup.ts
+export const actions = {
+  logout: async ({ request, response, session }: PageActionContext) => {
+    if (session?.model) {
+      await authService.logout(session.model, request.cookie("access_token"), request.cookie("refresh_token"));
+    }
+
+    authService.clearSessionCookies(response);
+
+    return response.redirect("/login");
+  },
+};
+```
+
+`session.model` is your auth model once `SessionRegistry` declares it.
+
 ## Multi-instance
 
 Nothing is held in process memory; renewal serialises in the database. Share:

@@ -1,4 +1,15 @@
 {
+  "5.22.0": {
+    "publishedAt": "2026-09-25T13:46:35.498Z",
+    "matrix": "none",
+    "summary": "**Page action and session contracts, durable Cascade jobs, and safer AI serving.** Web and Auth add action-specific validated input, session-aware page and layout loaders, buffered logout cookie clearing, and a 503 action helper. Cascade restores PostgreSQL TTL purge jobs after reconnect and retries post-commit sync fan-out; Core preserves configured local-storage path prefixes. AI serving adds server-owned sessions, request limits, disconnect cancellation, safer MCP environment handling, unpriced-model budget rejection, and Core-owned SSRF address classification. Sixteen approved Mongez skills-only patches and grouped agent-kit skills are included. Lockstep release across all 30 packages. Generator matrix scope: `none`; local-registry package checks and separate fresh-install checks are recorded in the release summary.",
+    "featured": [
+      "@warlock.js/web",
+      "@warlock.js/auth",
+      "@warlock.js/cascade",
+      "@warlock.js/ai"
+    ]
+  },
   "5.21.0": {
     "publishedAt": "2026-09-25T03:39:13.111Z",
     "matrix": "subset",

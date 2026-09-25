@@ -52,7 +52,23 @@ ai.middleware.budget({
 
 Breach → `BudgetExceededError` on `result.error`. Inspect `error.unit` (`"tokens" | "usd"`), `error.limit`, `error.actual`. Warn mode logs and continues — useful for measuring before enforcing.
 
-USD only fires when both `maxCostUSD` AND a matching `pricing[modelName]` entry exist.
+### USD pricing is fail-closed
+
+When you set `maxCostUSD`, the middleware resolves pricing in this order:
+
+1. The explicit `budget({ pricing })` entry for the running model.
+2. The model's resolved `ModelPricing`, whether it came from `sdk.model({ pricing })` or SDK-level pricing.
+
+An explicit budget entry takes precedence over model/SDK pricing. If neither source resolves a price, the run fails **before its first model call** with `BudgetExceededError`; the error names the unpriced model and tells you to configure pricing or opt out. This prevents a dollar cap from silently becoming unenforced.
+
+Use `onUnpriced: "allow"` only when accepting that risk is intentional:
+
+```ts
+ai.middleware.budget({
+  maxCostUSD: 0.5,
+  onUnpriced: "allow", // permit a model with no resolved ModelPricing
+});
+```
 
 ## `ai.middleware.guardrail`
 
