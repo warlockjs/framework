@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.22.0 - 2026-09-25
+
+### Added
+
+- PostgreSQL TTL indexes register purge jobs and persist retention rules in index comments so jobs restore after reconnect.
+
+### Fixed
+
+- Post-commit sync fan-out retries transient failures without failing committed writes.
+
 ## 5.21.0 - 2026-09-25
 
 ### Added

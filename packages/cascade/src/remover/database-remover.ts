@@ -1,4 +1,3 @@
-import { log } from "@warlock.js/logger";
 import type {
   DriverContract,
   UpdateOperations,
@@ -10,6 +9,7 @@ import type {
 } from "../contracts/database-remover.contract";
 import type { OnDeletedEventContext } from "../events/model-events";
 import type { ChildModel, Model } from "../model/model";
+import { enqueueSyncFanout } from "../sync/sync-fanout";
 import { triggerModelEvent } from "../sync/model-events";
 import { afterCommit } from "../transactions/after-commit";
 import type { DataSource } from "./../data-source/data-source";
@@ -219,9 +219,8 @@ export class DatabaseRemover implements RemoverContract {
       await this.model.emitEvent("deleted", context);
     }
 
-    // 7. Trigger sync operations after COMMIT; failures are logged
-    // A soft delete keeps the row, so embedded copies must stay: only permanent/trash fire it.
-    // TODO(5.22, K2:B10): move this fan-out to a retry/queue-backed path.
+    // 7. Queue sync operations after COMMIT. A soft delete keeps the row, so
+    // embedded copies must stay: only permanent/trash fire a delete sync.
     if (!options.skipSync && strategy !== "soft") {
       afterCommit(() => this.triggerSync());
     }
@@ -299,12 +298,11 @@ export class DatabaseRemover implements RemoverContract {
    *
    * @private
    */
-  private async triggerSync(): Promise<void> {
-    // Emit model.deleted event - ModelSyncOperation listens to these
-    try {
-      await triggerModelEvent(this.ctor, "deleted", this.model);
-    } catch (error) {
-      log.error("database", "sync.failed", `[cascade] sync failed for ${this.ctor.name}: ${error}`);
-    }
+  private triggerSync(): void {
+    enqueueSyncFanout({
+      sourceModel: this.ctor.name,
+      operation: "delete",
+      execute: () => triggerModelEvent(this.ctor, "deleted", this.model),
+    });
   }
 }

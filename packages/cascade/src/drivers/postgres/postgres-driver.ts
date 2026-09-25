@@ -43,6 +43,7 @@ import { PostgresDialect } from "./postgres-dialect";
 import { PostgresMigrationDriver } from "./postgres-migration-driver";
 import { PostgresQueryBuilder } from "./postgres-query-builder";
 import { PostgresSQLSerializer } from "./postgres-sql-serializer";
+import { loadPostgresTTLPurgeJobs, unregisterAllPostgresTTLPurgeJobs } from "./postgres-ttl-purge";
 import { assertPostgresUpdate } from "./postgres-update-validator";
 import type { PostgresPoolConfig, PostgresQueryResult, PostgresTransactionOptions } from "./types";
 
@@ -359,6 +360,7 @@ export class PostgresDriver implements DriverContract {
       // Learn which columns are native arrays straight from the live schema so
       // the value serializer encodes them correctly with zero app config.
       await this.loadNativeArrayColumns();
+      await loadPostgresTTLPurgeJobs(this);
 
       this.emit("connected");
     } catch (error) {
@@ -381,6 +383,7 @@ export class PostgresDriver implements DriverContract {
       return;
     }
 
+    unregisterAllPostgresTTLPurgeJobs(this);
     await this._pool.end();
     this._pool = undefined;
     this._isConnected = false;
@@ -1618,7 +1621,6 @@ export class PostgresDriver implements DriverContract {
    * @param params - Query parameters
    * @returns Query result
    */
-  // TODO(K1:B19): scheduler-based purge job for TTL indexes is deferred.
   private recordColumnTypes(result: PostgresQueryResult): void {
     if (!result.fields?.length || !result.rows?.length) return;
 

@@ -22,6 +22,7 @@ import type {
 } from "../../contracts/migration-driver.contract";
 import type { MigrationDefaults, UuidStrategy } from "../../types";
 import type { PostgresDriver } from "./postgres-driver";
+import { postgresTTLPurgeComment, registerPostgresTTLPurgeJob, unregisterPostgresTTLPurgeJob } from "./postgres-ttl-purge";
 
 /**
  * PostgreSQL Migration Driver.
@@ -651,7 +652,7 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
    *
    * Note: PostgreSQL doesn't have native TTL indexes like MongoDB.
    * This creates a plain index (a `NOW()` predicate is not IMMUTABLE, so a
-   * partial index cannot be built) and requires a scheduled job for cleanup.
+   * partial index cannot be built) and registers a scheduler purge job.
    *
    * @param table - Table name
    * @param column - Date column
@@ -672,8 +673,10 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
       `CREATE INDEX ${quotedIndexName} ON ${quotedTable} (${quotedColumn})`,
     );
 
-    // Note: User must set up a scheduled job (pg_cron, etc.) to:
-    // DELETE FROM table WHERE column < NOW() - INTERVAL 'X seconds'
+    const comment = postgresTTLPurgeComment(table, column, expireAfterSeconds).replaceAll("'", "''");
+    await this.execute(`COMMENT ON INDEX ${quotedIndexName} IS '${comment}'`);
+
+    registerPostgresTTLPurgeJob(this.driver, table, column, expireAfterSeconds);
   }
 
   /**
@@ -684,6 +687,7 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
    */
   public async dropTTLIndex(table: string, column: string): Promise<void> {
     await this.dropIndex(table, `idx_${table}_ttl_${column}`);
+    unregisterPostgresTTLPurgeJob(this.driver, table, column);
   }
 
   /**

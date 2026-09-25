@@ -1,5 +1,4 @@
 import { when } from "@mongez/reinforcements";
-import { log } from "@warlock.js/logger";
 import { getSealConfig, v, type ObjectValidator } from "@warlock.js/seal";
 import type {
   DriverContract,
@@ -14,6 +13,7 @@ import type {
 } from "../contracts/database-writer.contract";
 import { mergeDriverFields } from "../model/methods/accessor-methods";
 import type { ChildModel, Model } from "../model/model";
+import { enqueueSyncFanout } from "../sync/sync-fanout";
 import { triggerModelEvent } from "../sync/model-events";
 import type { StrictMode } from "../types";
 import { DatabaseWriterValidationError } from "../validation";
@@ -657,12 +657,11 @@ export class DatabaseWriter implements WriterContract {
    * @param changedFields - Fields that were changed (for filtering)
    * @private
    */
-  private async triggerSync(changedFields: string[]): Promise<void> {
-    try {
-      // Emit model.updated event - ModelSyncOperation listens to these
-      await triggerModelEvent(this.ctor, "updated", this.model, changedFields);
-    } catch (error) {
-      log.error("database", "sync.failed", `[cascade] sync failed for ${this.ctor.name}: ${error}`);
-    }
+  private triggerSync(changedFields: string[]): void {
+    enqueueSyncFanout({
+      sourceModel: this.ctor.name,
+      operation: "update",
+      execute: () => triggerModelEvent(this.ctor, "updated", this.model, changedFields),
+    });
   }
 }

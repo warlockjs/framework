@@ -7,6 +7,7 @@ import type {
 import type { DataSource } from "../data-source/data-source";
 import type { Model } from "../model/model";
 import type { DeleteStrategy } from "../types";
+import { enqueueSyncFanout } from "../sync/sync-fanout";
 import { triggerModelEvent } from "../sync/model-events";
 import { DatabaseWriter } from "../writer/database-writer";
 
@@ -535,22 +536,22 @@ export class DatabaseRestorer implements RestorerContract {
   }
 
   /**
-   * Re-run sync for a restored record so embedded copies come back up to date.
-   * Failures are swallowed: the restore itself already succeeded.
-   * TODO(5.22, K2:B10): move this fan-out to a retry/queue-backed path.
+   * Queue sync for a restored record so embedded copies come back up to date.
+   * The restore has already succeeded, so queued failures are retried separately.
    *
    * @private
    */
-  private async triggerSync(model: Model): Promise<void> {
-    try {
-      await triggerModelEvent(
-        this.ctor as any,
-        "updated",
-        model,
-        Object.keys(model.data as Record<string, unknown>),
-      );
-    } catch {
-      // sync failures never fail a restore
-    }
+  private triggerSync(model: Model): void {
+    enqueueSyncFanout({
+      sourceModel: this.ctor.name,
+      operation: "restore",
+      execute: () =>
+        triggerModelEvent(
+          this.ctor as any,
+          "updated",
+          model,
+          Object.keys(model.data as Record<string, unknown>),
+        ),
+    });
   }
 }

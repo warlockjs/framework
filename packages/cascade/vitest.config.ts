@@ -79,7 +79,7 @@ export default defineConfig({
     env: { NODE_ENV: "test" },
     globals: true,
     environment: "node",
-    include: ["tests/**/*.test.ts"],
+    include: ["tests/**/*.test.ts", "src/**/*.test.ts", "src/**/*.spec.ts"],
     // Integration tests boot real containers and run via vitest.integration.config.ts.
     // Keep them out of the default + coverage runs so those stay fast and offline.
     exclude: ["**/node_modules/**", "**/dist/**", "tests/integration/**"],
