@@ -54,8 +54,12 @@ declare module "@warlock.js/web" {
 
 Use `requireUser` as page middleware:
 
+:::note
+The guards live on the server-only subpath `@warlock.js/web/session`, so they never reach the client bundle. Client code reads the user with `useUser()` from `@warlock.js/web`.
+:::
+
 ```tsx title="src/web/account/account.page.tsx"
-import { requireUser } from "@warlock.js/web";
+import { requireUser } from "@warlock.js/web/session";
 
 export const config = {
   route: "/account",
@@ -77,7 +81,8 @@ requireUser({ userType: "admin", when: model => model.isActive });
 Pass the loader context to read the model and guard from a loader. A guest throws a redirect that stops lower loaders. `when` must be synchronous here.
 
 ```tsx
-import { requireUser, type PageLoaderContext } from "@warlock.js/web";
+import type { PageLoaderContext } from "@warlock.js/web";
+import { requireUser } from "@warlock.js/web/session";
 
 export async function loader(ctx: PageLoaderContext) {
   const account = requireUser(ctx, { loginPath: "/login" });
@@ -89,7 +94,7 @@ export async function loader(ctx: PageLoaderContext) {
 ### Guest-only pages
 
 ```ts
-import { requireGuest } from "@warlock.js/web";
+import { requireGuest } from "@warlock.js/web/session";
 
 export const config = { route: "/login", middleware: [requireGuest({ to: "/account" })] };
 ```
