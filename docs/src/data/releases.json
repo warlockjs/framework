@@ -1,4 +1,15 @@
 {
+  "5.22.1": {
+    "publishedAt": "2026-09-25T15:28:04.466Z",
+    "matrix": "none",
+    "summary": "**Installed app corrections.** Web resolves page sessions from Core's shared configuration, restoring signed-in loaders, actions, and `useUser()` in installed apps. Create Warlock loads generated page styles through the app stylesheet so sitemap generation can import page modules in Node. Lockstep corrective release across all 30 packages. Generator matrix scope: `none`; local-registry and separate fresh-install checks are recorded in the release summary.",
+    "featured": [
+      "@warlock.js/web",
+      "create-warlock",
+      "@warlock.js/core",
+      "@warlock.js/sitemap"
+    ]
+  },
   "5.22.0": {
     "publishedAt": "2026-09-25T13:46:35.498Z",
     "matrix": "none",
