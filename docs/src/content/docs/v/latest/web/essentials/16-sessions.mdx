@@ -1,0 +1,113 @@
+---
+title: Sessions in pages
+description: Resolve the signed-in user once per page request, read it with useUser(), and guard pages with requireUser and requireGuest.
+sidebar:
+  order: 16
+---
+
+Web resolves the signed-in user before loaders run and ships it to the browser in the hydration payload's optional `session` key. Web never imports auth: it accepts any resolver through `web.session`, and `@warlock.js/auth`'s `pageSession()` fits.
+
+## Wire it
+
+```ts title="src/config/web.ts"
+import { pageSession } from "@warlock.js/auth";
+import type { WebConfigurations } from "@warlock.js/web";
+import type { User } from "app/users/models/user";
+import { userSessionResource } from "app/users/resources/user-session.resource";
+
+export default {
+  session: pageSession({ project: (user: User) => userSessionResource(user) }),
+} satisfies WebConfigurations;
+```
+
+`project` is required: a model never crosses the wire by default. Only what it returns reaches the browser.
+
+## Read the user
+
+`useUser()` returns the projection, or `null` for a guest. It works in server render and in the browser, and components re-render on login and logout.
+
+```tsx
+import { useUser } from "@warlock.js/web";
+
+export function Greeting() {
+  const user = useUser();
+
+  return user ? <span>Hi {user.name}</span> : <a href="/login">Sign in</a>;
+}
+```
+
+Type it by augmenting `SessionRegistry`. Without it, `user` is `{ id: string | number }` and `model` is `unknown`.
+
+```ts title="src/types/session.d.ts"
+import type { User } from "app/users/models/user";
+import type { UserSessionOutput } from "app/users/resources/user-session.resource";
+
+declare module "@warlock.js/web" {
+  interface SessionRegistry {
+    user: UserSessionOutput;
+    model: User;
+  }
+}
+```
+
+## Guard a page
+
+Use `requireUser` as page middleware:
+
+```tsx title="src/web/account/account.page.tsx"
+import { requireUser } from "@warlock.js/web";
+
+export const config = {
+  route: "/account",
+  middleware: [requireUser({ loginPath: "/login" })],
+};
+```
+
+- A guest gets a 302 to `loginPath?redirect=<request.url>`. The login path is locale-prefixed when locale routing prefixes the request locale. Data navigations follow the redirect, so client navigation lands on the login page too.
+- The query name is `redirect`, or `auth.pageAuth.returnUrlParam` when you set it.
+- A request carrying an `Authorization` header, or an app with no `loginPath` (option or `auth.pageAuth.loginPath`), gets a 401 instead.
+- `userType` restricts to one user type and `when(model)` adds a check (it may be async). A failure is a 403, not a redirect.
+
+```ts
+requireUser({ userType: "admin", when: model => model.isActive });
+```
+
+### Loader form
+
+Pass the loader context to read the model and guard from a loader. A guest throws a redirect that stops lower loaders. `when` must be synchronous here.
+
+```tsx
+import { requireUser, type PageLoaderContext } from "@warlock.js/web";
+
+export async function loader(ctx: PageLoaderContext) {
+  const account = requireUser(ctx, { loginPath: "/login" });
+
+  return { name: account.name };
+}
+```
+
+### Guest-only pages
+
+```ts
+import { requireGuest } from "@warlock.js/web";
+
+export const config = { route: "/login", middleware: [requireGuest({ to: "/account" })] };
+```
+
+A signed-in user is sent to the `redirect` query when it is a same-origin relative path, else to `to` (default `/`). `safeRedirectTarget(value)` is exported to apply the same rule in your own login flow: it rejects `//host`, `/\host`, absolute URLs, `javascript:` and control characters.
+
+## Guests and the page cache
+
+A guest render carries `session: { user: null }` and stays cacheable. A signed-in request is never served from or stored in the page cache: it carries a cookie, resolving the user marks the response auth-derived (`private, no-store`), and a renewal sets a cookie.
+
+## Renewal and logout
+
+Renewal is on by default and reactive: an expired or missing access cookie plus a valid refresh cookie mints a new pair before the response headers are written, so activity keeps the session alive. Do not call the resolver from streamed or deferred work; a late resolution throws in development and logs in production.
+
+Log out with a POST action: `authService.logout(user, accessToken, refreshToken)`, then `authService.clearSessionCookies(response)`. Call `clearPrefetchCache()` before `navigateTo`/`refresh()` after login or logout.
+
+## Prefetch identity
+
+Each prefetch entry is tagged with the identity current when it was fetched (`user?.id ?? null`) and refused for a different one. When the identity in a payload changes, the client clears the prefetch cache automatically.
+
+See [Sessions for pages](/v/latest/auth/guides/sessions-for-pages/) for the auth side.

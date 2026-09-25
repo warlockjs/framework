@@ -40,6 +40,10 @@ Validation field mapping is enabled by default. Matching fields receive server e
 
 Named route metadata deliberately contains only name, path, and method. A route registered with `all` has no safe browser verb; use a direct path with an explicit method.
 
+## Page actions instead
+
+`useSubmitForm` posts to an API route and leaves the result to your callbacks. When the form belongs to a page and the outcome should re-render it or redirect (and work without JavaScript), export an `action` from the page and use `<Form>`; see [Page actions](./15-page-actions).
+
 ## Prefetch cache (5.21)
 
 The client prefetch cache is cleared on refresh, on locale change and after form submits. `clearPrefetchCache()` is exported from `@warlock.js/web` if you need to clear it yourself after a mutation made outside a form.

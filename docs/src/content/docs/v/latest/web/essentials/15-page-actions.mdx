@@ -1,0 +1,162 @@
+---
+title: Page actions
+description: Handle a form POST on the page itself with an action export, <Form>, and useActionData.
+sidebar:
+  order: 15
+---
+
+A page action is the server half of a form on a page. The page module exports `action` (or a named `actions` record); a `<Form>` posts to the same URL; the result comes back as `actionData` that the page reads with `useActionData`. It works with and without JavaScript.
+
+For a form that posts to an API route and handles the response in the browser, use [`useSubmitForm`](./14-form-submission) instead. Use a page action when the form belongs to a page and the outcome should re-render that page or redirect.
+
+## Export an action
+
+Policy goes in `config`, the handler is an export, like `loader`:
+
+```tsx
+import { Form, FieldError, useActionData, useIsSubmitting, href } from "@warlock.js/web";
+import type { PageActionContext, PageConfig } from "@warlock.js/web";
+import { v } from "@warlock.js/seal";
+
+export const config = {
+  route: { path: "/contact", name: "contact" },
+  action: {
+    validation: v.object({
+      email: v.string().email().required(),
+      message: v.string().required(),
+    }),
+  },
+} satisfies PageConfig;
+
+export async function action({ request, response }: PageActionContext<typeof config.action>) {
+  const { email } = request.validated();
+
+  if (email === "blocked@example.com") {
+    return response.forbidden({ message: "This address cannot write to us." });
+  }
+
+  return response.redirect(href("contact"));
+}
+
+export default function ContactPage() {
+  const result = useActionData<typeof action>();
+  const pending = useIsSubmitting();
+
+  return (
+    <Form resetOnSuccess>
+      <input name="email" defaultValue={result?.values?.email} />
+      <FieldError name="email" />
+      <textarea name="message" defaultValue={result?.values?.message} />
+      <FieldError name="message" />
+      {result?.formErrors.map(message => (
+        <p role="alert" key={message}>
+          {message}
+        </p>
+      ))}
+      <button disabled={pending}>Send</button>
+    </Form>
+  );
+}
+```
+
+`action` and `actions` are mutually exclusive, and only valid in page modules. `config.action` requires an `action` export; `config.actions` requires `actions`. Each may declare `validation` and `middleware`.
+
+### Several forms on one page
+
+Export `actions`, a plain object of functions, and configure each by key under `config.actions`. Names match `/^[a-z][a-zA-Z0-9]*$/`; `default` is reserved for the unnamed `action`.
+
+```tsx
+import { Form, useActionData } from "@warlock.js/web";
+import type { PageConfig } from "@warlock.js/web";
+
+export const config = {
+  route: { path: "/cart", name: "cart" },
+  actions: { remove: {} },
+} satisfies PageConfig;
+
+export const actions = {
+  save: async ({ response }: { response: import("@warlock.js/web").ActionResponse }) =>
+    response.redirect("/cart"),
+  remove: async ({ response }: { response: import("@warlock.js/web").ActionResponse }) =>
+    response.redirect("/cart"),
+};
+
+export default function CartPage() {
+  const result = useActionData<typeof actions>("remove");
+
+  return (
+    <Form action="remove">
+      {result?.ok === false && <p role="alert">Could not remove.</p>}
+      <button>Remove</button>
+    </Form>
+  );
+}
+```
+
+The action name travels in the body as the reserved field `_action` (`<Form action="remove">` renders it as a hidden input; a `<button name="_action" value="remove">` works too). It is stripped before validation. An invalid or unknown name is refused. `useActionData(name)` and `<FieldError action="remove">` see only that action's state.
+
+## Validation
+
+`config.action.validation` (or `config.actions.<name>.validation`) validates the **body only**, including uploaded files, minus `_action`. Params and query keep using the page's `config.validation`. Inside the action, `request.validated()` is the typed output. A failure never runs the action and becomes a 422 `ActionState`.
+
+## `ActionState` and `useActionData`
+
+`useActionData<typeof action>()` returns `undefined` before any submit, otherwise:
+
+| Field | Meaning |
+|---|---|
+| `action` | `"default"` or the action name |
+| `status`, `ok` | HTTP status and whether it succeeded |
+| `data` | The action's returned value, or a failure helper's payload |
+| `errors` | Field name (dotted) to first message |
+| `formErrors` | A helper's `message`, plus messages for inputs without a field |
+| `values` | Submitted strings, echoed on failure only |
+
+`values` never includes files, and omits names matching `web.forms.redactValues`. The default is `["password", "password_confirmation", "*token*", "*secret*"]`; `*` matches any run of characters. Set `forms.redactValues` in the `web` config to replace the list.
+
+The same state renders on the server without JS, after a JS swap, and after a JS 422.
+
+## Responses
+
+The action's `response` is buffered like a loader's, so `header()` and `cookie()` work. Return one of:
+
+- `response.redirect(url)`, a redirect (see outcomes below).
+- A value: success, and the page's loaders re-run.
+- A failure helper: `badRequest` (400), `unauthorized` (401), `forbidden` (403), `conflict` (409), `unprocessableEntity` (422), `tooManyRequests` (429). Pass an optional `{ message, errors }`; `errors` may be a Seal array or a `{ field: message }` record.
+
+## Outcomes
+
+| Action result | No JS (native POST) | With JS (`<Form>`) |
+|---|---|---|
+| `redirect(url)` | `303` with `Location` (301/302 are rewritten to 303) | `204` with `x-warlock-redirect`; the client navigates there, external URLs hard-navigate |
+| Returns data | Loaders re-run, page renders `200` with `actionData` | Page data swaps in place, same URL |
+| Validation / failure helper | Page renders at `422` (or the helper's status) with `actionData` including `values` | `422`/4xx body of `actionData` only; the page tree is not swapped |
+| Throws | Error page through the normal boundary | Page stays; `routerEvents.onNavigationError` fires |
+
+## `<Form>`
+
+`<Form>` renders a real `<form method="post">` with `encType` defaulting to `multipart/form-data`. Props: `action` (an action name, not a URL), `to` and `params` (post to another page's route by name), `resetOnSuccess`, `onSuccess(outcome)`, `onError(actionData)`, and any other form attribute except `action` and `method`. If the navigation runtime is not connected, it falls back to a native submit.
+
+`<FieldError name="address[city]">` renders `<span role="alert">` when the field has a message; bracket and dotted names are the same field. `<Form>` sets `aria-invalid` and `aria-describedby` on errored inputs. `useIsSubmitting()` is `true` while any action submitted from this document is in flight.
+
+Using `@mongez/react-form`? `useSubmitAction({ action?, to? })` from `@warlock.js/web/form` is an `onSubmit` for its `<Form method="post">` and maps `errors` into the form. Import one of the two `Form`s under an alias if both appear.
+
+## CSRF
+
+Every page action requires a same-origin `Origin` or `Referer` (or one listed in `auth.csrf.allowedOrigins`), whether or not cookies are present. Otherwise the reply is `403`. There is no opt-out. A `<Form>` is same-origin by construction.
+
+## Caching
+
+Actions are never cached. The POST never reads, stores, or honours `cache.public` and is always `private, no-store`. Other visitors' `serverCache` entries for the page stay stale until you call `invalidatePageCache(tags)` (from `@warlock.js/web/page-cache`). The client prefetch cache is cleared after a successful submit.
+
+## Uploads
+
+Multipart is the default encoding, so `<input type="file">` works with and without JS. Read files with `request.file("avatar")` and validate with Seal file rules in `config.action.validation`. Files are never echoed in `values`. Body-size limits are core's.
+
+## Redirect after success
+
+A no-JS action that returns data (rather than redirecting) renders at the POST URL, so a browser reload re-submits it. Redirect after success (`return response.redirect(...)`) unless you deliberately want the result shown in place.
+
+## Middleware
+
+App, layout, and page middleware run before every action, so a page's auth guard protects its actions. `config.action.middleware` runs after those.
