@@ -155,9 +155,9 @@ class StdioTransport implements McpTransportClient {
 
     try {
       child = spawn(transport.command, transport.args ?? [], {
-        // process.env is NOT inherited unless the caller opts in — pass
-        // what the server needs explicitly, mirroring the workspace shell
-        // policy. `undefined` lets Node default to an empty-ish env.
+        // process.env is NOT inherited wholesale: only the
+        // STDIO_ENV_ALLOWLIST keys are copied, then the caller's explicit
+        // `transport.env` entries are layered on top.
         env: createStdioEnvironment(transport.env),
         stdio: ["pipe", "pipe", "pipe"],
       }) as ChildProcessWithoutNullStreams;
