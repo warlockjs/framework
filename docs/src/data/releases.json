@@ -1,4 +1,12 @@
 {
+  "5.23.2": {
+    "publishedAt": "2026-09-26T21:08:30.311Z",
+    "matrix": "none",
+    "summary": "**Multi-site locale routing and site-origin URLs.** In a multi-site app, `<Link>`, `localizedPath()`, hreflang and the routing handed to the browser now follow each request's own site (its `localeRouting`), where before no locale prefix was ever added. Canonical, `og:url` and hreflang use the request's site origin instead of the app's single public URL. `warlock build` no longer fails when a site sets its own `localeRouting`. A page's declared `route.name` now reaches the generated route types when its loader lives in a companion `.setup.ts`. Lockstep release across all 30 packages. Generator matrix scope: `none`; the four-site demo (19/19 in dev and production, including new locale checks) and the blog cover the change.",
+    "featured": [
+      "@warlock.js/web"
+    ]
+  },
   "5.23.1": {
     "publishedAt": "2026-09-26T17:03:25.127Z",
     "matrix": "subset:web,sitemap",
