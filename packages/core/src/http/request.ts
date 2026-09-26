@@ -1214,9 +1214,17 @@ export class Request<RequestValidation = any> {
 
   /**
    * Set request params value
+   *
+   * Keeps `payload.all` in sync using the same precedence `parsePayload()`
+   * gives route params: `{ ...query, ...body, ...params }`, i.e. params
+   * always win. Without this, a param set after parsing (e.g. by a
+   * catch-all route dispatcher decoding dynamic segments itself) would be
+   * visible on `request.params` but not through `input()`/`get()`, since
+   * those read the once-computed `payload.all`.
    */
   public setParam(key: string, value: any) {
     set(this.payload.params, key, value);
+    set(this.payload.all, key, value);
 
     return this;
   }
