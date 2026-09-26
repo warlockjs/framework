@@ -835,4 +835,152 @@ describe("DatabaseWriter", () => {
       await expect(writer.save()).resolves.toMatchObject({ success: true });
     });
   });
+
+  describe("Explicit null is written as NULL (Real-Estate #18)", () => {
+    it("writes the soft-delete column as null when merge() clears it, instead of dropping the update", async () => {
+      vi.clearAllMocks();
+
+      class SoftRestoreModel extends Model {
+        static table = "soft_restore_models";
+        static primaryKey = "id";
+        static schema = v.object({ name: v.string() });
+        static deletedAtColumn = "deletedAt";
+      }
+      vi.spyOn(SoftRestoreModel, "getDataSource").mockReturnValue(mockDataSource);
+
+      const model = new SoftRestoreModel({
+        id: 1,
+        name: "Test",
+        deletedAt: new Date("2020-01-01T00:00:00.000Z"),
+      });
+      model.isNew = false;
+
+      model.merge({ deletedAt: null });
+
+      expect(model.hasChanges()).toBe(true);
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockDriver.update).toHaveBeenCalledWith(
+        "soft_restore_models",
+        { id: 1 },
+        expect.objectContaining({
+          $set: expect.objectContaining({ deletedAt: null }),
+        }),
+      );
+
+      // The column must be written as NULL via $set, never silently
+      // coerced into an $unset (that would change unset()'s own contract).
+      const [, , operations] = (mockDriver.update as any).mock.calls[0];
+      expect(operations.$unset?.deletedAt).toBeUndefined();
+    });
+
+    it("writes an ordinary schema column as null via set(), even when it is only .optional() and not .nullable()", async () => {
+      vi.clearAllMocks();
+
+      class DeletedByModel extends Model {
+        static table = "deleted_by_models";
+        static primaryKey = "id";
+        static schema = v.object({
+          name: v.string(),
+          deletedBy: v.number().optional(), // deliberately NOT .nullable()
+        });
+      }
+      vi.spyOn(DeletedByModel, "getDataSource").mockReturnValue(mockDataSource);
+
+      const model = new DeletedByModel({ id: 1, name: "Test", deletedBy: 7 });
+      model.isNew = false;
+
+      model.set("deletedBy", null);
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockDriver.update).toHaveBeenCalledWith(
+        "deleted_by_models",
+        { id: 1 },
+        expect.objectContaining({
+          $set: expect.objectContaining({ deletedBy: null }),
+        }),
+      );
+    });
+
+    it("still rejects an explicit null on a required column (no rule is loosened)", async () => {
+      vi.clearAllMocks();
+
+      class RequiredNameModel extends Model {
+        static table = "required_name_models";
+        static primaryKey = "id";
+        static schema = v.object({
+          name: v.string(),
+        });
+      }
+      vi.spyOn(RequiredNameModel, "getDataSource").mockReturnValue(mockDataSource);
+
+      const model = new RequiredNameModel({ id: 1, name: "Test" });
+      model.isNew = false;
+
+      model.set("name", null);
+
+      await expect(new DatabaseWriter(model).save()).rejects.toThrow(/Validation failed/);
+      expect(mockDriver.update).not.toHaveBeenCalled();
+    });
+
+    it("still restores via unset() ($unset) — Model.restore()'s shape is unchanged", async () => {
+      vi.clearAllMocks();
+
+      class SoftUnsetModel extends Model {
+        static table = "soft_unset_models";
+        static primaryKey = "id";
+        static schema = v.object({ name: v.string() });
+        static deletedAtColumn = "deletedAt";
+      }
+      vi.spyOn(SoftUnsetModel, "getDataSource").mockReturnValue(mockDataSource);
+
+      const model = new SoftUnsetModel({
+        id: 1,
+        name: "Test",
+        deletedAt: new Date(),
+      });
+      model.isNew = false;
+
+      model.unset("deletedAt");
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockDriver.update).toHaveBeenCalledWith(
+        "soft_unset_models",
+        { id: 1 },
+        expect.objectContaining({
+          $unset: { deletedAt: 1 },
+        }),
+      );
+    });
+
+    it("insert path is unaffected: an explicit null on a non-nullable optional field does not throw", async () => {
+      vi.clearAllMocks();
+
+      class InsertNullModel extends Model {
+        static table = "insert_null_models";
+        static primaryKey = "id";
+        static autoGenerateId = false;
+        static schema = v.object({
+          name: v.string(),
+          deletedBy: v.number().optional(),
+        });
+      }
+      vi.spyOn(InsertNullModel, "getDataSource").mockReturnValue(mockDataSource);
+
+      const model = new InsertNullModel({ name: "Test", deletedBy: null });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      const result = await writer.save();
+
+      expect(result.success).toBe(true);
+      expect(mockDriver.insert).toHaveBeenCalled();
+    });
+  });
 });

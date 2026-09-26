@@ -279,6 +279,13 @@ export class DatabaseWriter implements WriterContract {
       for (const column of Object.keys(dataToValidate)) {
         if (column in validated) {
           this.model.set(column, validated[column]);
+        } else if (dataToValidate[column] === null && column in validationSchema.schema) {
+          // An explicit null on a KNOWN column that passed validation: an
+          // optional, non-nullable leaf coalesces null to "absent" in seal, so
+          // it is missing from the result. It is a deliberate "clear this
+          // column", not an unknown one to strip (Real-Estate #18). A required
+          // column never gets here: its rule rejects the null and validation throws.
+          this.model.set(column, null);
         } else {
           // Dropped by strictMode "strip": never write an unvalidated column.
           this.unvalidatedColumns.add(column);

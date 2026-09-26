@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.23.3 - Unreleased
+
+### Fixed
+
+- An explicit `null` given to `merge()`/`set()` is now written as NULL on save. Before, an optional, non-nullable column cleared to `null` (for example, restoring a soft-deleted row with `merge({ deletedAt: null })`) was dropped from the update, and the row kept its old value. A required column set to `null` still fails validation.
+
 ## 5.23.2 - 2026-09-26
 
 ### Changed
