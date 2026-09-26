@@ -14,7 +14,7 @@ Warlock discovers page routes and publishes sitemap artifacts through
 ```ts title="src/config/web.ts"
 import type { WebConfigurations } from "@warlock.js/web";
 
-const web = {
+const web: WebConfigurations = {
   sitemap: {
     enabled: true,
     path: "/sitemap.xml",
@@ -28,7 +28,7 @@ const web = {
     enabled: true,
     groups: [{ userAgent: "*", disallow: ["/admin"] }],
   },
-} satisfies WebConfigurations;
+};
 
 export default web;
 ```
@@ -69,7 +69,7 @@ import type { PageConfig } from "@warlock.js/web";
 import { Product } from "@/app/products/product.model";
 import { listPublishedSitemapProducts } from "@/app/products/list-published-sitemap-products";
 
-export const config = {
+export const config: PageConfig = {
   sitemap: {
     entries: async function productEntries() {
       const products = await listPublishedSitemapProducts();
@@ -82,7 +82,7 @@ export const config = {
     },
     invalidateOn: [Product],
   },
-} satisfies PageConfig;
+};
 ```
 
 Keep models and data queries in server-only modules: sitemap policy is removed

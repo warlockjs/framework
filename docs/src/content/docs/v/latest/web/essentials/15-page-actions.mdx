@@ -18,17 +18,17 @@ import { Form, FieldError, useActionData, useIsSubmitting, href } from "@warlock
 import type { PageActionContext, PageConfig } from "@warlock.js/web";
 import { v } from "@warlock.js/seal";
 
-export const config = {
-  route: { path: "/contact", name: "contact" },
-  action: {
-    validation: v.object({
-      email: v.string().email().required(),
-      message: v.string().required(),
-    }),
-  },
-} satisfies PageConfig;
+const contactSchema = v.object({
+  email: v.string().email(),
+  message: v.string(),
+});
 
-export async function action({ request, response }: PageActionContext<typeof config.action>) {
+export const config: PageConfig = {
+  route: { path: "/contact", name: "contact" },
+  action: { validation: contactSchema },
+};
+
+export async function action({ request, response }: PageActionContext<typeof contactSchema>) {
   const { email } = request.validated();
 
   if (email === "blocked@example.com") {
@@ -67,18 +67,23 @@ Export `actions`, a plain object of functions, and configure each by key under `
 
 ```tsx
 import { Form, useActionData } from "@warlock.js/web";
-import type { PageConfig } from "@warlock.js/web";
+import type { PageActionContext, PageConfig } from "@warlock.js/web";
+import { v } from "@warlock.js/seal";
 
-export const config = {
+const removeSchema = v.object({ itemId: v.string() });
+
+export const config: PageConfig = {
   route: { path: "/cart", name: "cart" },
-  actions: { remove: {} },
-} satisfies PageConfig;
+  actions: { remove: { validation: removeSchema } },
+};
 
 export const actions = {
-  save: async ({ response }: { response: import("@warlock.js/web").ActionResponse }) =>
-    response.redirect("/cart"),
-  remove: async ({ response }: { response: import("@warlock.js/web").ActionResponse }) =>
-    response.redirect("/cart"),
+  save: async ({ response }: PageActionContext) => response.redirect("/cart"),
+  remove: async ({ request, response }: PageActionContext<typeof removeSchema>) => {
+    const { itemId } = request.validated();
+
+    return response.redirect(`/cart?removed=${itemId}`);
+  },
 };
 
 export default function CartPage() {
@@ -156,6 +161,21 @@ Multipart is the default encoding, so `<input type="file">` works with and witho
 ## Redirect after success
 
 A no-JS action that returns data (rather than redirecting) renders at the POST URL, so a browser reload re-submits it. Redirect after success (`return response.redirect(...)`) unless you deliberately want the result shown in place.
+
+## Rate-limit an action per user
+
+Add core's `rateLimit` to the action's middleware and key it on the signed-in user:
+
+```tsx
+import { middleware } from "@warlock.js/core";
+
+export const config: PageConfig = {
+  route: { path: "/contact", name: "contact" },
+  action: { middleware: [middleware.rateLimit({ max: 5, duration: 60_000, key: "user", guests: "ip" })] },
+};
+```
+
+The bucket is keyed on `request.locals.user.id`, so the page needs `pageSession()` from `@warlock.js/auth` to populate it. `guests` decides what happens without a user: `"ip"` (default) buckets them by IP, `"skip"` does not limit them. A `keyGenerator`, if set, wins. Over the limit the action does not run and the reply is a 429.
 
 ## Middleware
 

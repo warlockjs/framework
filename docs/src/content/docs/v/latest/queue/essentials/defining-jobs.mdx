@@ -49,6 +49,25 @@ The handler's second argument:
 | `progress(value)` | `Promise<void>` | Record progress — a number or a JSON object |
 | `log(line)` | `Promise<void>` | Append a line to the job's log |
 
+## Carry request context into jobs
+
+Register a context once during application setup to carry the current tenant from dispatch into the worker handler.
+
+```ts
+import { defineQueueContext, setQueueContext } from "@warlock.js/queue";
+
+setQueueContext(
+  defineQueueContext({
+    capture: () => tenantStorage.getStore(), // runs inside dispatch()
+    restore: (tenant, run) => tenantStorage.run(tenant, run), // wraps handle()
+  }),
+);
+```
+
+- `undefined` from `capture` carries nothing; the value must be JSON-safe. Read it in a handler as `ctx.context` (`unknown`).
+- Jobs dispatched from a restored handler capture the same context. Set `context: false` in `defineJob()` to opt one job out.
+- Throw `UnrecoverableJobError` from a handler or `restore` to fail a job without retries.
+
 ## Dispatch
 
 ```ts

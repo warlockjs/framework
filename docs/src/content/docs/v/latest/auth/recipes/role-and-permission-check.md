@@ -18,8 +18,8 @@ import { RegisterModel } from "@warlock.js/cascade";
 import { v } from "@warlock.js/seal";
 
 const userSchema = v.object({
-  email: v.string().email().required(),
-  password: v.string().required(),
+  email: v.string().email(),
+  password: v.string(),
   role: v.string().default("member"), // "member" | "editor" | "admin"
   permissions: v.array(v.string()).default([]), // e.g. ["posts.write", "users.read"]
 });

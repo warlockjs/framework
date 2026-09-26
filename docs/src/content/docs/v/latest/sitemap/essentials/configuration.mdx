@@ -22,13 +22,13 @@ The command adds a disabled section in `src/config/web.ts`. Enable it after
 ```ts title="src/config/web.ts"
 import type { WebConfigurations } from "@warlock.js/web";
 
-const web = {
+const web: WebConfigurations = {
   sitemap: {
     enabled: true,
     storage: { directory: "sitemap" },
     coordination: "local",
   },
-} satisfies WebConfigurations;
+};
 
 export default web;
 ```

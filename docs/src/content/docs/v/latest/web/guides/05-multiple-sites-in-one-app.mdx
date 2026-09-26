@@ -1,0 +1,168 @@
+---
+title: Multiple sites in one app
+slug: v/latest/web/guides/multiple-sites-in-one-app
+description: Serve several fixed and tenant-resolved domains from one Warlock Web application, with an isolated root and routes for each site.
+sidebar:
+  order: 5
+  label: Multiple sites
+---
+
+Use multi-site mode when one deployment serves genuinely separate web experiences: a marketing site, an application dashboard, and tenant-owned domains, for example. It gives each experience its own document root and route table while ordinary `src/app` API routes remain host-agnostic.
+
+## Folder layout
+
+Declare sites explicitly; a route group does not become a site just because it exists. Every configured folder has its own `root.tsx`, which owns that site's document.
+
+```text
+src/web/
+  (landing)/root.tsx
+  (landing)/index.page.tsx
+  (platform)/root.tsx
+  (platform)/index.page.tsx
+  (tenant)/root.tsx
+  (tenant)/listings/[id].page.tsx
+  (tenant-admin)/root.tsx
+  (tenant-admin)/index.page.tsx
+  components/                 # shared components, never pages
+```
+
+For the Real-Estate app, `landing` serves `estates.app`, `platform` serves the dashboard, `tenant` serves public agency sites, and `tenantAdmin` is the dashboard under `/admin` on each tenant domain.
+
+## Configure fixed and tenant sites
+
+`hosts` contains exact, lowercase hostnames without a port. List `www` explicitly if it is an alias. A `dynamic: true` site is claimed by the one application-level resolver instead; a site cannot use both forms.
+
+```ts title="src/config/web.ts"
+import type { WebConfigurations } from "@warlock.js/web";
+import { Tenant } from "app/tenants/tenant.model";
+
+const web: WebConfigurations = {
+  sites: {
+    landing: {
+      pages: "(landing)",
+      hosts: ["estates.app", "www.estates.app"],
+      localeRouting: { strategy: "prefix-except-default" },
+    },
+    platform: { pages: "(platform)", hosts: ["app.estates.app"] },
+    tenant: { pages: "(tenant)", dynamic: true, localeRouting: {} },
+    tenantAdmin: { pages: "(tenant-admin)", dynamic: true, basePath: "/admin" },
+  },
+  resolveHost: async ({ host, request }) => {
+    const domain = await Tenant.domains.findOne({ host });
+    if (!domain) return null;
+
+    const tenant = domain.tenant;
+    const site = domain.kind === "dashboard" ? "tenantAdmin" : "tenant";
+
+    return {
+      site,
+      key: String(tenant.id),
+      indexable: tenant.isPublic,
+      shared: { tenant: tenant.publicSummary(), theme: tenant.theme },
+    };
+  },
+  resolveCache: { ttl: 60 },
+  unknownHost: "not-found",
+  tlsAsk: "/.well-known/warlock/domain",
+};
+
+export default web;
+```
+
+`resolveHost({ host, request })` returns `{ site, key, indexable?, shared? }` or `null`. `host` is normalized (lowercase, without port or a trailing dot), and `request` is available when a lookup needs request data. The Real-Estate lookup owns `Tenant.domains[{ host, kind }]`; it returns only a declared `dynamic: true` site. `null` produces a controlled 404; a thrown lookup error remains a 500.
+
+`resolveCache: { ttl }` caches the resolver result by host for `ttl` **seconds**. It is off by default: a resolver that varies by a cookie or header must not reuse one visitor's result for every visitor on that host. Enable it only when the answer depends on the host alone.
+
+`basePath` puts an entire site below a path prefix on its hosts. In the example, the tenant-admin site is selected for `/admin` and descendants. `unknownHost` defaults to a plain 404; set it to a configured site key to use that site as a fallback.
+
+`localeRouting` on a site replaces the global `web.localeRouting` for that site. Omit it to inherit the global setting; use `{}` to disable locale routing for that site. The global locale codes and default locale still come from `app.localeCodes` and `app.localeCode`.
+
+## Local development
+
+Browsers resolve `*.localhost` to loopback, so point local configuration at the same shape as production, including the development port:
+
+```text
+estates.localhost:2030
+app.localhost:2030
+acme.localhost:2030
+```
+
+These hosts belong in application environment/configuration. Web does not add a separate hosts-file or environment-variable convention.
+
+## Use the selected site on the server
+
+In multi-site mode loaders and actions receive `ctx.site` (`PageSite`). It contains the configured site key, normalized host, selected `basePath`, and `tenantKey` for a resolver-selected site.
+
+```ts title="src/web/(tenant)/listings/[id].page.tsx"
+import type { PageActionContext, PageLoaderContext } from "@warlock.js/web";
+
+export async function loader({ site }: PageLoaderContext<undefined, undefined>) {
+  return { tenantId: site?.tenantKey, host: site?.host };
+}
+
+export async function action({ site, response }: PageActionContext<undefined>) {
+  if (!site?.tenantKey) return response.notFound();
+  return { savedFor: site.tenantKey };
+}
+```
+
+The resolver's `shared` object merges into the normal shared payload before page middleware runs. That is the hand-off for per-tenant themes: the tenant root reads `shared.theme` rather than deriving a theme again in the browser. See the [multi-theme guide](/v/latest/web/guides/multi-theme/).
+
+## Routes and links
+
+The same page path may exist in different sites. Generated route names always get the site-key prefix, whatever route form produced them: `landing.pricing` and `tenant.listings.show`. Explicit route names remain global across the app.
+
+`href()` returns a relative path for the current site and an absolute URL for another site. A dynamic target needs its runtime hostname as `$host`; `$host` is used only for the origin, not the route path. `siteUrl()` returns the current site's origin plus its `basePath`.
+
+```ts
+import { href, siteUrl } from "@warlock.js/web";
+
+const currentSite = siteUrl();
+const platformHome = href("platform.home");
+const tenantListing = href("tenant.listings.show", { $host: "acme.estates.app", id: "42" });
+```
+
+`<Link>` and `navigateTo()` take the same route names. A link to another site loads that site's page in full rather than as a same-site client transition:
+
+```tsx
+import { Link } from "@warlock.js/web";
+
+<Link to="platform.home">Open the platform</Link>;
+```
+
+`src/config/web.ts` can import your resolver from app code (`app/tenants/...`); `warlock build` resolves those path aliases when it reads `web.sites`.
+
+## Search and TLS endpoints
+
+With the normal sitemap and robots features enabled, `/sitemap.xml` and `/robots.txt` are selected per site. A site's sitemap contains only that site's pages and uses that request's site origin and `basePath`. A resolver-selected dynamic site is omitted from indexing unless its resolver result has `indexable: true`: its sitemap is a 404 and its robots response disallows all crawling otherwise.
+
+Set `web.tlsAsk` to expose a Caddy on-demand TLS `ask` endpoint. It requires `web.sites`; Warlock allows a domain only when it is a configured fixed host or `resolveHost` claims it.
+
+```caddyfile
+{
+  on_demand_tls {
+    ask http://127.0.0.1:<port>/.well-known/warlock/domain
+  }
+}
+```
+
+## Configuration and boot errors
+
+Multi-site boot checks fail early and name the offending configuration or file. Fix these rather than relying on selection order:
+
+- a top-level `src/web/root.tsx` exists in multi-site mode;
+- a `*.page.tsx` sits outside every configured site folder;
+- two sites point at the same `pages` folder;
+- a configured site folder has no `root.tsx`;
+- two fixed sites use the same host and `basePath`;
+- a page route shadows an `src/app` route for the same method;
+- a dynamic site has no `web.resolveHost`, or a resolver exists without a dynamic site;
+- `unknownHost` names a site key that is not configured.
+
+An exact listed host always wins over the resolver, even if the resolver could claim it. This keeps the platform dashboard from becoming a tenant site.
+
+Server page-cache entries are partitioned by the selected site and resolver tenant key, so identical paths from different sites or tenants cannot share an entry.
+
+## What stays out
+
+Multi-site mode does not select tenants from a path or session, share one root between sites, or prefetch cross-site `<Link>` navigations. It also does not restrict `src/app` APIs to a site: APIs stay host-agnostic and application middleware can restrict them when needed.

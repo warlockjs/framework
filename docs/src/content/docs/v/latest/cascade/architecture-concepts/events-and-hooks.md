@@ -236,6 +236,18 @@ await User.restore(id, { skipEvents: true });
 
 Useful for migrations, bulk seeders, and replaying state without re-triggering side effects. Use sparingly — by default, you want events to fire.
 
+## Bulk writes don't fire model events
+
+`Model.where(...).update(data)` and `Model.where(...).delete()` run one statement against the database; they never load the rows, so `updating`/`updated`/`deleting`/`deleted` do **not** fire. Global scopes **do** apply to them, so a tenant scope still limits which rows a bulk write touches.
+
+When a write needs its listeners (a guard, an audit log, cleanup), load the rows and save or destroy each one:
+
+```ts
+for (const order of await Order.where("status", "stale").get()) {
+  await order.destroy(); // fires deleting/deleted
+}
+```
+
 ## Going further
 
 - **Dirty state inside listeners** — [Dirty tracking guide](./dirty-tracking.md)

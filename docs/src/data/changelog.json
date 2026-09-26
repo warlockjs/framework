@@ -124,6 +124,664 @@
   ],
   "releases": [
     {
+      "version": "5.23.0",
+      "id": "v5-23-0",
+      "date": "September 26, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Multi-site web applications, safer traffic controls, and Postgres correctness.</strong> Web adds <code>web.sites</code> and <code>resolveHost</code> for fixed and tenant-resolved domains, with isolated roots, routes, page caches, sitemap/robots, cross-site links, <code>siteUrl()</code>, and <code>tlsAsk</code>; it also fixes Real-Estate multi-site production and page-action edge cases. Core adds per-user <code>rateLimit({ key: \"user\" })</code>. Cascade adds opt-in Postgres <code>naming: \"snake_case\"</code> and safe <code>bigint</code>/<code>int8</code> parsing. Queue carries request context into jobs, and Scheduler adds <code>scheduler.around</code>. Lockstep release across all 30 packages.",
+      "matrix": null,
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 12,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 7
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Multi-site support (<code>web.sites</code>, <code>resolveHost</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>PageActionContext&lt;typeof schema&gt;</code> accepts a bare Seal schema, typing <code>request.validated()</code> as its output; works with a plain <code>config: PageConfig</code> annotation. The <code>typeof config.action</code> form is unchanged."
+            },
+            {
+              "type": "Changed",
+              "html": "Build logs show app-relative output paths."
+            },
+            {
+              "type": "Changed",
+              "html": "A page action's <code>response.cookie()</code> and <code>response.clearCookie()</code> now take the same arguments as core's <code>Response</code>, so auth's cookie helpers (which take <code>Response</code>; <code>CookieWriter</code> is removed) accept it."
+            },
+            {
+              "type": "Fixed",
+              "html": "A page file can declare its action schema at the top (<code>const schema = v.object(...)</code>, read by <code>config.action.validation</code> or <code>config.actions.&lt;name&gt;.validation</code>) — the documented pattern. Dev and build no longer refuse it as an ambiguous statement."
+            },
+            {
+              "type": "Fixed",
+              "html": "Multi-site in dev: tenant data from <code>resolveHost({ shared })</code> now reaches <code>useShared()</code>, and <code>siteUrl()</code> / cross-site <code>href()</code> see the current site. The connector and the page pipeline run in two module copies in dev (Node and Vite SSR); both hand-offs now use global slots, as production already effectively did."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>siteUrl()</code> and the <code>CurrentSite</code> type are exported from <code>@warlock.js/web</code>, as the multi-site guide documents."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock build</code> with <code>web.sites</code> no longer fails when <code>src/config/web.ts</code> imports app code through a tsconfig alias (a <code>resolveHost</code> from <code>app/...</code>): the build bundles <code>web.ts</code> with esbuild before reading <code>sites</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "A <code>&lt;Link&gt;</code> or <code>navigateTo()</code> to another site's route (an absolute URL on another origin) now loads that site instead of silently doing nothing; the locale prefix is no longer applied to absolute URLs."
+            },
+            {
+              "type": "Fixed",
+              "html": "A multi-site production build now boots: each site's hashed <code>hydration-&lt;site&gt;</code> entry is read from the Vite manifest at boot and served to that site's pages (it previously demanded a single <code>hydration</code> entry and refused to start)."
+            },
+            {
+              "type": "Fixed",
+              "html": "Multi-site production installs each site's pages under its own root (the dispatcher was dropped on the way to the production installer), and boot no longer tries to publish one global sitemap that needs <code>app.publicUrl</code>: each site's sitemap is built for its own origin."
+            },
+            {
+              "type": "Security",
+              "html": "With <code>app.url</code> set, a request whose <code>Host</code> differs now bypasses the page cache (no lookup, no store) instead of being keyed as the configured host, closing cache poisoning via forged <code>Host</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>warlock generate.use-case &lt;module&gt;/&lt;verb-noun&gt;</code> scaffolds <code>use-cases/&lt;verb-noun&gt;.use-case.ts</code> (transport-agnostic <code>(input, actor)</code> returning a result union) plus a vitest spec, and refuses to overwrite existing files without <code>--force</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>rateLimit</code> accepts <code>key: \"user\"</code> to bucket by the signed-in user id (routes and page actions), with <code>guests: \"ip\" | \"skip\"</code> (default <code>\"ip\"</code>) for unauthenticated requests. <code>keyGenerator</code> and the 429 shape are unchanged."
+            },
+            {
+              "type": "Added",
+              "html": "Each <code>rateLimit()</code> call now keeps its own counters, so two limits on the same route (two page actions on one page, say) no longer share a bucket. <code>errorMessage</code> also accepts <code>(request) =&gt; string</code> for per-request (translated) messages."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>startHttpTestServer()</code> now loads <code>.env.test</code> itself before configuration is read, so a Vitest global setup cannot boot against the development database."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add</code> installs with the project's package manager: the nearest <code>packageManager</code> field, then a <code>pnpm-workspace.yaml</code>, then the nearest lockfile, searched upward so an app inside a workspace uses the workspace's manager."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>uniqueExceptCurrentUser</code> / <code>uniqueExceptCurrentId</code> / <code>existsExceptCurrentUser</code> / <code>existsExceptCurrentId</code> on <code>StringValidator</code> now return <code>this</code>, so <code>Infer&lt;&gt;</code> keeps the concrete output type."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Postgres <code>naming: \"snake_case\"</code> (opt-in, default <code>\"preserve\"</code>): camelCase model keys map to snake_case columns in inserts, updates, <code>where</code>, <code>orderBy</code>, <code>select</code>, <code>groupBy</code> and joins, and rows come back camelCase. Table names and raw SQL are left as written."
+            },
+            {
+              "type": "Added",
+              "html": "Static <code>Model.whereRaw(expression, bindings?)</code>, matching the other static query entry points (<code>Model.query().whereRaw(...)</code> still works)."
+            },
+            {
+              "type": "Fixed",
+              "html": "Postgres <code>bigint</code>/<code>int8</code> columns (and int8 arrays) come back as numbers when they fit in a safe integer, so a bigint id passes <code>v.number()</code>; larger values stay strings. The parser is installed on Cascade's own pool, not on the global <code>pg.types</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>unique()</code> / <code>exists()</code> on <code>StringValidator</code> and <code>NumberValidator</code> now return <code>this</code>, so <code>Infer&lt;&gt;</code> keeps the concrete output type (was <code>unknown</code>)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>defineQueueContext()</code> / <code>setQueueContext()</code>: capture ambient state (tenant, request id) at <code>dispatch</code> and restore it around the job handler. The captured value travels in a versioned envelope; jobs without one still run. Exposed as <code>ctx.context</code>. Opt a job out with <code>context: false</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>UnrecoverableJobError</code>: throw it from a handler or <code>restore</code> to fail the job permanently (mapped to BullMQ's <code>UnrecoverableError</code>)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>scheduler.around((job, run) =&gt; …)</code> wraps every job callback execution, each retry attempt included, so jobs can run inside a context such as <code>AsyncLocalStorage</code>. Multiple hooks compose with the first registered outermost; the call returns an unsubscribe function. A hook that never calls <code>run</code> skips the execution and emits <code>job:skip</code> (<code>JobResult.skipped</code> / <code>skipReason</code>); a hook that throws follows the normal retry/error path."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Template schemas and models drop redundant <code>.required()</code> and non-load-bearing <code>satisfies</code>, matching the framework skills."
+            },
+            {
+              "type": "Fixed",
+              "html": "Scaffolding inside an existing pnpm workspace no longer writes a nested <code>pnpm-workspace.yaml</code>; a standalone app still gets one."
+            },
+            {
+              "type": "Fixed",
+              "html": "Postgres apps get their own database defaults in <code>.env</code> and <code>.env.example</code> (MongoDB keeps <code>DB_AUTH</code> and port 27017)."
+            },
+            {
+              "type": "Fixed",
+              "html": "The <code>gen.*</code> scripts use the registered <code>warlock generate.&lt;x&gt;</code> commands."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>minimumReleaseAgeExclude</code> covers <code>@warlock.js/*</code> by pattern, so a freshly published family installs without listing versions or unused packages."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>notificationColumns()</code> now supports <code>idType</code> for UUID, bigint, integer, and string recipient and tenant IDs."
+            },
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Array validators take <code>.min(n)</code> / <code>.max(n)</code> for length, like strings and numbers; <code>.minLength()</code> / <code>.maxLength()</code> remain as aliases."
+            },
+            {
+              "type": "Fixed",
+              "html": "An omitted optional field skips its mutators, so <code>v.string().trim().optional()</code> no longer reports a missing field as required."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Removed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Removed",
+              "html": "<strong>BREAKING:</strong> <code>CookieWriter</code> is removed. <code>setSessionCookies</code>, <code>clearSessionCookies</code>, <code>setAuthCookie</code>, <code>clearAuthCookie</code> and <code>loginWithSessionCookies</code> take core's <code>Response</code> (only its <code>cookie</code> and <code>clearCookie</code>), so a page action's <code>response</code> still works without a cast. An app helper that was typed as <code>CookieWriter</code> can take <code>{ cookie: (...args: Parameters&lt;Response[\"cookie\"]&gt;) =&gt; unknown }</code> instead."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/sitemap",
+          "slug": "sitemap",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep patch release; package APIs are unchanged."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.22.1",
       "id": "v5-22-1",
       "date": "September 25, 2026",

@@ -73,7 +73,7 @@ URL-safe alphabet: `A-Za-z0-9_-`. Default length 21 gives ~2^126 possibilities â
 ID validators compose like any other rule:
 
 ```ts
-v.string().uuid(4).required()                    // required UUID v4
+v.string().uuid(4)                    // required UUID v4
 v.string().ulid().optional()                     // optional ULID
 v.string().nanoid().describe("Public share id")  // with description
 v.string().uuid().sameAs("parent_id")            // cross-field equality check

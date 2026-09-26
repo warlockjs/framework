@@ -20,7 +20,7 @@ HIT without re-running loaders or rendering at all.
 ```tsx title="src/web/products/index.page.tsx"
 import type { PageConfig } from "@warlock.js/web";
 
-export const config = {
+export const config: PageConfig = {
   route: { path: "/products", name: "products.index" },
   cache: {
     public: true,
@@ -30,7 +30,7 @@ export const config = {
     // or: tags: (data) => [`product:${data.id}`],
     ttl: 300, // optional — defaults to maxAge
   },
-} satisfies PageConfig;
+};
 ```
 
 - `serverCache` requires `public: true` — like every `config.cache` opt-in — **and**

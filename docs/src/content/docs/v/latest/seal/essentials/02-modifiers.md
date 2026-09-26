@@ -49,7 +49,6 @@ The number family ships a built-in numeric-string mutator behind **`.coerce()`**
 v.string()             // required by default inside v.object
 v.string().optional()  // type: string | undefined — caller may omit
 v.string().present()   // must exist (key present), may be "" or null
-v.string().required()  // explicit form — same as default, redundant
 ```
 
 **Required is the default inside `v.object`.** Skip `.required()` — the inferred type already shows what's required (no `?`) vs optional (`?`). The canonical seal style relies on `.optional()` standing out.
@@ -199,7 +198,7 @@ Validators are **immutable by default**. Every chain method returns a clone:
 
 ```ts
 const baseString = v.string();
-const required = baseString.required();
+const short = baseString.min(3);
 // baseString is unchanged
 ```
 
@@ -208,7 +207,7 @@ This matters because schemas are often shared (`Model.schema = v.object({...})`)
 Toggle in-place with the `.mutable` getter (rare):
 
 ```ts
-const schema = v.string().mutable.required().min(3);
+const schema = v.string().mutable.min(3);
 // Same instance throughout — useful when building dynamically
 ```
 

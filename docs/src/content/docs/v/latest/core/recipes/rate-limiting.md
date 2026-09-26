@@ -163,7 +163,40 @@ Practically unlimited. Health checks from load balancers should never hit a real
 
 ## Step 3 — Per-user keying
 
-The framework's built-in rate-limit is per-IP. For authed traffic that's the wrong shape — five users sharing an office NAT all eat from the same bucket, while one shady user behind a clean IP gets the same allowance as the whole office.
+The built-in `rateLimit` can key on the signed-in user directly, on routes and in web page actions:
+
+```ts
+middleware: [rateLimit({ max: 10, duration: 60_000, key: "user" })],
+```
+
+Guests fall back to their IP by default; pass `guests: "skip"` to leave them unlimited. `keyGenerator` still takes precedence when set.
+
+Each `rateLimit()` call counts on its own, so two actions on the same page keep separate budgets. `errorMessage` can be a function of the request, which is how you return a translated message:
+
+```ts title="src/web/posts/[slug]/index.setup.ts"
+actions: {
+  comment: {
+    validation: createCommentSchema,
+    middleware: [
+      middleware.rateLimit({
+        max: 10,
+        duration: 60_000,
+        key: "user",
+        guests: "skip",
+        errorMessage: () => t("articleControls.commentPostFailed"),
+      }),
+    ],
+  },
+  like: {
+    validation: createLikeSchema,
+    middleware: [middleware.rateLimit({ max: 30, duration: 60_000, key: "user", guests: "skip" })],
+  },
+},
+```
+
+The custom middleware below is only needed for behavior beyond this.
+
+Without `key: "user"`, the framework's built-in rate-limit is per-IP. For authed traffic that's the wrong shape — five users sharing an office NAT all eat from the same bucket, while one shady user behind a clean IP gets the same allowance as the whole office.
 
 Per-user keying needs a small custom middleware. The pattern: maintain an in-process bucket keyed by user id, increment on every request, return 429 when the bucket overflows.
 

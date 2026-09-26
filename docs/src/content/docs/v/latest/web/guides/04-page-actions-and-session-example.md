@@ -57,7 +57,7 @@ export const config = {
   middleware: [requireUser({ loginPath: "/login" })],
   action: {
     validation: v.object({
-      name: v.string().min(2).required(),
+      name: v.string().min(2),
     }),
   },
 } satisfies PageConfig;

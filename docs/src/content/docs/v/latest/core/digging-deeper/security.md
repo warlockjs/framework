@@ -248,9 +248,9 @@ export const createUser = async ({ request, response }) => {
 
 createUser.validation = {
   schema: v.object({
-    email: v.string().email().required(),
-    password: v.string().min(8).required(),
-    role: v.string().in(["client", "admin"]).required(),
+    email: v.string().email(),
+    password: v.string().min(8),
+    role: v.string().in(["client", "admin"]),
   }),
 };
 ```

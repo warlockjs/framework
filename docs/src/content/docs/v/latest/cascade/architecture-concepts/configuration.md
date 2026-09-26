@@ -127,7 +127,23 @@ await connectToDatabase<MongoDriverOptions>({
 
 ### Postgres driver options
 
-Postgres has fewer Cascade-side knobs today — most options flow through `clientOptions` (which maps to `pg`'s `PoolConfig`). Schema selection lives here when it matters.
+Most Postgres options flow through `clientOptions` (which maps to `pg`'s `PoolConfig`). Schema selection lives here when it matters.
+
+**`naming: "snake_case"`** maps your camelCase model keys to snake_case columns everywhere Cascade writes SQL (inserts, updates, `where`, `orderBy`, `select`, `groupBy`, joins), and maps result rows back to camelCase. The default, `"preserve"`, uses keys verbatim as column names. Table names and raw SQL (`whereRaw`, `raw`) are never rewritten.
+
+```ts title="src/config/database.ts"
+connectToDatabase({
+  driver: "postgres",
+  uri: process.env.DATABASE_URL,
+  driverOptions: { naming: "snake_case" },
+});
+
+// model.set("createdAt", …) writes "created_at"; Order.where("tenantId", id) queries "tenant_id"
+```
+
+This is separate from [`namingConvention`](#namingconvention), which only names the columns Cascade generates for you (timestamps, foreign keys).
+
+`bigint` / `int8` columns come back as numbers when they fit in a safe integer; larger values stay strings, so no precision is lost.
 
 ## Native client options — `clientOptions`
 

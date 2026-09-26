@@ -1,4 +1,15 @@
 {
+  "5.23.0": {
+    "publishedAt": "2026-09-26T10:25:14.971Z",
+    "summary": "**Multi-site web applications, safer traffic controls, and Postgres correctness.** Web adds `web.sites` and `resolveHost` for fixed and tenant-resolved domains, with isolated roots, routes, page caches, sitemap/robots, cross-site links, `siteUrl()`, and `tlsAsk`; it also fixes Real-Estate multi-site production and page-action edge cases. Core adds per-user `rateLimit({ key: \"user\" })`. Cascade adds opt-in Postgres `naming: \"snake_case\"` and safe `bigint`/`int8` parsing. Queue carries request context into jobs, and Scheduler adds `scheduler.around`. Lockstep release across all 30 packages.",
+    "featured": [
+      "@warlock.js/web",
+      "@warlock.js/core",
+      "@warlock.js/cascade",
+      "@warlock.js/queue",
+      "@warlock.js/scheduler"
+    ]
+  },
   "5.22.1": {
     "publishedAt": "2026-09-25T15:28:04.466Z",
     "matrix": "none",

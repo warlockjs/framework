@@ -62,9 +62,9 @@ Define password strength on the schema, not in the controller:
 import { v } from "@warlock.js/seal";
 
 const userSchema = v.object({
-  email: v.string().email().required(),
-  name: v.string().min(2).max(120).required(),
-  password: v.string().min(12).required(),
+  email: v.string().email(),
+  name: v.string().min(2).max(120),
+  password: v.string().min(12),
 });
 ```
 

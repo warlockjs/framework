@@ -45,9 +45,9 @@ Create `src/web/about.page.tsx`:
 ```tsx title="src/web/about.page.tsx"
 import type { PageConfig } from "@warlock.js/web";
 
-export const config = {
+export const config: PageConfig = {
   metadata: { title: "About" },
-} satisfies PageConfig;
+};
 
 export default function AboutPage() {
   return (

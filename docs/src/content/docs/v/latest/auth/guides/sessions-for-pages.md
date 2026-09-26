@@ -54,13 +54,13 @@ It checks Origin (or Referer) before looking at credentials, even when the reque
 
 ## In a page action
 
-The cookie helpers take any `CookieWriter`, meaning any object with `cookie()` and `clearCookie()`. That covers both a controller's `Response` and a page action's `response`, so login and logout work as [page actions](/v/latest/web/essentials/15-page-actions/). The cookies go out with the action's reply.
+The cookie helpers take a `response`: pass a controller's `Response` or a page action's `response`, so login and logout work as [page actions](/v/latest/web/essentials/15-page-actions/). The cookies go out with the action's reply.
 
 ```ts
 // src/web/auth/login.setup.ts
 export const config = {
   action: {
-    validation: v.object({ email: v.string().email().required(), password: v.string().required() }),
+    validation: v.object({ email: v.string().email(), password: v.string() }),
   },
 } satisfies PageConfig;
 

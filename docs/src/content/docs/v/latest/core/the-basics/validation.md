@@ -100,7 +100,6 @@ v.string().optional(); // field may be omitted
 v.string().nullable(); // value may be null
 v.string().nullish(); // optional + nullable
 v.string().default("anonymous"); // default if missing/empty
-v.string().required(); // explicit required (default)
 v.string().describe("user's display name"); // metadata for OpenAPI
 
 v.string().requiredIf("plan", "premium"); // required when plan === "premium"

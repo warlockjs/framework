@@ -31,9 +31,9 @@ import { RegisterModel } from "@warlock.js/cascade";
 import { v } from "@warlock.js/seal";
 
 const userSchema = v.object({
-  email: v.string().email().required(),
-  name: v.string().required(),
-  password: v.string().required(),
+  email: v.string().email(),
+  name: v.string(),
+  password: v.string(),
 });
 
 @RegisterModel()

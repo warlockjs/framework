@@ -40,9 +40,9 @@ Put a literal path or object in the page's `config`:
 ```tsx title="src/web/products/[id].page.tsx"
 import type { PageConfig } from "@warlock.js/web";
 
-export const config = {
+export const config: PageConfig = {
   route: { path: "/catalog/:id", name: "products.show" },
-} satisfies PageConfig;
+};
 
 export default function ProductPage() {
   return <main>Product</main>;
@@ -55,7 +55,7 @@ bare string inside `config` is also valid:
 ```ts
 import type { PageConfig } from "@warlock.js/web";
 
-export const config = { route: "/products" } satisfies PageConfig;
+export const config: PageConfig = { route: "/products" };
 ```
 
 Warlock reads `config.route` without executing application code. Route
@@ -98,10 +98,10 @@ default. Opt a public page into shared caching with `config.cache`:
 ```tsx title="src/web/products/index.page.tsx"
 import type { PageConfig } from "@warlock.js/web";
 
-export const config = {
+export const config: PageConfig = {
   route: { path: "/products", name: "products.index" },
   cache: { public: true, maxAge: 60 },
-} satisfies PageConfig;
+};
 ```
 
 `maxAge` is seconds. Both keys are required:
@@ -158,9 +158,9 @@ Use an explicit terminal wildcard instead:
 ```tsx title="src/web/docs/catch-all.page.tsx"
 import type { PageConfig } from "@warlock.js/web";
 
-export const config = {
+export const config: PageConfig = {
   route: { path: "/docs/*", name: "docs.catchAll" },
-} satisfies PageConfig;
+};
 ```
 
 ## Default export failures
