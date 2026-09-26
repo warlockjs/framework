@@ -480,8 +480,7 @@ describe("proof 4 — different-option setup rejects without mutating the live r
     await expect(first).resolves.toBeUndefined();
 
     expect(bootstrapMock).toHaveBeenCalledTimes(1);
-    expect(startMock).toHaveBeenCalledOnce();
-    expect(startMock).toHaveBeenCalledWith(["database"]);
+    expect(startMock).toHaveBeenCalledExactlyOnceWith(["database"]);
   });
 
   it("rejects a config-derived call that conflicts with an in-flight explicit one", async () => {
@@ -790,8 +789,7 @@ describe("proof 8 — a successful teardown permits setup with a different selec
     await expect(setupTest({ connectors: false })).resolves.toBeUndefined();
 
     expect(bootstrapMock).toHaveBeenCalledTimes(2);
-    expect(startMock).toHaveBeenCalledOnce();
-    expect(startMock).toHaveBeenCalledWith(["database"]);
+    expect(startMock).toHaveBeenCalledExactlyOnceWith(["database"]);
   });
 
   it("accepts a different selection after teardown across a module-registry rebuild", async () => {
@@ -816,8 +814,7 @@ describe("proof 9 — teardown is manager-wide, not selective", () => {
     await teardownTest();
 
     // No selective handle exists, and this call must not pretend one does.
-    expect(shutdownMock).toHaveBeenCalledOnce();
-    expect(shutdownMock).toHaveBeenCalledWith();
+    expect(shutdownMock).toHaveBeenCalledExactlyOnceWith();
   });
 });
 

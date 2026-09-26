@@ -1,5 +1,5 @@
 import config from "@mongez/config";
-import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PortInUseError } from "../../../src/http/port-preflight";
 
 /**
@@ -96,7 +96,7 @@ describe("assertConfiguredHttpPortIsFree", () => {
 
 describe("preflightConfiguredHttpPort", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
-  let exitSpy: MockInstance<[code?: number], never>;
+  let exitSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     preflightMock.assertPortIsAvailable.mockClear();

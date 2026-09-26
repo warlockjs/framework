@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const spawn = vi.fn();
 const devLogError = vi.fn();
@@ -39,7 +39,7 @@ function boot(worker: ReturnType<typeof createWorker>) {
 describe("supervisor", () => {
   const originalFlag = process.env[WORKER_ENV_FLAG];
   let workers: ReturnType<typeof createWorker>[];
-  let exit: MockInstance<[code?: number], never>;
+  let exit: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();

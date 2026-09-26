@@ -63,9 +63,7 @@ describe("SocketConnector adapter", () => {
 });
 
 describe("SocketConnector shutdown (shared server)", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
+  afterEach(() => vi.restoreAllMocks());
 
   it("detaches the engine and never closes the shared http server", async () => {
     const disconnect = vi.fn();

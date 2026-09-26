@@ -88,7 +88,7 @@ async function sendAndExit(message: unknown, exitCode = 0): Promise<never> {
   }
 
   await new Promise<void>((resolve, reject) => {
-    process.send!(message, (error: Error | null) => (error ? reject(error) : resolve()));
+    process.send!(message, (error) => (error ? reject(error) : resolve()));
   });
   process.disconnect?.();
   process.exit(exitCode);
