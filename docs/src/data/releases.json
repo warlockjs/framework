@@ -1,4 +1,12 @@
 {
+  "5.23.1": {
+    "publishedAt": "2026-09-26T17:03:25.127Z",
+    "matrix": "subset:web,sitemap",
+    "summary": "**Multi-site: `$sites` folders, dev hydration, and production routing.** Sites now live only in `src/web/$sites/<key>/` (the folder name is the site key); `web.sites.<key>.pages` is removed and a leftover `pages` is a boot error naming the folder to move. Fixes: in `warlock dev`, each site's client entry now loads only its own pages (it failed with \"Two pages resolve to the same route path\" and never hydrated); adding or removing a page in dev no longer fails with a duplicate site-dispatch route name; `$sites/<key>` never leaks into page URLs or route names in production. Lockstep release across all 30 packages.",
+    "featured": [
+      "@warlock.js/web"
+    ]
+  },
   "5.23.0": {
     "publishedAt": "2026-09-26T10:25:14.971Z",
     "summary": "**Multi-site web applications, safer traffic controls, and Postgres correctness.** Web adds `web.sites` and `resolveHost` for fixed and tenant-resolved domains, with isolated roots, routes, page caches, sitemap/robots, cross-site links, `siteUrl()`, and `tlsAsk`; it also fixes Real-Estate multi-site production and page-action edge cases. Core adds per-user `rateLimit({ key: \"user\" })`. Cascade adds opt-in Postgres `naming: \"snake_case\"` and safe `bigint`/`int8` parsing. Queue carries request context into jobs, and Scheduler adds `scheduler.around`. Lockstep release across all 30 packages.",
