@@ -11,7 +11,13 @@ import type {
   RemoverResult,
   WriterOptions,
 } from "../contracts";
-import { type QueryBuilderContract, type WhereCallback, type WhereObject, type WhereOperator } from "../contracts";
+import {
+  type QueryBuilderContract,
+  type RawExpression,
+  type WhereCallback,
+  type WhereObject,
+  type WhereOperator,
+} from "../contracts";
 import type { DataSource } from "../data-source/data-source";
 import { DatabaseDirtyTracker } from "../database-dirty-tracker";
 import type { ModelEventListener, ModelEventName } from "../events/model-events";
@@ -1733,6 +1739,17 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     ...args: any[]
   ): QueryBuilderContract<TModel> {
     return (this.query().where as any)(...args);
+  }
+
+  /**
+   * Use a raw where clause directly.
+   */
+  public static whereRaw<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    expression: RawExpression,
+    bindings?: unknown[],
+  ): QueryBuilderContract<TModel> {
+    return this.query().whereRaw(expression, bindings);
   }
 
   /**

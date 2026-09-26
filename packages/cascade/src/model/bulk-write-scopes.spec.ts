@@ -30,7 +30,9 @@ function addLifecycleSpies(ModelClass: any) {
 }
 
 function addTenantScope(ModelClass: any) {
-  ModelClass.addGlobalScope("tenant", (query) => query.where("tenantId", tenantId));
+  ModelClass.addGlobalScope("tenant", (query: { where: (field: string, value: unknown) => unknown }) =>
+    query.where("tenantId", tenantId),
+  );
 }
 
 describe("Model bulk writes with global scopes", () => {

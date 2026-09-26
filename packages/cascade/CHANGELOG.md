@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.23.0 - 2026-09-25
 
+### Added
+
+- Static `Model.whereRaw(expression, bindings?)`, matching the other static query entry points (`Model.query().whereRaw(...)` still works).
+
 ### Fixed
 
 - `unique()` / `exists()` on `StringValidator` and `NumberValidator` now return `this`, so `Infer<>` keeps the concrete output type (was `unknown`).
@@ -50,7 +54,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Postgres driver: `whereLike` with a RegExp (`~*`/`!~*`), `count()`/`exists()` honour `has`/`whereHas`, joins and `groupBy`/`distinct`, and `whereJsonContains` binds a parameter.
 - Migrations: `.index()`/`.unique()`/`.vectorIndex()` inside `Migration.alter` `modify` now create the index, and `randomIncrement` takes effect.
 - Mongo: replica-set detection runs `hello` once per driver.
-
 
 ### Changed
 
