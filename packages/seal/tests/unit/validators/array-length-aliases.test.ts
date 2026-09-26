@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validate, v } from "../index";
+import { validate, v } from "../../../src/index";
 
 describe("ArrayValidator length aliases", () => {
   it("uses min and max as aliases for minLength and maxLength", async () => {

@@ -6,13 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.23.0 - 2026-09-25
 
+### Added
+
+- Array validators take `.min(n)` / `.max(n)` for length, like strings and numbers; `.minLength()` / `.maxLength()` remain as aliases.
+
 ### Fixed
 
-- Skip mutators for omitted optional fields.
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
+- An omitted optional field skips its mutators, so `v.string().trim().optional()` no longer reports a missing field as required.
 
 ## 5.22.1 - 2026-09-25
 

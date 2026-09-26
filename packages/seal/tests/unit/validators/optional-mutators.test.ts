@@ -1,4 +1,4 @@
-import { validate, v } from "../index";
+import { validate, v } from "../../../src/index";
 
 describe("optional fields with mutators", () => {
   it("skips mutators for omitted optional string fields", async () => {

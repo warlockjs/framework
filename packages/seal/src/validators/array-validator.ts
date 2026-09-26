@@ -65,13 +65,23 @@ export class ArrayValidator extends BaseValidator {
   }
 
   /** Array length must be greater than the given length */
+  public min(min: number, errorMessage?: string) {
+    return this.addRule(minLengthRule, errorMessage, { minLength: min });
+  }
+
+  /** @alias min */
   public minLength(length: number, errorMessage?: string) {
-    return this.addRule(minLengthRule, errorMessage, { minLength: length });
+    return this.min(length, errorMessage);
   }
 
   /** Array length must be less than the given length */
+  public max(max: number, errorMessage?: string) {
+    return this.addRule(maxLengthRule, errorMessage, { maxLength: max });
+  }
+
+  /** @alias max */
   public maxLength(length: number, errorMessage?: string) {
-    return this.addRule(maxLengthRule, errorMessage, { maxLength: length });
+    return this.max(length, errorMessage);
   }
 
   /** Array length must be of the given length */
