@@ -39,6 +39,8 @@ export type PostgresConnectionConfig = {
  * PostgreSQL pool configuration options.
  */
 export type PostgresPoolConfig = PostgresConnectionConfig & {
+  /** Column naming policy; snake_case maps columns both directions while preserving table names. @default "preserve" */
+  readonly naming?: "preserve" | "snake_case";
   /** Maximum number of clients in the pool (default: 10) */
   readonly max?: number;
   /** Minimum number of clients in the pool (default: 0) */

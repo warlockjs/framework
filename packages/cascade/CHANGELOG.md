@@ -8,10 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Postgres `naming: "snake_case"` (opt-in, default `"preserve"`): camelCase model keys map to snake_case columns in inserts, updates, `where`, `orderBy`, `select`, `groupBy` and joins, and rows come back camelCase. Table names and raw SQL are left as written.
 - Static `Model.whereRaw(expression, bindings?)`, matching the other static query entry points (`Model.query().whereRaw(...)` still works).
 
 ### Fixed
 
+- Postgres `bigint`/`int8` columns (and int8 arrays) come back as numbers when they fit in a safe integer, so a bigint id passes `v.number()`; larger values stay strings. The parser is installed on Cascade's own pool, not on the global `pg.types`.
 - `unique()` / `exists()` on `StringValidator` and `NumberValidator` now return `this`, so `Infer<>` keeps the concrete output type (was `unknown`).
 
 ## 5.22.1 - 2026-09-25

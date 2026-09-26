@@ -40,6 +40,7 @@ import { type DatabaseDriver } from "../../utils/connect-to-database";
 import { convertPostgresValue, type PostgresColumnTypes } from "./postgres-type-converters";
 import { PostgresBlueprint } from "./postgres-blueprint";
 import { PostgresDialect } from "./postgres-dialect";
+import { snakeKeysToCamel } from "./naming";
 import { PostgresMigrationDriver } from "./postgres-migration-driver";
 import { PostgresQueryBuilder } from "./postgres-query-builder";
 import { PostgresSQLSerializer } from "./postgres-sql-serializer";
@@ -63,6 +64,47 @@ type UniqueKey = {
 type PgPool = import("pg").Pool;
 type PgPoolClient = import("pg").PoolClient;
 type PgPoolConfig = import("pg").PoolConfig;
+type PgTypes = Pick<typeof import("pg").types, "getTypeParser">;
+
+const POSTGRES_INT8_OID = 20;
+const POSTGRES_INT8_ARRAY_OID = 1016;
+
+/**
+ * Convert a PostgreSQL int8 result to a number only when it can be represented
+ * exactly. PostgreSQL sends int8 values as strings by default to avoid silently
+ * losing precision above JavaScript's safe-integer limit.
+ */
+export function parsePostgresInt8(value: string | null): number | string | null {
+  if (value === null) {
+    return null;
+  }
+
+  const numberValue = Number(value);
+  return Number.isSafeInteger(numberValue) ? numberValue : value;
+}
+
+/**
+ * Build pool-local type overrides without changing pg's process-wide registry.
+ */
+function createPostgresTypes(types: PgTypes): NonNullable<PgPoolConfig["types"]> {
+  return {
+    getTypeParser(oid, format) {
+      if (oid === POSTGRES_INT8_OID) {
+        return parsePostgresInt8;
+      }
+
+      if ((oid as number) === POSTGRES_INT8_ARRAY_OID) {
+        const parseArray = types.getTypeParser(oid, format);
+        return (value: string) => {
+          const array = parseArray(value);
+          return Array.isArray(array) ? array.map(parsePostgresInt8) : array;
+        };
+      }
+
+      return types.getTypeParser(oid, format);
+    },
+  };
+}
 
 /**
  * Build pg's `PoolConfig` from cascade's `PostgresPoolConfig`, coercing the
@@ -185,7 +227,7 @@ export class PostgresDriver implements DriverContract {
   /**
    * SQL dialect for PostgreSQL-specific syntax.
    */
-  public readonly dialect = new PostgresDialect();
+  public readonly dialect: PostgresDialect;
 
   /**
    * PostgreSQL driver model defaults.
@@ -267,6 +309,7 @@ export class PostgresDriver implements DriverContract {
    * @param config - PostgreSQL connection configuration
    */
   public constructor(private readonly config: PostgresPoolConfig) {
+    this.dialect = new PostgresDialect({ naming: config.naming });
     this._nativeArrayColumns = new Set(config.nativeArrayColumns ?? []);
   }
 
@@ -321,6 +364,7 @@ export class PostgresDriver implements DriverContract {
 
     try {
       const poolConfig = buildPostgresPoolConfig(this.config);
+      poolConfig.types = createPostgresTypes(pg.types);
 
       log.info(
         "database.postgres",
@@ -600,15 +644,15 @@ export class PostgresDriver implements DriverContract {
     // `query()`. A row that did not come from `query()` is left as pg
     // returned it rather than guessed from its values (K1:B29).
     const columnTypes = this.rowColumnTypes.get(data);
-    if (!columnTypes) return data;
+    if (columnTypes) {
+      for (const [key, value] of Object.entries(data)) {
+        if (typeof value !== "string") continue;
 
-    for (const [key, value] of Object.entries(data)) {
-      if (typeof value !== "string") continue;
-
-      data[key] = convertPostgresValue(value, columnTypes.get(key));
+        data[key] = convertPostgresValue(value, columnTypes.get(key));
+      }
     }
 
-    return data;
+    return this.config.naming === "snake_case" ? snakeKeysToCamel(data) : data;
   }
 
   /**
@@ -648,7 +692,7 @@ export class PostgresDriver implements DriverContract {
 
     const quotedColumns = columns.map((c) => this.dialect.quoteIdentifier(c)).join(", ");
     const placeholders = columns.map((_, i) => this.dialect.placeholder(i + 1)).join(", ");
-    const quotedTable = this.dialect.quoteIdentifier(table);
+    const quotedTable = this.dialect.quoteTableIdentifier(table);
 
     const sql = `INSERT INTO ${quotedTable} (${quotedColumns}) VALUES (${placeholders}) RETURNING *`;
 
@@ -687,7 +731,7 @@ export class PostgresDriver implements DriverContract {
     const columns = Array.from(allColumns);
 
     const quotedColumns = columns.map((c) => this.dialect.quoteIdentifier(c)).join(", ");
-    const quotedTable = this.dialect.quoteIdentifier(table);
+    const quotedTable = this.dialect.quoteTableIdentifier(table);
 
     // Build value sets and params
     const valueSets: string[] = [];
@@ -806,7 +850,7 @@ export class PostgresDriver implements DriverContract {
       return result.rows[0] ?? null;
     }
 
-    const quotedTable = this.dialect.quoteIdentifier(table);
+    const quotedTable = this.dialect.quoteTableIdentifier(table);
     const keyList = (qualifier?: string) =>
       primaryKey
         .map((column) => (qualifier ? `${qualifier}.` : "") + this.dialect.quoteIdentifier(column))
@@ -908,7 +952,7 @@ export class PostgresDriver implements DriverContract {
 
     const columns = Object.keys(insertRow).filter((key) => insertRow[key] !== undefined);
     const params: unknown[] = columns.map((key) => this.serializeValue(key, insertRow[key], table));
-    const quotedTable = this.dialect.quoteIdentifier(table);
+    const quotedTable = this.dialect.quoteTableIdentifier(table);
     const quotedColumns = columns.map((column) => this.dialect.quoteIdentifier(column)).join(", ");
     const placeholders = columns.map((_, index) => this.dialect.placeholder(index + 1)).join(", ");
 
@@ -1024,7 +1068,7 @@ export class PostgresDriver implements DriverContract {
     const columns = Object.keys(serialized);
     const values = Object.values(serialized);
 
-    const quotedTable = this.dialect.quoteIdentifier(table);
+    const quotedTable = this.dialect.quoteTableIdentifier(table);
     const setClauses = columns
       .map((col, i) => `${this.dialect.quoteIdentifier(col)} = ${this.dialect.placeholder(i + 1)}`)
       .join(", ");
@@ -1064,7 +1108,7 @@ export class PostgresDriver implements DriverContract {
       throw new Error("Cannot upsert empty document");
     }
 
-    const quotedTable = this.dialect.quoteIdentifier(table);
+    const quotedTable = this.dialect.quoteTableIdentifier(table);
     const quotedColumns = columns.map((c) => this.dialect.quoteIdentifier(c)).join(", ");
     const placeholders = columns.map((_, i) => this.dialect.placeholder(i + 1)).join(", ");
 
@@ -1124,7 +1168,7 @@ export class PostgresDriver implements DriverContract {
     filter: Record<string, unknown>,
     _options?: Record<string, unknown>,
   ): Promise<T | null> {
-    const quotedTable = this.dialect.quoteIdentifier(table);
+    const quotedTable = this.dialect.quoteTableIdentifier(table);
     const { whereClause, whereParams } = this.buildWhereClause(filter, 1);
 
     const sql = `${this.singleRowTarget("DELETE FROM " + quotedTable, quotedTable, filter, whereClause)} RETURNING *`;
@@ -1147,7 +1191,7 @@ export class PostgresDriver implements DriverContract {
     filter?: Record<string, unknown>,
     _options?: Record<string, unknown>,
   ): Promise<number> {
-    const quotedTable = this.dialect.quoteIdentifier(table);
+    const quotedTable = this.dialect.quoteTableIdentifier(table);
     const { whereClause, whereParams } = this.buildWhereClause(filter ?? {}, 1);
 
     const sql = this.singleRowTarget(
@@ -1175,7 +1219,7 @@ export class PostgresDriver implements DriverContract {
     filter?: Record<string, unknown>,
     _options?: Record<string, unknown>,
   ): Promise<number> {
-    const quotedTable = this.dialect.quoteIdentifier(table);
+    const quotedTable = this.dialect.quoteTableIdentifier(table);
     const { whereClause, whereParams } = this.buildWhereClause(filter ?? {}, 1);
 
     const sql = `DELETE FROM ${quotedTable} ${whereClause}`;
@@ -1196,7 +1240,7 @@ export class PostgresDriver implements DriverContract {
    * @returns Number of deleted rows (always 0 for TRUNCATE)
    */
   public async truncateTable(table: string, options?: { cascade?: boolean }): Promise<number> {
-    const quotedTable = this.dialect.quoteIdentifier(table);
+    const quotedTable = this.dialect.quoteTableIdentifier(table);
     const cascadeClause = options?.cascade ? " CASCADE" : "";
     await this.query(`TRUNCATE TABLE ${quotedTable} RESTART IDENTITY${cascadeClause}`);
     return 0; // TRUNCATE doesn't return row count
@@ -1910,7 +1954,7 @@ export class PostgresDriver implements DriverContract {
     }
 
     const params = [...set.params];
-    const quotedTable = this.dialect.quoteIdentifier(table);
+    const quotedTable = this.dialect.quoteTableIdentifier(table);
     const { whereClause, whereParams } = this.buildWhereClause(filter, set.nextIndex);
     params.push(...whereParams);
 

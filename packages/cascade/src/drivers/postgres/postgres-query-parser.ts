@@ -532,7 +532,7 @@ export class PostgresQueryParser {
     parts.push(this.buildSelectClause());
 
     // FROM clause
-    const quotedTable = this.dialect.quoteIdentifier(this.table);
+    const quotedTable = this.quoteTable(this.table);
     const fromClause = this.alias
       ? `FROM ${quotedTable} AS ${this.dialect.quoteIdentifier(this.alias)}`
       : `FROM ${quotedTable}`;
@@ -591,7 +591,7 @@ export class PostgresQueryParser {
     // If no specific columns, select all — qualify with main table when joins present
     if (this.selectColumns.length === 0 && this.selectRaw.length === 0) {
       return this.hasJoins
-        ? `SELECT ${distinct}${this.dialect.quoteIdentifier(this.table)}.*`
+        ? `SELECT ${distinct}${this.quoteTable(this.table)}.*`
         : `SELECT ${distinct}*`;
     }
 
@@ -1023,7 +1023,7 @@ export class PostgresQueryParser {
     const relationType = data.type as string | undefined;
     const constraintOps = data.constraintOps as PostgresParserOperation[] | undefined;
     const quotedAlias = this.dialect.quoteIdentifier(alias);
-    const quotedTable = this.dialect.quoteIdentifier(this.table);
+    const quotedTable = this.quoteTable(this.table);
 
     const hasExplicitSelect = this.selectColumns.length > 0;
     if (!hasExplicitSelect && !this.selectRaw.includes(`${quotedTable}.*`)) {
@@ -1035,10 +1035,10 @@ export class PostgresQueryParser {
       const relatedTable = data.table as string;
       const foreignKey = data.foreignKey as string;
       const localKey = data.localKey as string;
-      const quotedRelatedTable = this.dialect.quoteIdentifier(relatedTable);
+      const quotedRelatedTable = this.quoteTable(relatedTable);
       const quotedForeignKey = this.dialect.quoteIdentifier(foreignKey);
       const quotedLocalKey = this.dialect.quoteIdentifier(localKey);
-      const quotedMainTable = this.dialect.quoteIdentifier(this.table);
+      const quotedMainTable = this.quoteTable(this.table);
 
       let innerSelect: string;
       if (select && select.length > 0) {
@@ -1066,6 +1066,7 @@ export class PostgresQueryParser {
         const subParser = new PostgresQueryParser({
           table: relatedTable,
           alias: "a",
+          dialect: this.dialect,
           operations: constraintOps,
         });
         subParser.parse();
@@ -1103,6 +1104,7 @@ export class PostgresQueryParser {
         const subParser = new PostgresQueryParser({
           table: (data.table as string) ?? alias,
           alias,
+          dialect: this.dialect,
           operations: constraintOps,
         });
         subParser.parse();
@@ -1144,7 +1146,7 @@ export class PostgresQueryParser {
     const alias = "alias" in options ? options.alias : undefined;
     const constraintOps = (data.constraintOps as PostgresParserOperation[] | undefined) ?? [];
 
-    const quotedTable = this.dialect.quoteIdentifier(joinTable);
+    const quotedTable = this.quoteTable(joinTable);
     const tableRef = alias
       ? `${quotedTable} AS ${this.dialect.quoteIdentifier(alias)}`
       : quotedTable;
@@ -1178,6 +1180,7 @@ export class PostgresQueryParser {
         const subParser = new PostgresQueryParser({
           table: joinTable,
           alias: tableAlias,
+          dialect: this.dialect,
           operations: whereOps,
         });
         subParser.parse();
@@ -1229,7 +1232,7 @@ export class PostgresQueryParser {
 
     if (parts.length === 1) {
       // Single part: just a column name, prefix with default table
-      expression = `${this.dialect.quoteIdentifier(effectiveTable)}.${this.dialect.quoteIdentifier(field)}`;
+      expression = `${this.quoteTable(effectiveTable)}.${this.dialect.quoteIdentifier(field)}`;
     } else if (parts.length === 2) {
       // Two parts: could be "table.column" or "jsonbColumn.key"
       const [first, second] = parts;
@@ -1246,7 +1249,7 @@ export class PostgresQueryParser {
 
       if (this.isTableReference(first)) {
         // It's table.column - regular column reference
-        expression = `${this.dialect.quoteIdentifier(first)}.${this.dialect.quoteIdentifier(second)}`;
+        expression = `${this.quoteTable(first)}.${this.dialect.quoteIdentifier(second)}`;
       } else {
         // It's jsonbColumn.key - JSONB path
         expression = this.buildJsonbPath(effectiveTable, first, [second]);
@@ -1299,6 +1302,12 @@ export class PostgresQueryParser {
     return false;
   }
 
+  private quoteTable(table: string): string {
+    return this.dialect instanceof PostgresDialect
+      ? this.dialect.quoteTableIdentifier(table)
+      : this.dialect.quoteIdentifier(table);
+  }
+
   /**
    * Build a JSONB path expression.
    *
@@ -1319,7 +1328,7 @@ export class PostgresQueryParser {
    * // Returns: "posts"."createdBy"->'address'->>'city'
    */
   private buildJsonbPath(table: string, column: string, path: string[]): string {
-    const quotedTable = this.dialect.quoteIdentifier(table);
+    const quotedTable = this.quoteTable(table);
     const quotedColumn = this.dialect.quoteIdentifier(column);
 
     if (path.length === 0) {
@@ -1343,7 +1352,7 @@ export class PostgresQueryParser {
    */
   private processCrossJoin(data: Record<string, unknown>): void {
     const table = data.table as string;
-    const quotedTable = this.dialect.quoteIdentifier(table);
+    const quotedTable = this.quoteTable(table);
     this.joinClauses.push(`CROSS JOIN ${quotedTable}`);
   }
 

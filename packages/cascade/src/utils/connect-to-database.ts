@@ -2,7 +2,7 @@ import { type DriverContract, type TransactionContext } from "../contracts";
 import { DataSource } from "../data-source/data-source";
 import { dataSourceRegistry } from "../data-source/data-source-registry";
 import { MongoDbDriver } from "../drivers/mongodb/mongodb-driver";
-import { PostgresDriver } from "../drivers/postgres";
+import { PostgresDriver, type PostgresPoolConfig } from "../drivers/postgres";
 import type { DeleteStrategy, MigrationDefaults, ModelDefaults, RelationDefaults } from "../types";
 
 /**
@@ -396,6 +396,8 @@ export async function connectToDatabase<TDriverOptions = any, TClientOptions = a
         user: options.username,
         password: options.password,
         logging: options.logging,
+        // Cascade-side Postgres options (e.g. `naming: "snake_case"`).
+        ...pickPostgresDriverOptions(options.driverOptions),
         // Spread any additional client options (pool settings, SSL, etc.)
         ...(options.clientOptions as object),
       });
@@ -471,4 +473,11 @@ export async function transaction<T = any>(
   options?: Record<string, unknown>,
 ): Promise<T> {
   return getDatabaseDriver().transaction(fn, options);
+}
+
+/** The Cascade-side Postgres driver options `driverOptions` may carry. */
+function pickPostgresDriverOptions(driverOptions: unknown): Pick<PostgresPoolConfig, "naming"> {
+  const naming = (driverOptions as { naming?: PostgresPoolConfig["naming"] } | undefined)?.naming;
+
+  return naming === undefined ? {} : { naming };
 }

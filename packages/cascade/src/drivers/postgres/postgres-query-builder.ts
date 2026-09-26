@@ -439,7 +439,7 @@ export class PostgresQueryBuilder<T = unknown>
     // pgvector expects the literal format: [n,n,n,...]
     const literal = `[${embedding.join(",")}]`;
     const quotedCol = this.driver.dialect.quoteIdentifier(column);
-    const quotedTable = this.driver.dialect.quoteIdentifier(this.table);
+    const quotedTable = this.driver.dialect.quoteTableIdentifier(this.table);
 
     // 0 — Preserve all table columns.
     //     Adding a selectRaw suppresses the parser's "SELECT *" fallback,
@@ -566,7 +566,7 @@ export class PostgresQueryBuilder<T = unknown>
 
   /** Full-text search across the whole row, plus optional equality filters. */
   public override textSearch(query: string, filters?: WhereObject): this {
-    const table = this.driver.dialect.quoteIdentifier(this.table);
+    const table = this.driver.dialect.quoteTableIdentifier(this.table);
     this.addOperation("whereRaw", {
       expression: `to_tsvector('english', ${table}::text) @@ plainto_tsquery('english', ?)`,
       bindings: [query],
@@ -821,6 +821,7 @@ export class PostgresQueryBuilder<T = unknown>
 
     const parser = new PostgresQueryParser({
       table: this.table,
+      dialect: this.driver.dialect,
       operations: toParserOps(this.operations),
     });
 
@@ -943,7 +944,11 @@ export class PostgresQueryBuilder<T = unknown>
           ? matchOps
           : [...matchOps, { type: "selectRaw", data: { expression: "1" } }],
       );
-      const inner = new PostgresQueryParser({ table: this.table, operations: innerOps }).parse();
+      const inner = new PostgresQueryParser({
+        table: this.table,
+        dialect: this.driver.dialect,
+        operations: innerOps,
+      }).parse();
       query = `SELECT COUNT(*) AS "count" FROM (${inner.query}) AS "__count"`;
       bindings = inner.bindings ?? [];
     } else {
@@ -951,7 +956,11 @@ export class PostgresQueryBuilder<T = unknown>
         ...matchOps.filter((op) => !/select/i.test(op.type)),
         { type: "selectRaw", data: { expression: 'COUNT(*) AS "count"' } },
       ]);
-      const parsed = new PostgresQueryParser({ table: this.table, operations: countOps }).parse();
+      const parsed = new PostgresQueryParser({
+        table: this.table,
+        dialect: this.driver.dialect,
+        operations: countOps,
+      }).parse();
       query = parsed.query ?? "";
       bindings = parsed.bindings ?? [];
     }
@@ -1044,6 +1053,7 @@ export class PostgresQueryBuilder<T = unknown>
     ]);
     const { query = "", bindings = [] } = new PostgresQueryParser({
       table: this.table,
+      dialect: this.driver.dialect,
       operations: probeOps,
     }).parse();
     const result = await this.driver.query(query, bindings);
@@ -1084,10 +1094,10 @@ export class PostgresQueryBuilder<T = unknown>
     // (e.g. `... + $1 WHERE id = $1`) and the wrong value lands in each slot.
     const amountPlaceholder = `$${filterParams.length + 1}`;
     const updateSql =
-      `UPDATE ${this.driver.dialect.quoteIdentifier(this.table)} ` +
+      `UPDATE ${this.driver.dialect.quoteTableIdentifier(this.table)} ` +
       `SET ${this.driver.dialect.quoteIdentifier(field)} = COALESCE(${this.driver.dialect.quoteIdentifier(field)}, 0) + ${amountPlaceholder} ` +
       // One row only (matches Mongo and the single returned value).
-      `WHERE ctid IN (SELECT ctid FROM ${this.driver.dialect.quoteIdentifier(this.table)} ${filterSql} LIMIT 1 FOR UPDATE SKIP LOCKED) ` +
+      `WHERE ctid IN (SELECT ctid FROM ${this.driver.dialect.quoteTableIdentifier(this.table)} ${filterSql} LIMIT 1 FOR UPDATE SKIP LOCKED) ` +
       `RETURNING ${this.driver.dialect.quoteIdentifier(field)}`;
     const result = await this.driver.query<Record<string, number>>(updateSql, [
       ...filterParams,
@@ -1108,7 +1118,7 @@ export class PostgresQueryBuilder<T = unknown>
     // Amount binds last ($N+1) so it never collides with the filter's $1..$N.
     const amountPlaceholder = `$${filterParams.length + 1}`;
     const updateSql =
-      `UPDATE ${this.driver.dialect.quoteIdentifier(this.table)} ` +
+      `UPDATE ${this.driver.dialect.quoteTableIdentifier(this.table)} ` +
       `SET ${this.driver.dialect.quoteIdentifier(field)} = COALESCE(${this.driver.dialect.quoteIdentifier(field)}, 0) + ${amountPlaceholder}` +
       (filterSql ? ` WHERE ${filterSql.replace("WHERE ", "")}` : "");
     const result = await this.driver.query(updateSql, [...filterParams, amount]);
@@ -1237,7 +1247,7 @@ export class PostgresQueryBuilder<T = unknown>
   public async delete(): Promise<number> {
     this.applyPendingScopes();
     const { sql, params } = this.buildFilter();
-    const deleteSql = `DELETE FROM ${this.driver.dialect.quoteIdentifier(this.table)} ${sql}`;
+    const deleteSql = `DELETE FROM ${this.driver.dialect.quoteTableIdentifier(this.table)} ${sql}`;
     const result = await this.driver.query(deleteSql, params);
     return result.rowCount ?? 0;
   }
@@ -1251,7 +1261,7 @@ export class PostgresQueryBuilder<T = unknown>
   public async deleteOne(): Promise<number> {
     this.applyPendingScopes();
     const { sql: filterSql, params } = this.buildFilter();
-    const quotedTable = this.driver.dialect.quoteIdentifier(this.table);
+    const quotedTable = this.driver.dialect.quoteTableIdentifier(this.table);
     const deleteSql = `DELETE FROM ${quotedTable} WHERE ctid IN (SELECT ctid FROM ${quotedTable} ${filterSql} LIMIT 1 FOR UPDATE SKIP LOCKED)`;
     const result = await this.driver.query(deleteSql, params);
     return result.rowCount ?? 0;
@@ -1285,7 +1295,7 @@ export class PostgresQueryBuilder<T = unknown>
     }
 
     const updateSql =
-      `UPDATE ${this.driver.dialect.quoteIdentifier(this.table)} ` +
+      `UPDATE ${this.driver.dialect.quoteTableIdentifier(this.table)} ` +
       `SET ${setClauses.join(", ")}` +
       (filterSql ? ` ${filterSql}` : "");
     const result = await this.driver.query(updateSql, [...filterParams, ...setParams]);
@@ -1308,7 +1318,7 @@ export class PostgresQueryBuilder<T = unknown>
       (field) => `${this.driver.dialect.quoteIdentifier(field)} = NULL`,
     );
     const updateSql =
-      `UPDATE ${this.driver.dialect.quoteIdentifier(this.table)} ` +
+      `UPDATE ${this.driver.dialect.quoteTableIdentifier(this.table)} ` +
       `SET ${setClauses.join(", ")}` +
       (filterSql ? ` ${filterSql}` : "");
     const result = await this.driver.query(updateSql, filterParams);
@@ -1335,6 +1345,7 @@ export class PostgresQueryBuilder<T = unknown>
 
     const parser = new PostgresQueryParser({
       table: this.table,
+      dialect: this.driver.dialect,
       operations: toParserOps(this.operations),
     });
     return parser.parse();
@@ -1603,8 +1614,8 @@ export class PostgresQueryBuilder<T = unknown>
     count: number | undefined,
   ): { expression: string; bindings: unknown[] } {
     const dialect = this.driver.dialect;
-    const quotedSelfTable = dialect.quoteIdentifier(this.table);
-    const quotedRelatedTable = dialect.quoteIdentifier(RelatedModel.table);
+    const quotedSelfTable = dialect.quoteTableIdentifier(this.table);
+    const quotedRelatedTable = dialect.quoteTableIdentifier(RelatedModel.table);
     const relationType = definition.type as string;
     const selfModel = this.modelClass as { name?: string; primaryKey?: string } | undefined;
     const conventions = this.dataSource?.relationDefaults;
@@ -1640,7 +1651,7 @@ export class PostgresQueryBuilder<T = unknown>
         (definition.pivot as string | undefined) ??
         inferPivotTable(selfModel?.name ?? "Model", RelatedModel.name, conventions);
 
-      const quotedPivot = dialect.quoteIdentifier(pivotTableName);
+      const quotedPivot = dialect.quoteTableIdentifier(pivotTableName);
       const pivotLocalCol =
         (definition.localKey as string | undefined) ??
         inferPivotKey(selfModel?.name ?? "Model", conventions);
@@ -1771,7 +1782,7 @@ export class PostgresQueryBuilder<T = unknown>
       return;
     }
 
-    const quotedTable = this.driver.dialect.quoteIdentifier(this.table);
+    const quotedTable = this.driver.dialect.quoteTableIdentifier(this.table);
 
     this.addOperation("selectRaw", {
       expression: `${quotedTable}.*`,
@@ -1794,8 +1805,8 @@ export class PostgresQueryBuilder<T = unknown>
   ): { expression: string; bindings: unknown[] } {
     const dialect = this.driver.dialect;
     const quotedAlias = dialect.quoteIdentifier(alias);
-    const quotedSelfTable = dialect.quoteIdentifier(this.table);
-    const quotedRelatedTable = dialect.quoteIdentifier(RelatedModel.table);
+    const quotedSelfTable = dialect.quoteTableIdentifier(this.table);
+    const quotedRelatedTable = dialect.quoteTableIdentifier(RelatedModel.table);
     const relationType = definition.type as string;
 
     const selfModel = this.modelClass as { name?: string; primaryKey?: string } | undefined;
@@ -1844,7 +1855,7 @@ export class PostgresQueryBuilder<T = unknown>
         (definition.pivot as string | undefined) ??
         inferPivotTable(selfModel?.name ?? "Model", relatedMeta.name, conventions);
 
-      const quotedPivot = dialect.quoteIdentifier(pivotTableName);
+      const quotedPivot = dialect.quoteTableIdentifier(pivotTableName);
       const pivotLocalCol =
         (definition.localKey as string | undefined) ??
         inferPivotKey(selfModel?.name ?? "Model", conventions);
@@ -1909,6 +1920,7 @@ export class PostgresQueryBuilder<T = unknown>
 
     const subParser = new PostgresQueryParser({
       table: relatedTable,
+      dialect: this.driver.dialect,
       operations: toParserOps(whereOps),
     });
 
@@ -2152,6 +2164,7 @@ export class PostgresQueryBuilder<T = unknown>
 
     const parser = new PostgresQueryParser({
       table: this.table,
+      dialect: this.driver.dialect,
       operations: toParserOps(whereOps),
     });
 

@@ -10,6 +10,11 @@
 
 import type { AggregateExpression, ColumnExpression } from "../../expressions";
 import type { SqlDialectContract } from "../sql/sql-dialect.contract";
+import { camelToSnake } from "./naming";
+
+export type PostgresNaming = "preserve" | "snake_case";
+
+export type PostgresDialectOptions = { readonly naming?: PostgresNaming };
 
 /**
  * PostgreSQL-specific SQL dialect implementation.
@@ -31,6 +36,11 @@ import type { SqlDialectContract } from "../sql/sql-dialect.contract";
  * ```
  */
 export class PostgresDialect implements SqlDialectContract {
+  private readonly naming: PostgresNaming;
+
+  public constructor(options: PostgresDialectOptions = {}) {
+    this.naming = options.naming ?? "preserve";
+  }
   /**
    * Dialect name identifier.
    */
@@ -70,7 +80,14 @@ export class PostgresDialect implements SqlDialectContract {
   public quoteIdentifier(identifier: string): string {
     // Split on dots for qualified names (schema.table.column)
     const parts = identifier.split(".");
-    return parts.map((part) => `"${part.replace(/"/g, '""')}"`).join(".");
+    return parts
+      .map((part) => `"${(this.naming === "snake_case" ? camelToSnake(part) : part).replace(/"/g, '""')}"`)
+      .join(".");
+  }
+
+  /** Quote a table identifier without applying the column naming policy. */
+  public quoteTableIdentifier(identifier: string): string {
+    return identifier.split(".").map((part) => `"${part.replace(/"/g, '""')}"`).join(".");
   }
 
   /**

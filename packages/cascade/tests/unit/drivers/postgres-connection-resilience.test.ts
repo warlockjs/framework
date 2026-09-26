@@ -56,9 +56,13 @@ class MockPool {
   public end = poolEnd;
 }
 
+// The driver installs pool-local type parsers built from `pg.types`.
+const mockPgTypes = { getTypeParser: () => (value: string) => value };
+
 vi.mock("pg", () => ({
-  default: { Pool: MockPool },
+  default: { Pool: MockPool, types: mockPgTypes },
   Pool: MockPool,
+  types: mockPgTypes,
 }));
 
 // Imported after the mock so the driver's dynamic `import("pg")` resolves to it.
