@@ -100,8 +100,8 @@ The default is to **reject** unknown keys, which is what you want for inbound pa
 
 ```ts
 const publicArticle = v.object({
-  id: v.string().required(),
-  title: v.string().required(),
+  id: v.string(),
+  title: v.string(),
 }).stripUnknown();
 
 const { isValid, data } = await v.validate(publicArticle, record);

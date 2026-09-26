@@ -39,10 +39,9 @@ v.string().min(3).trim()
 ## `.required()` / `.optional()` / `.present()`
 
 ```ts
-v.string()             // already required inside v.object — no need to call .required()
+v.string()             // already required inside v.object
 v.string().optional()  // type: string | undefined — { isOptional: true } brand
 v.string().present()   // must exist, may be "" / null
-v.string().required()  // explicit form — same behavior, redundant
 ```
 
 **Required is the default inside `v.object`.** Most schemas read cleaner without `.required()` — `Infer<>` already shows what's required (no `?`) vs optional (`?`). Calling `.required()` explicitly is harmless and accepted, but the canonical seal style is to skip it. Keep `.optional()` explicit (it changes behavior); skip `.required()` (it doesn't).
@@ -50,7 +49,6 @@ v.string().required()  // explicit form — same behavior, redundant
 The `{ isOptional: true }` brand survives chaining (`.optional().min(3)` is still optional) and `Infer<>` reads it to make the key optional.
 
 **When `.required()` is still useful:**
-- Visual contrast next to `.optional()` siblings when you want the asymmetry to be loud — style call.
 - It's not needed for conditional rules — `.requiredIf(field, value)` and friends *replace* the default required-condition slot, so they work standalone.
 
 Conditional variants (run inside `v.object` only):
@@ -247,7 +245,7 @@ Validators are **immutable by default**. Every chain method returns a clone:
 
 ```ts
 const baseString = v.string();
-const required = baseString.required();
+const short = baseString.min(3);
 // baseString is unchanged
 ```
 
@@ -256,7 +254,7 @@ This matters because schemas are often shared (`Model.schema = v.object({...})`)
 Toggle in-place with the `.mutable` getter (rare):
 
 ```ts
-const schema = v.string().mutable.required().min(3);
+const schema = v.string().mutable.min(3);
 // Same instance throughout — useful when building dynamically
 ```
 

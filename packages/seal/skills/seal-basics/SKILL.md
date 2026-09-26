@@ -49,7 +49,7 @@ import { object } from "@warlock.js/seal/object";
 import { string } from "@warlock.js/seal/string";
 
 const commentSchema = object({
-  comment: string().trim().required().minLength(3),
+  comment: string().trim().minLength(3),
 });
 
 const result = await commentSchema["~standard"].validate({
