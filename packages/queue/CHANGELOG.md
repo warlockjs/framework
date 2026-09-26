@@ -4,18 +4,12 @@ All notable changes to `@warlock.js/queue` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
-## Unreleased (5.23)
+## 5.23.0 - 2026-09-25
 
 ### Added
 
 - `defineQueueContext()` / `setQueueContext()`: capture ambient state (tenant, request id) at `dispatch` and restore it around the job handler. The captured value travels in a versioned envelope; jobs without one still run. Exposed as `ctx.context`. Opt a job out with `context: false`.
 - `UnrecoverableJobError`: throw it from a handler or `restore` to fail the job permanently (mapped to BullMQ's `UnrecoverableError`).
-
-## 5.23.0 - 2026-09-25
-
-### Changed
-
-- Lockstep patch release; package APIs are unchanged.
 
 ## 5.22.1 - 2026-09-25
 
