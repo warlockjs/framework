@@ -44,6 +44,22 @@ const job = await sendInvoice.find(id);
 // { id, name, queue, state, payload, progress, attemptsMade, result, failedReason, createdAt, finishedAt }
 ```
 
+## Carry request context into jobs
+
+```ts
+setQueueContext(
+  defineQueueContext({
+    capture: () => tenantStorage.getStore(), // runs inside dispatch()
+    restore: (tenant, run) => tenantStorage.run(tenant, run), // wraps handle()
+  }),
+);
+```
+
+- `undefined` from `capture` carries nothing; the value must be JSON-safe. Read it in a handler as `ctx.context` (`unknown`).
+- Jobs dispatched from a restored handler capture the same context.
+- `defineJob({ context: false })` opts a job out.
+- Throw `UnrecoverableJobError` from a handler or `restore` to fail the job without retries.
+
 ## Rules
 
 - A job name with no handler in the worker process fails at once, without retries.

@@ -60,3 +60,14 @@ export class QueueDashboardDependencyError extends Error {
     this.name = "QueueDashboardDependencyError";
   }
 }
+
+/**
+ * Throw from a job handler (or a queue context's `restore`) to fail the job
+ * permanently — it is not retried, whatever `attempts` allows.
+ */
+export class UnrecoverableJobError extends Error {
+  public constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "UnrecoverableJobError";
+  }
+}

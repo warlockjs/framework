@@ -2,6 +2,7 @@ import type { Job, JobsOptions } from "bullmq";
 import { getQueueConfig } from "./config";
 import { toMilliseconds } from "./duration";
 import { InvalidJobDefinitionError } from "./errors";
+import { getQueueContext, unwrapPayload, wrapPayload } from "./queue-context";
 import { queueOf, registerJob, type RegisteredJob } from "./job-registry";
 import { getQueue } from "./queue-manager";
 import type {
@@ -45,9 +46,11 @@ export function defineJob<TPayload, TResult = unknown>(
     },
     async dispatch(payload, options = {}) {
       const queueName = queueOf(definition);
+      // Capture synchronously, in the caller's async context.
+      const captured = definition.context === false ? undefined : getQueueContext()?.capture();
       const job = await getQueue(queueName).add(
         definition.name,
-        payload,
+        wrapPayload(payload, captured),
         toBullJobOptions(definition, options),
       );
 
@@ -138,7 +141,7 @@ export async function toSnapshot<TPayload, TResult>(
     name: job.name,
     queue: job.queueName,
     state: resolvedState,
-    payload: job.data as TPayload,
+    payload: unwrapPayload(job.data).payload as TPayload,
     progress: job.progress as JobSnapshot["progress"],
     attemptsMade: job.attemptsMade,
     result: job.returnvalue as TResult | undefined,

@@ -1,3 +1,4 @@
+import { unwrapPayload } from "./queue-context";
 import type { Job } from "bullmq";
 import { defaultQueueName } from "./config";
 import { FailedJobNotFoundError } from "./errors";
@@ -44,7 +45,7 @@ function toFailedJob(job: Job): FailedJob {
     id: String(job.id),
     name: job.name,
     queue: job.queueName,
-    payload: job.data,
+    payload: unwrapPayload(job.data).payload,
     attemptsMade: job.attemptsMade,
     failedReason: job.failedReason,
     stacktrace: job.stacktrace ?? [],

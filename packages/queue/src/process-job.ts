@@ -1,5 +1,7 @@
 import { type Job, UnrecoverableError } from "bullmq";
+import { UnrecoverableJobError } from "./errors";
 import { findRegisteredJob } from "./job-registry";
+import { getQueueContext, unwrapPayload } from "./queue-context";
 import type { JobContext } from "./types";
 
 /**
@@ -20,6 +22,8 @@ export async function processJob(job: Job): Promise<unknown> {
     );
   }
 
+  const { payload, context: captured } = unwrapPayload(job.data);
+
   const context: JobContext = {
     id: String(job.id),
     name: job.name,
@@ -30,7 +34,19 @@ export async function processJob(job: Job): Promise<unknown> {
     log: async (line) => {
       await job.log(line);
     },
+    context: captured,
   };
 
-  return definition.handle(job.data, context);
+  const run = async () => definition.handle(payload, context);
+  const queueContext = getQueueContext();
+
+  try {
+    return captured !== undefined && queueContext ? await queueContext.restore(captured, run) : await run();
+  } catch (error) {
+    if (error instanceof UnrecoverableJobError) {
+      throw new UnrecoverableError(error.message);
+    }
+
+    throw error;
+  }
 }

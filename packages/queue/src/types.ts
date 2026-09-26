@@ -122,12 +122,16 @@ export type JobContext = {
   progress(value: JobProgress): Promise<void>;
   /** Append a line to the job's log. */
   log(line: string): Promise<void>;
+  /** State captured at dispatch by the registered queue context, if any. */
+  context: unknown;
 };
 
 /**
  * The definition passed to `defineJob`.
  */
 export type JobDefinition<TPayload, TResult> = JobOptions & {
+  /** Set `false` to skip capturing the queue context for this job. */
+  context?: false;
   /** Unique job name, e.g. `"invoices.send"`. */
   name: string;
   /** Queue to run on. Default: `queue.defaultQueue` (`"default"`). */
