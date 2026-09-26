@@ -17,4 +17,20 @@ describe("SyncFanoutQueue", () => {
     expect(executeSecond).toHaveBeenCalledTimes(1);
     expect(reportFailure).not.toHaveBeenCalled();
   });
+
+  it("reports failure once after the last retry fails", async () => {
+    const error = new Error("permanent");
+    const execute = vi.fn().mockRejectedValue(error);
+    const reportFailure = vi.fn();
+    const queue = new SyncFanoutQueue({ maxAttempts: 3, retryDelay: () => 0, reportFailure });
+    const job = { sourceModel: "Category", operation: "update", execute };
+
+    queue.enqueue(job);
+
+    await queue.flush();
+
+    expect(execute).toHaveBeenCalledTimes(3);
+    expect(reportFailure).toHaveBeenCalledTimes(1);
+    expect(reportFailure).toHaveBeenCalledWith(job, error);
+  });
 });

@@ -4,6 +4,18 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## Unreleased
+
+### Fixed
+
+- `unique()` / `exists()` on `StringValidator` and `NumberValidator` now return `this`, so `Infer<>` keeps the concrete output type (was `unknown`).
+
+## 5.23.0 - 2026-09-25
+
+### Changed
+
+- Lockstep patch release; package APIs are unchanged.
+
 ## 5.22.1 - 2026-09-25
 
 ### Changed

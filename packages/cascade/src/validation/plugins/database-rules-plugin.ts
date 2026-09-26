@@ -36,13 +36,33 @@ declare module "@warlock.js/seal" {
   }
 
   interface StringValidator {
-    unique: ScalarValidator["unique"];
-    exists: ScalarValidator["exists"];
+    unique(
+      model: ChildModel<Model> | string,
+      optionsList?: Partial<UniqueRuleOptions> & {
+        errorMessage?: string;
+      },
+    ): this;
+    exists(
+      model: ChildModel<Model> | string,
+      optionsList?: Partial<ExistsRuleOptions> & {
+        errorMessage?: string;
+      },
+    ): this;
   }
 
   interface NumberValidator {
-    unique: ScalarValidator["unique"];
-    exists: ScalarValidator["exists"];
+    unique(
+      model: ChildModel<Model> | string,
+      optionsList?: Partial<UniqueRuleOptions> & {
+        errorMessage?: string;
+      },
+    ): this;
+    exists(
+      model: ChildModel<Model> | string,
+      optionsList?: Partial<ExistsRuleOptions> & {
+        errorMessage?: string;
+      },
+    ): this;
   }
 }
 
