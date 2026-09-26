@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.23.0 - 2026-09-25
 
+### Added
+
+- `notificationColumns()` now supports `idType` for UUID, bigint, integer, and string recipient and tenant IDs.
+
 ### Changed
 
 - Lockstep patch release; package APIs are unchanged.

@@ -2,6 +2,27 @@ import { describe, expect, it } from "vitest";
 import { notificationColumns } from "../../../src/migration/notification-columns";
 
 describe("notificationColumns", () => {
+  it("uses bigint for recipient and tenant columns when requested", () => {
+    expect(notificationColumns({ idType: "bigint" }).user_id.getDefinition().type).toBe("bigInteger");
+
+    const cols = notificationColumns(
+      { columnMap: { recipient: "account_id", tenant: "organization_id" } },
+      { idType: "bigint" },
+    );
+
+    expect(cols.account_id.getDefinition().type).toBe("bigInteger");
+    expect(cols.organization_id.getDefinition().type).toBe("bigInteger");
+  });
+
+  it("keeps uuid as the default for recipient and tenant columns", () => {
+    const cols = notificationColumns({
+      columnMap: { recipient: "account_id", tenant: "organization_id" },
+    });
+
+    expect(cols.account_id.getDefinition().type).toBe("uuid");
+    expect(cols.organization_id.getDefinition().type).toBe("uuid");
+  });
+
   it("defaults to the read_at-only column set (no model)", () => {
     const cols = notificationColumns();
     expect(Object.keys(cols)).toEqual([
