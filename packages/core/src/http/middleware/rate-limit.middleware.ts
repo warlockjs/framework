@@ -34,9 +34,10 @@ export type RateLimitOptions = {
    */
   guests?: "ip" | "skip";
   /**
-   * Override the default error message.
+   * Override the default error message. Pass a function to build it per
+   * request, e.g. to translate it into the visitor's locale.
    */
-  errorMessage?: string;
+  errorMessage?: string | ((request: Request) => string);
 };
 
 type Bucket = {
@@ -45,6 +46,13 @@ type Bucket = {
 };
 
 const buckets = new Map<string, Bucket>();
+
+/**
+ * Each `rateLimitMiddleware()` call is its own limiter. Page actions share one
+ * route, so without this two limits on the same page (say `like` and
+ * `comment`) would count into one bucket.
+ */
+let nextLimiterId = 0;
 
 /**
  * Sweep expired buckets so the Map doesn't grow unbounded with one-shot keys
@@ -83,6 +91,8 @@ function pruneExpired(now: number) {
  * });
  */
 export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
+  const limiterId = nextLimiterId++;
+
   return ({ request, response }) => {
     const now = Date.now();
 
@@ -104,7 +114,7 @@ export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
     }
 
     const groupKey = options.keyGenerator?.(request) || userKey || request.detectIp() || "unknown";
-    const cacheKey = `${request.route.path}:${groupKey}`;
+    const cacheKey = `${limiterId}:${request.route.path}:${groupKey}`;
 
     let bucket = buckets.get(cacheKey);
 
@@ -126,7 +136,10 @@ export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
       response.header("Retry-After", retryAfter);
 
       return response.tooManyRequests({
-        error: options.errorMessage || t("http.rateLimitExceeded"),
+        error:
+          (typeof options.errorMessage === "function"
+            ? options.errorMessage(request)
+            : options.errorMessage) || t("http.rateLimitExceeded"),
         errorCode: HttpErrorCodes.RateLimitExceeded,
       });
     }

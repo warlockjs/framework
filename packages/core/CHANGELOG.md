@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `warlock generate.use-case <module>/<verb-noun>` scaffolds `use-cases/<verb-noun>.use-case.ts` (transport-agnostic `(input, actor)` returning a result union) plus a vitest spec, and refuses to overwrite existing files without `--force`.
 - `rateLimit` accepts `key: "user"` to bucket by the signed-in user id (routes and page actions), with `guests: "ip" | "skip"` (default `"ip"`) for unauthenticated requests. `keyGenerator` and the 429 shape are unchanged.
+- Each `rateLimit()` call now keeps its own counters, so two limits on the same route (two page actions on one page, say) no longer share a bucket. `errorMessage` also accepts `(request) => string` for per-request (translated) messages.
 
 ### Fixed
 

@@ -52,6 +52,31 @@ describe("rateLimitMiddleware key: user", () => {
     }
   });
 
+  it("keeps two limiters on the same route and user apart", () => {
+    const path = `/u${seq++}`;
+    const comment = rateLimitMiddleware({ max: 1, duration: 60_000, key: "user" });
+    const like = rateLimitMiddleware({ max: 3, duration: 60_000, key: "user" });
+
+    run(like, path, "a");
+    run(like, path, "a");
+
+    expect(run(comment, path, "a").response.tooManyRequests).not.toHaveBeenCalled();
+    expect(run(like, path, "a").response.tooManyRequests).not.toHaveBeenCalled();
+    expect(run(comment, path, "a").response.tooManyRequests).toHaveBeenCalled();
+  });
+
+  it("builds a function errorMessage per request", () => {
+    const path = `/u${seq++}`;
+    const errorMessage = vi.fn(() => "slow down");
+    const mw = rateLimitMiddleware({ max: 1, duration: 60_000, key: "user", errorMessage });
+
+    run(mw, path, "a");
+    const { response } = run(mw, path, "a");
+
+    expect(errorMessage).toHaveBeenCalledTimes(1);
+    expect(response.tooManyRequests).toHaveBeenCalledWith(expect.objectContaining({ error: "slow down" }));
+  });
+
   it("sets X-RateLimit headers", () => {
     const mw = rateLimitMiddleware({ max: 5, duration: 60_000, key: "user" });
     const { response } = run(mw, `/u${seq++}`, "a");
