@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `startHttpTestServer()` now loads `.env.test` itself before configuration is read, so a Vitest global setup cannot boot against the development database.
 - `warlock add` installs with the project's package manager: the nearest `packageManager` field, then a `pnpm-workspace.yaml`, then the nearest lockfile, searched upward so an app inside a workspace uses the workspace's manager.
 - `uniqueExceptCurrentUser` / `uniqueExceptCurrentId` / `existsExceptCurrentUser` / `existsExceptCurrentId` on `StringValidator` now return `this`, so `Infer<>` keeps the concrete output type.
 

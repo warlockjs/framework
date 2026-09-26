@@ -17,6 +17,7 @@ import { connectorsManager } from "../connectors/connectors-manager";
 import { ConnectorLifecyclePhase } from "../connectors/types";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
 import { assertPortIsAvailable } from "../http/port-preflight";
+import { loadEnvironmentFiles } from "../utils/load-environment";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 import { publishTestServerPort, withdrawTestServerPort } from "./test-server-port-channel";
 
@@ -106,6 +107,16 @@ async function applyTestServerPort(port?: number): Promise<void> {
  * await startHttpTestServer({ port: 3999 });
  */
 export async function startHttpTestServer(options: StartHttpTestServerOptions = {}): Promise<void> {
+  const nodeEnvironment = process.env.NODE_ENV;
+
+  if (nodeEnvironment === undefined) {
+    process.env.NODE_ENV = "test";
+  } else if (nodeEnvironment !== "test") {
+    throw new Error(
+      `startHttpTestServer() requires NODE_ENV="test", but received NODE_ENV=${JSON.stringify(nodeEnvironment)}. Set NODE_ENV=test before starting the test server.`,
+    );
+  }
+
   if (isServerRunning) {
     console.log("[test-server] Server already running, skipping start");
     return;
@@ -114,6 +125,10 @@ export async function startHttpTestServer(options: StartHttpTestServerOptions = 
   console.log("[test-server] Starting HTTP test server...");
 
   try {
+    // `globalSetup` runs in Vitest's main process, where Vitest's worker env
+    // setup has not run. Load `.env.test` here, before any config is read.
+    await loadEnvironmentFiles();
+
     // Set environment
     Application.setRuntimeStrategy("development");
     Application.setEnvironment("test");
