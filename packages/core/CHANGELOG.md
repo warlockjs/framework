@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `warlock add` installs with the project's package manager: the nearest `packageManager` field, then a `pnpm-workspace.yaml`, then the nearest lockfile, searched upward so an app inside a workspace uses the workspace's manager.
 - `uniqueExceptCurrentUser` / `uniqueExceptCurrentId` / `existsExceptCurrentUser` / `existsExceptCurrentId` on `StringValidator` now return `this`, so `Infer<>` keeps the concrete output type.
 
 ## 5.22.1 - 2026-09-25
