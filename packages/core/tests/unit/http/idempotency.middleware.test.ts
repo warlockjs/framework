@@ -47,6 +47,18 @@ vi.mock("../../../src/http/middleware/inject-request-context", () => ({
 
 type SentCallback = (response: unknown) => void;
 
+interface ResponseDouble {
+  statusCode: number;
+  contentType: unknown;
+  parsedBody: unknown;
+  header: ReturnType<typeof vi.fn>;
+  replay: ReturnType<typeof vi.fn>;
+  badRequest: ReturnType<typeof vi.fn>;
+  unprocessableEntity: ReturnType<typeof vi.fn>;
+  onSent: (callback: SentCallback) => void;
+  fireSent: () => void;
+}
+
 function makeRequest(seed: {
   method?: string;
   idempotencyKey?: string;
@@ -76,7 +88,7 @@ function makeResponse(seed: {
 }) {
   const sentCallbacks: SentCallback[] = [];
 
-  const response = {
+  const response: ResponseDouble = {
     statusCode: seed.statusCode ?? 200,
     contentType: seed.contentType,
     parsedBody: seed.parsedBody,

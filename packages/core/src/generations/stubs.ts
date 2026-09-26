@@ -757,10 +757,10 @@ export { register } from "./index.register";
  * where the file lives. A page file with
  * no \`config.route\` declaration derives its URL from the filesystem.
  */
-export const config = {
+export const config: PageConfig = {
   route: { path: "/", name: "index" },
   metadata: { title: "Home" },
-} as const satisfies PageConfig;
+};
 
 const contactSchema = v.object({
   name: v.string().min(2),

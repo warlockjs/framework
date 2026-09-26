@@ -98,10 +98,30 @@ declare module "@warlock.js/seal" {
 
   // StringValidator gets same database methods
   interface StringValidator {
-    uniqueExceptCurrentUser: ScalarValidator["uniqueExceptCurrentUser"];
-    uniqueExceptCurrentId: ScalarValidator["uniqueExceptCurrentId"];
-    existsExceptCurrentUser: ScalarValidator["existsExceptCurrentUser"];
-    existsExceptCurrentId: ScalarValidator["existsExceptCurrentId"];
+    uniqueExceptCurrentUser(
+      model: ChildModel<Model> | string,
+      optionsList?: Partial<UniqueExceptCurrentUserRuleOptions> & {
+        errorMessage?: string;
+      },
+    ): this;
+    uniqueExceptCurrentId(
+      model: ChildModel<Model> | string,
+      optionsList?: Partial<UniqueExceptCurrentIdRuleOptions> & {
+        errorMessage?: string;
+      },
+    ): this;
+    existsExceptCurrentUser(
+      model: ChildModel<Model> | string,
+      optionsList?: Partial<ExistsExceptCurrentUserRuleOptions> & {
+        errorMessage?: string;
+      },
+    ): this;
+    existsExceptCurrentId(
+      model: ChildModel<Model> | string,
+      optionsList?: Partial<ExistsExceptCurrentIdRuleOptions> & {
+        errorMessage?: string;
+      },
+    ): this;
   }
 }
 

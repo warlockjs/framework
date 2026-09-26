@@ -177,7 +177,7 @@ describe("web starter stubs", () => {
 
   it("keeps universal registration behind a stable Fast Refresh boundary", () => {
     expect(webHomePageStub).toContain(
-      'export const config = {\n  route: { path: "/", name: "index" },\n  metadata: { title: "Home" },\n} as const satisfies PageConfig;',
+      'export const config: PageConfig = {\n  route: { path: "/", name: "index" },\n  metadata: { title: "Home" },\n};',
     );
     expect(webHomePageStub).not.toContain("export const route =");
     expect(webHomePageStub).toContain('export { register } from "./index.register";');

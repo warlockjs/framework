@@ -13,6 +13,7 @@ import {
   generateRepositoryCommand,
   generateResourceCommand,
   generateServiceCommand,
+  generateUseCaseCommand,
 } from "./commands/generate/generate.command";
 import { migrateCommand } from "./commands/migrate.command";
 import { routesCommand, routesDiffCommand } from "./commands/routes.command";
@@ -51,6 +52,7 @@ export const frameworkCommands = [
   generateModuleCommand,
   generateControllerCommand,
   generateServiceCommand,
+  generateUseCaseCommand,
   generateModelCommand,
   generateRepositoryCommand,
   generateResourceCommand,

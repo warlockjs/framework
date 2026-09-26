@@ -1,13 +1,28 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const existingFiles = new Set<string>();
+const packageJsons = new Map<string, string>();
+
+/** Controlled project root — detection walks up from here, never into the real repo. */
+const projectRoot = path.resolve("/project");
 
 vi.mock("@warlock.js/fs", () => ({
   fileExistsAsync: async (path: string) => existingFiles.has(path),
 }));
 
+vi.mock("node:fs/promises", () => ({
+  readFile: async (file: string) => {
+    const content = packageJsons.get(file);
+
+    if (content === undefined) throw new Error("ENOENT");
+
+    return content;
+  },
+}));
+
 vi.mock("../../../src/utils", () => ({
-  rootPath: (file: string) => `/project/${file}`,
+  rootPath: (file = "") => path.join(path.resolve("/project"), file),
 }));
 
 const { detectPackageManager, getAddCommand, getExactAddCommand, getInstallCommand } =
@@ -18,12 +33,21 @@ function withLockfiles(...files: string[]) {
   existingFiles.clear();
 
   for (const file of files) {
-    existingFiles.add(`/project/${file}`);
+    existingFiles.add(path.join(projectRoot, file));
   }
 }
 
 describe("detectPackageManager", () => {
-  beforeEach(() => existingFiles.clear());
+  beforeEach(() => {
+    existingFiles.clear();
+    packageJsons.clear();
+    // Hermetic: never inherit the invoking shell's package manager.
+    vi.stubEnv("npm_config_user_agent", "");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
 
   it.each([
     ["bun.lock", "bun"],
@@ -34,13 +58,13 @@ describe("detectPackageManager", () => {
   ])("detects %s as %s", async (lockfile, expected) => {
     withLockfiles(lockfile);
 
-    await expect(detectPackageManager()).resolves.toBe(expected);
+    await expect(detectPackageManager(projectRoot)).resolves.toBe(expected);
   });
 
   it("falls back to npm when the project has no lockfile", async () => {
     withLockfiles();
 
-    await expect(detectPackageManager()).resolves.toBe("npm");
+    await expect(detectPackageManager(projectRoot)).resolves.toBe("npm");
   });
 
   it("prefers bun over a yarn.lock written alongside it", async () => {
@@ -48,13 +72,32 @@ describe("detectPackageManager", () => {
     // legitimately carry both — running yarn there is the wrong installer.
     withLockfiles("bun.lock", "yarn.lock");
 
-    await expect(detectPackageManager()).resolves.toBe("bun");
+    await expect(detectPackageManager(projectRoot)).resolves.toBe("bun");
   });
 
   it("prefers the text bun.lock over the legacy binary bun.lockb", async () => {
     withLockfiles("bun.lockb", "bun.lock");
 
-    await expect(detectPackageManager()).resolves.toBe("bun");
+    await expect(detectPackageManager(projectRoot)).resolves.toBe("bun");
+  });
+
+  it("walks up to a parent directory's lockfile", async () => {
+    existingFiles.add(path.join(path.resolve("/"), "yarn.lock"));
+
+    await expect(detectPackageManager(path.join(projectRoot, "apps", "web"))).resolves.toBe("yarn");
+  });
+
+  it("honours the packageManager field over a lockfile", async () => {
+    withLockfiles("package-lock.json");
+    packageJsons.set(path.join(projectRoot, "package.json"), '{"packageManager":"pnpm@9.0.0"}');
+
+    await expect(detectPackageManager(projectRoot)).resolves.toBe("pnpm");
+  });
+
+  it("falls back to the invoking user agent when nothing else identifies it", async () => {
+    vi.stubEnv("npm_config_user_agent", "bun/1.1.0 npm/? node/v20");
+
+    await expect(detectPackageManager(projectRoot)).resolves.toBe("bun");
   });
 });
 

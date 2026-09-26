@@ -24,6 +24,16 @@ export type RateLimitOptions = {
    */
   keyGenerator?: (request: Request) => string;
   /**
+   * Key the bucket to the signed-in user (`request.locals.user.id`). Works on
+   * routes and page actions alike. `keyGenerator` wins when both are set.
+   */
+  key?: "user";
+  /**
+   * With `key: "user"`, what to do for unauthenticated requests: bucket them
+   * by IP (default) or skip limiting entirely.
+   */
+  guests?: "ip" | "skip";
+  /**
    * Override the default error message.
    */
   errorMessage?: string;
@@ -81,7 +91,19 @@ export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
       lastPruneAt = now;
     }
 
-    const groupKey = options.keyGenerator?.(request) || request.detectIp() || "unknown";
+    let userKey: string | undefined;
+
+    if (options.key === "user" && !options.keyGenerator) {
+      const id = (request.locals as { user?: { id?: unknown } } | undefined)?.user?.id;
+
+      if (id !== undefined && id !== null && id !== "") {
+        userKey = `user:${String(id)}`;
+      } else if (options.guests === "skip") {
+        return;
+      }
+    }
+
+    const groupKey = options.keyGenerator?.(request) || userKey || request.detectIp() || "unknown";
     const cacheKey = `${request.route.path}:${groupKey}`;
 
     let bucket = buckets.get(cacheKey);

@@ -46,7 +46,9 @@ describe("normalizeBuildConfig", () => {
 });
 
 describe("resolveBuildConfig", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it("honours outDirectory from a config that never went through defineConfig", () => {
     // A project may `export default { ... }` instead of calling defineConfig,

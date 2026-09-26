@@ -216,6 +216,7 @@ export async function installDependencies(
   packageManager: PackageManager | undefined,
   dependencies: Record<string, string>,
   devDependencies: Record<string, string>,
+  exec: (command: string, options: { cwd: string; stdio: "inherit" }) => unknown = execSync,
 ) {
   // `--package-manager` is optional; without it, fall back to the lockfile.
   const resolvedPackageManager = packageManager ?? (await detectPackageManager());
@@ -235,7 +236,7 @@ export async function installDependencies(
     const runInstall = (command: string, specs: string[]) => {
       if (specs.length === 0) return;
 
-      execSync(`${command} ${specs.join(" ")}${developmentFlag}`, {
+      exec(`${command} ${specs.join(" ")}${developmentFlag}`, {
         cwd: process.cwd(),
         stdio: "inherit",
       });

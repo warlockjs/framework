@@ -1,4 +1,6 @@
 import { fileExistsAsync } from "@warlock.js/fs";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { rootPath } from "../utils";
 
 /** Package managers the framework knows how to drive. */
@@ -13,9 +15,9 @@ export type PackageManager = "npm" | "yarn" | "pnpm" | "bun";
 const LOCKFILES: ReadonlyArray<{ file: string; packageManager: PackageManager }> = [
   { file: "bun.lock", packageManager: "bun" },
   { file: "bun.lockb", packageManager: "bun" },
-  { file: "package-lock.json", packageManager: "npm" },
-  { file: "yarn.lock", packageManager: "yarn" },
   { file: "pnpm-lock.yaml", packageManager: "pnpm" },
+  { file: "yarn.lock", packageManager: "yarn" },
+  { file: "package-lock.json", packageManager: "npm" },
 ];
 
 /**
@@ -23,14 +25,53 @@ const LOCKFILES: ReadonlyArray<{ file: string; packageManager: PackageManager }>
  * npm when none is present. Shared by `warlock update` and `warlock add` so
  * both agree on a project that happens to carry more than one lockfile.
  */
-export async function detectPackageManager(): Promise<PackageManager> {
-  for (const { file, packageManager } of LOCKFILES) {
-    if (await fileExistsAsync(rootPath(file))) {
-      return packageManager;
+export async function detectPackageManager(startDir: string = rootPath()): Promise<PackageManager> {
+  const dirs: string[] = [];
+
+  for (let dir = path.resolve(startDir); ; dir = path.dirname(dir)) {
+    dirs.push(dir);
+
+    if (path.dirname(dir) === dir) break;
+  }
+
+  // 1. nearest declared `packageManager` field
+  for (const dir of dirs) {
+    const declared = await readDeclaredPackageManager(dir);
+
+    if (declared) return declared;
+  }
+
+  // 2. a pnpm workspace marker beats any (possibly stray) lockfile
+  for (const dir of dirs) {
+    if (await fileExistsAsync(path.join(dir, "pnpm-workspace.yaml"))) return "pnpm";
+  }
+
+  // 3. lockfiles, nearest level first
+  for (const dir of dirs) {
+    for (const { file, packageManager } of LOCKFILES) {
+      if (await fileExistsAsync(path.join(dir, file))) return packageManager;
     }
   }
 
+  const agent = process.env.npm_config_user_agent?.split("/")[0];
+
+  if (agent === "pnpm" || agent === "yarn" || agent === "bun") return agent;
+
   return "npm";
+}
+
+/** The manager named by the app's `packageManager` field, if any. */
+async function readDeclaredPackageManager(dir: string): Promise<PackageManager | undefined> {
+  try {
+    const json = JSON.parse(await readFile(path.join(dir, "package.json"), "utf8"));
+    const name = String(json.packageManager ?? "").split("@")[0];
+
+    if (name === "pnpm" || name === "yarn" || name === "bun" || name === "npm") return name;
+  } catch {
+    // no readable package.json — fall through to lockfiles
+  }
+
+  return undefined;
 }
 
 /**

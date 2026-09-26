@@ -18,7 +18,7 @@ const printReadyBlock = vi.hoisted(() => vi.fn());
 const startCheckingHealth = vi.hoisted(() => vi.fn(async () => undefined));
 const shutdown = vi.hoisted(() => vi.fn(async () => undefined));
 const executeGenerateAllCommand = vi.hoisted(() =>
-  vi.fn<() => Promise<void>>(async (): Promise<void> => undefined),
+  vi.fn<[], Promise<void>>(async (): Promise<void> => undefined),
 );
 
 vi.mock("@mongez/events", () => ({ default: { on: vi.fn(), emit: vi.fn() } }));

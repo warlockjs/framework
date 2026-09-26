@@ -8,11 +8,13 @@ import { generateModule } from "./generators/module.generator";
 import { generateRepository } from "./generators/repository.generator";
 import { generateResource } from "./generators/resource.generator";
 import { generateService } from "./generators/service.generator";
+import { generateUseCase } from "./generators/use-case.generator";
 
 const generators: Record<string, (data: CommandActionData) => Promise<void>> = {
   module: generateModule,
   controller: generateController,
   service: generateService,
+  "use-case": generateUseCase,
   model: generateModel,
   migration: generateMigration,
   repository: generateRepository,
@@ -133,6 +135,24 @@ export const generateServiceCommand = command({
   alias: "gen.s",
   description: "Generate a new service",
   action: generateService,
+  options: [
+    {
+      text: "--force, -f",
+      description: "Overwrite existing files",
+      type: "boolean",
+    },
+    {
+      text: "--dry-run",
+      description: "Preview the files that would be generated without writing anything",
+      type: "boolean",
+    },
+  ],
+});
+
+export const generateUseCaseCommand = command({
+  name: "generate.use-case <module>/<verb-noun>",
+  description: "Generate a transport-agnostic use-case and its spec",
+  action: generateUseCase,
   options: [
     {
       text: "--force, -f",

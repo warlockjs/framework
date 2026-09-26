@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import { generateController } from "../../../src/cli/commands/generate/generators/controller.generator";
 import { generateService } from "../../../src/cli/commands/generate/generators/service.generator";
 import { setDryRun } from "../../../src/cli/commands/generate/utils/writer";
@@ -34,7 +34,7 @@ class ProcessExitError extends Error {
 let tempDir: string;
 let originalCwd: string;
 let consoleSpy: ReturnType<typeof vi.spyOn>;
-let exitSpy: ReturnType<typeof vi.spyOn>;
+let exitSpy: MockInstance<[code?: number], never>;
 
 beforeEach(async () => {
   originalCwd = process.cwd();

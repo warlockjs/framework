@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import { RESTART_EXIT_CODE, WORKER_ENV_FLAG } from "../../../src/dev-server/supervisor";
 
 const devLogError = vi.fn();
@@ -13,7 +13,7 @@ const { restartDevServer } = await import("../../../src/dev-server/restart-dev-s
 describe("restartDevServer", () => {
   const originalFlag = process.env[WORKER_ENV_FLAG];
   let shutdown: ReturnType<typeof vi.fn>;
-  let exit: ReturnType<typeof vi.spyOn>;
+  let exit: MockInstance<[code?: number], never>;
 
   beforeEach(() => {
     vi.clearAllMocks();

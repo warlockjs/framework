@@ -274,6 +274,8 @@ Per-invocation callbacks fire first, then use-case-level, then globals. The retu
 
 Don't reach for `useCase` for a 5-line service — the ceremony outweighs the benefit.
 
+For the plain-function flavour (`warlock generate.use-case <module>/<verb-noun>`) shared by a page action and a controller, see the guide [One use-case, two adapters](https://warlock.js.org/v/latest/core/guides/one-use-case-two-adapters/).
+
 ## Gotchas
 
 - **`name` must be unique.** The registry de-dupes by name; a duplicate in dev logs a warning and one wins. Use namespaced names: `"orders.placeOrder"`.

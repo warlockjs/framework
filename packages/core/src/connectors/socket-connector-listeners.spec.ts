@@ -29,7 +29,9 @@ vi.mock("socket.io", () => ({
 const events = ["request", "upgrade", "close", "listening"];
 
 describe("SocketConnector shared-server listeners", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it("leaves the server's listener counts unchanged after repeated attach/detach", async () => {
     const server = createServer();

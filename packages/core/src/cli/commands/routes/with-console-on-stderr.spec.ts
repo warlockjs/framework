@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { withConsoleOnStderr } from "./with-console-on-stderr";
 
 describe("withConsoleOnStderr", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it("routes console.log/info to console.error while the task runs, then restores them", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);

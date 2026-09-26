@@ -582,3 +582,51 @@ export class ${name.singular.pascal}Resource extends Resource {
 }
 `;
 }
+
+/**
+ * Use-case template stub
+ * Outputs to: use-cases/{name}.use-case.ts
+ *
+ * A use-case takes validated input and an actor, never a request or response,
+ * so a page action and a controller can both call it.
+ */
+export function useCaseStub(name: Name): string {
+  return `import type { ${name.pascal}Schema } from "../schema/${name.kebab}.schema";
+
+export type ${name.pascal}Actor = { id: number | string };
+
+export type ${name.pascal}Result =
+  | { code: "OK" }
+  | { code: "FORBIDDEN" }
+  | { code: "NOT_FOUND" };
+
+export async function ${name.camel}UseCase(
+  input: ${name.pascal}Schema,
+  actor: ${name.pascal}Actor,
+): Promise<${name.pascal}Result> {
+  // TODO: Implement use-case logic
+  void input;
+  void actor;
+
+  return { code: "OK" };
+}
+`;
+}
+
+/**
+ * Use-case spec template stub
+ * Outputs to: use-cases/{name}.use-case.spec.ts
+ */
+export function useCaseSpecStub(name: Name): string {
+  return `import { describe, expect, it } from "vitest";
+import { ${name.camel}UseCase } from "./${name.kebab}.use-case";
+
+describe("${name.camel}UseCase", () => {
+  it("returns OK for a valid input", async () => {
+    const result = await ${name.camel}UseCase({} as never, { id: 1 });
+
+    expect(result.code).toBe("OK");
+  });
+});
+`;
+}

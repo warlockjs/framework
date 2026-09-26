@@ -106,8 +106,8 @@ export class UsersRestful extends Restful<User> implements RouteResource {
   public validation = {
     create: {
       schema: v.object({
-        name: v.string().required().min(2),
-        email: v.email().required(),
+        name: v.string().min(2),
+        email: v.email(),
       }),
     },
     update: {

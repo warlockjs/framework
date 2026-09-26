@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/core",
-  "version": "5.22.1",
+  "version": "5.23.0",
   "description": "A robust nodejs framework for building blazing fast applications",
   "main": "./src/index.ts",
   "warlock": {
@@ -51,7 +51,8 @@
     "import-meta-resolve": "^4.2.0",
     "mime": "^4.1.0",
     "pluralize-esm": "^9.0.5",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "zod": "3.0.0"
   },
   "peerDependencies": {
     "@aws-sdk/client-s3": "^3.955.0",
@@ -139,7 +140,7 @@
     "@warlock.js/auth": "workspace:^",
     "@warlock.js/herald": "workspace:^",
     "@warlock.js/notifications": "workspace:^",
-    "vitest": "4.1.10"
+    "vitest": "1.0.0"
   },
   "packageManager": "pnpm@11.24.0"
 }
