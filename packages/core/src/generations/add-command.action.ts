@@ -134,6 +134,7 @@ export async function addCommandAction(options: CommandActionData) {
   // the feature map's static range.
   const frameworkVersion = await getWarlockVersion();
   resolveWarlockDependencyVersions(dependencies, frameworkVersion);
+  resolveWarlockDependencyVersions(devDependencies, frameworkVersion);
 
   const currentPackageJson = await getJsonFileAsync<ProjectPackageJson>(rootPath("package.json"));
 

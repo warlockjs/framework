@@ -11,6 +11,7 @@ import { aiFeature } from "./ai.feature";
 import { authGoogleFeature } from "./auth-google.feature";
 import { authPasskeysFeature } from "./auth-passkeys.feature";
 import { bullBoardFeature } from "./bull-board.feature";
+import { devtoolsFeature } from "./devtools.feature";
 import { heraldFeature } from "./herald.feature";
 import { imageFeature } from "./image.feature";
 import { mailFeature } from "./mail.feature";
@@ -72,6 +73,7 @@ export const featuresMap: Record<string, FeatureDefinition> = {
   // exposes) and a reader scanning `--list` for the page stack should meet it
   // there rather than filed between queues and sockets.
   sitemap: sitemapFeature,
+  devtools: devtoolsFeature,
   herald: heraldFeature,
   queue: queueFeature,
   // Directly after `queue`, for the same reason `tailwind` follows `web`: it

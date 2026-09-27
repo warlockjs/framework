@@ -13,6 +13,7 @@ import { MANIFEST_PATH } from "./flags";
 import type { IncomingReloadTimings } from "./layer-executor";
 import { LayerExecutor } from "./layer-executor";
 import { printReadyBlock } from "./ready-block";
+import { registerInstalledDevtools } from "./register-installed-devtools";
 import { restartDevServer } from "./restart-dev-server";
 import { publishCurrentRouteTypes } from "./route-types-publisher";
 import { devServerShortcuts } from "./shortcuts";
@@ -85,6 +86,10 @@ export class DevelopmentServer {
       } catch (error) {
         throw new BootPreconditionError((error as Error).message, { cause: error });
       }
+
+      // `@warlock.js/devtools` is a dev dependency the config never names;
+      // when installed it joins the late phase here, and only here.
+      await registerInstalledDevtools();
 
       // Late-phase connectors (http, socket) bind after app code has
       // registered routes/listeners.

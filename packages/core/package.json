@@ -63,6 +63,7 @@
     "@warlock.js/ai": "*",
     "@warlock.js/herald": "*",
     "@warlock.js/notifications": "*",
+    "@warlock.js/devtools": "*",
     "nodemailer": "^8.0.5",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
@@ -110,6 +111,9 @@
       "optional": true
     },
     "@warlock.js/notifications": {
+      "optional": true
+    },
+    "@warlock.js/devtools": {
       "optional": true
     }
   },
