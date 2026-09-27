@@ -95,7 +95,7 @@ describe("toBedrockMessages", () => {
 
     const persisted = JSON.parse(JSON.stringify(messages)) as Message[];
 
-    expect(toBedrockMessages(persisted).messages[0].content).toEqual([
+    expect(toBedrockMessages(persisted).messages[0]?.content).toEqual([
       { reasoningContent: { redactedContent: new Uint8Array([1, 2, 3]) } },
       { toolUse: { toolUseId: "tu_1", name: "lookup", input: {} } },
     ]);
@@ -113,7 +113,7 @@ describe("toBedrockMessages", () => {
       }],
     }];
 
-    expect(toBedrockMessages(messages).messages[0].content).toEqual([
+    expect(toBedrockMessages(messages).messages[0]?.content).toEqual([
       { toolUse: { toolUseId: "tu_1", name: "lookup", input: {} } },
     ]);
   });

@@ -177,7 +177,7 @@ describe("BedrockModel.complete()", () => {
 
     const response = await model.complete([{ role: "user", content: "hi" }]);
 
-    expect(response.toolCalls?.[0].providerMetadata).toEqual({
+    expect(response.toolCalls?.[0]?.providerMetadata).toEqual({
       bedrock: { reasoningBlocks: [
         { type: "reasoning", text: "considering", signature: "sig_1" },
         { type: "redacted", data: "AQID" },
@@ -1091,7 +1091,7 @@ describe("BedrockModel cost-truth — reasoning / thinking", () => {
 
     await model.complete([{ role: "user", content: "hi" }], { reasoning: { maxTokens: 2048 } });
 
-    expect(calls[0].inferenceConfig).toEqual({ maxTokens: 6144 });
+    expect(calls[0]?.inferenceConfig).toEqual({ maxTokens: 6144 });
   });
 
   it("throws when explicit maxTokens does not exceed the thinking budget", async () => {
@@ -1119,7 +1119,7 @@ describe("BedrockModel cost-truth — reasoning / thinking", () => {
 
     await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "none" } });
 
-    expect(calls[0].inferenceConfig).toEqual({});
+    expect(calls[0]?.inferenceConfig).toEqual({});
     expect(calls[0]).not.toHaveProperty("additionalModelRequestFields");
   });
 
