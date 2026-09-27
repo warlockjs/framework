@@ -22,6 +22,7 @@ Both share the same tag index — invalidate them with `cache.tags([...]).invali
 ## Why Tags Matter?
 
 **Without Tags:**
+
 ```ts
 // When user updates profile, you need to manually track all cache keys
 await cache.remove("users.123.profile");
@@ -32,6 +33,7 @@ await cache.remove("feed.homepage"); // if user is featured
 ```
 
 **With Tags:**
+
 ```ts
 // One line invalidates everything
 await cache.tags([`user.123`]).invalidate();
@@ -55,7 +57,7 @@ await userCache.set(`user.${userId}.preferences`, settingsData, CACHE_FOR.ONE_HO
 // When user updates their profile
 async function updateUserProfile(userId: number, data: any) {
   await db.users.update(userId, data);
-  
+
   // Invalidate all user-related cache
   await cache.tags(["user", `user.${userId}`]).invalidate();
 }
@@ -105,17 +107,9 @@ import { cache, CACHE_FOR } from "@warlock.js/cache";
 const userId = 123;
 const productId = 456;
 
-const wishlistCache = cache.tags([
-  `user.${userId}`,
-  `product.${productId}`,
-  "wishlists"
-]);
+const wishlistCache = cache.tags([`user.${userId}`, `product.${productId}`, "wishlists"]);
 
-await wishlistCache.set(
-  `wishlist.${userId}.${productId}`,
-  wishlistData,
-  CACHE_FOR.ONE_WEEK
-);
+await wishlistCache.set(`wishlist.${userId}.${productId}`, wishlistData, CACHE_FOR.ONE_WEEK);
 
 // Invalidate by user (clear all user's wishlists)
 await cache.tags([`user.${userId}`]).invalidate();
@@ -146,10 +140,10 @@ cache.tags([`user.${id}.profile`, `user.${id}.posts`]); // Too specific
 
 ```ts
 const tagged = cache.tags([
-  `user.${userId}`,      // User-specific
-  "users",              // All users
-  `category.${catId}`,  // Category-specific
-  "posts"               // All posts
+  `user.${userId}`, // User-specific
+  "users", // All users
+  `category.${catId}`, // Category-specific
+  "posts", // All posts
 ]);
 
 // When user updates: invalidate user-specific cache
@@ -200,6 +194,25 @@ await tagged.increment("user.123.views");
 
 ## Performance Considerations
 
+## Observe tag invalidations
+
+`tags([...]).invalidate()` emits one `invalidated` event in addition to its
+per-key `removed` events. Use it to record the size and cost of an invalidation:
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+cache.on("invalidated", ({ tags, keys, durationMs }) => {
+  metrics.histogram("cache.invalidation.duration", durationMs ?? 0, {
+    tags: tags?.join(",") ?? "",
+  });
+  metrics.count("cache.invalidation.keys", keys?.length ?? 0);
+});
+```
+
+The event includes the tags passed to `invalidate()`, the keys it removed, and
+the operation duration in milliseconds.
+
 ### How Tags Work Internally
 
 1. When you store a key with tags, the driver adds the key to each tag's index with a set primitive (`tagAdd`), so concurrent tagged writes never drop members.
@@ -221,7 +234,6 @@ await tagged.increment("user.123.views");
 3. **Group invalidation**: Invalidate multiple tags together when possible
 4. **Monitor tag counts**: If a tag has thousands of keys, invalidation will take longer
 
-
 ## Limitations
 
 1. **Tag relationships stored in cache**: Uses the same driver as your cache data. On the memory drivers the index lives in a separate store, so `maxSize` or LRU capacity can no longer evict it.
@@ -237,4 +249,3 @@ await tagged.increment("user.123.views");
 - **Missing keys after invalidation?** Tags invalidate based on stored relationships — ensure keys were stored through tagged cache instances
 
 See [Best Practices](/v/latest/cache/best-practices/) for more tag organization strategies.
-

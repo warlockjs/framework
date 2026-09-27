@@ -60,17 +60,17 @@ export default mailConfigurations;
 
 The fields map to a standard nodemailer SMTP transport, with two convenience aliases:
 
-| Field        | Purpose                                                                |
-| ------------ | ---------------------------------------------------------------------- |
-| `host`       | SMTP hostname (`smtp.gmail.com`, `smtp.sendgrid.net`, …)               |
-| `port`       | SMTP port — usually `587` (STARTTLS) or `465` (SSL)                    |
-| `secure`     | `true` for port 465, `false` for 587                                   |
-| `tls`        | Enable STARTTLS upgrade — set `true` on port 587                       |
-| `username`   | Auth username (alias for `auth.user`)                                  |
-| `password`   | Auth password (alias for `auth.pass`)                                  |
-| `auth`       | Full auth object — use instead of username/password when needed        |
-| `from`       | Default `From` for every send. String or `{ name, address }`           |
-| `requireTLS` | Fail the connection if STARTTLS upgrade fails. Useful in compliance    |
+| Field        | Purpose                                                             |
+| ------------ | ------------------------------------------------------------------- |
+| `host`       | SMTP hostname (`smtp.gmail.com`, `smtp.sendgrid.net`, …)            |
+| `port`       | SMTP port — usually `587` (STARTTLS) or `465` (SSL)                 |
+| `secure`     | `true` for port 465, `false` for 587                                |
+| `tls`        | Enable STARTTLS upgrade — set `true` on port 587                    |
+| `username`   | Auth username (alias for `auth.user`)                               |
+| `password`   | Auth password (alias for `auth.pass`)                               |
+| `auth`       | Full auth object — use instead of username/password when needed     |
+| `from`       | Default `From` for every send. String or `{ name, address }`        |
+| `requireTLS` | Fail the connection if STARTTLS upgrade fails. Useful in compliance |
 
 Anything nodemailer's `SMTPTransport.Options` accepts works here — `pool`, `connectionTimeout`, `socketTimeout`, etc.
 
@@ -131,15 +131,15 @@ const result = await Mail.to("user@example.com")
   .text("Thanks for joining.")
   .send();
 
-console.log(result.success);    // true
-console.log(result.messageId);  // "<random-id@smtp.host>"
+console.log(result.success); // true
+console.log(result.messageId); // "<random-id@smtp.host>"
 ```
 
 ### Recipients and addressing
 
 ```ts
 await Mail.to("a@example.com")
-  .to(["a@example.com", "b@example.com"])   // override — last `to()` wins
+  .to(["a@example.com", "b@example.com"]) // override — last `to()` wins
   .cc("manager@example.com")
   .bcc(["audit@example.com", "ops@example.com"])
   .replyTo("support@example.com")
@@ -195,15 +195,15 @@ Cid-referenced inline images (the kind email clients display inline rather than 
 
 ### Other knobs on the builder
 
-| Method                                          | Purpose                                                       |
-| ----------------------------------------------- | ------------------------------------------------------------- |
-| `.priority("high" \| "normal" \| "low")`         | sets the X-Priority header                                    |
-| `.headers({ "X-Foo": "bar" })`                  | merge a header bag                                            |
-| `.header("X-Foo", "bar")`                       | add one header                                                |
-| `.tags(["welcome"])` / `.tag("transactional")`  | categorization tags for downstream filtering / analytics      |
-| `.correlationId("req-123")`                     | tracking id (logged alongside the send)                       |
-| `.config(MailConfigurations)`                   | one-off override of the global config (multi-tenant — see below) |
-| `.mailer("marketing")`                          | route via a named mailer from config                          |
+| Method                                         | Purpose                                                          |
+| ---------------------------------------------- | ---------------------------------------------------------------- |
+| `.priority("high" \| "normal" \| "low")`       | sets the X-Priority header                                       |
+| `.headers({ "X-Foo": "bar" })`                 | merge a header bag                                               |
+| `.header("X-Foo", "bar")`                      | add one header                                                   |
+| `.tags(["welcome"])` / `.tag("transactional")` | categorization tags for downstream filtering / analytics         |
+| `.correlationId("req-123")`                    | tracking id (logged alongside the send)                          |
+| `.config(MailConfigurations)`                  | one-off override of the global config (multi-tenant — see below) |
+| `.mailer("marketing")`                         | route via a named mailer from config                             |
 
 ### Per-mail event handlers
 
@@ -307,16 +307,16 @@ The mail pipeline switches on a process-global mode. Set it with `setMailMode(..
 ```ts
 import { setMailMode } from "@warlock.js/core";
 
-setMailMode("production");    // actually send (default)
-setMailMode("development");   // log subject + recipient, no send, return fake-success
-setMailMode("test");          // capture to test mailbox, no send, return fake-success
+setMailMode("production"); // actually send (default)
+setMailMode("development"); // log subject + recipient, no send, return fake-success
+setMailMode("test"); // capture to test mailbox, no send, return fake-success
 ```
 
-| Mode          | Behaviour                                                                  |
-| ------------- | -------------------------------------------------------------------------- |
-| `production`  | Hits the transport. Real send. Real `MailResult` from nodemailer / SES.    |
-| `development` | Logs `subject` and `to` to the logger. Returns `{ success: true, ... }`.   |
-| `test`        | Pushes a `CapturedMail` onto an in-memory mailbox. Returns success.        |
+| Mode          | Behaviour                                                                |
+| ------------- | ------------------------------------------------------------------------ |
+| `production`  | Hits the transport. Real send. Real `MailResult` from nodemailer / SES.  |
+| `development` | Logs `subject` and `to` to the logger. Returns `{ success: true, ... }`. |
+| `test`        | Pushes a `CapturedMail` onto an in-memory mailbox. Returns success.      |
 
 Test mode is the workhorse — it lets you write `expect(wasMailSentTo("u@e.com")).toBe(true)` against a service that calls `Mail.to(...).send()` without spinning up an SMTP fake.
 
@@ -359,28 +359,28 @@ it("sends a welcome email on signup", async () => {
 
 The helper surface:
 
-| Helper                                  | What it returns                                              |
-| --------------------------------------- | ------------------------------------------------------------ |
-| `getTestMailbox()`                      | a shallow copy of all captured mails                         |
-| `getLastMail()`                         | the most recent capture, or `undefined`                      |
-| `findMailsTo(email)`                    | every captured mail whose `to` includes `email`              |
-| `findMailsBySubject(needle)`            | every captured mail whose subject `.includes(needle)`        |
-| `wasMailSentTo(email)`                  | boolean                                                      |
-| `wasMailSentWithSubject(exactSubject)`  | boolean (exact match)                                        |
-| `getMailboxSize()`                      | number of captured mails                                     |
-| `clearTestMailbox()`                    | empty the mailbox                                            |
-| `assertMailSent(predicate)`             | the matching `CapturedMail`, or throws                       |
-| `assertMailCount(n)`                    | throws if count isn't exactly `n`                            |
+| Helper                                 | What it returns                                       |
+| -------------------------------------- | ----------------------------------------------------- |
+| `getTestMailbox()`                     | a shallow copy of all captured mails                  |
+| `getLastMail()`                        | the most recent capture, or `undefined`               |
+| `findMailsTo(email)`                   | every captured mail whose `to` includes `email`       |
+| `findMailsBySubject(needle)`           | every captured mail whose subject `.includes(needle)` |
+| `wasMailSentTo(email)`                 | boolean                                               |
+| `wasMailSentWithSubject(exactSubject)` | boolean (exact match)                                 |
+| `getMailboxSize()`                     | number of captured mails                              |
+| `clearTestMailbox()`                   | empty the mailbox                                     |
+| `assertMailSent(predicate)`            | the matching `CapturedMail`, or throws                |
+| `assertMailCount(n)`                   | throws if count isn't exactly `n`                     |
 
 Each captured mail looks like:
 
 ```ts
 type CapturedMail = {
-  options: MailOptions;        // original payload — `to`, `subject`, `component`, etc.
-  normalized: NormalizedMail;  // post-normalization (arrays, resolved `from`)
+  options: MailOptions; // original payload — `to`, `subject`, `component`, etc.
+  normalized: NormalizedMail; // post-normalization (arrays, resolved `from`)
   timestamp: Date;
-  result?: MailResult;         // always success in test mode
-  error?: MailError;           // populated only if render/normalize threw
+  result?: MailResult; // always success in test mode
+  error?: MailError; // populated only if render/normalize threw
 };
 ```
 
@@ -488,6 +488,22 @@ mailEvents.onSent((mail, result, error) => {
 
 Global hooks fire for **every** mail. Per-mail handlers from `Mail` / `sendMail` fire only for that single send. Both run; they don't replace each other — be careful not to double-count metrics.
 
+### Observe development mail capture
+
+Development and test mail is captured instead of delivered. Subscribe to its
+normalized record when building local tooling such as a mailbox preview:
+
+```ts
+import { mailEvents } from "@warlock.js/core";
+
+mailEvents.onCaptured((mail) => {
+  console.log("captured mail", mail.normalized.subject);
+});
+```
+
+`onCaptured` fires only in development and test mail modes, never when mail is
+being delivered in production.
+
 ### Tracking a specific mail by id
 
 If you need to correlate a global hook back to one specific send (e.g. emit an analytics event for a particular invitation), generate an id and subscribe by id:
@@ -527,7 +543,7 @@ Pool statistics for debugging:
 ```ts
 import { getPoolStats } from "@warlock.js/core";
 
-const stats = getPoolStats();    // { size: number, hashes: string[] }
+const stats = getPoolStats(); // { size: number, hashes: string[] }
 ```
 
 You can also verify a config end-to-end without sending:
@@ -535,7 +551,12 @@ You can also verify a config end-to-end without sending:
 ```ts
 import { verifyMailer } from "@warlock.js/core";
 
-const ok = await verifyMailer({ host: "smtp.gmail.com", port: 587, username: "...", password: "..." });
+const ok = await verifyMailer({
+  host: "smtp.gmail.com",
+  port: 587,
+  username: "...",
+  password: "...",
+});
 ```
 
 `verifyMailer` connects, runs nodemailer's `verify()`, and returns a boolean — useful for `/health` endpoints in production.
@@ -622,7 +643,7 @@ const result = await sendMail({
   bcc,
   replyTo: reply_to,
   priority,
-  config,   // injected per-org from the tool registry — falls back to global config if undefined
+  config, // injected per-org from the tool registry — falls back to global config if undefined
 });
 ```
 

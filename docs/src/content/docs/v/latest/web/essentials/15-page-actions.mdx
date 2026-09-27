@@ -104,6 +104,57 @@ The action name travels in the body as the reserved field `_action` (`<Form acti
 
 `config.action.validation` (or `config.actions.<name>.validation`) validates the **body only**, including uploaded files, minus `_action`. Params and query keep using the page's `config.validation`. Inside the action, `request.validated()` is the typed output. A failure never runs the action and becomes a 422 `ActionState`.
 
+### Validate in the browser with the same schema
+
+For immediate browser feedback, keep the browser-safe rules in a separate
+module and import the same Seal schema into both the page action configuration
+and an `@mongez/react-form` form. Seal implements Standard Schema, which the
+form accepts through `schema`.
+
+```tsx
+// src/web/contact/contact.schema.ts
+import { v } from "@warlock.js/seal";
+
+export const contactSchema = v.object({
+  email: v.string().email(),
+  message: v.string().min(10),
+});
+```
+
+```tsx
+// src/web/contact/contact.page.tsx
+import { Form as ReactForm } from "@mongez/react-form";
+import { useSubmitAction } from "@warlock.js/web/form";
+import type { PageActionContext, PageConfig } from "@warlock.js/web";
+import { contactSchema } from "./contact.schema";
+
+export const config: PageConfig = {
+  route: { path: "/contact", name: "contact" },
+  action: { validation: contactSchema },
+};
+
+export async function action({ request, response }: PageActionContext<typeof contactSchema>) {
+  const values = request.validated();
+  // Handle values, then redirect or return data.
+  return response.redirect("/contact");
+}
+
+export default function ContactPage() {
+  const submit = useSubmitAction<typeof contactSchema>();
+
+  return (
+    <ReactForm method="post" schema={contactSchema} onSubmit={submit.submit}>
+      {/* Your registered controls must be named "email" and "message". */}
+    </ReactForm>
+  );
+}
+```
+
+The action validation is still authoritative. A request that bypasses the
+browser fails with 422 before the action runs. Keep database uniqueness checks
+and other server-only rules in server code, or split them from the shared
+browser-safe schema.
+
 ## `ActionState` and `useActionData`
 
 `useActionData<typeof action>()` returns `undefined` before any submit, otherwise:

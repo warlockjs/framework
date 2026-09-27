@@ -16,7 +16,7 @@ When you call `connectToDatabase(...)`, two things happen:
 1. A `DataSource` instance is created from your config.
 2. It's registered with the **global `dataSourceRegistry`** under the `name` you provided (default `"default"`).
 
-Models reach their data source through the registry. By default, they look up the *default* data source. Override per model when you need a different one.
+Models reach their data source through the registry. By default, they look up the _default_ data source. Override per model when you need a different one.
 
 ```
                 ┌─────────────────────────────┐
@@ -45,7 +45,7 @@ await connectToDatabase({
   name: "primary",
   driver: "postgres",
   database: "myapp",
-  isDefault: true,                 // models without `static dataSource` use this
+  isDefault: true, // models without `static dataSource` use this
 });
 
 await connectToDatabase({
@@ -53,7 +53,7 @@ await connectToDatabase({
   driver: "postgres",
   database: "warehouse",
   isDefault: false,
-  clientOptions: { max: 5 },       // smaller pool — analytics is bursty + low-frequency
+  clientOptions: { max: 5 }, // smaller pool — analytics is bursty + low-frequency
 });
 
 await connectToDatabase({
@@ -98,7 +98,7 @@ For one-off queries against a non-default data source without changing the model
 import { dataSourceRegistry } from "@warlock.js/cascade";
 
 const analyticsDs = dataSourceRegistry.get("analytics");
-const driver      = analyticsDs.driver;
+const driver = analyticsDs.driver;
 
 const result = await driver.find("events", { type: "page_view" });
 ```
@@ -109,20 +109,20 @@ This drops below the model API to the raw driver. Useful for diagnostic scripts,
 
 The honest constraints:
 
-| Operation | Works across data sources? | Notes |
-| --------- | ------------------------- | ----- |
-| Models on different sources | ✅ Yes | Each model uses its registered source |
-| `Model.find()` / `.query()` / `.create()` | ✅ Yes | Always within the model's own source |
-| **Joins** (`.join()`, `.with()`, `.joinWith()`) across sources | ❌ No | A join is a single-source operation by definition |
-| **Transactions** across sources | ❌ No | Each transaction belongs to one driver/connection |
-| **Sync system** across sources | ⚠️ Partial | Sync events propagate, but the bulk update is single-source — embedding `User` (cache) into `Comment` (primary) requires the target source to handle the update |
-| **Cross-source consistency** | ❌ Not guaranteed | Two writes to two sources are independent — no two-phase commit |
+| Operation                                                      | Works across data sources? | Notes                                                                                                                                                           |
+| -------------------------------------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Models on different sources                                    | ✅ Yes                     | Each model uses its registered source                                                                                                                           |
+| `Model.find()` / `.query()` / `.create()`                      | ✅ Yes                     | Always within the model's own source                                                                                                                            |
+| **Joins** (`.join()`, `.with()`, `.joinWith()`) across sources | ❌ No                      | A join is a single-source operation by definition                                                                                                               |
+| **Transactions** across sources                                | ❌ No                      | Each transaction belongs to one driver/connection                                                                                                               |
+| **Sync system** across sources                                 | ⚠️ Partial                 | Sync events propagate, but the bulk update is single-source — embedding `User` (cache) into `Comment` (primary) requires the target source to handle the update |
+| **Cross-source consistency**                                   | ❌ Not guaranteed          | Two writes to two sources are independent — no two-phase commit                                                                                                 |
 
-The pattern that scales: **keep related data on the same data source**. Cross-source references are *fine* as long as you don't expect joins, transactions, or atomic consistency. Treat the second data source as a separate system you happen to be calling.
+The pattern that scales: **keep related data on the same data source**. Cross-source references are _fine_ as long as you don't expect joins, transactions, or atomic consistency. Treat the second data source as a separate system you happen to be calling.
 
 ## Multi-tenant — one database per tenant
 
-A common ask: *every tenant gets their own physical database, register one per tenant.* Cascade supports this — the registry can hold N data sources — but the model surface gets tricky because `static dataSource` is fixed at class-definition time.
+A common ask: _every tenant gets their own physical database, register one per tenant._ Cascade supports this — the registry can hold N data sources — but the model surface gets tricky because `static dataSource` is fixed at class-definition time.
 
 Two practical shapes:
 
@@ -156,7 +156,7 @@ You lose the high-level model API for the per-tenant queries (since `static data
 Most multi-tenant apps don't need per-tenant databases. A `tenantId` column plus a global scope is dramatically simpler:
 
 ```ts
-User.addGlobalScope("tenant", q => q.where("tenantId", currentTenantId()));
+User.addGlobalScope("tenant", (q) => q.where("tenantId", currentTenantId()));
 ```
 
 Every query is automatically filtered to the current tenant. See the [Scopes guide](./scopes.md#tenant-scoping-with-async-context) for the full pattern.
@@ -202,13 +202,41 @@ const analyticsDriver = dataSourceRegistry.get("analytics").driver;
 await analyticsDriver.transaction(async ctx => { ... });
 ```
 
-The transaction is scoped to that data source — operations against `"primary"` inside the callback are *not* part of this transaction.
+The transaction is scoped to that data source — operations against `"primary"` inside the callback are _not_ part of this transaction.
 
 ## Migrations across data sources
 
 Migrations live per-data-source — each source has its own `_migrations` tracking table (configurable via the `migrations.table` connection option). The CLI runs migrations against the default source by default; targeting a specific source requires either a flag or a separate config-loading entry point depending on your CI setup.
 
 For now, the simplest pattern is: keep migrations folders per data source (`migrations/primary/`, `migrations/analytics/`) and run the migrate command per source at deploy time, pointing at the right folder + config.
+
+## Observe queries across data sources
+
+The registry forwards each settled database command as a `query` event. This is
+the application-level place to record slow queries across named data sources:
+
+```ts
+import { dataSourceRegistry } from "@warlock.js/cascade";
+import { log } from "@warlock.js/logger";
+
+dataSourceRegistry.on("query", (event) => {
+  if (event.durationMs <= 200) return;
+
+  log.warn("database", "slow query", {
+    connection: event.connection,
+    driver: event.driver,
+    sql: event.sql,
+    collection: event.collection,
+    command: event.command,
+    durationMs: event.durationMs,
+    rowCount: event.rowCount,
+  });
+});
+```
+
+`QueryEvent` includes the connection name, driver, duration, `startedAt`, and
+an optional error. Postgres events can include `sql` and `bindings`; MongoDB
+events can include `collection`, `command`, and `pipeline`.
 
 ## Going further
 

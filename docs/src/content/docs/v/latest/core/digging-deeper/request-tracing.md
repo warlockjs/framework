@@ -47,6 +47,7 @@ type TracingContext = {
 type TracingPhaseInfo = {
   name: string;
   durationMs: number;
+  startedAt?: number; // epoch milliseconds when available
   attrs?: Record<string, unknown>;
 };
 
@@ -65,25 +66,55 @@ type TracingHooks = {
 
 Every verb is optional — a hook that only wants phase spans need not implement `onRequestStart`/`onRequestEnd`. Register as many hooks as you like via `hooks: TracingHooks[]`; each fires independently.
 
+## Register at runtime
+
+Packages and application code that should not own `src/config/http.ts` can
+register a hook directly. Registration turns tracing on immediately; the
+returned function unregisters that hook. Runtime hooks run after configured
+hooks.
+
+```ts
+import { registerTracingHooks } from "@warlock.js/core";
+
+const unregister = registerTracingHooks({
+  onPhase(ctx, phase) {
+    metrics.timing("http.phase", phase.durationMs, {
+      route: ctx.route,
+      phase: phase.name,
+    });
+  },
+});
+
+// Call during teardown or when the integration is disabled.
+unregister();
+```
+
 ## Phase names
 
 `core` wires five phases into the request lifecycle, in this order, for every HTTP request:
 
-| Phase             | Fires around                                                                                     |
-| ----------------- | -------------------------------------------------------------------------------------------------- |
-| `route.match`     | Resolving the incoming path/method to a registered route                                          |
-| `middleware`      | Each middleware in the route's chain — one `onPhase` call per middleware, with `attrs: { name, index }` |
-| `validation`      | The route's input validation (`v.object(...)` / RESTful resource validation)                      |
-| `handler`         | The route handler itself                                                                          |
-| `response.write`  | The overall request span, closed once the response has settled (success or thrown error) — this is also where `onRequestEnd` fires |
+| Phase            | Fires around                                                                                                                       |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `route.match`    | Resolving the incoming path/method to a registered route                                                                           |
+| `middleware`     | Each middleware in the route's chain — one `onPhase` call per middleware, with `attrs: { name, index }`                            |
+| `validation`     | The route's input validation (`v.object(...)` / RESTful resource validation)                                                       |
+| `handler`        | The route handler itself                                                                                                           |
+| `response.write` | The overall request span, closed once the response has settled (success or thrown error) — this is also where `onRequestEnd` fires |
 
-`@warlock.js/web` page requests report through this same `onPhase` surface instead of adding a separate hook API. They add three phases:
+`@warlock.js/web` page requests report through this same `onPhase` surface instead of adding a separate hook API. Alongside `loader`, `render.shell`, and `stream.end`, they add page middleware, cache, and deferred-settlement phases:
 
-| Phase          | Fires around                                                                       |
-| -------------- | ------------------------------------------------------------------------------------ |
-| `loader`       | Each loader level, once per app/layout/page, with `attrs: { level, layoutPath? }`  |
-| `render.shell` | Time from render start until React's shell is ready to stream                       |
-| `stream.end`   | The whole streamed response, including every `defer()` value settling               |
+| Phase             | Fires around                                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `page.middleware` | The complete page middleware chain, with `attrs: { count, outcome }`; `outcome` is `next`, `response`, or `error`. |
+| `loader`          | Each loader level, once per app/layout/page, with `attrs: { level, layoutPath? }`.                                 |
+| `page.cache`      | Page-cache lookup or write, with cache outcome attributes.                                                         |
+| `render.shell`    | Time from render start until React's shell is ready to stream.                                                     |
+| `defer.settle`    | Each deferred value settling, with `attrs: { key, status }`; `status` is `fulfilled` or `rejected`.                |
+| `stream.end`      | The whole streamed response, including every `defer()` value settling.                                             |
+
+Phases that record an absolute start time expose it as `startedAt`; consumers
+can use it to place spans on one request timeline rather than relying only on
+durations.
 
 ## Trace id derivation
 

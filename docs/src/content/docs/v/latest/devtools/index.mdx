@@ -1,0 +1,55 @@
+---
+title: Devtools
+description: A loopback-only development dashboard for request timing, database queries, N+1 warnings, mail, logs, cache activity, and routes.
+---
+
+`@warlock.js/devtools` is an in-app dashboard for understanding what a request
+did while you develop. It is served at `/__warlock` and keeps its data only in
+memory.
+
+## Install
+
+```bash
+warlock add devtools
+warlock dev
+# open http://localhost:<port>/__warlock
+```
+
+The command adds `@warlock.js/devtools` as a development dependency. There is
+nothing to configure: `warlock dev` discovers and loads it automatically.
+
+Do **not** add it to `warlock.config.ts`. Production installs omit development
+dependencies, so importing devtools from application configuration would make
+the production process fail to resolve that import.
+
+## The dashboard
+
+The default dashboard retains the latest 200 requests at `/__warlock`.
+
+| Panel    | What it shows                                                                                                                                                                                                                                                             |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Requests | Status, duration, query count, and a waterfall for router and page middleware, loaders, page-cache activity, rendering, and deferred values.                                                                                                                              |
+| Queries  | SQL with bindings or Mongo commands, duration, rows, and Postgres `SELECT` query plans through **Explain**. Explain uses `EXPLAIN (FORMAT JSON)`, never `ANALYZE`.                                                                                                        |
+| N+1      | Repeated query shapes within one request, including the source file and line. The dashboard marks the request and prints a terminal warning such as `N+1: 12× "select … where post_id = $1" — src/app/posts/services/list-posts.service.ts:18`. The fixed threshold is 5. |
+| Mail     | Mail captured by the development mail mode, including headers, sandboxed HTML and text, and attachment names.                                                                                                                                                             |
+| Logs     | Request-associated log entries, filterable by level and module.                                                                                                                                                                                                           |
+| Cache    | Hit, miss, set, removed, and tag-invalidation activity.                                                                                                                                                                                                                   |
+| Routes   | Registered HTTP routes with their method, path, name, and middleware.                                                                                                                                                                                                     |
+
+Work that is not part of a request, such as boot work or a scheduler tick,
+appears separately so it does not distort a request timeline.
+
+## Safe by construction
+
+- The package is not installed in a production dependency install.
+- If it is present anyway, devtools refuses to mount outside development.
+- Dashboard and API routes answer only loopback clients (`127.0.0.1` and
+  `::1`). The check uses the socket address; `X-Forwarded-For` cannot unlock
+  it.
+- Data is held in memory and disappears when the process restarts.
+
+## Build your own tooling
+
+The dashboard uses public observability hooks rather than a private telemetry
+path. You can subscribe to the same request, query, mail, and cache events in
+your own tooling; see [Request tracing](/v/latest/core/digging-deeper/request-tracing/).

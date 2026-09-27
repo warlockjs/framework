@@ -627,8 +627,8 @@ export class UsersRestful extends Restful<User> implements RouteResource {
   public validation = {
     create: {
       schema: v.object({
-        name: v.string().required().min(2),
-        email: v.email().required(),
+        name: v.string().min(2),
+        email: v.email(),
       }),
     },
     update: {
@@ -3157,6 +3157,7 @@ type TracingContext = {
 type TracingPhaseInfo = {
   name: string;
   durationMs: number;
+  startedAt?: number; // epoch milliseconds; supplied when the phase started
   attrs?: Record<string, unknown>;
 };
 
@@ -3175,29 +3176,52 @@ type TracingHooks = {
 
 Every verb is optional — a hook that only wants phase spans need not implement
 `onRequestStart`/`onRequestEnd`. Register as many hooks as you like via
-`hooks: TracingHooks[]`; each fires independently.
+`hooks: TracingHooks[]`; each fires independently. Use `registerTracingHooks()`
+when the observer is installed by application code rather than static config:
+
+```ts
+import { registerTracingHooks, type TracingHooks } from "@warlock.js/core";
+
+const hooks: TracingHooks = {
+  onPhase(ctx, phase) {
+    console.log(ctx.traceId, phase.name, phase.startedAt);
+  },
+};
+
+const unregister = registerTracingHooks(hooks);
+// Later, for example during plugin teardown:
+unregister();
+```
+
+`registerTracingHooks(hooks): () => void` enables tracing immediately. Runtime
+hooks run after configured hooks; calling the returned unregister function more
+than once is safe. When a phase did not provide `startedAt`, the dispatcher
+derives it from its duration before delivering the callback.
 
 ## Phase names
 
 `core` wires five phases into the request lifecycle, in this order, for every
 HTTP request:
 
-| Phase | Fires around |
-| --- | --- |
-| `route.match` | Resolving the incoming path/method to a registered route |
-| `middleware` | Each middleware in the route's chain — one `onPhase` call per middleware, with `attrs: { name, index }` |
-| `validation` | The route's input validation (`v.object(...)` / RESTful resource validation) |
-| `handler` | The route handler itself |
+| Phase            | Fires around                                                                                                                       |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `route.match`    | Resolving the incoming path/method to a registered route                                                                           |
+| `middleware`     | Each middleware in the route's chain — one `onPhase` call per middleware, with `attrs: { name, index }`                            |
+| `validation`     | The route's input validation (`v.object(...)` / RESTful resource validation)                                                       |
+| `handler`        | The route handler itself                                                                                                           |
 | `response.write` | The overall request span, closed once the response has settled (success or thrown error) — this is also where `onRequestEnd` fires |
 
 `@warlock.js/web` page requests report through this same `onPhase` surface
 instead of adding a separate hook API. They add three phases:
 
-| Phase | Fires around |
-| --- | --- |
-| `loader` | Each loader level, once per app/layout/page, with `attrs: { level, layoutPath? }` |
-| `render.shell` | Time from render start until React's shell is ready to stream |
-| `stream.end` | The whole streamed response, including every `defer()` value settling |
+| Phase             | Fires around                                                                                        |
+| ----------------- | --------------------------------------------------------------------------------------------------- |
+| `loader`          | Each loader level, once per app/layout/page, with `attrs: { level, layoutPath? }`                   |
+| `render.shell`    | Time from render start until React's shell is ready to stream                                       |
+| `stream.end`      | The whole streamed response, including every `defer()` value settling                               |
+| `page.middleware` | Page middleware chain; `attrs: { count, outcome }`, where outcome is `next`, `response`, or `error` |
+| `page.cache`      | Page-cache lookup; `attrs: { status }`, where status is `hit`, `miss`, or `bypass`                  |
+| `defer.settle`    | A deferred key settling; `attrs: { key, status }`, where status is `fulfilled` or `rejected`        |
 
 ## Trace id derivation
 
@@ -3291,9 +3315,8 @@ export default {
 - **No OTel dependency, and none planned for `core`.** An OTel (or other
   vendor) bridge is a separate, optional package that subscribes to these
   hooks — never add `@opentelemetry/api` to `core` itself.
-- **`web`'s phases aren't live yet.** Don't register a hook expecting
-  `loader`/`render.shell`/`stream.end` calls today; only the five `core`
-  phases fire in this release.
+- **Web phases share the same hook.** Do not create a second page-tracing
+  integration: subscribe with `TracingHooks.onPhase`.
 - **`route` is `undefined` until routing has matched.** There's no path where
   a hook fires before that, but code branching on `ctx.route` for an
   early-failing request (e.g. a 404 with no match) must handle `undefined`.
@@ -3629,11 +3652,11 @@ Boots the framework in dev mode: file watcher, HMR-style module reload, on-disk 
 
 ### Flags
 
-| Flag                  | Default | Purpose                                                                                                  |
-| --------------------- | ------- | -------------------------------------------------------------------------------------------------------- |
+| Flag                  | Default | Purpose                                                                                                     |
+| --------------------- | ------- | ----------------------------------------------------------------------------------------------------------- |
 | `--fresh, -f`         | off     | Delete `.warlock/manifest.json` before start — forces a full re-parse from disk. Use after odd boot states. |
-| `--skip-typings, -st` | off     | Skip background type generation **for this run**. Overrides `devServer.generateTypings` config.           |
-| `--skip-health, -sh`  | off     | Skip file health checkers **for this run**. Overrides `devServer.healthCheckers` config.                  |
+| `--skip-typings, -st` | off     | Skip background type generation **for this run**. Overrides `devServer.generateTypings` config.             |
+| `--skip-health, -sh`  | off     | Skip file health checkers **for this run**. Overrides `devServer.healthCheckers` config.                    |
 
 When a flag is **not** passed, the corresponding `warlock.config.ts > devServer.*` value applies. When passed, the flag wins.
 
@@ -3641,14 +3664,14 @@ When a flag is **not** passed, the corresponding `warlock.config.ts > devServer.
 
 Once the server is ready, `warlock dev` listens for single keypresses:
 
-| Key      | Does                                                                       |
-| -------- | ---------------------------------------------------------------------------- |
-| `r`      | Restart the server on a fresh process.                                     |
-| `c`      | Clear the console.                                                         |
-| `q`      | Graceful shutdown, exit `0` — the same path as `Ctrl+C`.                    |
-| `h`      | Print the shortcuts that are armed right now.                              |
+| Key      | Does                                                                                                                                                                    |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `r`      | Restart the server on a fresh process.                                                                                                                                  |
+| `c`      | Clear the console.                                                                                                                                                      |
+| `q`      | Graceful shutdown, exit `0` — the same path as `Ctrl+C`.                                                                                                                |
+| `h`      | Print the shortcuts that are armed right now.                                                                                                                           |
 | `u`      | **Only while an update notice is showing** — update every `@warlock.js/*` package, install, and restart. See [`update-packages/SKILL.md`](../update-packages/SKILL.md). |
-| `Ctrl+C` | Graceful shutdown, unchanged.                                              |
+| `Ctrl+C` | Graceful shutdown, unchanged.                                                                                                                                           |
 
 A "restart" is a fresh process (`r` and `u` both use it) — see [The supervisor](#the-supervisor) below for how that works.
 
@@ -3668,7 +3691,7 @@ shell
 
 The supervisor spawns the worker with `stdio: "inherit"` and mirrors its exit code. To restart, the worker shuts down cleanly — freeing the http port — and exits `75`; the supervisor spawns a replacement. **The tree never gets deeper**, however many restarts happen.
 
-The supervisor is chosen in the `dev` command's `preAction`, which runs *before* the preloaders — deliberately, so the supervisor never loads config or starts connectors. A supervisor holding a second database connection open for the session would be a real bug, not a cosmetic one.
+The supervisor is chosen in the `dev` command's `preAction`, which runs _before_ the preloaders — deliberately, so the supervisor never loads config or starts connectors. A supervisor holding a second database connection open for the session would be a real bug, not a cosmetic one.
 
 Signals: `SIGINT` reaches the worker directly (same process group), so the supervisor ignores it and only notes that the next exit is final — acting on it would exit the parent while the worker was still draining. `SIGTERM` / `SIGHUP` are forwarded explicitly, since they don't propagate to the group on Windows. After any worker exits, the supervisor puts stdin back out of raw mode in case the worker was killed before it could.
 
@@ -3682,13 +3705,13 @@ A worker that dies **after running healthily for at least 5s** — OOM, a native
 14:31:02 Development server was killed by SIGSEGV — restarting.
 ```
 
-A worker that dies *sooner* than that failed to **boot** — a broken config, a port already taken — and it has already printed why. Restarting there would just reprint the same error and bury it, so the supervisor mirrors the exit code and stops.
+A worker that dies _sooner_ than that failed to **boot** — a broken config, a port already taken — and it has already printed why. Restarting there would just reprint the same error and bury it, so the supervisor mirrors the exit code and stops.
 
-A busy port is now caught *before* the bind attempt: the HTTP connector calls `assertPortIsAvailable(port, host)` immediately before `listen()`, so the failure is `Port <port> is already in use on <host>. Stop the dev server (or whatever else is listening on port <port>) and run again, or start on a free port…` — not a raw `EADDRINUSE` surfacing from inside Fastify. Same connector, same preflight, for `warlock start`.
+A busy port is now caught _before_ the bind attempt: the HTTP connector calls `assertPortIsAvailable(port, host)` immediately before `listen()`, so the failure is `Port <port> is already in use on <host>. Stop the dev server (or whatever else is listening on port <port>) and run again, or start on a free port…` — not a raw `EADDRINUSE` surfacing from inside Fastify. Same connector, same preflight, for `warlock start`.
 
 Flapping is capped: more than 3 crashes inside 60s and the supervisor gives up rather than restarting behind your back.
 
-An explicit restart (`r`, `u`, a config change) is a *request*, not a crash, so the uptime rule never swallows it.
+An explicit restart (`r`, `u`, a config change) is a _request_, not a crash, so the uptime rule never swallows it.
 
 ### Restart on config change
 
@@ -3704,7 +3727,7 @@ Set `devServer.restartOnConfigChange: false` for the previous behaviour (a warni
 
 On first boot `warlock dev` bundles its ESM loader hook and writes it to **your project's** `.warlock/loader-hook.mjs` — the hook runs in a fresh Node worker thread with no TypeScript loader of its own, so it has to be plain, pre-bundled ESM.
 
-Because that file lives in your directory rather than core's, every npm import inside it is rewritten at generation time to an **absolute path resolved from core's own install**. A bare `import "esbuild"` there would resolve from *your* `node_modules`, and `esbuild` / `get-tsconfig` are core's dependencies, not yours.
+Because that file lives in your directory rather than core's, every npm import inside it is rewritten at generation time to an **absolute path resolved from core's own install**. A bare `import "esbuild"` there would resolve from _your_ `node_modules`, and `esbuild` / `get-tsconfig` are core's dependencies, not yours.
 
 :::note[Fixed in 4.9.2 — pnpm users]
 Before 4.9.2 those imports were left bare. npm and yarn hoist every transitive dependency into one flat tree, so they resolved by accident; pnpm's strict layout does not, and the dev server failed with `ERR_MODULE_NOT_FOUND: Cannot find package 'esbuild'`. The workaround was declaring `esbuild` and `get-tsconfig` in your own `package.json` — no longer needed, and you can drop them.
@@ -3766,12 +3789,12 @@ esbuild bundle of the app down to a single JS file in `dist/`. No flags — ever
 ```ts title="warlock.config.ts"
 export default defineConfig({
   build: {
-    outdir: "dist",        // default — relative or absolute
-    outFile: "app.js",            // default — bundle filename
-    minify: true,                 // default — esbuild minify
-    sourcemap: true,              // default — true | false | "inline" | "linked"
-    singleBundle: false,          // default — one runnable file, deps inlined
-    esmShim: true,                // default — require/__filename/__dirname for bundled CJS
+    outdir: "dist", // default — relative or absolute
+    outFile: "app.js", // default — bundle filename
+    minify: true, // default — esbuild minify
+    sourcemap: true, // default — true | false | "inline" | "linked"
+    singleBundle: false, // default — one runnable file, deps inlined
+    esmShim: true, // default — require/__filename/__dirname for bundled CJS
   },
 });
 ```
@@ -3783,7 +3806,7 @@ Defaults are sensible for the typical "Node service" deployment. Knobs to actual
 - **`minify: false`** — flip to debug a production-only bug. Larger bundle, readable stack traces.
 - **`sourcemap: "inline"`** — embed the source map in the bundle. Useful when your error reporter only captures the bundle and can't fetch a `.map` sidecar.
 - **`sourcemap: false`** — skip source maps entirely. Smaller artifact, but stack traces in production logs lose their file:line precision (and `warlock start` will not enable `--enable-source-maps` since there's nothing to map).
-- **`singleBundle: true`** — inline dependencies so `node dist/app.js` runs with no `node_modules` and no launcher. Sets `packages: "bundle"` + `splitting: false` as **defaults you can override**. ⚠ Native `.node` addons are still emitted alongside — "single bundle" is one JS file *plus* any native addons. Do NOT reach for it as the default: keeping deps external is right when you deploy the folder.
+- **`singleBundle: true`** — inline dependencies so `node dist/app.js` runs with no `node_modules` and no launcher. Sets `packages: "bundle"` + `splitting: false` as **defaults you can override**. ⚠ Native `.node` addons are still emitted alongside — "single bundle" is one JS file _plus_ any native addons. Do NOT reach for it as the default: keeping deps external is right when you deploy the folder.
 - **`esmShim: false`** — only if you are certain nothing in the graph is CommonJS. Leave it on.
 
 ⚠ **The trap this replaced.** Setting `packages: "bundle"` by hand used to produce a clean build whose process died on start with `Error: Dynamic require of "node:assert" is not supported`. The output is ESM; bundled CJS deps call `require(...)` and read `__dirname`, and neither exists in an ES module, so the bundler substitutes a throwing stub. **A green `warlock build` was not evidence the bundle ran.** `esmShim` now injects `createRequire(import.meta.url)` and friends automatically for any ESM build, so both `singleBundle` and a hand-written `packages: "bundle"` work. An existing hand-written `banner` is preserved — the shim is prepended, not substituted.
@@ -3842,6 +3865,41 @@ npx warlock start --inspect              # → spawns node --enable-source-maps 
 npx warlock start --max-old-space-size=4096  # → spawns node --enable-source-maps --max-old-space-size=4096 dist/app.js
 ```
 
+### Deploy one build in parts
+
+One production build can run as API, page, and background-worker processes.
+Omit `--role` to run every role (the existing default); combine roles with a
+comma-separated list:
+
+```bash
+npx warlock start --role=api
+npx warlock start --role=web --sites=admin,storefront
+npx warlock start --role=worker
+npx warlock start --role=web,api
+```
+
+`--sites=a,b` is valid only with the `web` role and installs the listed site
+keys' pages (shared non-site pages remain installed). Unknown roles, an empty
+list, `--sites` without `web`, and unknown site keys fail boot rather than
+silently serving the wrong traffic.
+
+An API or web role binds HTTP. A worker-only process binds no HTTP port; it
+loads worker work, starts queue workers and the scheduler there, and its
+readiness banner reports `worker ready`. `warlock dev` always runs every role.
+
+Inside application code, inspect the roles resolved at bootstrap:
+
+```ts
+import { Application } from "@warlock.js/core";
+
+if (Application.hasRole("worker")) {
+  // worker-only integration
+}
+
+Application.roles; // ReadonlySet<"api" | "web" | "worker">
+Application.sites; // ReadonlySet<string> | undefined (undefined = all sites)
+```
+
 Everything you pass after `start` is forwarded to the spawned Node process. Use this to attach a debugger (`--inspect`), tune memory (`--max-old-space-size`), or pass any other Node flag without editing the command.
 
 ### Source maps
@@ -3884,9 +3942,9 @@ Nothing else is needed for pnpm. Warlock never requires an app to declare a pack
 
 **A success line on stdout means the app is serving requests.** That is a contract, not a convention, and you can build a CI gate or a health probe on it.
 
-| Stream     | Carries                                                        |
-| ---------- | -------------------------------------------------------------- |
-| **stdout** | the started banner, and start failures. Nothing else.           |
+| Stream     | Carries                                                                                |
+| ---------- | -------------------------------------------------------------------------------------- |
+| **stdout** | the started banner, and start failures. Nothing else.                                  |
 | **stderr** | progress (`🚀 Starting production server...`), diagnostics, the application's own logs |
 
 The started banner prints **only** when the running application reports a completed boot — not when the command starts, not when the child is spawned. A child that dies before reporting is a failed start: the failure is written to **both** streams (stderr for humans and log collectors, stdout so a supervisor greping for the banner finds a failure rather than silence), and `warlock start` exits non-zero **even when the child itself exited `0`**.
@@ -3922,7 +3980,7 @@ else is listening on port 3000) and run again, or start on a free port — e.g.
 startHttpTestServer({ port: 3001 }).
 ```
 
-**The process exits `78` (`EX_CONFIG`), and `warlock dev`'s supervisor treats that as terminal — it prints once and stops rather than restarting.** That code is the counterpart of `75`, which a worker uses to ask for a fresh process. The distinction is the point: a code error is worth restarting, and a *startup precondition* — a port held by something else, a port value that is not a port, a boot validator that rejected — cannot change because we tried again six seconds later. Retrying one only reprints the diagnostic and then scrolls it away.
+**The process exits `78` (`EX_CONFIG`), and `warlock dev`'s supervisor treats that as terminal — it prints once and stops rather than restarting.** That code is the counterpart of `75`, which a worker uses to ask for a fresh process. The distinction is the point: a code error is worth restarting, and a _startup precondition_ — a port held by something else, a port value that is not a port, a boot validator that rejected — cannot change because we tried again six seconds later. Retrying one only reprints the diagnostic and then scrolls it away.
 
 `EACCES` on the port is treated the same way as `EADDRINUSE` (a privileged port you may not bind is also "not available"); anything else the probe throws is rethrown untouched.
 
@@ -3937,7 +3995,7 @@ Configured http.port "03999" normalised to 3999.
 `warlock start` spawns the bundle with an IPC channel and sets `WARLOCK_BOOT_SIGNAL=1` on it. `Application.markBooted()` — which the production entry calls after the late-phase connectors (http, socket) are up — sends one versioned message and closes the channel:
 
 ```ts
-{ type: "warlock:ready", version: 1, pid, at, environment, runtimeStrategy, bootDurationMs?, port? }
+{ type: "warlock:ready", version: 1, pid, at, environment, runtimeStrategy, bootDurationMs?, port?, roles }
 ```
 
 Three consequences worth knowing:
@@ -3952,11 +4010,11 @@ If you need the same fact inside the app, use `Application.onceBooted()` / `Appl
 
 `Application.environment` and `Application.runtimeStrategy` are separate axes:
 
-| Mode             | `environment`   | `runtimeStrategy` | How                                       |
-| ---------------- | --------------- | ----------------- | ----------------------------------------- |
-| `warlock dev`    | `development`*  | `development`     | preload force-sets `runtimeStrategy`      |
-| `warlock build`  | n/a (no app boots) | n/a            | only loads warlock.config.ts              |
-| `warlock start`  | `production`*   | `production`*     | usually set via `NODE_ENV` in the env     |
+| Mode            | `environment`      | `runtimeStrategy` | How                                   |
+| --------------- | ------------------ | ----------------- | ------------------------------------- |
+| `warlock dev`   | `development`*     | `development`     | preload force-sets `runtimeStrategy`  |
+| `warlock build` | n/a (no app boots) | n/a               | only loads warlock.config.ts          |
+| `warlock start` | `production`*      | `production`*     | usually set via `NODE_ENV` in the env |
 
 `*` — `environment` follows `NODE_ENV`. The dev command doesn't force it, but the default in most projects is `development`. `start` doesn't force it either; deployments set `NODE_ENV=production` themselves.
 
@@ -4015,7 +4073,7 @@ export default defineConfig({
 
 CI sets `BUILD_OUT=build/<sha>` per pipeline. `warlock start` reads the same config and finds the bundle without any hardcoded paths.
 
-**This recipe only started working in 4.11.0.** Before that, `warlock.config.ts` was evaluated *before* any `.env` file was read, so every `env()` call in it returned its default — silently, under every command. If you copied this recipe earlier and concluded that `BUILD_OUT` was ignored, it was.
+**This recipe only started working in 4.11.0.** Before that, `warlock.config.ts` was evaluated _before_ any `.env` file was read, so every `env()` call in it returned its default — silently, under every command. If you copied this recipe earlier and concluded that `BUILD_OUT` was ignored, it was.
 
 **Which file the value comes from is decided by `NODE_ENV`, and no Warlock command sets it.** `env()` reads `.env.<NODE_ENV>` when that file exists and falls back to plain `.env`. So:
 
@@ -4095,10 +4153,7 @@ Two APIs over the same engine. The fluent `Mail` builder reads top-to-bottom in 
 ```ts
 import { Mail } from "@warlock.js/core";
 
-await Mail.to("user@example.com")
-  .subject("Welcome!")
-  .text("Thanks for joining.")
-  .send();
+await Mail.to("user@example.com").subject("Welcome!").text("Thanks for joining.").send();
 ```
 
 Or:
@@ -4142,10 +4197,25 @@ For named mailers (multi-provider apps), export a `MailersConfig` instead:
 
 ```ts
 const config: MailersConfig = {
-  default: { host: "smtp.sendgrid.net", port: 587, username: "apikey", password: env("SENDGRID_KEY") },
+  default: {
+    host: "smtp.sendgrid.net",
+    port: 587,
+    username: "apikey",
+    password: env("SENDGRID_KEY"),
+  },
   mailers: {
-    marketing: { host: "smtp.mailchimp.com", port: 587, username: env("MC_USER"), password: env("MC_PASS") },
-    transactional: { host: "smtp.postmark.com", port: 587, username: env("PM_USER"), password: env("PM_PASS") },
+    marketing: {
+      host: "smtp.mailchimp.com",
+      port: 587,
+      username: env("MC_USER"),
+      password: env("MC_PASS"),
+    },
+    transactional: {
+      host: "smtp.postmark.com",
+      port: 587,
+      username: env("PM_USER"),
+      password: env("PM_PASS"),
+    },
   },
 };
 ```
@@ -4177,9 +4247,9 @@ The mail pipeline switches behavior on a global mode:
 ```ts
 import { setMailMode } from "@warlock.js/core";
 
-setMailMode("production");   // actually send (default)
-setMailMode("development");  // log subject + recipient, no send
-setMailMode("test");         // capture to test mailbox, no send
+setMailMode("production"); // actually send (default)
+setMailMode("development"); // log subject + recipient, no send
+setMailMode("test"); // capture to test mailbox, no send
 ```
 
 Production sends. Development logs and returns a fake-success `MailResult`. Test captures every call into an in-memory mailbox (cleared between tests) and returns success — handy for asserting "the welcome email got sent" without hitting SMTP.
@@ -4192,7 +4262,7 @@ Production sends. Development logs and returns a fake-success `MailResult`. Test
 
 ```ts
 await Mail.to("a@example.com")
-  .to(["a@example.com", "b@example.com"])      // override
+  .to(["a@example.com", "b@example.com"]) // override
   .cc("manager@example.com")
   .bcc("audit@example.com")
   .replyTo("support@example.com")
@@ -4233,15 +4303,15 @@ await Mail.to("u@e.com")
 
 ### Other knobs
 
-| Method                                | Purpose                                       |
-| ------------------------------------- | --------------------------------------------- |
-| `.priority("high" \| "normal" \| "low")` | priority header                            |
-| `.headers({ "X-Foo": "bar" })`        | replace custom headers                        |
-| `.header("X-Foo", "bar")`             | add one header                                |
-| `.tags(["welcome"])` / `.tag("transactional")` | categorization tags                  |
-| `.correlationId("req-123")`           | tracking id (logged with sends)               |
-| `.config(MailConfigurations)`         | one-off override of the global config         |
-| `.mailer("marketing")`                | route via a named mailer from config          |
+| Method                                         | Purpose                               |
+| ---------------------------------------------- | ------------------------------------- |
+| `.priority("high" \| "normal" \| "low")`       | priority header                       |
+| `.headers({ "X-Foo": "bar" })`                 | replace custom headers                |
+| `.header("X-Foo", "bar")`                      | add one header                        |
+| `.tags(["welcome"])` / `.tag("transactional")` | categorization tags                   |
+| `.correlationId("req-123")`                    | tracking id (logged with sends)       |
+| `.config(MailConfigurations)`                  | one-off override of the global config |
+| `.mailer("marketing")`                         | route via a named mailer from config  |
 
 ### Per-mail event handlers
 
@@ -4254,9 +4324,9 @@ await Mail.to("u@e.com")
   .beforeSending((mail) => {
     // mutate `mail` or return false to cancel
   })
-  .onSent((mail, result, error) => {})    // always fires after attempt
-  .onSuccess((mail, result) => {})        // only on success
-  .onError((mail, error) => {})           // only on failure
+  .onSent((mail, result, error) => {}) // always fires after attempt
+  .onSuccess((mail, result) => {}) // only on success
+  .onError((mail, error) => {}) // only on failure
   .send();
 ```
 
@@ -4326,6 +4396,23 @@ mailEvents.onBeforeSending((mail) => {
 
 Global hooks fire for **every** mail. Per-mail handlers from the builder / `sendMail` fire only for that one send.
 
+### Observe captured development and test mail
+
+Development and test sends create a `CapturedMail` and synchronously emit the
+global `mail.captured` event. Subscribe with `mailEvents.onCaptured`:
+
+```ts
+import { mailEvents, type CapturedMail } from "@warlock.js/core";
+
+mailEvents.onCaptured((mail: CapturedMail) => {
+  console.log(mail.id, mail.options.subject);
+});
+```
+
+`CapturedMail.id` is the mail's generated or supplied id. This event is for
+development/test tooling; production sends do not emit it. Listener failures
+are logged and never interrupt mail delivery.
+
 For correlated tracking of a specific mail, generate an id and subscribe by id:
 
 ```ts
@@ -4379,10 +4466,11 @@ Captured mail shape:
 
 ```ts
 type CapturedMail = {
-  options: MailOptions;       // original payload
+  id: string;
+  options: MailOptions; // original payload
   normalized: NormalizedMail; // post-normalization (arrays, resolved from)
   timestamp: Date;
-  result?: MailResult;        // in test mode, always success
+  result?: MailResult; // in test mode, always success
   error?: MailError;
 };
 ```
@@ -8426,6 +8514,9 @@ This skill is the foundation. Every other warlock skill (`register-route`, `crea
 2. **Several files are auto-loaded — never `import` them.** The dev-server file watcher and the production builder categorize these as "special" and load them on boot.
    - `src/app/<module>/routes.ts` — route declarations
    - `src/app/<module>/main.ts` — per-module one-time setup
+   - `src/app/<module>/worker.ts` — worker-only setup (queue job definitions,
+     `scheduler.addJob(...)`, `scheduler.start()`); loaded only for the
+     `worker` role, and always loaded by `warlock dev`
    - `src/app/main.ts` — **project-level** one-time application setup (global hooks and other app initialization; connector instances belong in `warlock.config.ts > connectors`)
    - `src/app/<module>/events/*.ts(x)` — **any** `.ts(x)` file inside the `events/` folder (the `*.event.ts` suffix is convention, not a framework requirement)
    - `src/app/<module>/utils/locales.ts` — module translations via `groupedTranslations(...)`
@@ -8446,7 +8537,7 @@ This skill is the foundation. Every other warlock skill (`register-route`, `crea
    ```ts title="src/app/<module>/schema/create-<thing>.schema.ts"
    import { v, type Infer } from "@warlock.js/seal";
 
-   export const createThingSchema = v.object({ /* … */ });
+   export const createThingSchema = v.object({/* … */});
    export type CreateThingSchema = Infer<typeof createThingSchema>;
    ```
 
@@ -8455,13 +8546,17 @@ This skill is the foundation. Every other warlock skill (`register-route`, `crea
    import { type CreateThingSchema, createThingSchema } from "../schema/create-thing.schema";
    import { createThingService } from "../services/create-thing.service";
 
-   export const createThingController: GuardedRequestHandler<CreateThingSchema> = async ({ request, response }) => {
+   export const createThingController: GuardedRequestHandler<CreateThingSchema> = async ({
+     request,
+     response,
+   }) => {
      const thing = await createThingService(request.validated());
      return response.success({ thing });
    };
 
    createThingController.validation = { schema: createThingSchema };
    ```
+
 8. **Model getters beat `.get<T>("field")`.** Add a typed getter on the model rather than scattering `.get<string>("name")` casts across call sites.
 
 ## Module layout (the standard subfolders)
@@ -8480,26 +8575,27 @@ src/app/<module>/
   seeds/                    seed data for `warlock seed`
   routes.ts                 ← auto-loaded
   main.ts                   ← auto-loaded once, one-time setup
+  worker.ts                 ← auto-loaded for the worker role only
 ```
 
 Some older modules still have a `validation/` folder instead of `schema/` — historical drift. The framework treats them as plain folders either way; the generator emits to `schema/`.
 
 ## File naming (project-wide)
 
-| Suffix              | Role                                  | Example                             |
-| ------------------- | ------------------------------------- | ----------------------------------- |
-| `.controller.ts`    | HTTP handler                          | `create-product.controller.ts`      |
-| `.service.ts`       | Stateless business logic              | `create-product.service.ts`         |
-| `.usecase.ts`       | `useCase()` pipeline                  | `login.usecase.ts`                  |
-| `.model.ts`         | Cascade model class                   | `product.model.ts`                  |
-| `.repository.ts`    | `RepositoryManager` subclass          | `products.repository.ts`            |
-| `.resource.ts`      | `Resource` subclass                   | `product.resource.ts`               |
-| `.schema.ts`        | seal validation schema + its inferred `<Name>Schema` type from the same file | `create-product.schema.ts`          |
-| `.type.ts`          | data shape (TypeScript `type`)        | `cart-state.type.ts`                |
-| `.contract.ts`      | interface (TypeScript `interface`)    | `model.contract.ts`                 |
-| `.event.ts`         | event listener registrations (any `.ts(x)` inside `events/` works; the suffix is convention) | `audit.event.ts`                    |
-| `.migration.ts`     | Cascade migration                     | `2026_05_22_120000_product.migration.ts` |
-| `.seed.ts`          | seed data                             | `products.seed.ts`                  |
+| Suffix           | Role                                                                                         | Example                                  |
+| ---------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `.controller.ts` | HTTP handler                                                                                 | `create-product.controller.ts`           |
+| `.service.ts`    | Stateless business logic                                                                     | `create-product.service.ts`              |
+| `.usecase.ts`    | `useCase()` pipeline                                                                         | `login.usecase.ts`                       |
+| `.model.ts`      | Cascade model class                                                                          | `product.model.ts`                       |
+| `.repository.ts` | `RepositoryManager` subclass                                                                 | `products.repository.ts`                 |
+| `.resource.ts`   | `Resource` subclass                                                                          | `product.resource.ts`                    |
+| `.schema.ts`     | seal validation schema + its inferred `<Name>Schema` type from the same file                 | `create-product.schema.ts`               |
+| `.type.ts`       | data shape (TypeScript `type`)                                                               | `cart-state.type.ts`                     |
+| `.contract.ts`   | interface (TypeScript `interface`)                                                           | `model.contract.ts`                      |
+| `.event.ts`      | event listener registrations (any `.ts(x)` inside `events/` works; the suffix is convention) | `audit.event.ts`                         |
+| `.migration.ts`  | Cascade migration                                                                            | `2026_05_22_120000_product.migration.ts` |
+| `.seed.ts`       | seed data                                                                                    | `products.seed.ts`                       |
 
 Filenames are kebab-case. Class names are PascalCase. Function names are camelCase. Table/collection names are snake_case (plural).
 
@@ -8510,8 +8606,8 @@ The scaffolded `tsconfig.json` defines:
 ```jsonc
 {
   "paths": {
-    "app/*": ["./src/app/*"]
-  }
+    "app/*": ["./src/app/*"],
+  },
 }
 ```
 
@@ -9156,16 +9252,16 @@ Run it: `npx warlock users.promote --email=hasan@example.com` (or `npx warlock u
 
 ## `CLICommandOptions` — the factory input
 
-| Field         | Type                          | Required | Notes                                                                                          |
-| ------------- | ----------------------------- | -------- | ---------------------------------------------------------------------------------------------- |
-| `name`        | `string`                      | yes      | Dot notation OK (`db.seed`, `jwt.generate`). May include positional placeholders (`name <arg>`). |
-| `description` | `string`                      |          | Shown in `warlock --help` and `warlock <cmd> --help`.                                          |
-| `alias`       | `string`                      |          | Short name (`m` for `migrate`).                                                                |
-| `action`      | `(data) => void \| Promise`   | yes      | Runs after preloaders. `data` is `{ args, options }`.                                          |
-| `preAction`   | `(data) => void \| Promise`   |          | Runs **before** preloaders — banner, input validation.                                         |
-| `preload`     | `CLICommandPreload`           |          | What to load before `action` runs. See below.                                                  |
-| `persistent`  | `boolean`                     |          | `true` for long-running commands (dev server). Skips the auto-exit.                            |
-| `options`     | `CLICommandOption[]`          |          | Flag definitions. See below.                                                                   |
+| Field         | Type                        | Required | Notes                                                                                            |
+| ------------- | --------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `name`        | `string`                    | yes      | Dot notation OK (`db.seed`, `jwt.generate`). May include positional placeholders (`name <arg>`). |
+| `description` | `string`                    |          | Shown in `warlock --help` and `warlock <cmd> --help`.                                            |
+| `alias`       | `string`                    |          | Short name (`m` for `migrate`).                                                                  |
+| `action`      | `(data) => void \| Promise` | yes      | Runs after preloaders. `data` is `{ args, options }`.                                            |
+| `preAction`   | `(data) => void \| Promise` |          | Runs **before** preloaders — banner, input validation.                                           |
+| `preload`     | `CLICommandPreload`         |          | What to load before `action` runs. See below.                                                    |
+| `persistent`  | `boolean`                   |          | `true` for long-running commands (dev server). Skips the auto-exit.                              |
+| `options`     | `CLICommandOption[]`        |          | Flag definitions. See below.                                                                     |
 
 ## Options — flag shape
 
@@ -9267,29 +9363,29 @@ The framework ships a fixed set of commands you call but don't author. Knowing t
 
 ### Database + migrations
 
-| Command  | Flags / args                                    | Preloads                       |
-| -------- | ----------------------------------------------- | ------------------------------ |
-| `warlock migrate` | `--list` / `-l` (executed **and** pending), `--pending` (pending only, sets an exit code), `--fresh` / `-f` (drop tables first) | database, logger          |
-| `warlock seed` | `--name <pattern>` (run seeds matching the pattern) | full bootstrap (env, configs, app modules) |
-| `warlock create-database <name>` | bare positional `<name>`        | database                       |
-| `warlock drop.tables` | `--force, -f` (skip confirmation prompt) | database, logger          |
-| `warlock db.indexes` | builds DB indexes for every registered model    | database                  |
+| Command                          | Flags / args                                                                                                                    | Preloads                                   |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `warlock migrate`                | `--list` / `-l` (executed **and** pending), `--pending` (pending only, sets an exit code), `--fresh` / `-f` (drop tables first) | database, logger                           |
+| `warlock seed`                   | `--name <pattern>` (run seeds matching the pattern)                                                                             | full bootstrap (env, configs, app modules) |
+| `warlock create-database <name>` | bare positional `<name>`                                                                                                        | database                                   |
+| `warlock drop.tables`            | `--force, -f` (skip confirmation prompt)                                                                                        | database, logger                           |
+| `warlock db.indexes`             | builds DB indexes for every registered model                                                                                    | database                                   |
 
 **Asking what will run next.** `warlock migrate --list` prints executed migrations and then the pending ones **in execution order**. Do not derive the pending set by differencing `--all` against `--list`: `--all` globs `src/app` only, while `--list` reads the migrations table, which also holds migrations that packages register through `database.migrations` (`@warlock.js/auth` contributes two). The difference under-counts pending, in the direction that says "safe to proceed".
 
 `--list` is a report and always exits `0`. `--pending` is a gate, and its exit code is its whole API:
 
-| Exit | Meaning |
-| ---- | ------- |
+| Exit | Meaning                   |
+| ---- | ------------------------- |
 | `0`  | computed, nothing pending |
-| `1`  | computed, N pending |
+| `1`  | computed, N pending       |
 | `2`  | **could not be computed** |
 
 ```bash
 warlock migrate --pending && ./deploy.sh
 ```
 
-`2` is separate from `1` on purpose — a script must be able to tell a backlog from an unknown, because one means *run them* and the other means *stop*. When the migration files cannot be loaded, both commands print `Pending: unavailable — <reason>` beneath a complete executed listing rather than reporting `0`.
+`2` is separate from `1` on purpose — a script must be able to tell a backlog from an unknown, because one means _run them_ and the other means _stop_. When the migration files cannot be loaded, both commands print `Pending: unavailable — <reason>` beneath a complete executed listing rather than reporting `0`.
 
 **If you are writing a command that reports on pending migrations:** register migrations first. `listPendingMigrations()` filters the runner's registry, so a caller that has not loaded anything gets `[]` — which reads as "nothing pending" and is not the same claim.
 
@@ -9315,36 +9411,41 @@ warlock generate                         (alias: g)      — interactive picker
 
 `warlock add <features...>` installs framework-adjacent features through a curated registry — bundles npm dependencies + scaffold files + tsconfig patches + package.json scripts in one call. Featured names (from `add-command.action.ts`):
 
-| Feature       | Installs                                                                                            |
-| ------------- | --------------------------------------------------------------------------------------------------- |
-| `react-email` | `react-email` + `@react-email/components` + `@react-email/render` + `@react-email/tailwind`; drops a `welcome-email.tsx` sample; patches `tsconfig.json` |
-| `web`         | Warlock Web + React stack; scaffolds the application page, localization, contact endpoint, and Web configuration                         |
-| `react`       | `react` + `react-dom` + types                                                                       |
+| Feature       | Installs                                                                                                                                                                               |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `react-email` | `react-email` + `@react-email/components` + `@react-email/render` + `@react-email/tailwind`; drops a `welcome-email.tsx` sample; patches `tsconfig.json`                               |
+| `web`         | Warlock Web + React stack; scaffolds the application page, localization, contact endpoint, and Web configuration                                                                       |
+| `react`       | `react` + `react-dom` + types                                                                                                                                                          |
 | `bull-board`  | `@bull-board/api` + `@bull-board/fastify`; writes a `dashboard` block to `src/config/queue.ts`. `requires: ["queue"]` — adds the `queue` feature first automatically when it's missing |
-| `image`       | `sharp` (for the `Image` class)                                                                     |
-| `mail`        | `nodemailer` + types                                                                                |
-| `ses`         | `@aws-sdk/client-sesv2`                                                                             |
-| `mongodb`     | `mongodb` driver                                                                                    |
-| `postgres`    | `pg`                                                                                                |
-| `mysql`       | `mysql2`                                                                                            |
-| `redis`       | `redis`                                                                                             |
-| `s3`          | `@aws-sdk/client-s3` + `@aws-sdk/lib-storage` + `@aws-sdk/s3-request-presigner`                     |
-| `scheduler`   | `@warlock.js/scheduler`                                                                             |
-| `swagger`     | `@warlock.js/swagger`                                                                               |
-| `postman`     | `@warlock.js/postman`                                                                               |
-| `herald`      | `@warlock.js/herald` + `amqplib` + types; ejects `src/config/communicator.ts`                       |
-| `test`        | `vitest` + `@mongez/vite` + coverage; drops `test-global-setup.ts` / `test-setup.ts` / `vite.config.ts` |
+| `image`       | `sharp` (for the `Image` class)                                                                                                                                                        |
+| `mail`        | `nodemailer` + types                                                                                                                                                                   |
+| `ses`         | `@aws-sdk/client-sesv2`                                                                                                                                                                |
+| `mongodb`     | `mongodb` driver                                                                                                                                                                       |
+| `postgres`    | `pg`                                                                                                                                                                                   |
+| `mysql`       | `mysql2`                                                                                                                                                                               |
+| `redis`       | `redis`                                                                                                                                                                                |
+| `s3`          | `@aws-sdk/client-s3` + `@aws-sdk/lib-storage` + `@aws-sdk/s3-request-presigner`                                                                                                        |
+| `scheduler`   | `@warlock.js/scheduler`                                                                                                                                                                |
+| `swagger`     | `@warlock.js/swagger`                                                                                                                                                                  |
+| `postman`     | `@warlock.js/postman`                                                                                                                                                                  |
+| `herald`      | `@warlock.js/herald` + `amqplib` + types; ejects `src/config/communicator.ts`                                                                                                          |
+| `test`        | `vitest` + `@mongez/vite` + coverage; drops `test-global-setup.ts` / `test-setup.ts` / `vite.config.ts`                                                                                |
+| `devtools`    | `@warlock.js/devtools` as a dev dependency; `warlock dev` auto-loads its development dashboard at `/__warlock`                                                                         |
 
 Run `warlock add --list` to see what's currently registered. Pass `--packageManager <yarn\|pnpm\|npm>` to override auto-detection (defaults to whichever lockfile is present).
+
+`warlock add devtools` never adds anything to `warlock.config.ts`. The package
+is loaded automatically by `warlock dev` when installed, and is omitted from a
+production install with dev dependencies excluded.
 
 The Web starter keeps the page's universal non-component setup in `src/web/index.register.ts`, while `src/web/index.page.tsx` re-exports `register`. Warlock still discovers and runs the hook from the page namespace in both SSR and the browser, but editing the page component remains inside React's Fast Refresh boundary. Do not move the `register()` declaration inline beside the component: React Refresh treats that non-component export as incompatible and reloads the page, losing component state.
 
 ### Misc
 
-| Command  | Purpose                                                     |
-| -------- | ----------------------------------------------------------- |
-| `warlock storage.put <localPath> [destination]` | Upload a local file to the default storage disk |
-| `warlock jwt.generate` | Generate a JWT secret in `.env` (from `@warlock.js/auth`)            |
+| Command                                         | Purpose                                                   |
+| ----------------------------------------------- | --------------------------------------------------------- |
+| `warlock storage.put <localPath> [destination]` | Upload a local file to the default storage disk           |
+| `warlock jwt.generate`                          | Generate a JWT secret in `.env` (from `@warlock.js/auth`) |
 
 ## Common patterns
 
@@ -9406,7 +9507,7 @@ export default command({
 });
 ```
 
-`preAction` runs *before* preloaders — cheap way to bail out without spinning up the database.
+`preAction` runs _before_ preloaders — cheap way to bail out without spinning up the database.
 
 ## Gotchas
 
@@ -9414,7 +9515,7 @@ export default command({
 - **Don't put logic at module top level.** The file gets imported during the commands scan (`warlock --warm-cache`). Anything outside `action` runs at scan time, possibly before any config or env is loaded.
 - **Required options block execution.** If `required: true` and the user omits the flag, the framework prints `Missing required options:` and exits `1` before `action` runs.
 - **Connectors are not free.** `connectors: true` boots the database, cache, storage, etc. For a print-version-and-exit command, leave `preload` undefined.
-- **`name` field with positional slots** (`name: "storage.put <localPath>"`) — the *registered* name is still `storage.put` (the first whitespace-separated token), so look up + alias work normally. Slots are only documentation/help-output.
+- **`name` field with positional slots** (`name: "storage.put <localPath>"`) — the _registered_ name is still `storage.put` (the first whitespace-separated token), so look up + alias work normally. Slots are only documentation/help-output.
 - **Aliases must be unique across plugin + framework + project.** The first registration wins; later collisions silently overwrite the map entry.
 
 ## See also
@@ -10310,6 +10411,8 @@ Per-invocation callbacks fire first, then use-case-level, then globals. The retu
 | Use case   | Guards/validation/handler/after + retry + benchmark + broadcast + events | Cross-cutting concerns, multi-service orchestration, anything called from multiple transports (HTTP + CLI + queue). |
 
 Don't reach for `useCase` for a 5-line service — the ceremony outweighs the benefit.
+
+For the plain-function flavour (`warlock generate.use-case <module>/<verb-noun>`) shared by a page action and a controller, see the guide [One use-case, two adapters](https://warlock.js.org/v/latest/core/guides/one-use-case-two-adapters/).
 
 ## Gotchas
 
@@ -11792,6 +11895,43 @@ dataSourceRegistry.getAllDataSources(); // DataSource[] — every registered sou
 ```
 
 There is no `has(name)` / `list()` / `setDefault()` — guard with a `try/catch` around `get(name)`, iterate `getAllDataSources()`, and set the default via `isDefault` at registration.
+
+## Observe database queries
+
+Subscribe once at the registry to observe settled queries from every registered
+source. Keep the listener reference to remove it later:
+
+```ts
+import { dataSourceRegistry, type QueryEvent } from "@warlock.js/cascade";
+import { log } from "@warlock.js/logger";
+
+const onQuery = (event: QueryEvent) => {
+  if (event.durationMs > 200) {
+    log.warn("database", "slow-query", event);
+  }
+};
+
+dataSourceRegistry.on("query", onQuery);
+// Later:
+dataSourceRegistry.off("query", onQuery);
+```
+
+`QueryEvent` has `connection`, `driver` (`"postgres"` or `"mongodb"`),
+`durationMs`, and `startedAt`; SQL events may include `sql`, `bindings`, and
+`rowCount`, while Mongo events may include `collection`, `command`, and
+`pipeline`. It also carries `error` when the command failed. Registry events
+use the registered data-source name as `connection`.
+
+For one source only, subscribe to its driver with the same listener lifecycle:
+
+```ts
+const source = dataSourceRegistry.get("analytics");
+source.driver.on("query", onQuery);
+source.driver.off("query", onQuery);
+```
+
+A throwing listener never fails the query. Mongo command monitoring is enabled
+unless `clientOptions.monitorCommands` is explicitly set.
 
 ## Things NOT to do
 
@@ -16183,7 +16323,7 @@ cache.on("miss", ({ key, driver }) => {
 });
 ```
 
-Available events: `hit`, `miss`, `set`, `removed`, `flushed`, `expired`, `connected`, `disconnected`, `error`.
+Available events: `hit`, `miss`, `set`, `removed`, `invalidated`, `flushed`, `expired`, `connected`, `disconnected`, `error`.
 
 Listeners attached via `cache.on(...)` survive driver switches the same way the metrics collector does.
 
@@ -16195,6 +16335,7 @@ Listeners attached via `cache.on(...)` survive driver switches the same way the 
 | Page on cache errors | `cache.on("error", ...)` |
 | Periodic export to Prometheus / StatsD | `cache.metrics()` + `setInterval` + `resetMetrics()` |
 | Audit log of every removal | `cache.on("removed", ...)` |
+| See which tag invalidations ran, what they removed and how long they took | `cache.on("invalidated", ({ tags, keys, durationMs }) => ...)` — once per `tags([...]).invalidate()` |
 | Detect a specific anti-pattern (e.g. always-miss key) | `cache.on("miss", ...)` |
 | Debug "is the cache being hit at all?" in dev | `cache.metrics()` once at the end of a flow |
 
@@ -26622,6 +26763,58 @@ export default function Contact() {
 - Per-user limit: `config.action.middleware: [middleware.rateLimit({ max: 5, duration: 60_000, key: "user", guests: "ip" })]` (`import { middleware } from "@warlock.js/core"`). Keyed on `request.locals.user.id`, so it needs `pageSession()` from `@warlock.js/auth`. `guests`: `"ip"` (default) or `"skip"`. Over the limit: 429, action not run.
 - With `@mongez/react-form`, use `useSubmitAction` from `@warlock.js/web/form` and alias one of the two `Form`s.
 
+## Validate in the browser with the same schema
+
+Put browser-safe, shared constraints in a separate schema module. Import that one
+constant into the page for `config.action.validation` and into the
+`@mongez/react-form` form's `schema` prop:
+
+```tsx
+// src/web/contact/contact.schema.ts
+import { v } from "@warlock.js/seal";
+
+export const contactSchema = v.object({
+  email: v.string().email(),
+  message: v.string().min(10),
+});
+```
+
+```tsx
+// src/web/contact/contact.page.tsx
+import { Form as ReactForm } from "@mongez/react-form";
+import { useSubmitAction } from "@warlock.js/web/form";
+import type { PageActionContext, PageConfig } from "@warlock.js/web";
+import { contactSchema } from "./contact.schema";
+
+export const config: PageConfig = {
+  route: { path: "/contact", name: "contact" },
+  action: { validation: contactSchema },
+};
+
+export async function action({ request, response }: PageActionContext<typeof contactSchema>) {
+  const values = request.validated();
+  // Handle values, then redirect or return data.
+  return response.redirect("/contact");
+}
+
+export default function ContactPage() {
+  const submit = useSubmitAction<typeof contactSchema>();
+
+  return (
+    <ReactForm method="post" schema={contactSchema} onSubmit={submit.submit}>
+      {/* Your registered controls must be named "email" and "message". */}
+    </ReactForm>
+  );
+}
+```
+
+`schema` provides immediate browser feedback, but `config.action.validation`
+remains authoritative: a request that bypasses the browser is still rejected
+with 422 before the action runs. `useSubmitForm` is for Core API routes; use
+`useSubmitAction` for a page action. Keep database uniqueness checks and any
+other server-only rule out of this shared schema: keep them server-side or
+split the browser-safe constraints into a shared schema.
+
 ## load-page-data  `@warlock.js/web/load-page-data/SKILL.md`
 
 ---
@@ -27963,6 +28156,46 @@ function LocalePicker() {
 
 The switch re-fetches the current page and commits after its tree is ready. In the default strategy, the browser writes its locale preference only at that commit, so a failed or superseded switch leaves the displayed page and the next document load unchanged. Prefix and `[locale]` routes update their path as part of the successful navigation. Await the returned promise when failure handling matters.
 
+## observe-page-requests  `@warlock.js/web/observe-page-requests/SKILL.md`
+
+---
+name: observe-page-requests
+description: 'Observe SSR page request phases through core `TracingHooks`: page middleware, cache lookup, loader/render streaming, and deferred-value settlement. Triggers: `page.middleware`, `page.cache`, `defer.settle`, `render.shell`, `TracingHooks`, `http.tracing`; "trace a page request", "page cache telemetry", "deferred stream observability".'
+---
+
+# Observe page requests
+
+Web emits page spans through core's `TracingHooks.onPhase`; there is no
+web-specific tracing API. Configure or register the hook as documented in
+[`@warlock.js/core/request-tracing/SKILL.md`](@warlock.js/core/request-tracing/SKILL.md).
+
+```ts
+import { registerTracingHooks } from "@warlock.js/core";
+
+registerTracingHooks({
+  onPhase(_ctx, phase) {
+    if (phase.name === "page.cache") {
+      console.log(phase.attrs?.status); // hit | miss | bypass
+    }
+  },
+});
+```
+
+## Page-specific phases
+
+| Phase             | Attributes                   | Meaning                                            |
+| ----------------- | ---------------------------- | -------------------------------------------------- |
+| `page.middleware` | `count`, `outcome` (`next`   | `response`                                         | `error`)                           | All page middleware settling |
+| `page.cache`      | `status` (`hit`              | `miss`                                             | `bypass`)                          | Page-cache lookup settling   |
+| `loader`          | `level`, `layoutPath?`       | An app, layout, or page loader                     |
+| `render.shell`    | —                            | Rendering until React's shell is ready to stream   |
+| `stream.end`      | —                            | Whole streamed response, including deferred values |
+| `defer.settle`    | `key`, `status` (`fulfilled` | `rejected`)                                        | One deferred loader value settling |
+
+Every phase has `name`, `durationMs`, and `startedAt` (epoch milliseconds).
+Use `key` only to identify a deferred value; do not put sensitive loader data
+in tracing attributes.
+
 ## protect-a-page  `@warlock.js/web/protect-a-page/SKILL.md`
 
 ---
@@ -28671,6 +28904,33 @@ The default client is the configured `@mongez/http` singleton, so its base URL a
 `response`, `data`, and `error` start as `null`; `onSuccess`, `onError`, and `onComplete` receive the full `HttpResult`. Duplicate calls share the active submission. `cancel()` cancels it, and `reset()` clears hook state and errors assigned by the hook.
 
 Validation mapping is on by default. Known server field errors are assigned to controls; unknown fields and general messages go to `formErrors`. Set `mapFieldErrors: false` to leave controls untouched or provide a mapper returning `{ [field]: message }`.
+
+## Validate in the browser with the same schema
+
+`@mongez/react-form` accepts a Standard Schema through its `schema` prop, so a
+browser-safe Seal schema can be shared with the API route's server validation:
+
+```tsx
+import { Form } from "@mongez/react-form";
+import { useSubmitForm } from "@warlock.js/web/form";
+import { contactSchema } from "./contact.schema";
+
+export default function ContactForm() {
+  const submit = useSubmitForm({ path: "/api/contact" });
+
+  return (
+    <Form schema={contactSchema} onSubmit={submit.submit}>
+      {/* Registered controls use the schema's field names. */}
+    </Form>
+  );
+}
+```
+
+Client validation is feedback, not authorization: the API must validate the
+same schema itself, because a browser can be bypassed. For a page action, put
+the schema in `config.action.validation` and submit with `useSubmitAction`, not
+`useSubmitForm`. Do not share database uniqueness checks or other server-only
+rules with the browser; keep those server-side or split the schema.
 
 Named route metadata contains only name, path, and method. A route declared with method `all` cannot select a browser verb: use a direct `path` and explicit `method`.
 
@@ -38408,6 +38668,88 @@ Failures surface the error and halt; there is no rollback. After it finishes, `c
 - `@warlock.js/core/run-app/SKILL.md` — `warlock dev` / `build` / `start` once the project exists.
 - `@warlock.js/core/create-module/SKILL.md` — generate a new module inside the project.
 - `@warlock.js/core/add-connector/SKILL.md` — what `warlock add` wires when a feature pulls a connector.
+
+
+================================================================================
+# @warlock.js/devtools
+================================================================================
+
+# Warlock Devtools — full skills
+
+> Package: `@warlock.js/devtools`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/devtools/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## devtools-overview  `@warlock.js/devtools/devtools-overview/SKILL.md`
+
+---
+name: devtools-overview
+description: 'Development-only dashboard for Warlock.js apps at `/__warlock`: request timeline (router + page middleware, loaders, render, deferred values), every SQL/Mongo query with EXPLAIN, N+1 warnings naming the file and line, a dev mailbox, logs, cache operations and the route map. Use for: "why is this page slow", "which queries does this request run", "find N+1 queries", "see the email my app just sent in dev", "open the dashboard". Install with `warlock add devtools`; never registered in warlock.config.ts. Not this package: production monitoring/APM or OpenTelemetry export — use `http.tracing` hooks in @warlock.js/core; slow-query logging in production — subscribe to cascade `dataSourceRegistry.on("query")` yourself.'
+---
+
+# `@warlock.js/devtools` — overview
+
+A dashboard for **development only**, served by your own app at `/__warlock`.
+It shows what each request did: its timing waterfall, the queries it ran, the
+cache operations, the logs, and any mail it sent.
+
+## Install: one command, no config
+
+```bash
+warlock add devtools   # adds @warlock.js/devtools as a DEV dependency
+warlock dev            # open http://localhost:<port>/__warlock
+```
+
+There's nothing to register. `warlock dev` loads devtools automatically when
+the package is installed.
+
+**Do not** add `devtoolsConnector()` to `warlock.config.ts`. Devtools is a
+dev dependency, so a production install doesn't have it, and a config import
+of it would fail to resolve there.
+
+## Why it can't leak into production
+
+1. **It isn't installed there.** Production installs omit dev dependencies.
+2. **It refuses to run outside development.** If it's present anyway, it logs
+   one warning (`@warlock.js/devtools only runs in development; it is not mounted`)
+   and mounts nothing.
+3. **It only answers loopback clients.** Every dashboard and API route answers
+   404 unless the connection comes from `127.0.0.1` / `::1`. It checks the
+   socket address, not `X-Forwarded-For`, so a forwarded-for header can't
+   unlock it.
+
+## What each panel shows
+
+| Panel | What you see | Where it comes from |
+|---|---|---|
+| **Requests** | Each request with its status, duration and query count. Click one for a waterfall: router middleware, `page.middleware`, loaders, `page.cache` hit/miss, `render.shell`, `defer.settle`, with queries and cache ops placed on the same time axis. | core `registerTracingHooks()` |
+| **Queries** | SQL + bindings or the Mongo command, duration, rows, and an **Explain** button (Postgres `SELECT` only; runs `EXPLAIN (FORMAT JSON)`, never `ANALYZE`) | cascade `dataSourceRegistry.on("query")` |
+| **N+1** | `⚠ N+1: 12× "select … where post_id = $1" — src/app/posts/services/list-posts.service.ts:18`, shown on the request and printed in the terminal | same query shape ≥ 5 times in one request |
+| **Mail** | Every mail sent in development: headers, HTML (sandboxed) and text, attachment names | core `mailEvents.onCaptured()` |
+| **Logs** | Log entries per request, filterable by level and module | a logger channel |
+| **Cache** | hit / miss / set / removed / `invalidated` (tags, keys removed) | cache `cache.on(...)` |
+| **Routes** | Every HTTP route with its method, path, name and middleware | core router |
+
+Work outside a request (boot, scheduler ticks, queue jobs) goes to a separate
+background list, so it never clutters a request's timeline.
+
+## Options
+
+`warlock dev` uses the defaults: path `/__warlock`, the last 200 requests
+kept, and an N+1 threshold of 5. Everything lives in memory and is gone on
+restart.
+
+## Secrets
+
+Query bindings and log context go through the logger's redaction rules
+before they're stored. The data is still real request data, which is exactly
+why the dashboard is development-only and loopback-only.
+
+## Related
+
+- Building your own tooling on the same hooks: core `registerTracingHooks()`,
+  cascade `dataSourceRegistry.on("query")`, core `mailEvents.onCaptured()` and
+  the cache `invalidated` event are public APIs that also work without devtools.
 
 
 ================================================================================

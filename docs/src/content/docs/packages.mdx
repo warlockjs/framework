@@ -6,47 +6,136 @@ template: splash
 
 import { Card, CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-Fifteen packages, four groups — plus five AI provider adapters nested under
+Sixteen packages, four groups — plus five AI provider adapters nested under
 the AI package. Each one is independently installable; together they form a
 cohesive framework.
 
 ## Foundation
 
 <CardGrid>
-  <LinkCard title="Core" href="/v/latest/core/" description="HTTP, routing, modules, middleware, mail, file storage, conventions." />
-  <LinkCard title="Web" href="/v/latest/web/" description="SSR React pages with hydration, client navigation, and Fast Refresh." />
-  <LinkCard title="Seal" href="/v/latest/seal/" description="Schema validation that doubles as TypeScript types and JSON schema." />
-  <LinkCard title="Logger" href="/v/latest/logger/" description="Structured logging with channels, redaction, and shutdown flushing." />
-  <LinkCard title="Context" href="/v/latest/context/" description="Request-scoped context propagation without prop-drilling." />
-  <LinkCard title="File System" href="/v/latest/fs/" description="File system utilities with atomic writes and directory management." />
+  <LinkCard
+    title="Core"
+    href="/v/latest/core/"
+    description="HTTP, routing, modules, middleware, mail, file storage, conventions."
+  />
+  <LinkCard
+    title="Web"
+    href="/v/latest/web/"
+    description="SSR React pages with hydration, client navigation, and Fast Refresh."
+  />
+  <LinkCard
+    title="Seal"
+    href="/v/latest/seal/"
+    description="Schema validation that doubles as TypeScript types and JSON schema."
+  />
+  <LinkCard
+    title="Logger"
+    href="/v/latest/logger/"
+    description="Structured logging with channels, redaction, and shutdown flushing."
+  />
+  <LinkCard
+    title="Context"
+    href="/v/latest/context/"
+    description="Request-scoped context propagation without prop-drilling."
+  />
+  <LinkCard
+    title="File System"
+    href="/v/latest/fs/"
+    description="File system utilities with atomic writes and directory management."
+  />
+  <LinkCard
+    title="Devtools"
+    href="/v/latest/devtools/"
+    description="Development-only dashboard for requests, queries, mail, logs, cache, and routes."
+  />
 </CardGrid>
 
 ## Data
 
 <CardGrid>
-  <LinkCard title="Cascade" href="/v/latest/cascade/" description="Database ORM with relations, migrations, vector search, and atomic ops." />
-  <LinkCard title="Cache" href="/v/latest/cache/" description="Multi-driver cache with tags, locks, SWR, and similarity search." />
+  <LinkCard
+    title="Cascade"
+    href="/v/latest/cascade/"
+    description="Database ORM with relations, migrations, vector search, and atomic ops."
+  />
+  <LinkCard
+    title="Cache"
+    href="/v/latest/cache/"
+    description="Multi-driver cache with tags, locks, SWR, and similarity search."
+  />
 </CardGrid>
 
 ## Lifecycle
 
 <CardGrid>
-  <LinkCard title="Auth" href="/v/latest/auth/" description="Authentication, tokens, route protection, custom user types." />
-  <LinkCard title="Access" href="/v/latest/access/" description="Authorization — RBAC permission checks, ABAC policies, roles, and a pluggable resolver." />
-  <LinkCard title="Scheduler" href="/v/latest/scheduler/" description="Cron jobs with retry, overlap prevention, and timezone pinning." />
-  <LinkCard title="Queue" href="/v/latest/queue/" description="Durable background jobs on BullMQ + Redis — retries, delay, priority, failed-job recovery." />
-  <LinkCard title="Herald" href="/v/latest/herald/" description="Pub/sub messaging — publish, consume, request-and-respond patterns." />
-  <LinkCard title="Notifications" href="/v/latest/notifications/" description="Multi-channel notifications — define once; mail, in-app, custom channels, preferences, idempotency." />
+  <LinkCard
+    title="Auth"
+    href="/v/latest/auth/"
+    description="Authentication, tokens, route protection, custom user types."
+  />
+  <LinkCard
+    title="Access"
+    href="/v/latest/access/"
+    description="Authorization — RBAC permission checks, ABAC policies, roles, and a pluggable resolver."
+  />
+  <LinkCard
+    title="Scheduler"
+    href="/v/latest/scheduler/"
+    description="Cron jobs with retry, overlap prevention, and timezone pinning."
+  />
+  <LinkCard
+    title="Queue"
+    href="/v/latest/queue/"
+    description="Durable background jobs on BullMQ + Redis — retries, delay, priority, failed-job recovery."
+  />
+  <LinkCard
+    title="Herald"
+    href="/v/latest/herald/"
+    description="Pub/sub messaging — publish, consume, request-and-respond patterns."
+  />
+  <LinkCard
+    title="Notifications"
+    href="/v/latest/notifications/"
+    description="Multi-channel notifications — define once; mail, in-app, custom channels, preferences, idempotency."
+  />
 </CardGrid>
 
 ## AI
 
 <CardGrid>
-  <LinkCard title="AI" href="/v/latest/ai/" description="Agents, tools, workflows, supervisors, orchestrators, a planner, and memory." />
-  <LinkCard title="AI Panoptic" href="/v/latest/ai/observability/ai-panoptic/" description="Observability for AI — a trace collector with OpenTelemetry, Langfuse, console, and file exporters." />
-  <LinkCard title="OpenAI" href="/v/latest/ai/providers/openai/" description="OpenAI provider adapter." />
-  <LinkCard title="Anthropic" href="/v/latest/ai/providers/anthropic/" description="Anthropic provider adapter." />
-  <LinkCard title="Bedrock" href="/v/latest/ai/providers/bedrock/" description="AWS Bedrock provider adapter." />
-  <LinkCard title="Google" href="/v/latest/ai/providers/google/" description="Google provider adapter." />
-  <LinkCard title="Ollama" href="/v/latest/ai/providers/ollama/" description="Ollama (local LLM) provider adapter." />
+  <LinkCard
+    title="AI"
+    href="/v/latest/ai/"
+    description="Agents, tools, workflows, supervisors, orchestrators, a planner, and memory."
+  />
+  <LinkCard
+    title="AI Panoptic"
+    href="/v/latest/ai/observability/ai-panoptic/"
+    description="Observability for AI — a trace collector with OpenTelemetry, Langfuse, console, and file exporters."
+  />
+  <LinkCard
+    title="OpenAI"
+    href="/v/latest/ai/providers/openai/"
+    description="OpenAI provider adapter."
+  />
+  <LinkCard
+    title="Anthropic"
+    href="/v/latest/ai/providers/anthropic/"
+    description="Anthropic provider adapter."
+  />
+  <LinkCard
+    title="Bedrock"
+    href="/v/latest/ai/providers/bedrock/"
+    description="AWS Bedrock provider adapter."
+  />
+  <LinkCard
+    title="Google"
+    href="/v/latest/ai/providers/google/"
+    description="Google provider adapter."
+  />
+  <LinkCard
+    title="Ollama"
+    href="/v/latest/ai/providers/ollama/"
+    description="Ollama (local LLM) provider adapter."
+  />
 </CardGrid>

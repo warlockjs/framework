@@ -8,7 +8,7 @@ sidebar:
 
 Shipping a Warlock app is two commands: `warlock build` to produce a bundle, `warlock start` to run it. Dev runs through a custom ESM loader optimized for fast reloads; production runs an esbuild bundle on a plain Node process — no `tsx`, no loader hook, no file watcher. This page covers what `build` emits, how `start` launches it, how the environment is selected, why the runtime flips into "production" mode, and what happens to your connectors when the process gets a kill signal.
 
-It stays grounded in the actual `build`/`start` commands and the production builder. Where to *host* the resulting process — a VM, a container, a PaaS — is up to you; Warlock just needs a Node runtime and the right env vars. There's a short pointer at the end, but no Docker or PM2 recipe here, because the framework doesn't ship one.
+It stays grounded in the actual `build`/`start` commands and the production builder. Where to _host_ the resulting process — a VM, a container, a PaaS — is up to you; Warlock just needs a Node runtime and the right env vars. There's a short pointer at the end, but no Docker or PM2 recipe here, because the framework doesn't ship one.
 
 ## The 30-second look
 
@@ -48,33 +48,33 @@ Three takeaways:
 
 What the builder generates before bundling:
 
-| Generated file       | What it contains                                                                                   |
-| -------------------- | -------------------------------------------------------------------------------------------------- |
-| `bootstrap.ts`       | Calls `bootstrap()` and sets the runtime strategy + environment to `production` (see below)         |
-| `config-loader.ts`   | Imports every `src/config/*` file, registers each into `config`, and runs its special handlers      |
-| `events.ts`          | Side-effect imports of every `**/events/*` file — only generated if your app has event files         |
-| `locales.ts`         | Side-effect imports of every `**/utils/locales` file — only if present                               |
-| `main.ts`            | Side-effect imports of every `**/main` file — only if present                                        |
-| `routes.ts`          | Side-effect imports of every `**/routes` file — only if present                                      |
-| `app.ts`             | The entry point that ties it all together (bootstrap → configs → early connectors → app code → late connectors) |
+| Generated file     | What it contains                                                                                                |
+| ------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `bootstrap.ts`     | Calls `bootstrap()` and sets the runtime strategy + environment to `production` (see below)                     |
+| `config-loader.ts` | Imports every `src/config/*` file, registers each into `config`, and runs its special handlers                  |
+| `events.ts`        | Side-effect imports of every `**/events/*` file — only generated if your app has event files                    |
+| `locales.ts`       | Side-effect imports of every `**/utils/locales` file — only if present                                          |
+| `main.ts`          | Side-effect imports of every `**/main` file — only if present                                                   |
+| `routes.ts`        | Side-effect imports of every `**/routes` file — only if present                                                 |
+| `app.ts`           | The entry point that ties it all together (bootstrap → configs → early connectors → app code → late connectors) |
 
-The `app.ts` entry imports app code with dynamic `await import("./routes")` (not static imports) so each module's side effects fire *after* the early-phase connectors have finished starting — that's why the builder turns on esbuild's `splitting: true`. The same phase split you read about in [Bootstrap and connectors](../architecture-concepts/bootstrap-and-connectors.md) is baked straight into the generated entry.
+The `app.ts` entry imports app code with dynamic `await import("./routes")` (not static imports) so each module's side effects fire _after_ the early-phase connectors have finished starting — that's why the builder turns on esbuild's `splitting: true`. The same phase split you read about in [Bootstrap and connectors](../architecture-concepts/bootstrap-and-connectors.md) is baked straight into the generated entry.
 
 ### esbuild settings
 
 The builder bundles with esbuild using these settings (the ones you can influence come from `build` config):
 
-| Setting              | Value                                                              | Source                       |
-| -------------------- | ----------------------------------------------------------------- | ---------------------------- |
-| `platform`           | `node`                                                            | fixed                        |
-| `format`             | `esm`                                                             | fixed                        |
-| `target`             | `node22`                                                          | fixed (transpiles stage-3 decorators, which Node doesn't run natively yet) |
-| `bundle` / `splitting` | both `true`                                                     | fixed                        |
-| `packages`           | `external` (your `node_modules` are not inlined)                  | fixed                        |
-| `minify`             | from `build.minify`                                              | config — default `true`      |
-| `sourcemap`          | from `build.sourcemap` (`true` becomes `"linked"`)               | config — default `true`      |
-| `outdir`             | from `build.outdir`                                        | config — default `dist`      |
-| `entryNames`         | from `build.outFile` (extension stripped; esbuild adds `.js`)    | config — default `app.js`    |
+| Setting                | Value                                                         | Source                                                                     |
+| ---------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `platform`             | `node`                                                        | fixed                                                                      |
+| `format`               | `esm`                                                         | fixed                                                                      |
+| `target`               | `node22`                                                      | fixed (transpiles stage-3 decorators, which Node doesn't run natively yet) |
+| `bundle` / `splitting` | both `true`                                                   | fixed                                                                      |
+| `packages`             | `external` (your `node_modules` are not inlined)              | fixed                                                                      |
+| `minify`               | from `build.minify`                                           | config — default `true`                                                    |
+| `sourcemap`            | from `build.sourcemap` (`true` becomes `"linked"`)            | config — default `true`                                                    |
+| `outdir`               | from `build.outdir`                                           | config — default `dist`                                                    |
+| `entryNames`           | from `build.outFile` (extension stripped; esbuild adds `.js`) | config — default `app.js`                                                  |
 
 Because `packages: "external"`, your dependencies are **not** bundled in — `node_modules` must be present (installed) wherever you run the result.
 
@@ -82,12 +82,12 @@ Because `packages: "external"`, your dependencies are **not** bundled in — `no
 
 These live in `warlock.config.ts` under `build`. The defaults the runtime actually applies come from the framework's default configuration, merged over your values by `resolveBuildConfig()`:
 
-| Key            | Type                                     | Default  | What it does                                                              |
-| -------------- | ---------------------------------------- | -------- | ------------------------------------------------------------------------ |
-| `outdir` | `string`                                 | `dist/` under the project root (resolved from `process.cwd()`) | Folder the bundle is written to                                          |
-| `outFile`      | `string`                                 | `"app.js"` | Bundle filename (the extension is normalized to `.js` by esbuild)        |
-| `minify`       | `boolean`                                | `true`   | Minify the output                                                        |
-| `sourcemap`    | `boolean \| "inline" \| "linked"`        | `true`   | Emit source maps; `true` is treated as `"linked"`                        |
+| Key         | Type                              | Default                                                        | What it does                                                      |
+| ----------- | --------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `outdir`    | `string`                          | `dist/` under the project root (resolved from `process.cwd()`) | Folder the bundle is written to                                   |
+| `outFile`   | `string`                          | `"app.js"`                                                     | Bundle filename (the extension is normalized to `.js` by esbuild) |
+| `minify`    | `boolean`                         | `true`                                                         | Minify the output                                                 |
+| `sourcemap` | `boolean \| "inline" \| "linked"` | `true`                                                         | Emit source maps; `true` is treated as `"linked"`                 |
 
 ```ts title="warlock.config.ts"
 import { defineConfig } from "@warlock.js/core";
@@ -127,13 +127,63 @@ It is the success marker `warlock start` checks. Copy `outdir` whole when you sh
 node --enable-source-maps dist/app.js
 ```
 
+### Run only the parts this process serves
+
+One production build can run as an API process, a page-serving web process, a
+background worker, or a combination. Omit `--role` to preserve the ordinary
+behaviour: every role runs. `warlock dev` also always runs every role.
+
+```bash
+warlock start --role=api
+warlock start --role=web
+warlock start --role=worker
+warlock start --role=api,web
+warlock start --role=web --sites=admin,marketing
+```
+
+| Source                       | Role that loads it |
+| ---------------------------- | ------------------ |
+| `src/app/**/main.ts`         | Every role         |
+| `src/app/<module>/routes.ts` | `api`              |
+| `src/web/**` pages           | `web`              |
+| `src/app/<module>/worker.ts` | `worker`           |
+
+`main.ts` remains the shared place for models, listeners, and configuration.
+A `worker.ts` is for worker-only setup such as queue definitions and scheduler
+jobs. A `worker` process does not bind an HTTP port; when it is ready, the
+supervisor reports `worker ready` rather than a URL.
+
+`--role` accepts the comma-separated roles `api`, `web`, and `worker`; roles
+are combinable. `--sites=a,b` filters page installation to those site keys and
+requires the `web` role. An empty or unknown role, an empty sites list,
+`--sites` without `web`, an unknown site key, or a sites filter without a
+configured `web.sites` setup fails rather than falling back to serving more
+traffic than intended.
+
+At runtime, use `Application.hasRole("worker")`, `Application.roles`, and
+`Application.sites` to inspect the resolved process shape. `roles` is a
+read-only set; `sites` is a read-only set or `undefined` when every site is
+enabled.
+
+```text
+                    load balancer
+                   /             \\
+             /api → API processes  → web processes → pages and public files
+                                      (optionally selected sites)
+
+                                  worker processes → queues, scheduler, worker.ts
+```
+
+Route groups and per-site builds are planned separately; for now, one build is
+shared by these process roles.
+
 Specifically:
 
 - `--enable-source-maps` is added **unless** `build.sourcemap` is `false`, so production stack traces map back to your TypeScript.
 - Anything you type after `start` is passed through to the Node process — e.g. `warlock start --inspect` forwards `--inspect`.
 - The command inherits stdio and the parent's `env`, in the same working directory, and adds one IPC channel the bundle reports readiness on.
 
-`start` exits with the child's exit code, except that a child which never finished booting always exits non-zero. It forwards `SIGTERM` to the child explicitly and lets `SIGINT` (Ctrl+C) reach the child naturally; the actual graceful shutdown is handled *inside* the bundle by the connectors manager (next section).
+`start` exits with the child's exit code, except that a child which never finished booting always exits non-zero. It forwards `SIGTERM` to the child explicitly and lets `SIGINT` (Ctrl+C) reach the child naturally; the actual graceful shutdown is handled _inside_ the bundle by the connectors manager (next section).
 
 > The build must exist before you call `start`. `start` does not build for you — run `warlock build` first (typically as a deploy step), then `warlock start` on the server.
 
@@ -196,12 +246,12 @@ The second is a non-issue by design, but worth knowing why: **Warlock never asks
 
 **A success line on stdout means the app is serving requests.** Deployment tooling can depend on that:
 
-| Stream     | Carries                                                            |
-| ---------- | ------------------------------------------------------------------ |
-| **stdout** | the started banner, and start failures. Nothing else.               |
-| **stderr** | progress, diagnostics, and the application's own logs               |
+| Stream     | Carries                                               |
+| ---------- | ----------------------------------------------------- |
+| **stdout** | the started banner, and start failures. Nothing else. |
+| **stderr** | progress, diagnostics, and the application's own logs |
 
-The banner prints only when the *running application* reports a completed boot — after the late-phase connectors (http, socket) are up. It is not printed when the command starts or when the child is spawned, so a health gate cannot mistake an intention for an outcome:
+The banner prints only when the _running application_ reports a completed boot — after the late-phase connectors (http, socket) are up. It is not printed when the command starts or when the child is spawned, so a health gate cannot mistake an intention for an outcome:
 
 ```bash
 warlock start | grep -q "production server started"
@@ -222,7 +272,7 @@ Inside the app, `Application.onceBooted()` and `Application.whenBooted()` fire f
 There are two distinct notions of "environment", and it's worth keeping them straight:
 
 1. **`NODE_ENV`** — a standard process env var (`"development" | "production" | "test"`). It decides which `.env` file gets loaded and what `Application.environment` reports.
-2. **Runtime strategy** — an internal Warlock flag (`"development" | "production"`) that decides whether the dev-server code paths run. It is set by the CLI command / generated bundle, *not* read from `NODE_ENV`.
+2. **Runtime strategy** — an internal Warlock flag (`"development" | "production"`) that decides whether the dev-server code paths run. It is set by the CLI command / generated bundle, _not_ read from `NODE_ENV`.
 
 ### `NODE_ENV` and the `.env` file it picks
 
@@ -232,7 +282,7 @@ There are two distinct notions of "environment", and it's worth keeping them str
 2. Then, if `.env.<NODE_ENV>` exists (e.g. `.env.production`), that file is loaded.
 3. Otherwise it falls back to plain `.env`.
 
-By default `loadEnv` overrides — values in the loaded file win over whatever is already in `process.env`. If `NODE_ENV` is unset, `Application.environment` defaults to `"development"`, so on a production host you typically set `NODE_ENV=production` *before* the process starts (so the right `.env.production` is picked up) and provide the secrets your config files read.
+By default `loadEnv` overrides — values in the loaded file win over whatever is already in `process.env`. If `NODE_ENV` is unset, `Application.environment` defaults to `"development"`, so on a production host you typically set `NODE_ENV=production` _before_ the process starts (so the right `.env.production` is picked up) and provide the secrets your config files read.
 
 ```bash title="Production launch"
 NODE_ENV=production warlock start
@@ -251,19 +301,19 @@ MAIL_HOST=...
 
 `Application` exposes read-only getters for the resolved environment:
 
-| Accessor                     | Returns                                  |
-| ---------------------------- | ---------------------------------------- |
-| `Application.environment`    | `NODE_ENV` (or `"development"` if unset) |
-| `Application.isProduction`   | `true` when environment is `"production"`|
-| `Application.isDevelopment`  | `true` when environment is `"development"`|
-| `Application.isTest`         | `true` when environment is `"test"`      |
+| Accessor                    | Returns                                    |
+| --------------------------- | ------------------------------------------ |
+| `Application.environment`   | `NODE_ENV` (or `"development"` if unset)   |
+| `Application.isProduction`  | `true` when environment is `"production"`  |
+| `Application.isDevelopment` | `true` when environment is `"development"` |
+| `Application.isTest`        | `true` when environment is `"test"`        |
 
 ### Runtime strategy: dev vs production
 
 The runtime strategy is set in exactly one place per run:
 
 - **Dev** — the `warlock dev` command preloads `runtimeStrategy: "development"`.
-- **Production** — the *generated* `bootstrap.ts` in the bundle calls `Application.setRuntimeStrategy("production")` and `Application.setEnvironment("production")` before anything else.
+- **Production** — the _generated_ `bootstrap.ts` in the bundle calls `Application.setRuntimeStrategy("production")` and `Application.setEnvironment("production")` before anything else.
 
 ```ts title=".warlock/production/bootstrap.ts (generated)"
 import { bootstrap, Application } from "@warlock.js/core";
@@ -276,17 +326,17 @@ bootstrap();
 
 The strategy matters because some connectors branch on it. The clearest case is the HTTP connector: in `development` it registers routes via `router.scanDevServer(...)` (the HMR-aware path); otherwise it uses the plain `router.scan(...)`. You don't toggle this yourself — building for production wires the production path in.
 
-> The generated bootstrap forces `Application.setEnvironment("production")`, which sets `process.env.NODE_ENV = "production"` from inside the process. But that happens *after* `loadEnv()` has already chosen the `.env` file based on the `NODE_ENV` the process started with. So the env var you set on the host still determines which `.env` file is read — set `NODE_ENV=production` before launching if you want `.env.production`.
+> The generated bootstrap forces `Application.setEnvironment("production")`, which sets `process.env.NODE_ENV = "production"` from inside the process. But that happens _after_ `loadEnv()` has already chosen the `.env` file based on the `NODE_ENV` the process started with. So the env var you set on the host still determines which `.env` file is read — set `NODE_ENV=production` before launching if you want `.env.production`.
 
 ## Graceful shutdown
 
 The generated production entry ends by calling `connectorsManager.shutdownOnProcessKill()`. That installs signal handlers so the process tears subsystems down cleanly instead of dropping connections:
 
-| Signal     | Where                | Behavior                                              |
-| ---------- | -------------------- | ----------------------------------------------------- |
-| `SIGINT`   | all platforms        | Triggers graceful shutdown (Ctrl+C)                   |
-| `SIGTERM`  | all platforms        | Triggers graceful shutdown (orchestrators send this)  |
-| `SIGHUP`   | Windows only (`win32`) | Triggers graceful shutdown                           |
+| Signal    | Where                  | Behavior                                             |
+| --------- | ---------------------- | ---------------------------------------------------- |
+| `SIGINT`  | all platforms          | Triggers graceful shutdown (Ctrl+C)                  |
+| `SIGTERM` | all platforms          | Triggers graceful shutdown (orchestrators send this) |
+| `SIGHUP`  | Windows only (`win32`) | Triggers graceful shutdown                           |
 
 When a signal arrives, `gracefulShutdown` runs once (an `isShuttingDown` re-entry guard ignores repeat signals), prints `Exiting...`, awaits `connectorsManager.shutdown()`, then `process.exit(0)`.
 
@@ -321,7 +371,7 @@ The upshot for deployment: if a subsystem isn't coming up in production, the fir
 
 Before `warlock start` on a fresh host:
 
-- **`NODE_ENV` is set** to `production` *before* the process starts, so `loadEnv` reads `.env.production` (if you keep one) and `Application.environment` reports `production`.
+- **`NODE_ENV` is set** to `production` _before_ the process starts, so `loadEnv` reads `.env.production` (if you keep one) and `Application.environment` reports `production`.
 - **The right env file is on the box** — `.env.production` (and/or `.env.shared`, and/or `.env`). `loadEnv` throws if the file it resolves to does not exist, so at minimum the resolved file must be present.
 - **Every secret your config files read is in the environment.** Connectors pull values via `config.get(...)`, which is fed by your `src/config/*` files reading `env(...)`. Missing values mean a subsystem silently no-ops (or, for access, fails fast — see gotchas).
 - **The config files for the subsystems you need are present** in `src/config/` (`http.ts`, `database.ts`, `cache.ts`, …). A subsystem with no config file does not activate.
@@ -332,8 +382,8 @@ Before `warlock start` on a fresh host:
 ## Gotchas
 
 - **`start` does not build, and it will not run a `dist/` it cannot vouch for.** It checks for the `.warlock-build.json` success marker and refuses by that reason if it is absent — a directory left by a failed build, or one assembled by hand, is rejected rather than half-run. Always `warlock build` first in your pipeline.
-- **`NODE_ENV` is read before the bundle forces it.** The generated bootstrap sets the environment to `production` *inside* the process, but `loadEnv` already chose the `.env` file from the `NODE_ENV` the process started with. Setting `NODE_ENV=production` in the bundle does **not** retroactively change which `.env` file was loaded.
-- **`loadEnv` throws on a missing file.** If `.env.<NODE_ENV>` doesn't exist it falls back to `.env`, but if *that* is also missing it throws. Make sure at least one resolvable env file is on the host.
+- **`NODE_ENV` is read before the bundle forces it.** The generated bootstrap sets the environment to `production` _inside_ the process, but `loadEnv` already chose the `.env` file from the `NODE_ENV` the process started with. Setting `NODE_ENV=production` in the bundle does **not** retroactively change which `.env` file was loaded.
+- **`loadEnv` throws on a missing file.** If `.env.<NODE_ENV>` doesn't exist it falls back to `.env`, but if _that_ is also missing it throws. Make sure at least one resolvable env file is on the host.
 - **Dependencies aren't bundled.** `packages: "external"` keeps `node_modules` out of the bundle, so a host without the installed packages will fail at runtime, not at build time.
 - **A subsystem that "won't start" is usually a missing config file or missing env value**, not a framework bug — the connector is registered, it just read an empty config and returned.
 - **The `access` connector fails at startup if misconfigured.** Unlike the others, it validates that a resolver is present, so an authorization layer that's half-configured surfaces the error on boot rather than on the first protected request — a feature, but it means a bad `src/config/access.ts` will stop the process from coming up.

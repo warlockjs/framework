@@ -427,6 +427,8 @@ const topics = [
   pkgTopic({ label: "Context", slug: "context", sections: contextSections }, "latest"),
   pkgTopic({ label: "File System", slug: "fs", sections: fullSections }, "latest"),
   pkgTopic({ label: "Sitemap", slug: "sitemap", sections: sitemapSections }, "latest"),
+  // Devtools is one page (install, panels, safety): overview only.
+  pkgTopic({ label: "Devtools", slug: "devtools" }, "latest"),
 
   // Data
   pkgTopic({ label: "Cascade", slug: "cascade", sections: cascadeSections }, "latest"),

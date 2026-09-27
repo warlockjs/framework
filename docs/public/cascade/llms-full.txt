@@ -1458,6 +1458,43 @@ dataSourceRegistry.getAllDataSources(); // DataSource[] — every registered sou
 
 There is no `has(name)` / `list()` / `setDefault()` — guard with a `try/catch` around `get(name)`, iterate `getAllDataSources()`, and set the default via `isDefault` at registration.
 
+## Observe database queries
+
+Subscribe once at the registry to observe settled queries from every registered
+source. Keep the listener reference to remove it later:
+
+```ts
+import { dataSourceRegistry, type QueryEvent } from "@warlock.js/cascade";
+import { log } from "@warlock.js/logger";
+
+const onQuery = (event: QueryEvent) => {
+  if (event.durationMs > 200) {
+    log.warn("database", "slow-query", event);
+  }
+};
+
+dataSourceRegistry.on("query", onQuery);
+// Later:
+dataSourceRegistry.off("query", onQuery);
+```
+
+`QueryEvent` has `connection`, `driver` (`"postgres"` or `"mongodb"`),
+`durationMs`, and `startedAt`; SQL events may include `sql`, `bindings`, and
+`rowCount`, while Mongo events may include `collection`, `command`, and
+`pipeline`. It also carries `error` when the command failed. Registry events
+use the registered data-source name as `connection`.
+
+For one source only, subscribe to its driver with the same listener lifecycle:
+
+```ts
+const source = dataSourceRegistry.get("analytics");
+source.driver.on("query", onQuery);
+source.driver.off("query", onQuery);
+```
+
+A throwing listener never fails the query. Mongo command monitoring is enabled
+unless `clientOptions.monitorCommands` is explicitly set.
+
 ## Things NOT to do
 
 - Don't call `dataSourceRegistry.register("name", config)` — `register` takes a single `DataSourceOptions` object (`{ name, driver, isDefault }`, `driver` being a built `DriverContract`); for the common case use `connectToDatabase({ name, ... })`.
