@@ -1,4 +1,14 @@
 {
+  "5.24.0": {
+    "publishedAt": "2026-09-27T16:45:17.156Z",
+    "matrix": "none",
+    "summary": "**Safer human-in-the-loop approvals and working Claude extended thinking.** A durable HITL approval is now bound to the exact agent session, tool and arguments it approved, so it can no longer be consumed by a concurrent run or applied to a different call; pending approvals from earlier versions ask again. Claude extended thinking now works on Anthropic and Bedrock across tool calls (signed thinking blocks are replayed), and `maxTokens` must exceed the thinking budget. Named `ErrorBoundary` components receive the HTTP `status`; `PageLoaderContext` no longer needs type arguments; Postgres transactions accept `settings` applied as `SET LOCAL`; `request.input()` sees multi-site route params; `merge({ col: null })` saves NULL. Lockstep release across all 30 packages. Generator matrix scope: `none`; the blog on 5.24.0 from npm passed its production browser smoke.",
+    "featured": [
+      "@warlock.js/ai",
+      "@warlock.js/web",
+      "@warlock.js/cascade"
+    ]
+  },
   "5.23.2": {
     "publishedAt": "2026-09-26T21:08:30.311Z",
     "matrix": "none",

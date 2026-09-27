@@ -124,6 +124,576 @@
   ],
   "releases": [
     {
+      "version": "5.24.0",
+      "id": "v5-24-0",
+      "date": "September 27, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Safer human-in-the-loop approvals and working Claude extended thinking.</strong> A durable HITL approval is now bound to the exact agent session, tool and arguments it approved, so it can no longer be consumed by a concurrent run or applied to a different call; pending approvals from earlier versions ask again. Claude extended thinking now works on Anthropic and Bedrock across tool calls (signed thinking blocks are replayed), and <code>maxTokens</code> must exceed the thinking budget. Named <code>ErrorBoundary</code> components receive the HTTP <code>status</code>; <code>PageLoaderContext</code> no longer needs type arguments; Postgres transactions accept <code>settings</code> applied as <code>SET LOCAL</code>; <code>request.input()</code> sees multi-site route params; <code>merge({ col: null })</code> saves NULL. Lockstep release across all 30 packages. Generator matrix scope: <code>none</code>; the blog on 5.24.0 from npm passed its production browser smoke.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            },
+            {
+              "type": "Security",
+              "html": "Durable HITL approvals are now bound to the exact agent session, tool, and arguments they approved, preventing cross-run or cross-action replay. A decision that doesn't match the call being gated is never applied; the call asks for approval again. <code>resume()</code> re-runs in the interrupted session unless <code>executeOptions.sessionId</code> says otherwise. Approvals left pending by an earlier version must be approved again after upgrading."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Named page, layout, and root <code>ErrorBoundary</code> components now receive the resolved HTTP <code>status</code> alongside <code>error</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>PageLoaderContext</code>'s type parameters default to <code>undefined</code>, so a loader with no validation or route can be typed <code>({ request }: PageLoaderContext)</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Added the missing <code>web.forms.redactValues</code> configuration type for redacting submitted values echoed in failed page-action state."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "PostgreSQL transactions accept transaction-local <code>settings</code>, applied safely with parameterized <code>set_config</code> calls after <code>BEGIN</code>; use them for RLS context, <code>statement_timeout</code>, or <code>search_path</code> without leaking values to the pool."
+            },
+            {
+              "type": "Fixed",
+              "html": "An explicit <code>null</code> given to <code>merge()</code>/<code>set()</code> is now written as NULL on save. Before, an optional, non-nullable column cleared to <code>null</code> (for example, restoring a soft-deleted row with <code>merge({ deletedAt: null })</code>) was dropped from the update, and the row kept its old value. A required column set to <code>null</code> still fails validation."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            },
+            {
+              "type": "Fixed",
+              "html": "Preserve signed and redacted extended-thinking blocks across Anthropic tool-use follow-ups, and ensure <code>max_tokens</code> exceeds the thinking budget."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            },
+            {
+              "type": "Fixed",
+              "html": "Preserve Claude extended-thinking reasoning blocks across Bedrock Converse tool-use follow-ups, and enforce valid thinking budgets and output-token ceilings."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>request.input(key)</code> now sees a route param set with <code>Request.setParam()</code>. Before, it updated only <code>request.params</code>, so in a multi-site app (where the site dispatcher sets each page param) every dynamic segment read as <code>undefined</code> through <code>input()</code>, <code>only()</code> and <code>all()</code>. Params keep their precedence over query and body."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/sitemap",
+          "slug": "sitemap",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.23.2",
       "id": "v5-23-2",
       "date": "September 26, 2026",

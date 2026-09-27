@@ -138,6 +138,10 @@ toOptions: ({ signal }) => ({ signal })
 
 Cancellation is cooperative: the executable and its provider or dependencies must honor the signal to stop in-flight work.
 
+## What `serve` enforces, and what it does not
+
+`serve` enforces the request body cap (`maxBodyBytes`), optional bearer auth, and abort on client disconnect. It does **not** limit concurrent requests or streams, and it applies no idle, header, or overall run timeout. Put those limits on the `node:http` server (`headersTimeout`, `requestTimeout`), a reverse proxy, or your own middleware.
+
 ## Durable multi-turn serving
 
 For durable multi-turn serving, pair `serve` with an [orchestrator](/v/latest/ai/orchestration/run-orchestrator/). Configure `session.createId` and `session.loadHistory` from trusted server-side state; the orchestrator then loads and checkpoints its own session state while `serve` streams the turn. Because each POST is independent, add a session lock (or rely on orchestrator snapshot/checkpoint discipline) when one session can receive concurrent turns.
