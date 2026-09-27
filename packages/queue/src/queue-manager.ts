@@ -39,12 +39,26 @@ export function getQueue(name: string): Queue {
  * Start one worker per queue that has a registered job, and keep starting
  * workers for queues whose first job is defined later.
  *
- * A no-op returning `[]` when `workers.enabled` is `false`. Calling it again
- * while workers run starts only the missing ones.
+ * A no-op returning `[]` when `workers.enabled` is `false`, or when this
+ * process does not serve the `worker` role (`Application.hasRole`) — a
+ * process started with `--role=web`, for example, produces jobs but never
+ * runs them in-process. Calling it again while workers run starts only the
+ * missing ones.
  *
  * @returns the queue names that now have a worker in this process.
  */
 export async function startWorkers(): Promise<string[]> {
+  const { Application } = await import("@warlock.js/core");
+
+  if (!Application.hasRole("worker")) {
+    log.info(
+      "queue",
+      "workers",
+      `queue: workers not started (role: ${[...Application.roles].join(",")})`,
+    );
+    return [];
+  }
+
   const config = getQueueConfig();
 
   if (config.workers?.enabled === false) {
@@ -87,7 +101,11 @@ function ensureWorker(queueName: string): void {
   });
 
   worker.on("failed", (job, error) => {
-    log.error("queue", "job.failed", `${job?.name ?? "unknown"} (${job?.id ?? "?"}): ${error.message}`);
+    log.error(
+      "queue",
+      "job.failed",
+      `${job?.name ?? "unknown"} (${job?.id ?? "?"}): ${error.message}`,
+    );
   });
 
   workers.set(queueName, worker);

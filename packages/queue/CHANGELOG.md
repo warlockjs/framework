@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/queue` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.25.0 - Unreleased
+
+### Changed
+
+- `startWorkers()` (and the `queueConnector`'s `start()`, which calls it) no longer starts in-process workers on a process that doesn't serve the `worker` role (`WARLOCK_ROLES`), logging `queue: workers not started (role: ...)` instead. Producers (`dispatch`) and the dashboard mount are unaffected. With no `--role` passed, every role is on and nothing changes.
+
 ## 5.24.0 - 2026-09-27
 
 ### Changed
