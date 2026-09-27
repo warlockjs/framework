@@ -33,6 +33,8 @@ export type TracingContext = {
 export type TracingPhaseInfo = {
   name: string;
   durationMs: number;
+  /** Epoch milliseconds at which this phase began. */
+  startedAt?: number;
   attrs?: Record<string, unknown>;
 };
 

@@ -18,11 +18,13 @@ import type {
 } from "./tracing.type";
 
 type ResolvedTracing = {
-  enabled: boolean;
+  configEnabled: boolean;
   hooks: TracingHooks[];
 };
 
 let resolved: ResolvedTracing | undefined;
+let tracingEnabled: boolean | undefined;
+let runtimeHooks: TracingHooks[] = [];
 
 /**
  * Minimal request shape `buildTracingContext` needs. Kept structural (not a
@@ -48,21 +50,50 @@ export function resolveTracingConfig(): ResolvedTracing {
   const tracing = config.get("http.tracing", {} as HttpTracingConfig) ?? {};
 
   resolved = {
-    enabled: tracing.enabled === true,
+    configEnabled: tracing.enabled === true,
     hooks: tracing.hooks ?? [],
   };
+  tracingEnabled = resolved.configEnabled || runtimeHooks.length > 0;
 
   return resolved;
 }
 
 /** The single boolean check every instrumented call site guards on. */
 export function isTracingEnabled(): boolean {
-  return resolveTracingConfig().enabled;
+  if (tracingEnabled === undefined) resolveTracingConfig();
+
+  return tracingEnabled === true;
 }
 
-/** Test-only: forces the next `resolveTracingConfig()` call to re-read config. */
+/**
+ * Register request tracing hooks independently of `http.tracing` config.
+ *
+ * Runtime hooks are called after configured hooks. Registering a hook enables
+ * tracing immediately; the returned function removes that registration.
+ */
+export function registerTracingHooks(hooks: TracingHooks): () => void {
+  runtimeHooks.push(hooks);
+  tracingEnabled = true;
+
+  let registered = true;
+
+  return () => {
+    if (!registered) return;
+
+    registered = false;
+    const index = runtimeHooks.indexOf(hooks);
+    if (index !== -1) runtimeHooks.splice(index, 1);
+
+    const { configEnabled } = resolveTracingConfig();
+    tracingEnabled = configEnabled || runtimeHooks.length > 0;
+  };
+}
+
+/** Test-only: resets resolved config and removes all runtime tracing hooks. */
 export function resetTracingConfigForTests(): void {
   resolved = undefined;
+  tracingEnabled = undefined;
+  runtimeHooks = [];
   reportedHooks = new WeakMap();
 }
 
@@ -118,35 +149,54 @@ function safeInvoke<Verb extends keyof TracingHooks>(
   }
 }
 
-/** Dispatch `onRequestStart` to every configured hook. No-op when disabled. */
+/** Dispatch `onRequestStart` to every configured and runtime hook. No-op when disabled. */
 export function dispatchRequestStart(ctx: TracingContext): void {
-  const { enabled, hooks } = resolveTracingConfig();
+  if (!isTracingEnabled()) return;
 
-  if (!enabled) return;
+  const { hooks } = resolveTracingConfig();
 
   for (const hook of hooks) {
     safeInvoke(hook, "onRequestStart", (fn) => fn(ctx));
   }
+
+  for (const hook of runtimeHooks) {
+    safeInvoke(hook, "onRequestStart", (fn) => fn(ctx));
+  }
 }
 
-/** Dispatch `onRequestEnd` to every configured hook. No-op when disabled. */
+/** Dispatch `onRequestEnd` to every configured and runtime hook. No-op when disabled. */
 export function dispatchRequestEnd(ctx: TracingContext, result: TracingRequestEndInfo): void {
-  const { enabled, hooks } = resolveTracingConfig();
+  if (!isTracingEnabled()) return;
 
-  if (!enabled) return;
+  const { hooks } = resolveTracingConfig();
 
   for (const hook of hooks) {
     safeInvoke(hook, "onRequestEnd", (fn) => fn(ctx, result));
   }
+
+  for (const hook of runtimeHooks) {
+    safeInvoke(hook, "onRequestEnd", (fn) => fn(ctx, result));
+  }
 }
 
-/** Dispatch `onPhase` to every configured hook. No-op when disabled. */
+/** Dispatch `onPhase` to every configured and runtime hook. No-op when disabled. */
 export function dispatchPhase(ctx: TracingContext, phase: TracingPhaseInfo): void {
-  const { enabled, hooks } = resolveTracingConfig();
+  if (!isTracingEnabled()) return;
 
-  if (!enabled) return;
+  const { hooks } = resolveTracingConfig();
+  const phaseInfo =
+    phase.startedAt === undefined
+      ? {
+          ...phase,
+          startedAt: performance.timeOrigin + performance.now() - phase.durationMs,
+        }
+      : phase;
 
   for (const hook of hooks) {
-    safeInvoke(hook, "onPhase", (fn) => fn(ctx, phase));
+    safeInvoke(hook, "onPhase", (fn) => fn(ctx, phaseInfo));
+  }
+
+  for (const hook of runtimeHooks) {
+    safeInvoke(hook, "onPhase", (fn) => fn(ctx, phaseInfo));
   }
 }
