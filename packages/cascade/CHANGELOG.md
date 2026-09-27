@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.25.0
 
+### Added
+
+- Drivers emit public `query` events for settled PostgreSQL SQL and MongoDB commands; `dataSourceRegistry` forwards them with the registered connection name for centralized inspection.
+
 ### Fixed
 
 - PostgreSQL `groupByRaw()` now emits and parses its raw GROUP BY operation correctly, including bound parameters.

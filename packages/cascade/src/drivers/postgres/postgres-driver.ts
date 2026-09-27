@@ -23,6 +23,7 @@ import type {
   DriverTransactionContract,
   DropDatabaseOptions,
   InsertResult,
+  QueryEvent,
   TransactionContext,
   UpdateOperations,
   UpdateResult,
@@ -446,6 +447,15 @@ export class PostgresDriver implements DriverContract {
     }
 
     this._eventListeners.get(event)!.add(listener);
+  }
+
+  /** Remove a previously registered driver event listener. */
+  public off(event: string, listener: DriverEventListener): void {
+    const listeners = this._eventListeners.get(event);
+    if (!listeners) return;
+
+    listeners.delete(listener);
+    if (listeners.size === 0) this._eventListeners.delete(event);
   }
 
   /**
@@ -1297,16 +1307,20 @@ export class PostgresDriver implements DriverContract {
         beginSql += " DEFERRABLE";
       }
 
-      await client.query(beginSql);
+      await this.executePostgresQuery(() => client.query(beginSql), beginSql);
       transactionStarted = true;
 
       for (const [name, value] of settings) {
-        await client.query("SELECT set_config($1, $2, true)", [name, String(value)]);
+        await this.executePostgresQuery(
+          () => client.query("SELECT set_config($1, $2, true)", [name, String(value)]),
+          "SELECT set_config($1, $2, true)",
+          [name, String(value)],
+        );
       }
     } catch (error) {
       if (transactionStarted) {
         try {
-          await client.query("ROLLBACK");
+          await this.executePostgresQuery(() => client.query("ROLLBACK"), "ROLLBACK");
         } catch {
           // The original setup error is the useful error to callers. The
           // client is discarded below, so a failed cleanup cannot leak it.
@@ -1329,7 +1343,7 @@ export class PostgresDriver implements DriverContract {
         // transaction state; the original COMMIT error still propagates and
         // the caller must NOT issue ROLLBACK afterwards (see transaction()).
         try {
-          await client.query("COMMIT");
+          await this.executePostgresQuery(() => client.query("COMMIT"), "COMMIT");
         } catch (error) {
           client.release(error instanceof Error ? error : new Error(String(error)));
           throw error;
@@ -1338,7 +1352,7 @@ export class PostgresDriver implements DriverContract {
       },
       rollback: async () => {
         try {
-          await client.query("ROLLBACK");
+          await this.executePostgresQuery(() => client.query("ROLLBACK"), "ROLLBACK");
         } catch (error) {
           client.release(error instanceof Error ? error : new Error(String(error)));
           throw error;
@@ -1722,7 +1736,7 @@ export class PostgresDriver implements DriverContract {
         });
       }
       if (txClient) {
-        result = await txClient.query(sql, params);
+        result = await this.executePostgresQuery(() => txClient.query(sql, params), sql, params);
       } else {
         // No automatic retry here: a client that looked idle-healthy to the
         // pool can already have been dropped by the server/OS (card
@@ -1735,7 +1749,7 @@ export class PostgresDriver implements DriverContract {
         // side effect and the response would duplicate it. Callers that
         // need retry semantics must implement them with real idempotency
         // guarantees at the call site.
-        result = await this.pool.query(sql, params);
+        result = await this.executePostgresQuery(() => this.pool.query(sql, params), sql, params);
       }
 
       if (this.config.logging) {
@@ -1766,6 +1780,60 @@ export class PostgresDriver implements DriverContract {
         });
       }
       throw error;
+    }
+  }
+
+  /** Execute SQL and emit its public query event when the event is observed. */
+  private async executePostgresQuery<T extends { rowCount?: number | null }>(
+    execute: () => Promise<T>,
+    sql: string,
+    bindings: unknown[] = [],
+  ): Promise<T> {
+    // This guard keeps the non-observability path to a single map lookup.
+    if (!this._eventListeners.get("query")?.size) return execute();
+
+    const started = performance.now();
+    const startedAt = performance.timeOrigin + started;
+    let result: T;
+
+    try {
+      result = await execute();
+    } catch (error) {
+      this.emitQueryEvent({
+        connection: this.name,
+        driver: "postgres",
+        sql,
+        bindings,
+        durationMs: performance.now() - started,
+        startedAt,
+        error,
+      });
+      throw error;
+    }
+
+    const event: QueryEvent = {
+      connection: this.name,
+      driver: "postgres",
+      sql,
+      bindings,
+      durationMs: performance.now() - started,
+      startedAt,
+    };
+    if (typeof result.rowCount === "number") event.rowCount = result.rowCount;
+    this.emitQueryEvent(event);
+
+    return result;
+  }
+
+  /**
+   * Emit a `query` event. An observer is never allowed to fail the query it
+   * observes, so a throwing listener is swallowed here.
+   */
+  private emitQueryEvent(event: QueryEvent): void {
+    try {
+      this.emit("query", event);
+    } catch {
+      // Observability must not change query behaviour.
     }
   }
 

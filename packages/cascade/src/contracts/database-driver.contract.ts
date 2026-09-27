@@ -12,6 +12,26 @@ export type DriverEvent = "connected" | "disconnected" | string;
 /** Listener signature for driver lifecycle events. */
 export type DriverEventListener = (...args: unknown[]) => void;
 
+/**
+ * Details of a database command after it has settled.
+ *
+ * `connection` is the driver name when emitted by a driver directly, and the
+ * registered data-source name when forwarded by `dataSourceRegistry`.
+ */
+export type QueryEvent = {
+  connection: string;
+  driver: "postgres" | "mongodb";
+  sql?: string;
+  bindings?: unknown[];
+  collection?: string;
+  command?: string;
+  pipeline?: unknown;
+  durationMs: number;
+  startedAt: number;
+  rowCount?: number;
+  error?: unknown;
+};
+
 /** Representation of an opened transaction (manual pattern). */
 export interface DriverTransactionContract<TContext = unknown> {
   /** Driver-specific transaction context (session, connection, ...). */
@@ -240,6 +260,9 @@ export interface DriverContract {
 
   /** Register event listeners (connected/disconnected/custom). */
   on(event: DriverEvent, listener: DriverEventListener): void;
+
+  /** Remove a previously registered event listener. */
+  off(event: DriverEvent, listener: DriverEventListener): void;
 
   /** Insert a single document/row into the given table. */
   insert(

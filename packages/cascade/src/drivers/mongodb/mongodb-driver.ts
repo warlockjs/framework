@@ -29,6 +29,7 @@ import type {
   IdGeneratorContract,
   InsertResult,
   MigrationDriverContract,
+  QueryEvent,
   QueryBuilderContract,
   RawQueryResult,
   SyncAdapterContract,
@@ -139,6 +140,10 @@ export class MongoDbDriver implements DriverContract {
   private readonly transactionOptions: TransactionOptions;
   private idGeneratorInstance?: IdGeneratorContract;
   private _blueprint?: DriverBlueprintContract;
+  private readonly monitoredCommands = new Map<
+    number,
+    Omit<QueryEvent, "durationMs" | "error"> & { started: number }
+  >();
 
   public get blueprint(): DriverBlueprintContract {
     if (!this._blueprint) {
@@ -324,8 +329,20 @@ export class MongoDbDriver implements DriverContract {
         }
       });
 
+      client.on("commandStarted", (event: any) => this.commandStarted(event));
+      client.on("commandSucceeded", (event: any) => this.commandSucceeded(event));
+      client.on("commandFailed", (event: any) => this.commandFailed(event));
+
       if (this.config.logging) {
-        const ignoredCommands = ["isMaster", "hello", "ping", "saslStart", "saslContinue"];
+        const ignoredCommands = [
+          "isMaster",
+          "hello",
+          "ping",
+          "saslStart",
+          "saslContinue",
+          "endSessions",
+          "buildInfo",
+        ];
 
         client.on("commandStarted", (event: any) => {
           if (ignoredCommands.includes(event.commandName)) return;
@@ -402,6 +419,11 @@ export class MongoDbDriver implements DriverContract {
    */
   public on(event: DriverEvent, listener: DriverEventListener): void {
     this.events.on(event, listener);
+  }
+
+  /** Remove a previously registered driver event listener. */
+  public off(event: DriverEvent, listener: DriverEventListener): void {
+    this.events.off(event, listener);
   }
 
   /**
@@ -931,7 +953,9 @@ export class MongoDbDriver implements DriverContract {
       ...(this.config.clientOptions ?? {}),
     };
 
-    if (this.config.logging) {
+    // Command monitoring feeds the public `query` event; an app that set
+    // `clientOptions.monitorCommands` explicitly keeps its choice.
+    if (baseOptions.monitorCommands === undefined) {
       baseOptions.monitorCommands = true;
     }
 
@@ -954,6 +978,82 @@ export class MongoDbDriver implements DriverContract {
    */
   private emit(event: DriverEvent, ...args: unknown[]): void {
     this.events.emit(event, ...args);
+  }
+
+  private commandStarted(event: {
+    requestId: number;
+    commandName: string;
+    command: Record<string, unknown>;
+  }): void {
+    if (this.ignoredCommand(event.commandName) || this.events.listenerCount("query") === 0) return;
+
+    const started = performance.now();
+    const { lsid: _lsid, $clusterTime: _clusterTime, $db: _database, ...pipeline } = event.command;
+    const collection = event.command[event.commandName];
+    this.monitoredCommands.set(event.requestId, {
+      connection: this.name,
+      driver: "mongodb",
+      command: event.commandName,
+      collection: typeof collection === "string" ? collection : undefined,
+      pipeline,
+      started,
+      startedAt: performance.timeOrigin + started,
+    });
+  }
+
+  private commandSucceeded(event: {
+    requestId: number;
+    reply?: { n?: number; cursor?: { firstBatch?: unknown[] } };
+  }): void {
+    const command = this.monitoredCommands.get(event.requestId);
+    if (!command) return;
+    this.monitoredCommands.delete(event.requestId);
+
+    const { started, ...query } = command;
+    const rowCount = event.reply?.n ?? event.reply?.cursor?.firstBatch?.length;
+    this.emitQueryEvent({
+      ...query,
+      durationMs: performance.now() - started,
+      ...(typeof rowCount === "number" ? { rowCount } : {}),
+    });
+  }
+
+  private commandFailed(event: { requestId: number; failure: unknown }): void {
+    const command = this.monitoredCommands.get(event.requestId);
+    if (!command) return;
+    this.monitoredCommands.delete(event.requestId);
+
+    const { started, ...query } = command;
+    this.emitQueryEvent({
+      ...query,
+      durationMs: performance.now() - started,
+      error: event.failure,
+    });
+  }
+
+  /**
+   * Emit a `query` event. It runs inside the MongoDB client's own monitoring
+   * callback, and an observer must never break the client, so a throwing
+   * listener is swallowed here.
+   */
+  private emitQueryEvent(event: QueryEvent): void {
+    try {
+      this.emit("query", event);
+    } catch {
+      // Observability must not change query behaviour.
+    }
+  }
+
+  private ignoredCommand(command: string): boolean {
+    return [
+      "isMaster",
+      "hello",
+      "ping",
+      "saslStart",
+      "saslContinue",
+      "endSessions",
+      "buildInfo",
+    ].includes(command);
   }
 
   /**

@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { databaseDataSourceContext } from "../context/database-data-source-context";
 import { MissingDataSourceError } from "../errors/missing-data-source.error";
 import { DataSource, type DataSourceOptions } from "./data-source";
+import type { QueryEvent } from "../contracts/database-driver.contract";
 
 /**
  * Event types emitted by the DataSourceRegistry.
@@ -10,17 +11,17 @@ import { DataSource, type DataSourceOptions } from "./data-source";
  * - `default-registered`: Emitted when a default data source is registered
  * - `connected`: Emitted when a data source's driver connects
  * - `disconnected`: Emitted when a data source's driver disconnects
+ * - `query`: Emitted when a registered driver's query settles
  */
 export type DataSourceRegistryEvent =
-  | "registered"
-  | "default-registered"
-  | "connected"
-  | "disconnected";
+  "registered" | "default-registered" | "connected" | "disconnected" | "query";
 
 /**
  * Callback signature for registry events.
  */
-export type DataSourceRegistryListener = (dataSource: DataSource) => void;
+export type DataSourceRegistryListener<
+  E extends DataSourceRegistryEvent = DataSourceRegistryEvent,
+> = (data: E extends "query" ? QueryEvent : DataSource) => void;
 
 /** Maintains registry of named data sources. */
 class DataSourceRegistry {
@@ -28,7 +29,7 @@ class DataSourceRegistry {
   private defaultSource?: DataSource;
   private defaultIsExplicit = false;
   private readonly events = new EventEmitter();
-  /** Replaced sources; their forwarded driver events are ignored (drivers have no `off`). */
+  /** Replaced sources; their forwarded driver events are ignored. */
   private readonly detached = new WeakSet<DataSource>();
   /** In-flight `getOrRegister` factories, so concurrent callers share one creation. */
   private readonly pending = new Map<string, Promise<DataSource>>();
@@ -111,6 +112,12 @@ class DataSourceRegistry {
 
     source.driver.on("disconnected", () => {
       if (!this.detached.has(source)) this.events.emit("disconnected", source);
+    });
+
+    source.driver.on("query", (event) => {
+      if (!this.detached.has(source)) {
+        this.events.emit("query", { ...(event as QueryEvent), connection: source.name });
+      }
     });
 
     return source;
@@ -211,7 +218,10 @@ class DataSourceRegistry {
    * });
    * ```
    */
-  public on(event: DataSourceRegistryEvent, listener: DataSourceRegistryListener): void {
+  public on<E extends DataSourceRegistryEvent>(
+    event: E,
+    listener: DataSourceRegistryListener<E>,
+  ): void {
     this.events.on(event, listener);
   }
 
@@ -223,7 +233,10 @@ class DataSourceRegistry {
    * @param event - The event to listen for
    * @param listener - Callback to execute when event fires
    */
-  public once(event: DataSourceRegistryEvent, listener: DataSourceRegistryListener): void {
+  public once<E extends DataSourceRegistryEvent>(
+    event: E,
+    listener: DataSourceRegistryListener<E>,
+  ): void {
     this.events.once(event, listener);
   }
 
@@ -233,7 +246,10 @@ class DataSourceRegistry {
    * @param event - The event to stop listening for
    * @param listener - The listener to remove
    */
-  public off(event: DataSourceRegistryEvent, listener: DataSourceRegistryListener): void {
+  public off<E extends DataSourceRegistryEvent>(
+    event: E,
+    listener: DataSourceRegistryListener<E>,
+  ): void {
     this.events.off(event, listener);
   }
 
