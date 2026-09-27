@@ -64,6 +64,8 @@ await model.complete(messages, { reasoning: { effort: "high" } });
 
 `maxTokens` wins over `effort` when both are set. For non-reasoning models — or when neither `effort` nor `maxTokens` is given — the option is a no-op, so unsupported params never reach the wire. Bedrock's Converse `TokenUsage` reports no reasoning-token channel, so `usage.reasoningTokens` is left unset (reasoning text arrives as `reasoningContent` content blocks, not a token count).
 
+A thinking budget below `1024` throws before the request. When thinking is enabled and no output cap is configured, Converse receives `maxTokens = thinking budget + 4096`; an explicit `maxTokens` must be greater than the budget. On tool calls, Converse `reasoningContent` is retained and replayed automatically on the next turn through provider metadata. The stored shape is JSON-safe: signed reasoning text stays text, while redacted reasoning bytes are base64 encoded, so persisted history preserves the opaque block exactly.
+
 ## Prompt caching
 
 For a `promptCaching`-capable model, `ModelCallOptions.cacheControl.breakpoints` (any positive value) appends one Converse `cachePoint: { type: "default" }` block to the LAST message — Bedrock then caches the whole prefix up to that point:
