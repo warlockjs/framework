@@ -16,11 +16,12 @@ export function captureCallerLocation(
   return undefined;
 }
 
-function parseFrame(line: string): DevtoolsCallerLocation | undefined {
-  const match = line.match(/\bat\s+(?:.*?\s+\()?(.+?):(\d+):(\d+)\)?\s*$/);
-  if (!match) return undefined;
-  const file = normalizePath(match[1]);
-  return { file, line: Number(match[2]), column: Number(match[3]) };
+function parseFrame(frame: string): DevtoolsCallerLocation | undefined {
+  const match = frame.match(/\bat\s+(?:.*?\s+\()?(.+?):(\d+):(\d+)\)?\s*$/);
+  const [, rawFile, line, column] = match ?? [];
+  if (!rawFile || !line || !column) return undefined;
+  const file = normalizePath(rawFile);
+  return { file, line: Number(line), column: Number(column) };
 }
 
 function normalizePath(path: string): string {
