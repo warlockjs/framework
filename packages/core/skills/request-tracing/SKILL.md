@@ -55,6 +55,7 @@ type TracingContext = {
 type TracingPhaseInfo = {
   name: string;
   durationMs: number;
+  startedAt?: number; // epoch milliseconds; supplied when the phase started
   attrs?: Record<string, unknown>;
 };
 
@@ -73,29 +74,52 @@ type TracingHooks = {
 
 Every verb is optional — a hook that only wants phase spans need not implement
 `onRequestStart`/`onRequestEnd`. Register as many hooks as you like via
-`hooks: TracingHooks[]`; each fires independently.
+`hooks: TracingHooks[]`; each fires independently. Use `registerTracingHooks()`
+when the observer is installed by application code rather than static config:
+
+```ts
+import { registerTracingHooks, type TracingHooks } from "@warlock.js/core";
+
+const hooks: TracingHooks = {
+  onPhase(ctx, phase) {
+    console.log(ctx.traceId, phase.name, phase.startedAt);
+  },
+};
+
+const unregister = registerTracingHooks(hooks);
+// Later, for example during plugin teardown:
+unregister();
+```
+
+`registerTracingHooks(hooks): () => void` enables tracing immediately. Runtime
+hooks run after configured hooks; calling the returned unregister function more
+than once is safe. When a phase did not provide `startedAt`, the dispatcher
+derives it from its duration before delivering the callback.
 
 ## Phase names
 
 `core` wires five phases into the request lifecycle, in this order, for every
 HTTP request:
 
-| Phase | Fires around |
-| --- | --- |
-| `route.match` | Resolving the incoming path/method to a registered route |
-| `middleware` | Each middleware in the route's chain — one `onPhase` call per middleware, with `attrs: { name, index }` |
-| `validation` | The route's input validation (`v.object(...)` / RESTful resource validation) |
-| `handler` | The route handler itself |
+| Phase            | Fires around                                                                                                                       |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `route.match`    | Resolving the incoming path/method to a registered route                                                                           |
+| `middleware`     | Each middleware in the route's chain — one `onPhase` call per middleware, with `attrs: { name, index }`                            |
+| `validation`     | The route's input validation (`v.object(...)` / RESTful resource validation)                                                       |
+| `handler`        | The route handler itself                                                                                                           |
 | `response.write` | The overall request span, closed once the response has settled (success or thrown error) — this is also where `onRequestEnd` fires |
 
 `@warlock.js/web` page requests report through this same `onPhase` surface
 instead of adding a separate hook API. They add three phases:
 
-| Phase | Fires around |
-| --- | --- |
-| `loader` | Each loader level, once per app/layout/page, with `attrs: { level, layoutPath? }` |
-| `render.shell` | Time from render start until React's shell is ready to stream |
-| `stream.end` | The whole streamed response, including every `defer()` value settling |
+| Phase             | Fires around                                                                                        |
+| ----------------- | --------------------------------------------------------------------------------------------------- |
+| `loader`          | Each loader level, once per app/layout/page, with `attrs: { level, layoutPath? }`                   |
+| `render.shell`    | Time from render start until React's shell is ready to stream                                       |
+| `stream.end`      | The whole streamed response, including every `defer()` value settling                               |
+| `page.middleware` | Page middleware chain; `attrs: { count, outcome }`, where outcome is `next`, `response`, or `error` |
+| `page.cache`      | Page-cache lookup; `attrs: { status }`, where status is `hit`, `miss`, or `bypass`                  |
+| `defer.settle`    | A deferred key settling; `attrs: { key, status }`, where status is `fulfilled` or `rejected`        |
 
 ## Trace id derivation
 
@@ -189,9 +213,8 @@ export default {
 - **No OTel dependency, and none planned for `core`.** An OTel (or other
   vendor) bridge is a separate, optional package that subscribes to these
   hooks — never add `@opentelemetry/api` to `core` itself.
-- **`web`'s phases aren't live yet.** Don't register a hook expecting
-  `loader`/`render.shell`/`stream.end` calls today; only the five `core`
-  phases fire in this release.
+- **Web phases share the same hook.** Do not create a second page-tracing
+  integration: subscribe with `TracingHooks.onPhase`.
 - **`route` is `undefined` until routing has matched.** There's no path where
   a hook fires before that, but code branching on `ctx.route` for an
   early-failing request (e.g. a 404 with no match) must handle `undefined`.

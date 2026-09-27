@@ -43,16 +43,16 @@ Run it: `npx warlock users.promote --email=hasan@example.com` (or `npx warlock u
 
 ## `CLICommandOptions` — the factory input
 
-| Field         | Type                          | Required | Notes                                                                                          |
-| ------------- | ----------------------------- | -------- | ---------------------------------------------------------------------------------------------- |
-| `name`        | `string`                      | yes      | Dot notation OK (`db.seed`, `jwt.generate`). May include positional placeholders (`name <arg>`). |
-| `description` | `string`                      |          | Shown in `warlock --help` and `warlock <cmd> --help`.                                          |
-| `alias`       | `string`                      |          | Short name (`m` for `migrate`).                                                                |
-| `action`      | `(data) => void \| Promise`   | yes      | Runs after preloaders. `data` is `{ args, options }`.                                          |
-| `preAction`   | `(data) => void \| Promise`   |          | Runs **before** preloaders — banner, input validation.                                         |
-| `preload`     | `CLICommandPreload`           |          | What to load before `action` runs. See below.                                                  |
-| `persistent`  | `boolean`                     |          | `true` for long-running commands (dev server). Skips the auto-exit.                            |
-| `options`     | `CLICommandOption[]`          |          | Flag definitions. See below.                                                                   |
+| Field         | Type                        | Required | Notes                                                                                            |
+| ------------- | --------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `name`        | `string`                    | yes      | Dot notation OK (`db.seed`, `jwt.generate`). May include positional placeholders (`name <arg>`). |
+| `description` | `string`                    |          | Shown in `warlock --help` and `warlock <cmd> --help`.                                            |
+| `alias`       | `string`                    |          | Short name (`m` for `migrate`).                                                                  |
+| `action`      | `(data) => void \| Promise` | yes      | Runs after preloaders. `data` is `{ args, options }`.                                            |
+| `preAction`   | `(data) => void \| Promise` |          | Runs **before** preloaders — banner, input validation.                                           |
+| `preload`     | `CLICommandPreload`         |          | What to load before `action` runs. See below.                                                    |
+| `persistent`  | `boolean`                   |          | `true` for long-running commands (dev server). Skips the auto-exit.                              |
+| `options`     | `CLICommandOption[]`        |          | Flag definitions. See below.                                                                     |
 
 ## Options — flag shape
 
@@ -154,29 +154,29 @@ The framework ships a fixed set of commands you call but don't author. Knowing t
 
 ### Database + migrations
 
-| Command  | Flags / args                                    | Preloads                       |
-| -------- | ----------------------------------------------- | ------------------------------ |
-| `warlock migrate` | `--list` / `-l` (executed **and** pending), `--pending` (pending only, sets an exit code), `--fresh` / `-f` (drop tables first) | database, logger          |
-| `warlock seed` | `--name <pattern>` (run seeds matching the pattern) | full bootstrap (env, configs, app modules) |
-| `warlock create-database <name>` | bare positional `<name>`        | database                       |
-| `warlock drop.tables` | `--force, -f` (skip confirmation prompt) | database, logger          |
-| `warlock db.indexes` | builds DB indexes for every registered model    | database                  |
+| Command                          | Flags / args                                                                                                                    | Preloads                                   |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `warlock migrate`                | `--list` / `-l` (executed **and** pending), `--pending` (pending only, sets an exit code), `--fresh` / `-f` (drop tables first) | database, logger                           |
+| `warlock seed`                   | `--name <pattern>` (run seeds matching the pattern)                                                                             | full bootstrap (env, configs, app modules) |
+| `warlock create-database <name>` | bare positional `<name>`                                                                                                        | database                                   |
+| `warlock drop.tables`            | `--force, -f` (skip confirmation prompt)                                                                                        | database, logger                           |
+| `warlock db.indexes`             | builds DB indexes for every registered model                                                                                    | database                                   |
 
 **Asking what will run next.** `warlock migrate --list` prints executed migrations and then the pending ones **in execution order**. Do not derive the pending set by differencing `--all` against `--list`: `--all` globs `src/app` only, while `--list` reads the migrations table, which also holds migrations that packages register through `database.migrations` (`@warlock.js/auth` contributes two). The difference under-counts pending, in the direction that says "safe to proceed".
 
 `--list` is a report and always exits `0`. `--pending` is a gate, and its exit code is its whole API:
 
-| Exit | Meaning |
-| ---- | ------- |
+| Exit | Meaning                   |
+| ---- | ------------------------- |
 | `0`  | computed, nothing pending |
-| `1`  | computed, N pending |
+| `1`  | computed, N pending       |
 | `2`  | **could not be computed** |
 
 ```bash
 warlock migrate --pending && ./deploy.sh
 ```
 
-`2` is separate from `1` on purpose — a script must be able to tell a backlog from an unknown, because one means *run them* and the other means *stop*. When the migration files cannot be loaded, both commands print `Pending: unavailable — <reason>` beneath a complete executed listing rather than reporting `0`.
+`2` is separate from `1` on purpose — a script must be able to tell a backlog from an unknown, because one means _run them_ and the other means _stop_. When the migration files cannot be loaded, both commands print `Pending: unavailable — <reason>` beneath a complete executed listing rather than reporting `0`.
 
 **If you are writing a command that reports on pending migrations:** register migrations first. `listPendingMigrations()` filters the runner's registry, so a caller that has not loaded anything gets `[]` — which reads as "nothing pending" and is not the same claim.
 
@@ -202,36 +202,41 @@ warlock generate                         (alias: g)      — interactive picker
 
 `warlock add <features...>` installs framework-adjacent features through a curated registry — bundles npm dependencies + scaffold files + tsconfig patches + package.json scripts in one call. Featured names (from `add-command.action.ts`):
 
-| Feature       | Installs                                                                                            |
-| ------------- | --------------------------------------------------------------------------------------------------- |
-| `react-email` | `react-email` + `@react-email/components` + `@react-email/render` + `@react-email/tailwind`; drops a `welcome-email.tsx` sample; patches `tsconfig.json` |
-| `web`         | Warlock Web + React stack; scaffolds the application page, localization, contact endpoint, and Web configuration                         |
-| `react`       | `react` + `react-dom` + types                                                                       |
+| Feature       | Installs                                                                                                                                                                               |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `react-email` | `react-email` + `@react-email/components` + `@react-email/render` + `@react-email/tailwind`; drops a `welcome-email.tsx` sample; patches `tsconfig.json`                               |
+| `web`         | Warlock Web + React stack; scaffolds the application page, localization, contact endpoint, and Web configuration                                                                       |
+| `react`       | `react` + `react-dom` + types                                                                                                                                                          |
 | `bull-board`  | `@bull-board/api` + `@bull-board/fastify`; writes a `dashboard` block to `src/config/queue.ts`. `requires: ["queue"]` — adds the `queue` feature first automatically when it's missing |
-| `image`       | `sharp` (for the `Image` class)                                                                     |
-| `mail`        | `nodemailer` + types                                                                                |
-| `ses`         | `@aws-sdk/client-sesv2`                                                                             |
-| `mongodb`     | `mongodb` driver                                                                                    |
-| `postgres`    | `pg`                                                                                                |
-| `mysql`       | `mysql2`                                                                                            |
-| `redis`       | `redis`                                                                                             |
-| `s3`          | `@aws-sdk/client-s3` + `@aws-sdk/lib-storage` + `@aws-sdk/s3-request-presigner`                     |
-| `scheduler`   | `@warlock.js/scheduler`                                                                             |
-| `swagger`     | `@warlock.js/swagger`                                                                               |
-| `postman`     | `@warlock.js/postman`                                                                               |
-| `herald`      | `@warlock.js/herald` + `amqplib` + types; ejects `src/config/communicator.ts`                       |
-| `test`        | `vitest` + `@mongez/vite` + coverage; drops `test-global-setup.ts` / `test-setup.ts` / `vite.config.ts` |
+| `image`       | `sharp` (for the `Image` class)                                                                                                                                                        |
+| `mail`        | `nodemailer` + types                                                                                                                                                                   |
+| `ses`         | `@aws-sdk/client-sesv2`                                                                                                                                                                |
+| `mongodb`     | `mongodb` driver                                                                                                                                                                       |
+| `postgres`    | `pg`                                                                                                                                                                                   |
+| `mysql`       | `mysql2`                                                                                                                                                                               |
+| `redis`       | `redis`                                                                                                                                                                                |
+| `s3`          | `@aws-sdk/client-s3` + `@aws-sdk/lib-storage` + `@aws-sdk/s3-request-presigner`                                                                                                        |
+| `scheduler`   | `@warlock.js/scheduler`                                                                                                                                                                |
+| `swagger`     | `@warlock.js/swagger`                                                                                                                                                                  |
+| `postman`     | `@warlock.js/postman`                                                                                                                                                                  |
+| `herald`      | `@warlock.js/herald` + `amqplib` + types; ejects `src/config/communicator.ts`                                                                                                          |
+| `test`        | `vitest` + `@mongez/vite` + coverage; drops `test-global-setup.ts` / `test-setup.ts` / `vite.config.ts`                                                                                |
+| `devtools`    | `@warlock.js/devtools` as a dev dependency; `warlock dev` auto-loads its development dashboard at `/__warlock`                                                                         |
 
 Run `warlock add --list` to see what's currently registered. Pass `--packageManager <yarn\|pnpm\|npm>` to override auto-detection (defaults to whichever lockfile is present).
+
+`warlock add devtools` never adds anything to `warlock.config.ts`. The package
+is loaded automatically by `warlock dev` when installed, and is omitted from a
+production install with dev dependencies excluded.
 
 The Web starter keeps the page's universal non-component setup in `src/web/index.register.ts`, while `src/web/index.page.tsx` re-exports `register`. Warlock still discovers and runs the hook from the page namespace in both SSR and the browser, but editing the page component remains inside React's Fast Refresh boundary. Do not move the `register()` declaration inline beside the component: React Refresh treats that non-component export as incompatible and reloads the page, losing component state.
 
 ### Misc
 
-| Command  | Purpose                                                     |
-| -------- | ----------------------------------------------------------- |
-| `warlock storage.put <localPath> [destination]` | Upload a local file to the default storage disk |
-| `warlock jwt.generate` | Generate a JWT secret in `.env` (from `@warlock.js/auth`)            |
+| Command                                         | Purpose                                                   |
+| ----------------------------------------------- | --------------------------------------------------------- |
+| `warlock storage.put <localPath> [destination]` | Upload a local file to the default storage disk           |
+| `warlock jwt.generate`                          | Generate a JWT secret in `.env` (from `@warlock.js/auth`) |
 
 ## Common patterns
 
@@ -293,7 +298,7 @@ export default command({
 });
 ```
 
-`preAction` runs *before* preloaders — cheap way to bail out without spinning up the database.
+`preAction` runs _before_ preloaders — cheap way to bail out without spinning up the database.
 
 ## Gotchas
 
@@ -301,7 +306,7 @@ export default command({
 - **Don't put logic at module top level.** The file gets imported during the commands scan (`warlock --warm-cache`). Anything outside `action` runs at scan time, possibly before any config or env is loaded.
 - **Required options block execution.** If `required: true` and the user omits the flag, the framework prints `Missing required options:` and exits `1` before `action` runs.
 - **Connectors are not free.** `connectors: true` boots the database, cache, storage, etc. For a print-version-and-exit command, leave `preload` undefined.
-- **`name` field with positional slots** (`name: "storage.put <localPath>"`) — the *registered* name is still `storage.put` (the first whitespace-separated token), so look up + alias work normally. Slots are only documentation/help-output.
+- **`name` field with positional slots** (`name: "storage.put <localPath>"`) — the _registered_ name is still `storage.put` (the first whitespace-separated token), so look up + alias work normally. Slots are only documentation/help-output.
 - **Aliases must be unique across plugin + framework + project.** The first registration wins; later collisions silently overwrite the map entry.
 
 ## See also

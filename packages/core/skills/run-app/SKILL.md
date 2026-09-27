@@ -28,11 +28,11 @@ Boots the framework in dev mode: file watcher, HMR-style module reload, on-disk 
 
 ### Flags
 
-| Flag                  | Default | Purpose                                                                                                  |
-| --------------------- | ------- | -------------------------------------------------------------------------------------------------------- |
+| Flag                  | Default | Purpose                                                                                                     |
+| --------------------- | ------- | ----------------------------------------------------------------------------------------------------------- |
 | `--fresh, -f`         | off     | Delete `.warlock/manifest.json` before start — forces a full re-parse from disk. Use after odd boot states. |
-| `--skip-typings, -st` | off     | Skip background type generation **for this run**. Overrides `devServer.generateTypings` config.           |
-| `--skip-health, -sh`  | off     | Skip file health checkers **for this run**. Overrides `devServer.healthCheckers` config.                  |
+| `--skip-typings, -st` | off     | Skip background type generation **for this run**. Overrides `devServer.generateTypings` config.             |
+| `--skip-health, -sh`  | off     | Skip file health checkers **for this run**. Overrides `devServer.healthCheckers` config.                    |
 
 When a flag is **not** passed, the corresponding `warlock.config.ts > devServer.*` value applies. When passed, the flag wins.
 
@@ -40,14 +40,14 @@ When a flag is **not** passed, the corresponding `warlock.config.ts > devServer.
 
 Once the server is ready, `warlock dev` listens for single keypresses:
 
-| Key      | Does                                                                       |
-| -------- | ---------------------------------------------------------------------------- |
-| `r`      | Restart the server on a fresh process.                                     |
-| `c`      | Clear the console.                                                         |
-| `q`      | Graceful shutdown, exit `0` — the same path as `Ctrl+C`.                    |
-| `h`      | Print the shortcuts that are armed right now.                              |
+| Key      | Does                                                                                                                                                                    |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `r`      | Restart the server on a fresh process.                                                                                                                                  |
+| `c`      | Clear the console.                                                                                                                                                      |
+| `q`      | Graceful shutdown, exit `0` — the same path as `Ctrl+C`.                                                                                                                |
+| `h`      | Print the shortcuts that are armed right now.                                                                                                                           |
 | `u`      | **Only while an update notice is showing** — update every `@warlock.js/*` package, install, and restart. See [`update-packages/SKILL.md`](../update-packages/SKILL.md). |
-| `Ctrl+C` | Graceful shutdown, unchanged.                                              |
+| `Ctrl+C` | Graceful shutdown, unchanged.                                                                                                                                           |
 
 A "restart" is a fresh process (`r` and `u` both use it) — see [The supervisor](#the-supervisor) below for how that works.
 
@@ -67,7 +67,7 @@ shell
 
 The supervisor spawns the worker with `stdio: "inherit"` and mirrors its exit code. To restart, the worker shuts down cleanly — freeing the http port — and exits `75`; the supervisor spawns a replacement. **The tree never gets deeper**, however many restarts happen.
 
-The supervisor is chosen in the `dev` command's `preAction`, which runs *before* the preloaders — deliberately, so the supervisor never loads config or starts connectors. A supervisor holding a second database connection open for the session would be a real bug, not a cosmetic one.
+The supervisor is chosen in the `dev` command's `preAction`, which runs _before_ the preloaders — deliberately, so the supervisor never loads config or starts connectors. A supervisor holding a second database connection open for the session would be a real bug, not a cosmetic one.
 
 Signals: `SIGINT` reaches the worker directly (same process group), so the supervisor ignores it and only notes that the next exit is final — acting on it would exit the parent while the worker was still draining. `SIGTERM` / `SIGHUP` are forwarded explicitly, since they don't propagate to the group on Windows. After any worker exits, the supervisor puts stdin back out of raw mode in case the worker was killed before it could.
 
@@ -81,13 +81,13 @@ A worker that dies **after running healthily for at least 5s** — OOM, a native
 14:31:02 Development server was killed by SIGSEGV — restarting.
 ```
 
-A worker that dies *sooner* than that failed to **boot** — a broken config, a port already taken — and it has already printed why. Restarting there would just reprint the same error and bury it, so the supervisor mirrors the exit code and stops.
+A worker that dies _sooner_ than that failed to **boot** — a broken config, a port already taken — and it has already printed why. Restarting there would just reprint the same error and bury it, so the supervisor mirrors the exit code and stops.
 
-A busy port is now caught *before* the bind attempt: the HTTP connector calls `assertPortIsAvailable(port, host)` immediately before `listen()`, so the failure is `Port <port> is already in use on <host>. Stop the dev server (or whatever else is listening on port <port>) and run again, or start on a free port…` — not a raw `EADDRINUSE` surfacing from inside Fastify. Same connector, same preflight, for `warlock start`.
+A busy port is now caught _before_ the bind attempt: the HTTP connector calls `assertPortIsAvailable(port, host)` immediately before `listen()`, so the failure is `Port <port> is already in use on <host>. Stop the dev server (or whatever else is listening on port <port>) and run again, or start on a free port…` — not a raw `EADDRINUSE` surfacing from inside Fastify. Same connector, same preflight, for `warlock start`.
 
 Flapping is capped: more than 3 crashes inside 60s and the supervisor gives up rather than restarting behind your back.
 
-An explicit restart (`r`, `u`, a config change) is a *request*, not a crash, so the uptime rule never swallows it.
+An explicit restart (`r`, `u`, a config change) is a _request_, not a crash, so the uptime rule never swallows it.
 
 ### Restart on config change
 
@@ -103,7 +103,7 @@ Set `devServer.restartOnConfigChange: false` for the previous behaviour (a warni
 
 On first boot `warlock dev` bundles its ESM loader hook and writes it to **your project's** `.warlock/loader-hook.mjs` — the hook runs in a fresh Node worker thread with no TypeScript loader of its own, so it has to be plain, pre-bundled ESM.
 
-Because that file lives in your directory rather than core's, every npm import inside it is rewritten at generation time to an **absolute path resolved from core's own install**. A bare `import "esbuild"` there would resolve from *your* `node_modules`, and `esbuild` / `get-tsconfig` are core's dependencies, not yours.
+Because that file lives in your directory rather than core's, every npm import inside it is rewritten at generation time to an **absolute path resolved from core's own install**. A bare `import "esbuild"` there would resolve from _your_ `node_modules`, and `esbuild` / `get-tsconfig` are core's dependencies, not yours.
 
 :::note[Fixed in 4.9.2 — pnpm users]
 Before 4.9.2 those imports were left bare. npm and yarn hoist every transitive dependency into one flat tree, so they resolved by accident; pnpm's strict layout does not, and the dev server failed with `ERR_MODULE_NOT_FOUND: Cannot find package 'esbuild'`. The workaround was declaring `esbuild` and `get-tsconfig` in your own `package.json` — no longer needed, and you can drop them.
@@ -165,12 +165,12 @@ esbuild bundle of the app down to a single JS file in `dist/`. No flags — ever
 ```ts title="warlock.config.ts"
 export default defineConfig({
   build: {
-    outdir: "dist",        // default — relative or absolute
-    outFile: "app.js",            // default — bundle filename
-    minify: true,                 // default — esbuild minify
-    sourcemap: true,              // default — true | false | "inline" | "linked"
-    singleBundle: false,          // default — one runnable file, deps inlined
-    esmShim: true,                // default — require/__filename/__dirname for bundled CJS
+    outdir: "dist", // default — relative or absolute
+    outFile: "app.js", // default — bundle filename
+    minify: true, // default — esbuild minify
+    sourcemap: true, // default — true | false | "inline" | "linked"
+    singleBundle: false, // default — one runnable file, deps inlined
+    esmShim: true, // default — require/__filename/__dirname for bundled CJS
   },
 });
 ```
@@ -182,7 +182,7 @@ Defaults are sensible for the typical "Node service" deployment. Knobs to actual
 - **`minify: false`** — flip to debug a production-only bug. Larger bundle, readable stack traces.
 - **`sourcemap: "inline"`** — embed the source map in the bundle. Useful when your error reporter only captures the bundle and can't fetch a `.map` sidecar.
 - **`sourcemap: false`** — skip source maps entirely. Smaller artifact, but stack traces in production logs lose their file:line precision (and `warlock start` will not enable `--enable-source-maps` since there's nothing to map).
-- **`singleBundle: true`** — inline dependencies so `node dist/app.js` runs with no `node_modules` and no launcher. Sets `packages: "bundle"` + `splitting: false` as **defaults you can override**. ⚠ Native `.node` addons are still emitted alongside — "single bundle" is one JS file *plus* any native addons. Do NOT reach for it as the default: keeping deps external is right when you deploy the folder.
+- **`singleBundle: true`** — inline dependencies so `node dist/app.js` runs with no `node_modules` and no launcher. Sets `packages: "bundle"` + `splitting: false` as **defaults you can override**. ⚠ Native `.node` addons are still emitted alongside — "single bundle" is one JS file _plus_ any native addons. Do NOT reach for it as the default: keeping deps external is right when you deploy the folder.
 - **`esmShim: false`** — only if you are certain nothing in the graph is CommonJS. Leave it on.
 
 ⚠ **The trap this replaced.** Setting `packages: "bundle"` by hand used to produce a clean build whose process died on start with `Error: Dynamic require of "node:assert" is not supported`. The output is ESM; bundled CJS deps call `require(...)` and read `__dirname`, and neither exists in an ES module, so the bundler substitutes a throwing stub. **A green `warlock build` was not evidence the bundle ran.** `esmShim` now injects `createRequire(import.meta.url)` and friends automatically for any ESM build, so both `singleBundle` and a hand-written `packages: "bundle"` work. An existing hand-written `banner` is preserved — the shim is prepended, not substituted.
@@ -241,6 +241,41 @@ npx warlock start --inspect              # → spawns node --enable-source-maps 
 npx warlock start --max-old-space-size=4096  # → spawns node --enable-source-maps --max-old-space-size=4096 dist/app.js
 ```
 
+### Deploy one build in parts
+
+One production build can run as API, page, and background-worker processes.
+Omit `--role` to run every role (the existing default); combine roles with a
+comma-separated list:
+
+```bash
+npx warlock start --role=api
+npx warlock start --role=web --sites=admin,storefront
+npx warlock start --role=worker
+npx warlock start --role=web,api
+```
+
+`--sites=a,b` is valid only with the `web` role and installs the listed site
+keys' pages (shared non-site pages remain installed). Unknown roles, an empty
+list, `--sites` without `web`, and unknown site keys fail boot rather than
+silently serving the wrong traffic.
+
+An API or web role binds HTTP. A worker-only process binds no HTTP port; it
+loads worker work, starts queue workers and the scheduler there, and its
+readiness banner reports `worker ready`. `warlock dev` always runs every role.
+
+Inside application code, inspect the roles resolved at bootstrap:
+
+```ts
+import { Application } from "@warlock.js/core";
+
+if (Application.hasRole("worker")) {
+  // worker-only integration
+}
+
+Application.roles; // ReadonlySet<"api" | "web" | "worker">
+Application.sites; // ReadonlySet<string> | undefined (undefined = all sites)
+```
+
 Everything you pass after `start` is forwarded to the spawned Node process. Use this to attach a debugger (`--inspect`), tune memory (`--max-old-space-size`), or pass any other Node flag without editing the command.
 
 ### Source maps
@@ -283,9 +318,9 @@ Nothing else is needed for pnpm. Warlock never requires an app to declare a pack
 
 **A success line on stdout means the app is serving requests.** That is a contract, not a convention, and you can build a CI gate or a health probe on it.
 
-| Stream     | Carries                                                        |
-| ---------- | -------------------------------------------------------------- |
-| **stdout** | the started banner, and start failures. Nothing else.           |
+| Stream     | Carries                                                                                |
+| ---------- | -------------------------------------------------------------------------------------- |
+| **stdout** | the started banner, and start failures. Nothing else.                                  |
 | **stderr** | progress (`🚀 Starting production server...`), diagnostics, the application's own logs |
 
 The started banner prints **only** when the running application reports a completed boot — not when the command starts, not when the child is spawned. A child that dies before reporting is a failed start: the failure is written to **both** streams (stderr for humans and log collectors, stdout so a supervisor greping for the banner finds a failure rather than silence), and `warlock start` exits non-zero **even when the child itself exited `0`**.
@@ -321,7 +356,7 @@ else is listening on port 3000) and run again, or start on a free port — e.g.
 startHttpTestServer({ port: 3001 }).
 ```
 
-**The process exits `78` (`EX_CONFIG`), and `warlock dev`'s supervisor treats that as terminal — it prints once and stops rather than restarting.** That code is the counterpart of `75`, which a worker uses to ask for a fresh process. The distinction is the point: a code error is worth restarting, and a *startup precondition* — a port held by something else, a port value that is not a port, a boot validator that rejected — cannot change because we tried again six seconds later. Retrying one only reprints the diagnostic and then scrolls it away.
+**The process exits `78` (`EX_CONFIG`), and `warlock dev`'s supervisor treats that as terminal — it prints once and stops rather than restarting.** That code is the counterpart of `75`, which a worker uses to ask for a fresh process. The distinction is the point: a code error is worth restarting, and a _startup precondition_ — a port held by something else, a port value that is not a port, a boot validator that rejected — cannot change because we tried again six seconds later. Retrying one only reprints the diagnostic and then scrolls it away.
 
 `EACCES` on the port is treated the same way as `EADDRINUSE` (a privileged port you may not bind is also "not available"); anything else the probe throws is rethrown untouched.
 
@@ -336,7 +371,7 @@ Configured http.port "03999" normalised to 3999.
 `warlock start` spawns the bundle with an IPC channel and sets `WARLOCK_BOOT_SIGNAL=1` on it. `Application.markBooted()` — which the production entry calls after the late-phase connectors (http, socket) are up — sends one versioned message and closes the channel:
 
 ```ts
-{ type: "warlock:ready", version: 1, pid, at, environment, runtimeStrategy, bootDurationMs?, port? }
+{ type: "warlock:ready", version: 1, pid, at, environment, runtimeStrategy, bootDurationMs?, port?, roles }
 ```
 
 Three consequences worth knowing:
@@ -351,11 +386,11 @@ If you need the same fact inside the app, use `Application.onceBooted()` / `Appl
 
 `Application.environment` and `Application.runtimeStrategy` are separate axes:
 
-| Mode             | `environment`   | `runtimeStrategy` | How                                       |
-| ---------------- | --------------- | ----------------- | ----------------------------------------- |
-| `warlock dev`    | `development`*  | `development`     | preload force-sets `runtimeStrategy`      |
-| `warlock build`  | n/a (no app boots) | n/a            | only loads warlock.config.ts              |
-| `warlock start`  | `production`*   | `production`*     | usually set via `NODE_ENV` in the env     |
+| Mode            | `environment`      | `runtimeStrategy` | How                                   |
+| --------------- | ------------------ | ----------------- | ------------------------------------- |
+| `warlock dev`   | `development`*     | `development`     | preload force-sets `runtimeStrategy`  |
+| `warlock build` | n/a (no app boots) | n/a               | only loads warlock.config.ts          |
+| `warlock start` | `production`*      | `production`*     | usually set via `NODE_ENV` in the env |
 
 `*` — `environment` follows `NODE_ENV`. The dev command doesn't force it, but the default in most projects is `development`. `start` doesn't force it either; deployments set `NODE_ENV=production` themselves.
 
@@ -414,7 +449,7 @@ export default defineConfig({
 
 CI sets `BUILD_OUT=build/<sha>` per pipeline. `warlock start` reads the same config and finds the bundle without any hardcoded paths.
 
-**This recipe only started working in 4.11.0.** Before that, `warlock.config.ts` was evaluated *before* any `.env` file was read, so every `env()` call in it returned its default — silently, under every command. If you copied this recipe earlier and concluded that `BUILD_OUT` was ignored, it was.
+**This recipe only started working in 4.11.0.** Before that, `warlock.config.ts` was evaluated _before_ any `.env` file was read, so every `env()` call in it returned its default — silently, under every command. If you copied this recipe earlier and concluded that `BUILD_OUT` was ignored, it was.
 
 **Which file the value comes from is decided by `NODE_ENV`, and no Warlock command sets it.** `env()` reads `.env.<NODE_ENV>` when that file exists and falls back to plain `.env`. So:
 

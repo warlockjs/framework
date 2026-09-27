@@ -13,6 +13,9 @@ This skill is the foundation. Every other warlock skill (`register-route`, `crea
 2. **Several files are auto-loaded — never `import` them.** The dev-server file watcher and the production builder categorize these as "special" and load them on boot.
    - `src/app/<module>/routes.ts` — route declarations
    - `src/app/<module>/main.ts` — per-module one-time setup
+   - `src/app/<module>/worker.ts` — worker-only setup (queue job definitions,
+     `scheduler.addJob(...)`, `scheduler.start()`); loaded only for the
+     `worker` role, and always loaded by `warlock dev`
    - `src/app/main.ts` — **project-level** one-time application setup (global hooks and other app initialization; connector instances belong in `warlock.config.ts > connectors`)
    - `src/app/<module>/events/*.ts(x)` — **any** `.ts(x)` file inside the `events/` folder (the `*.event.ts` suffix is convention, not a framework requirement)
    - `src/app/<module>/utils/locales.ts` — module translations via `groupedTranslations(...)`
@@ -33,7 +36,7 @@ This skill is the foundation. Every other warlock skill (`register-route`, `crea
    ```ts title="src/app/<module>/schema/create-<thing>.schema.ts"
    import { v, type Infer } from "@warlock.js/seal";
 
-   export const createThingSchema = v.object({ /* … */ });
+   export const createThingSchema = v.object({/* … */});
    export type CreateThingSchema = Infer<typeof createThingSchema>;
    ```
 
@@ -42,13 +45,17 @@ This skill is the foundation. Every other warlock skill (`register-route`, `crea
    import { type CreateThingSchema, createThingSchema } from "../schema/create-thing.schema";
    import { createThingService } from "../services/create-thing.service";
 
-   export const createThingController: GuardedRequestHandler<CreateThingSchema> = async ({ request, response }) => {
+   export const createThingController: GuardedRequestHandler<CreateThingSchema> = async ({
+     request,
+     response,
+   }) => {
      const thing = await createThingService(request.validated());
      return response.success({ thing });
    };
 
    createThingController.validation = { schema: createThingSchema };
    ```
+
 8. **Model getters beat `.get<T>("field")`.** Add a typed getter on the model rather than scattering `.get<string>("name")` casts across call sites.
 
 ## Module layout (the standard subfolders)
@@ -67,26 +74,27 @@ src/app/<module>/
   seeds/                    seed data for `warlock seed`
   routes.ts                 ← auto-loaded
   main.ts                   ← auto-loaded once, one-time setup
+  worker.ts                 ← auto-loaded for the worker role only
 ```
 
 Some older modules still have a `validation/` folder instead of `schema/` — historical drift. The framework treats them as plain folders either way; the generator emits to `schema/`.
 
 ## File naming (project-wide)
 
-| Suffix              | Role                                  | Example                             |
-| ------------------- | ------------------------------------- | ----------------------------------- |
-| `.controller.ts`    | HTTP handler                          | `create-product.controller.ts`      |
-| `.service.ts`       | Stateless business logic              | `create-product.service.ts`         |
-| `.usecase.ts`       | `useCase()` pipeline                  | `login.usecase.ts`                  |
-| `.model.ts`         | Cascade model class                   | `product.model.ts`                  |
-| `.repository.ts`    | `RepositoryManager` subclass          | `products.repository.ts`            |
-| `.resource.ts`      | `Resource` subclass                   | `product.resource.ts`               |
-| `.schema.ts`        | seal validation schema + its inferred `<Name>Schema` type from the same file | `create-product.schema.ts`          |
-| `.type.ts`          | data shape (TypeScript `type`)        | `cart-state.type.ts`                |
-| `.contract.ts`      | interface (TypeScript `interface`)    | `model.contract.ts`                 |
-| `.event.ts`         | event listener registrations (any `.ts(x)` inside `events/` works; the suffix is convention) | `audit.event.ts`                    |
-| `.migration.ts`     | Cascade migration                     | `2026_05_22_120000_product.migration.ts` |
-| `.seed.ts`          | seed data                             | `products.seed.ts`                  |
+| Suffix           | Role                                                                                         | Example                                  |
+| ---------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `.controller.ts` | HTTP handler                                                                                 | `create-product.controller.ts`           |
+| `.service.ts`    | Stateless business logic                                                                     | `create-product.service.ts`              |
+| `.usecase.ts`    | `useCase()` pipeline                                                                         | `login.usecase.ts`                       |
+| `.model.ts`      | Cascade model class                                                                          | `product.model.ts`                       |
+| `.repository.ts` | `RepositoryManager` subclass                                                                 | `products.repository.ts`                 |
+| `.resource.ts`   | `Resource` subclass                                                                          | `product.resource.ts`                    |
+| `.schema.ts`     | seal validation schema + its inferred `<Name>Schema` type from the same file                 | `create-product.schema.ts`               |
+| `.type.ts`       | data shape (TypeScript `type`)                                                               | `cart-state.type.ts`                     |
+| `.contract.ts`   | interface (TypeScript `interface`)                                                           | `model.contract.ts`                      |
+| `.event.ts`      | event listener registrations (any `.ts(x)` inside `events/` works; the suffix is convention) | `audit.event.ts`                         |
+| `.migration.ts`  | Cascade migration                                                                            | `2026_05_22_120000_product.migration.ts` |
+| `.seed.ts`       | seed data                                                                                    | `products.seed.ts`                       |
 
 Filenames are kebab-case. Class names are PascalCase. Function names are camelCase. Table/collection names are snake_case (plural).
 
@@ -97,8 +105,8 @@ The scaffolded `tsconfig.json` defines:
 ```jsonc
 {
   "paths": {
-    "app/*": ["./src/app/*"]
-  }
+    "app/*": ["./src/app/*"],
+  },
 }
 ```
 

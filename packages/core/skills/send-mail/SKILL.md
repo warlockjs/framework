@@ -12,10 +12,7 @@ Two APIs over the same engine. The fluent `Mail` builder reads top-to-bottom in 
 ```ts
 import { Mail } from "@warlock.js/core";
 
-await Mail.to("user@example.com")
-  .subject("Welcome!")
-  .text("Thanks for joining.")
-  .send();
+await Mail.to("user@example.com").subject("Welcome!").text("Thanks for joining.").send();
 ```
 
 Or:
@@ -59,10 +56,25 @@ For named mailers (multi-provider apps), export a `MailersConfig` instead:
 
 ```ts
 const config: MailersConfig = {
-  default: { host: "smtp.sendgrid.net", port: 587, username: "apikey", password: env("SENDGRID_KEY") },
+  default: {
+    host: "smtp.sendgrid.net",
+    port: 587,
+    username: "apikey",
+    password: env("SENDGRID_KEY"),
+  },
   mailers: {
-    marketing: { host: "smtp.mailchimp.com", port: 587, username: env("MC_USER"), password: env("MC_PASS") },
-    transactional: { host: "smtp.postmark.com", port: 587, username: env("PM_USER"), password: env("PM_PASS") },
+    marketing: {
+      host: "smtp.mailchimp.com",
+      port: 587,
+      username: env("MC_USER"),
+      password: env("MC_PASS"),
+    },
+    transactional: {
+      host: "smtp.postmark.com",
+      port: 587,
+      username: env("PM_USER"),
+      password: env("PM_PASS"),
+    },
   },
 };
 ```
@@ -94,9 +106,9 @@ The mail pipeline switches behavior on a global mode:
 ```ts
 import { setMailMode } from "@warlock.js/core";
 
-setMailMode("production");   // actually send (default)
-setMailMode("development");  // log subject + recipient, no send
-setMailMode("test");         // capture to test mailbox, no send
+setMailMode("production"); // actually send (default)
+setMailMode("development"); // log subject + recipient, no send
+setMailMode("test"); // capture to test mailbox, no send
 ```
 
 Production sends. Development logs and returns a fake-success `MailResult`. Test captures every call into an in-memory mailbox (cleared between tests) and returns success — handy for asserting "the welcome email got sent" without hitting SMTP.
@@ -109,7 +121,7 @@ Production sends. Development logs and returns a fake-success `MailResult`. Test
 
 ```ts
 await Mail.to("a@example.com")
-  .to(["a@example.com", "b@example.com"])      // override
+  .to(["a@example.com", "b@example.com"]) // override
   .cc("manager@example.com")
   .bcc("audit@example.com")
   .replyTo("support@example.com")
@@ -150,15 +162,15 @@ await Mail.to("u@e.com")
 
 ### Other knobs
 
-| Method                                | Purpose                                       |
-| ------------------------------------- | --------------------------------------------- |
-| `.priority("high" \| "normal" \| "low")` | priority header                            |
-| `.headers({ "X-Foo": "bar" })`        | replace custom headers                        |
-| `.header("X-Foo", "bar")`             | add one header                                |
-| `.tags(["welcome"])` / `.tag("transactional")` | categorization tags                  |
-| `.correlationId("req-123")`           | tracking id (logged with sends)               |
-| `.config(MailConfigurations)`         | one-off override of the global config         |
-| `.mailer("marketing")`                | route via a named mailer from config          |
+| Method                                         | Purpose                               |
+| ---------------------------------------------- | ------------------------------------- |
+| `.priority("high" \| "normal" \| "low")`       | priority header                       |
+| `.headers({ "X-Foo": "bar" })`                 | replace custom headers                |
+| `.header("X-Foo", "bar")`                      | add one header                        |
+| `.tags(["welcome"])` / `.tag("transactional")` | categorization tags                   |
+| `.correlationId("req-123")`                    | tracking id (logged with sends)       |
+| `.config(MailConfigurations)`                  | one-off override of the global config |
+| `.mailer("marketing")`                         | route via a named mailer from config  |
 
 ### Per-mail event handlers
 
@@ -171,9 +183,9 @@ await Mail.to("u@e.com")
   .beforeSending((mail) => {
     // mutate `mail` or return false to cancel
   })
-  .onSent((mail, result, error) => {})    // always fires after attempt
-  .onSuccess((mail, result) => {})        // only on success
-  .onError((mail, error) => {})           // only on failure
+  .onSent((mail, result, error) => {}) // always fires after attempt
+  .onSuccess((mail, result) => {}) // only on success
+  .onError((mail, error) => {}) // only on failure
   .send();
 ```
 
@@ -243,6 +255,23 @@ mailEvents.onBeforeSending((mail) => {
 
 Global hooks fire for **every** mail. Per-mail handlers from the builder / `sendMail` fire only for that one send.
 
+### Observe captured development and test mail
+
+Development and test sends create a `CapturedMail` and synchronously emit the
+global `mail.captured` event. Subscribe with `mailEvents.onCaptured`:
+
+```ts
+import { mailEvents, type CapturedMail } from "@warlock.js/core";
+
+mailEvents.onCaptured((mail: CapturedMail) => {
+  console.log(mail.id, mail.options.subject);
+});
+```
+
+`CapturedMail.id` is the mail's generated or supplied id. This event is for
+development/test tooling; production sends do not emit it. Listener failures
+are logged and never interrupt mail delivery.
+
 For correlated tracking of a specific mail, generate an id and subscribe by id:
 
 ```ts
@@ -296,10 +325,11 @@ Captured mail shape:
 
 ```ts
 type CapturedMail = {
-  options: MailOptions;       // original payload
+  id: string;
+  options: MailOptions; // original payload
   normalized: NormalizedMail; // post-normalization (arrays, resolved from)
   timestamp: Date;
-  result?: MailResult;        // in test mode, always success
+  result?: MailResult; // in test mode, always success
   error?: MailError;
 };
 ```
