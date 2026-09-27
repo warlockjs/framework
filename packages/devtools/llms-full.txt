@@ -1,0 +1,78 @@
+# Warlock Devtools — full skills
+
+> Package: `@warlock.js/devtools`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/devtools/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## devtools-overview  `@warlock.js/devtools/devtools-overview/SKILL.md`
+
+---
+name: devtools-overview
+description: 'Development-only dashboard for Warlock.js apps at `/__warlock`: request timeline (router + page middleware, loaders, render, deferred values), every SQL/Mongo query with EXPLAIN, N+1 warnings naming the file and line, a dev mailbox, logs, cache operations and the route map. Use for: "why is this page slow", "which queries does this request run", "find N+1 queries", "see the email my app just sent in dev", "open the dashboard". Install with `warlock add devtools`; never registered in warlock.config.ts. Not this package: production monitoring/APM or OpenTelemetry export — use `http.tracing` hooks in @warlock.js/core; slow-query logging in production — subscribe to cascade `dataSourceRegistry.on("query")` yourself.'
+---
+
+# `@warlock.js/devtools` — overview
+
+A dashboard for **development only**, served by your own app at `/__warlock`.
+It shows what each request did: its timing waterfall, the queries it ran, the
+cache operations, the logs, and any mail it sent.
+
+## Install: one command, no config
+
+```bash
+warlock add devtools   # adds @warlock.js/devtools as a DEV dependency
+warlock dev            # open http://localhost:<port>/__warlock
+```
+
+There's nothing to register. `warlock dev` loads devtools automatically when
+the package is installed.
+
+**Do not** add `devtoolsConnector()` to `warlock.config.ts`. Devtools is a
+dev dependency, so a production install doesn't have it, and a config import
+of it would fail to resolve there.
+
+## Why it can't leak into production
+
+1. **It isn't installed there.** Production installs omit dev dependencies.
+2. **It refuses to run outside development.** If it's present anyway, it logs
+   one warning (`@warlock.js/devtools only runs in development; it is not mounted`)
+   and mounts nothing.
+3. **It only answers loopback clients.** Every dashboard and API route answers
+   404 unless the connection comes from `127.0.0.1` / `::1`. It checks the
+   socket address, not `X-Forwarded-For`, so a forwarded-for header can't
+   unlock it.
+
+## What each panel shows
+
+| Panel | What you see | Where it comes from |
+|---|---|---|
+| **Requests** | Each request with its status, duration and query count. Click one for a waterfall: router middleware, `page.middleware`, loaders, `page.cache` hit/miss, `render.shell`, `defer.settle`, with queries and cache ops placed on the same time axis. | core `registerTracingHooks()` |
+| **Queries** | SQL + bindings or the Mongo command, duration, rows, and an **Explain** button (Postgres `SELECT` only; runs `EXPLAIN (FORMAT JSON)`, never `ANALYZE`) | cascade `dataSourceRegistry.on("query")` |
+| **N+1** | `⚠ N+1: 12× "select … where post_id = $1" — src/app/posts/services/list-posts.service.ts:18`, shown on the request and printed in the terminal | same query shape ≥ 5 times in one request |
+| **Mail** | Every mail sent in development: headers, HTML (sandboxed) and text, attachment names | core `mailEvents.onCaptured()` |
+| **Logs** | Log entries per request, filterable by level and module | a logger channel |
+| **Cache** | hit / miss / set / removed / `invalidated` (tags, keys removed) | cache `cache.on(...)` |
+| **Routes** | Every HTTP route with its method, path, name and middleware | core router |
+
+Work outside a request (boot, scheduler ticks, queue jobs) goes to a separate
+background list, so it never clutters a request's timeline.
+
+## Options
+
+`warlock dev` uses the defaults: path `/__warlock`, the last 200 requests
+kept, and an N+1 threshold of 5. Everything lives in memory and is gone on
+restart.
+
+## Secrets
+
+Query bindings and log context go through the logger's redaction rules
+before they're stored. The data is still real request data, which is exactly
+why the dashboard is development-only and loopback-only.
+
+## Related
+
+- Building your own tooling on the same hooks: core `registerTracingHooks()`,
+  cascade `dataSourceRegistry.on("query")`, core `mailEvents.onCaptured()` and
+  the cache `invalidated` event are public APIs that also work without devtools.
+
+
