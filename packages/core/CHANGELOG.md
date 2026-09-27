@@ -12,6 +12,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `registerTracingHooks()` lets development tools subscribe to HTTP tracing at runtime, and phase tracing now includes each phase's `startedAt` timestamp.
 - `mailEvents.onCaptured()` (`mail.captured`): every mail sent in development or test mode is delivered in full (html, text, headers, attachments) to listeners. Development mode still logs instead of sending. `CapturedMail` gains `id`.
+- **Devtools:** `warlock add devtools` installs `@warlock.js/devtools` as a dev dependency, and `warlock dev` loads it automatically when it is installed. You never name it in `warlock.config.ts`, so production installs, which omit dev dependencies, have nothing to resolve. `warlock add` now pins `@warlock.js/*` dev dependencies to the installed framework version too.
+- **Deploy in parts:** `warlock start --role=api|web|worker` (combinable, e.g. `--role=web,api`) runs one build as separate processes, and `--sites=a,b` limits a `web` process to those sites.
+  - Roles are file-based. `routes.ts` is `api`, pages are `web`, and the new per-module `worker.ts` is `worker`. `main.ts` loads for every role.
+  - A process with neither `api` nor `web` binds no HTTP port and reports `worker ready`.
+  - `Application.roles`, `Application.hasRole()` and `Application.sites` expose the active set. The `warlock:ready` signal now carries `roles`.
+  - With no `--role`, every role is on, so existing apps and `warlock dev` behave exactly as before.
+  - Unknown roles, an empty list, or `--sites` without `web` fail before the app starts.
 
 ## 5.24.0 - 2026-09-27
 

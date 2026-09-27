@@ -8,6 +8,7 @@ import {
 } from "../utils/environment";
 import { getFrameworkVersion } from "../utils/framework-vesion";
 import { appPath, publicPath, rootPath, srcPath, storagePath, uploadsPath } from "../utils/paths";
+import { getRoles, getSites, hasRole, type AppRole } from "./roles";
 
 /**
  * Snapshot of the global facts known the moment the application finished
@@ -223,6 +224,7 @@ export class Application {
       runtimeStrategy: context.runtimeStrategy,
       bootDurationMs: context.bootDurationMs,
       port: this.servedPort,
+      roles: [...this.roles],
     });
 
     const listeners = this.bootListeners;
@@ -434,6 +436,35 @@ export class Application {
    */
   public static get isTest(): boolean {
     return this.environment === "test";
+  }
+
+  /**
+   * The roles this process serves — `WARLOCK_ROLES`, resolved once at
+   * bootstrap. Every role is on when the variable is absent (plain `warlock
+   * start`, `warlock dev`, and tests).
+   */
+  public static get roles(): ReadonlySet<AppRole> {
+    return getRoles();
+  }
+
+  /**
+   * The site keys this process installs pages for — `WARLOCK_SITES`,
+   * resolved once at bootstrap. `undefined` means every site.
+   */
+  public static get sites(): ReadonlySet<string> | undefined {
+    return getSites();
+  }
+
+  /**
+   * Whether this process serves the given role.
+   *
+   * @example
+   * if (Application.hasRole("worker")) {
+   *   scheduler.start();
+   * }
+   */
+  public static hasRole(role: AppRole): boolean {
+    return hasRole(role);
   }
 
   /**

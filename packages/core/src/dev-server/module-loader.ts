@@ -27,11 +27,19 @@ export class ModuleLoadError extends Error {
 }
 
 /**
- * The four "special" file kinds that the dev server eagerly imports at boot.
+ * The "special" file kinds that the dev server eagerly imports at boot.
  * Order matters: locales first (used by everything), events before main so
- * listeners are registered when main runs, routes last so handlers are bound.
+ * listeners are registered when main runs, routes after main so handlers are
+ * bound, worker last so scheduled jobs and queue definitions see routes
+ * already registered. Dev always loads worker files since dev runs every role.
  */
-const SPECIAL_TYPES: readonly SpecialFileType[] = ["locale", "event", "main", "route"] as const;
+const SPECIAL_TYPES: readonly SpecialFileType[] = [
+  "locale",
+  "event",
+  "main",
+  "route",
+  "worker",
+] as const;
 
 /**
  * Loads application modules through the ESM loader hook. The hook stamps

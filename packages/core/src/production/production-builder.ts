@@ -14,7 +14,14 @@ import { assertNoReservedConnectorNames } from "../connectors/assert-no-reserved
 import { assertUniqueConnectorNames } from "../connectors/assert-unique-connector-names";
 import type { Connector, ConnectorBuildContext, ConnectorEsbuildPatch } from "../connectors/types";
 import { configKeyFromPath } from "../config/config-key-from-path";
-import { isConfigFile, isEventFile, isLocaleFile, isMainFile, isRouteFile } from "../dev-server/special-file-patterns";
+import {
+  isConfigFile,
+  isEventFile,
+  isLocaleFile,
+  isMainFile,
+  isRouteFile,
+  isWorkerFile,
+} from "../dev-server/special-file-patterns";
 import { tsconfigManager } from "../dev-server/tsconfig-manager";
 import { appPath, rootPath, warlockPath } from "../utils";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
@@ -347,6 +354,7 @@ export class ProductionBuilder {
     events: false,
     main: false,
     routes: false,
+    workers: false,
   };
 
   /**
@@ -362,14 +370,15 @@ export class ProductionBuilder {
     await this.generateConfigLoader();
 
     // Generate special files and track which ones have content
-    const [locales, events, main, routes] = await Promise.all([
+    const [locales, events, main, routes, workers] = await Promise.all([
       this.generateLocales(),
       this.generateEvents(),
       this.generateMain(),
       this.generateRoutes(),
+      this.generateWorkers(),
     ]);
 
-    this.generatedFiles = { locales, events, main, routes };
+    this.generatedFiles = { locales, events, main, routes, workers };
   }
 
   /**
@@ -553,6 +562,17 @@ bootstrap();
   }
 
   /**
+   * Generate workers.ts (only if there are worker files)
+   * @returns true if file was generated with content
+   */
+  private async generateWorkers(): Promise<boolean> {
+    const files = await this.globModule(isWorkerFile);
+    if (files.length === 0) return false;
+    await this.generateImportsFile(files, "workers.ts");
+    return true;
+  }
+
+  /**
    * Generate a file with imports from all given files
    */
   private async generateImportsFile(importPaths: string[], outputFile: string): Promise<void> {
@@ -613,7 +633,9 @@ bootstrap();
       "//     a bind-and-release on a socket that is never served, and it reports",
       "//     on stderr because no log channel is configured this early.",
       'import { Application, connectorsManager, ConnectorLifecyclePhase, preflightConfiguredHttpPort } from "@warlock.js/core";',
-      "await preflightConfiguredHttpPort();",
+      'if (Application.hasRole("api") || Application.hasRole("web")) {',
+      "  await preflightConfiguredHttpPort();",
+      "}",
       "",
       "// 3. Start early-phase connectors (database, cache, logger, ...)",
       "//    so data sources, cache, etc. are ready before app code runs",
@@ -643,7 +665,10 @@ bootstrap();
       imports.push('await import("./main");');
     }
     if (this.generatedFiles.routes) {
-      imports.push('await import("./routes");');
+      imports.push('if (Application.hasRole("api")) {', '  await import("./routes");', "}");
+    }
+    if (this.generatedFiles.workers) {
+      imports.push('if (Application.hasRole("worker")) {', '  await import("./workers");', "}");
     }
 
     // Contributor imports come AFTER `./routes`, never before: a connector

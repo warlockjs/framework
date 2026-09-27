@@ -36,6 +36,8 @@ export type BootSignal = {
   bootDurationMs?: number;
   /** The bound http port, absent for an app with no http connector. */
   port?: number;
+  /** The roles this process serves — see `Application.roles`. */
+  roles: string[];
 };
 
 /**

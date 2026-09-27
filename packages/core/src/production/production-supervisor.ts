@@ -1,3 +1,4 @@
+import { colors } from "@mongez/copper";
 import { spawn } from "child_process";
 import { BOOT_SIGNAL_ENV_KEY, isBootSignal } from "../application/boot-signal";
 import {
@@ -148,6 +149,21 @@ export function superviseProductionProcess({
         // be reported as, or turn into, a boot failure.
         console.error(error);
       });
+
+      // A worker-only process never binds a port, so `http-connector.ts`
+      // never prints a URL for it — this is the one line that tells an
+      // operator watching `warlock start` that the process is up on purpose,
+      // not silently stuck.
+      const roles = message.roles ?? [];
+
+      if (roles.length > 0) {
+        const servesHttp = roles.includes("api") || roles.includes("web");
+        const summary = servesHttp
+          ? `roles: ${roles.join(", ")}`
+          : `worker ready — roles: ${roles.join(", ")}`;
+
+        console.log(`  ${colors.dim(summary)}`);
+      }
     });
 
     // A spawn that never starts (missing binary, EACCES) emits `error` and no

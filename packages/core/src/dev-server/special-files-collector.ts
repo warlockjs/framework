@@ -5,13 +5,14 @@ import {
   isLocaleFile,
   isMainFile,
   isRouteFile,
+  isWorkerFile,
 } from "./special-file-patterns";
 
-export type SpecialFileType = "config" | "main" | "route" | "event" | "locale";
+export type SpecialFileType = "config" | "main" | "route" | "event" | "locale" | "worker";
 
 /**
  * Categorises files into the kinds the dev server treats specially
- * (config / main / route / event / locale) and exposes typed accessors.
+ * (config / main / route / event / locale / worker) and exposes typed accessors.
  */
 export class SpecialFilesCollector {
   private readonly buckets: Record<SpecialFileType, Map<string, FileManager>> = {
@@ -20,6 +21,7 @@ export class SpecialFilesCollector {
     route: new Map(),
     event: new Map(),
     locale: new Map(),
+    worker: new Map(),
   };
 
   public collect(files: Map<string, FileManager>): void {
@@ -69,6 +71,7 @@ export class SpecialFilesCollector {
       route: this.buckets.route.size,
       event: this.buckets.event.size,
       locale: this.buckets.locale.size,
+      worker: this.buckets.worker.size,
     };
   }
 
@@ -87,7 +90,8 @@ export class SpecialFilesCollector {
       this.buckets.event.set(relativePath, fileManager);
     } else if (isLocaleFile(relativePath)) {
       this.buckets.locale.set(relativePath, fileManager);
+    } else if (isWorkerFile(relativePath)) {
+      this.buckets.worker.set(relativePath, fileManager);
     }
   }
 }
-

@@ -11,6 +11,10 @@ export const isMainFile = (path: string) =>
 export const isRouteFile = (path: string) =>
   /^src\/app\/[^/]+\/routes\.(ts|tsx)$/.test(normalize(path));
 
+/** `src/app/worker.ts` or `src/app/<module>/worker.ts` — mirrors `isMainFile`'s optional module dir */
+export const isWorkerFile = (path: string) =>
+  /^src\/app\/([^/]+\/)?worker\.(ts|tsx)$/.test(normalize(path));
+
 /** `src/app/<module>/events/<file>.ts` */
 export const isEventFile = (path: string) =>
   /^src\/app\/[^/]+\/events\/[^/]+\.(ts|tsx)$/.test(normalize(path));

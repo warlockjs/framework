@@ -1,7 +1,7 @@
 import config from "@mongez/config";
 import { colors } from "@mongez/copper";
 import { log } from "@warlock.js/logger";
-import { Application } from "../application";
+import { Application, getRoles, servesHttp } from "../application";
 import { health } from "../http/health";
 import { assertPortIsAvailable } from "../http/port-preflight";
 import { registerHttpPlugins } from "../http/plugins";
@@ -160,6 +160,16 @@ export class HttpConnector extends BaseConnector {
     const httpConfig = config.get("http");
 
     if (!httpConfig || !this.http) return;
+
+    // Neither `api` nor `web` is active — an http-only listener would serve
+    // nothing this process is meant to answer, so it never binds. `worker`
+    // is the only role that reaches here today; named generically so a
+    // future role composition still reads correctly.
+    if (!servesHttp()) {
+      log.info("http", "connection", `http: not started (role: ${[...getRoles()].join(", ")})`);
+
+      return;
+    }
 
     // Read once. `Application.isBooted` flips during the same boot this method
     // belongs to, and a predicate that answered differently before and after
