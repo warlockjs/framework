@@ -78,3 +78,21 @@ describe("pg scalar aggregates (K4 B10)", () => {
     expect(await build({ max: "12.5" }).qb.max("price")).toBe(12.5);
   });
 });
+
+describe("pg groupByRaw with selectRaw", () => {
+  afterEach(() => dataSourceRegistry.clear());
+
+  it("emits the raw GROUP BY expression and binds its placeholders after the SELECT bindings", () => {
+    const driver = createMockDriver("postgres");
+    (driver as any).dialect = new PostgresDialect();
+    const dataSource = new DataSource({ name: "t", driver, isDefault: true });
+
+    const qb = new PostgresQueryBuilder("orders", dataSource);
+    qb.selectRaw("date_trunc(?, created_at) AS bucket, COUNT(*) AS total", ["day"]);
+    qb.groupByRaw("date_trunc(?, created_at)", ["day"]);
+
+    const { query, bindings } = qb.parse();
+    expect(query).toContain("GROUP BY date_trunc($2, created_at)");
+    expect(bindings).toEqual(["day", "day"]);
+  });
+});

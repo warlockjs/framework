@@ -943,7 +943,7 @@ describe("PostgresQueryBuilder", () => {
         queryBuilder.groupByRaw("DATE(createdAt)");
 
         expect(queryBuilder.operations).toHaveLength(1);
-        expect(queryBuilder.operations[0].type).toBe("groupBy");
+        expect(queryBuilder.operations[0].type).toBe("groupByRaw");
         expect(queryBuilder.operations[0].data.expression).toBe("DATE(createdAt)");
       });
     });

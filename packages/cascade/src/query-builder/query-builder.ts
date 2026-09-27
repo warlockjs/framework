@@ -1549,7 +1549,7 @@ export class QueryBuilder<T = unknown> {
 
   /** Raw GROUP BY expression. */
   public groupByRaw(expression: RawExpression, bindings?: unknown[]): this {
-    this.addOperation("groupBy", { expression, bindings: bindings ?? [] });
+    this.addOperation("groupByRaw", { expression, bindings: bindings ?? [] });
     return this;
   }
 

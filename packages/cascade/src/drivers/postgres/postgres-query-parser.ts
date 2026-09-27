@@ -1412,12 +1412,15 @@ export class PostgresQueryParser {
     this.groupColumns.push(...columns);
   }
 
-  /**
-   * Process a raw GROUP BY expression (emitted verbatim, no quoting). Used by
-   * `groupByDate` to add a `date_trunc(...)` bucket to the GROUP BY clause.
-   */
+  /** Process a raw GROUP BY expression, binding `?` placeholders positionally. */
   private processGroupByRaw(data: Record<string, unknown>): void {
-    const expression = data.expression as string;
+    let expression = data.expression as string;
+    const bindings = (data.bindings as unknown[]) ?? [];
+
+    for (const binding of bindings) {
+      expression = expression.replace("?", this.addParam(binding));
+    }
+
     this.groupRawExpressions.push(expression);
   }
 
