@@ -50,6 +50,74 @@ describe("toBedrockMessages", () => {
     ]);
   });
 
+  it("replays JSON-persisted signed reasoning text before assistant text and tool use", () => {
+    const reasoningBlocks = [
+      { type: "reasoning", text: "considering", signature: "sig_1" },
+    ];
+    const messages: Message[] = [
+      {
+        role: "assistant",
+        content: "Let me check.",
+        toolCalls: [{
+          id: "tu_1",
+          name: "getWeather",
+          input: { city: "Cairo" },
+          providerMetadata: { bedrock: { reasoningBlocks } },
+        }],
+      },
+    ];
+
+    const persisted = JSON.parse(JSON.stringify(messages)) as Message[];
+
+    expect(toBedrockMessages(persisted).messages).toEqual([
+      {
+        role: "assistant",
+        content: [
+          { reasoningContent: { reasoningText: { text: "considering", signature: "sig_1" } } },
+          { text: "Let me check." },
+          { toolUse: { toolUseId: "tu_1", name: "getWeather", input: { city: "Cairo" } } },
+        ],
+      },
+    ]);
+  });
+
+  it("replays JSON-persisted redacted Bedrock reasoning content byte-exactly", () => {
+    const messages: Message[] = [{
+      role: "assistant",
+      content: "",
+      toolCalls: [{
+        id: "tu_1",
+        name: "lookup",
+        input: {},
+        providerMetadata: { bedrock: { reasoningBlocks: [{ type: "redacted", data: "AQID" }] } },
+      }],
+    }];
+
+    const persisted = JSON.parse(JSON.stringify(messages)) as Message[];
+
+    expect(toBedrockMessages(persisted).messages[0].content).toEqual([
+      { reasoningContent: { redactedContent: new Uint8Array([1, 2, 3]) } },
+      { toolUse: { toolUseId: "tu_1", name: "lookup", input: {} } },
+    ]);
+  });
+
+  it("ignores malformed Bedrock reasoning metadata", () => {
+    const messages: Message[] = [{
+      role: "assistant",
+      content: "",
+      toolCalls: [{
+        id: "tu_1",
+        name: "lookup",
+        input: {},
+        providerMetadata: { bedrock: { reasoningBlocks: [{ type: "redacted", data: "not base64!" }, null] } },
+      }],
+    }];
+
+    expect(toBedrockMessages(messages).messages[0].content).toEqual([
+      { toolUse: { toolUseId: "tu_1", name: "lookup", input: {} } },
+    ]);
+  });
+
   it("omits the leading text block when assistant content is empty", () => {
     const messages: Message[] = [
       { role: "assistant", content: "", toolCalls: [{ id: "tu_1", name: "noop", input: {} }] },

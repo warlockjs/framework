@@ -26,9 +26,14 @@ import {
   inferReasoningCapability,
 } from "./known-capabilities";
 import { inferVisionCapability } from "./known-vision-models";
+import { toReasoningMetadata, type BedrockReasoningBlock } from "./utils/reasoning-blocks";
 import { mapStopReason, toBedrockMessages, toBedrockToolConfig, wrapBedrockError } from "./utils";
 
 const LOG_MODULE = "ai.bedrock";
+
+/** Default output allowance added to a thinking budget when maxTokens is unset. */
+const DEFAULT_MAX_TOKENS = 4096;
+const MIN_THINKING_BUDGET = 1024;
 
 /**
  * Conventional extended-thinking token budgets for the neutral
@@ -179,6 +184,8 @@ export class BedrockModel implements ModelContract {
     let rawStopReason: string | undefined;
     const usage: Usage = { input: 0, output: 0, total: 0 };
     const toolBlocks = new Map<number, { id: string; name: string; json: string }>();
+    const reasoningBlocks = new Map<number, { text?: string; signature?: string; redactedContent?: Uint8Array }>();
+    const completedReasoningBlocks: BedrockReasoningBlock[] = [];
 
     try {
       for await (const event of response.stream ?? []) {
@@ -205,13 +212,31 @@ export class BedrockModel implements ModelContract {
             if (accumulator) {
               accumulator.json += delta.toolUse.input ?? "";
             }
+          } else if (delta.reasoningContent) {
+            const index = event.contentBlockDelta.contentBlockIndex ?? 0;
+            const accumulator = reasoningBlocks.get(index) ?? {};
+
+            if (delta.reasoningContent.text !== undefined) {
+              accumulator.text = (accumulator.text ?? "") + delta.reasoningContent.text;
+            }
+
+            if (delta.reasoningContent.signature !== undefined) {
+              accumulator.signature = delta.reasoningContent.signature;
+            }
+
+            if (delta.reasoningContent.redactedContent !== undefined) {
+              accumulator.redactedContent = delta.reasoningContent.redactedContent;
+            }
+
+            reasoningBlocks.set(index, accumulator);
           }
 
           continue;
         }
 
         if (event.contentBlockStop) {
-          const accumulator = toolBlocks.get(event.contentBlockStop.contentBlockIndex ?? 0);
+          const index = event.contentBlockStop.contentBlockIndex ?? 0;
+          const accumulator = toolBlocks.get(index);
 
           if (accumulator) {
             yield {
@@ -219,9 +244,23 @@ export class BedrockModel implements ModelContract {
               id: accumulator.id,
               name: accumulator.name,
               input: safeJsonParse<Record<string, unknown>>(accumulator.json, {}),
+              ...(completedReasoningBlocks.length > 0
+                ? { providerMetadata: { bedrock: { reasoningBlocks: completedReasoningBlocks } } }
+                : {}),
             };
 
-            toolBlocks.delete(event.contentBlockStop.contentBlockIndex ?? 0);
+            toolBlocks.delete(index);
+          }
+
+          const reasoningAccumulator = reasoningBlocks.get(index);
+
+          if (reasoningAccumulator) {
+            const reasoningBlock = this.toReasoningMetadata(reasoningAccumulator);
+
+            if (reasoningBlock) {
+              completedReasoningBlocks.push(reasoningBlock);
+            }
+            reasoningBlocks.delete(index);
           }
 
           continue;
@@ -272,7 +311,9 @@ export class BedrockModel implements ModelContract {
     options: ModelCallOptions | undefined,
   ): ConverseRequest {
     const { system, messages: bedrockMessages } = toBedrockMessages(messages);
-    const maxTokens = options?.maxTokens ?? this.config.maxTokens;
+    const thinkingBudget = this.resolveThinkingBudget(options?.reasoning);
+    const configuredMaxTokens = options?.maxTokens ?? this.config.maxTokens;
+    const maxTokens = this.resolveMaxTokens(configuredMaxTokens, thinkingBudget);
     const temperature = options?.temperature ?? this.config.temperature;
     const cachedMessages = this.applyCacheBreakpoints(bedrockMessages, options?.cacheControl);
 
@@ -286,7 +327,7 @@ export class BedrockModel implements ModelContract {
       },
       ...this.buildToolConfig(options?.tools),
       ...this.buildOutputConfig(options?.responseSchema),
-      ...this.buildReasoningConfig(options?.reasoning),
+      ...this.buildReasoningConfig(thinkingBudget),
     };
   }
 
@@ -338,15 +379,40 @@ export class BedrockModel implements ModelContract {
    * when no reasoning option was supplied, so unsupported params never
    * reach the wire.
    */
-  private buildReasoningConfig(
-    reasoning: ModelCallOptions["reasoning"],
-  ): Pick<ConverseRequest, "additionalModelRequestFields"> {
-    if (!this.capabilities.reasoning || !reasoning) {
-      return {};
+  private resolveThinkingBudget(reasoning: ModelCallOptions["reasoning"]): number | undefined {
+    if (!this.capabilities.reasoning || !reasoning || reasoning.effort === "none") {
+      return undefined;
     }
 
     const budgetTokens = reasoning.maxTokens ?? EFFORT_THINKING_BUDGET[reasoning.effort ?? ""];
 
+    if (budgetTokens !== undefined && budgetTokens < MIN_THINKING_BUDGET) {
+      throw new Error(`thinking budget (${budgetTokens}) must be at least ${MIN_THINKING_BUDGET}`);
+    }
+
+    return budgetTokens;
+  }
+
+  /** Resolve Bedrock's output ceiling while reserving room for extended thinking. */
+  private resolveMaxTokens(maxTokens: number | undefined, thinkingBudget: number | undefined): number | undefined {
+    if (thinkingBudget === undefined) {
+      return maxTokens;
+    }
+
+    if (maxTokens === undefined) {
+      return thinkingBudget + DEFAULT_MAX_TOKENS;
+    }
+
+    if (maxTokens <= thinkingBudget) {
+      throw new Error(`maxTokens (${maxTokens}) must be greater than thinking budget (${thinkingBudget})`);
+    }
+
+    return maxTokens;
+  }
+
+  private buildReasoningConfig(
+    budgetTokens: number | undefined,
+  ): Pick<ConverseRequest, "additionalModelRequestFields"> {
     if (budgetTokens === undefined) {
       return {};
     }
@@ -418,6 +484,9 @@ export class BedrockModel implements ModelContract {
    */
   private extractToolCalls(blocks: ContentBlock[]): ModelToolCallRequest[] | undefined {
     const toolCalls: ModelToolCallRequest[] = [];
+    const reasoningBlocks = blocks.map(toReasoningMetadata).filter(
+      (block): block is BedrockReasoningBlock => block !== undefined,
+    );
 
     for (const block of blocks) {
       if ("toolUse" in block && block.toolUse) {
@@ -425,11 +494,31 @@ export class BedrockModel implements ModelContract {
           id: block.toolUse.toolUseId ?? "",
           name: block.toolUse.name ?? "",
           input: (block.toolUse.input ?? {}) as Record<string, unknown>,
+          ...(reasoningBlocks.length > 0
+            ? { providerMetadata: { bedrock: { reasoningBlocks } } }
+            : {}),
         });
       }
     }
 
     return toolCalls.length > 0 ? toolCalls : undefined;
+  }
+
+  /** Encode accumulated stream deltas as persistence-safe reasoning metadata. */
+  private toReasoningMetadata(block: {
+    text?: string;
+    signature?: string;
+    redactedContent?: Uint8Array;
+  }): BedrockReasoningBlock | undefined {
+    if (block.redactedContent !== undefined) {
+      return toReasoningMetadata({ reasoningContent: { redactedContent: block.redactedContent } });
+    }
+
+    return toReasoningMetadata({
+      reasoningContent: {
+        reasoningText: { text: block.text ?? "", ...(block.signature ? { signature: block.signature } : {}) },
+      },
+    });
   }
 
   /**

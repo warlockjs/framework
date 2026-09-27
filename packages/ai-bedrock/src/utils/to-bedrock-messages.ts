@@ -5,6 +5,7 @@ import type {
   Message as BedrockMessage,
   SystemContentBlock,
 } from "@aws-sdk/client-bedrock-runtime";
+import { fromReasoningMetadata } from "./reasoning-blocks";
 
 /**
  * Result of splitting a vendor-neutral `Message[]` for the Bedrock
@@ -75,6 +76,9 @@ export function toBedrockMessages(messages: Message[]): BedrockMessages {
     if (message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0) {
       const blocks: ContentBlock[] = [];
       const text = stringifyContent(message.content);
+      const reasoningBlocks = getReasoningBlocks(message.toolCalls);
+
+      blocks.push(...reasoningBlocks);
 
       if (text) {
         blocks.push({ text });
@@ -114,6 +118,32 @@ export function toBedrockMessages(messages: Message[]): BedrockMessages {
     system: system.length > 0 ? system : undefined,
     messages: mapped,
   };
+}
+
+/**
+ * Recover opaque Converse reasoning blocks retained on a prior tool call.
+ * Bedrock requires them to be replayed before the assistant's text and
+ * tool-use blocks on the follow-up request.
+ */
+function getReasoningBlocks(toolCalls: NonNullable<Message["toolCalls"]>): ContentBlock[] {
+  for (const toolCall of toolCalls) {
+    const bedrock = toolCall.providerMetadata?.bedrock;
+
+    if (!isRecord(bedrock) || !Array.isArray(bedrock.reasoningBlocks)) {
+      continue;
+    }
+
+    return bedrock.reasoningBlocks.map(fromReasoningMetadata).filter(
+      (block): block is ContentBlock => block !== undefined,
+    );
+  }
+
+  return [];
+}
+
+/** Narrow an opaque metadata value to an object without altering its contents. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 /**

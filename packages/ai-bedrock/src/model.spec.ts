@@ -161,6 +161,30 @@ describe("BedrockModel.complete()", () => {
     ]);
   });
 
+  it("attaches response reasoning blocks to tool calls for replay", async () => {
+    const { client } = makeFakeClient({
+      converse: {
+        ...baseConverse,
+        stopReason: "tool_use",
+        output: { message: { role: "assistant", content: [
+          { reasoningContent: { reasoningText: { text: "considering", signature: "sig_1" } } },
+          { reasoningContent: { redactedContent: new Uint8Array([1, 2, 3]) } },
+          { toolUse: { toolUseId: "tu_1", name: "lookup", input: { q: "weather" } } },
+        ] } },
+      },
+    });
+    const model = new BedrockModel(client, { name: "anthropic.claude-3-7-sonnet-20250219-v1:0" });
+
+    const response = await model.complete([{ role: "user", content: "hi" }]);
+
+    expect(response.toolCalls?.[0].providerMetadata).toEqual({
+      bedrock: { reasoningBlocks: [
+        { type: "reasoning", text: "considering", signature: "sig_1" },
+        { type: "redacted", data: "AQID" },
+      ] },
+    });
+  });
+
   it("surfaces cacheReadInputTokens as cachedTokens", async () => {
     const { client } = makeFakeClient({
       converse: {
@@ -496,6 +520,38 @@ describe("BedrockModel.stream()", () => {
 
     expect(toolCalls).toEqual([{ id: "tu_1", name: "getWeather", input: { city: "Cairo" } }]);
     expect(finishReason).toBe("tool_calls");
+  });
+
+  it("attaches streamed reasoning blocks to tool calls for replay", async () => {
+    const { client } = makeFakeClient({
+      streamEvents: [
+        { contentBlockStart: { start: { reasoningContent: {} }, contentBlockIndex: 0 } },
+        { contentBlockDelta: { delta: { reasoningContent: { text: "considering" } }, contentBlockIndex: 0 } },
+        { contentBlockDelta: { delta: { reasoningContent: { signature: "sig_1" } }, contentBlockIndex: 0 } },
+        { contentBlockStop: { contentBlockIndex: 0 } },
+        { contentBlockStart: { start: { toolUse: { toolUseId: "tu_1", name: "lookup" } }, contentBlockIndex: 1 } },
+        { contentBlockDelta: { delta: { toolUse: { input: "{}" } }, contentBlockIndex: 1 } },
+        { contentBlockStop: { contentBlockIndex: 1 } },
+        { messageStop: { stopReason: "tool_use" } },
+      ] as unknown as ConverseStreamOutput[],
+    });
+    const model = new BedrockModel(client, { name: "anthropic.claude-3-7-sonnet-20250219-v1:0" });
+
+    const toolCall = (await collect(model.stream([{ role: "user", content: "hi" }]))).find(
+      (chunk) => chunk.type === "tool-call",
+    );
+
+    expect(toolCall).toEqual({
+      type: "tool-call",
+      id: "tu_1",
+      name: "lookup",
+      input: {},
+      providerMetadata: {
+        bedrock: { reasoningBlocks: [
+          { type: "reasoning", text: "considering", signature: "sig_1" },
+        ] },
+      },
+    });
   });
 
   it("rethrows a wrapped typed error when the stream request fails", async () => {
@@ -1027,6 +1083,44 @@ describe("BedrockModel cost-truth — reasoning / thinking", () => {
     expect(calls[0].additionalModelRequestFields).toEqual({
       thinking: { type: "enabled", budget_tokens: 2048 },
     });
+  });
+
+  it("derives maxTokens from the thinking budget when it is otherwise unset", async () => {
+    const { client, calls } = makeFakeClient({ converse: baseConverse });
+    const model = new BedrockModel(client, { name: "anthropic.claude-3-7-sonnet-20250219-v1:0" });
+
+    await model.complete([{ role: "user", content: "hi" }], { reasoning: { maxTokens: 2048 } });
+
+    expect(calls[0].inferenceConfig).toEqual({ maxTokens: 6144 });
+  });
+
+  it("throws when explicit maxTokens does not exceed the thinking budget", async () => {
+    const { client } = makeFakeClient({ converse: baseConverse });
+    const model = new BedrockModel(client, { name: "anthropic.claude-3-7-sonnet-20250219-v1:0" });
+
+    await expect(model.complete([{ role: "user", content: "hi" }], {
+      maxTokens: 2048,
+      reasoning: { maxTokens: 2048 },
+    })).rejects.toThrow("maxTokens (2048) must be greater than thinking budget (2048)");
+  });
+
+  it("throws when the thinking budget is below Bedrock's minimum", async () => {
+    const { client } = makeFakeClient({ converse: baseConverse });
+    const model = new BedrockModel(client, { name: "anthropic.claude-3-7-sonnet-20250219-v1:0" });
+
+    await expect(model.complete([{ role: "user", content: "hi" }], {
+      reasoning: { maxTokens: 1023 },
+    })).rejects.toThrow("thinking budget (1023) must be at least 1024");
+  });
+
+  it("leaves the request unchanged when thinking is explicitly off", async () => {
+    const { client, calls } = makeFakeClient({ converse: baseConverse });
+    const model = new BedrockModel(client, { name: "anthropic.claude-3-7-sonnet-20250219-v1:0" });
+
+    await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "none" } });
+
+    expect(calls[0].inferenceConfig).toEqual({});
+    expect(calls[0]).not.toHaveProperty("additionalModelRequestFields");
   });
 
   it("maps a reasoning.effort tier to a conventional thinking budget when no maxTokens is given", async () => {
