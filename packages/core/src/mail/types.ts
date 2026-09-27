@@ -287,9 +287,14 @@ export type NormalizedMail = {
 };
 
 /**
- * Captured mail for test mode
+ * Captured mail for development and test modes.
+ *
+ * Attachments retain their normalized contents so test assertions can inspect
+ * the exact mail that would be sent.
  */
 export type CapturedMail = {
+  /** The mail ID used for event namespacing and result correlation. */
+  id: string;
   options: MailOptions;
   normalized: NormalizedMail;
   timestamp: Date;

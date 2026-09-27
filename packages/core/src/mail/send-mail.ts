@@ -236,6 +236,18 @@ async function triggerEvents(
 }
 
 /**
+ * Notify development and test tooling of a captured mail without allowing a
+ * synchronous listener failure to interrupt delivery.
+ */
+function triggerCapturedMail(captured: CapturedMail): void {
+  try {
+    mailEvents.trigger("CAPTURED", captured);
+  } catch (error) {
+    log.error("mail", "event", `Captured mail event handler error: ${error}`);
+  }
+}
+
+/**
  * Send an email
  *
  * @param options Mail options including recipients, content, and configuration
@@ -322,6 +334,7 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
     };
 
     const captured: CapturedMail = {
+      id: mailId,
       options,
       normalized,
       timestamp: new Date(),
@@ -329,6 +342,7 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
     };
 
     captureMail(captured);
+    triggerCapturedMail(captured);
 
     await runMailEvent(options.onSuccess, options, result);
     await triggerEvents(mailId, "success", options, result);
@@ -354,6 +368,16 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
       rejected: [],
       response: "Development mode - mail logged",
     };
+
+    const captured: CapturedMail = {
+      id: mailId,
+      options,
+      normalized,
+      timestamp: new Date(),
+      result,
+    };
+
+    triggerCapturedMail(captured);
 
     await runMailEvent(options.onSuccess, options, result);
     await triggerEvents(mailId, "success", options, result);

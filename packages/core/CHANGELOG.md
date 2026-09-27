@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `registerTracingHooks()` lets development tools subscribe to HTTP tracing at runtime, and phase tracing now includes each phase's `startedAt` timestamp.
+- `mailEvents.onCaptured()` (`mail.captured`): every mail sent in development or test mode is delivered in full (html, text, headers, attachments) to listeners. Development mode still logs instead of sending. `CapturedMail` gains `id`.
 
 ## 5.24.0 - 2026-09-27
 

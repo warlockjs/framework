@@ -1,5 +1,6 @@
 import events from "@mongez/events";
 import { Random } from "@mongez/reinforcements";
+import type { CapturedMail } from "./types";
 
 /**
  * Generate a unique mail ID for event namespacing
@@ -13,6 +14,7 @@ export function generateMailId(): string {
  */
 export const MAIL_EVENTS = {
   BEFORE_SENDING: "mail.beforeSending",
+  CAPTURED: "mail.captured",
   SENT: "mail.sent",
   SUCCESS: "mail.success",
   ERROR: "mail.error",
@@ -87,6 +89,13 @@ export const mailEvents = {
   },
 
   // === GLOBAL EVENT HELPERS ===
+
+  /**
+   * Subscribe to mail captured in development or test mode.
+   */
+  onCaptured: (callback: (mail: CapturedMail) => void) => {
+    return events.subscribe(MAIL_EVENTS.CAPTURED, callback);
+  },
 
   /**
    * Subscribe to beforeSending event (all mails)
