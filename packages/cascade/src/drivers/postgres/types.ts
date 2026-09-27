@@ -113,6 +113,11 @@ export type PostgresTransactionOptions = {
   readonly readOnly?: boolean;
   /** Use deferrable mode (for serializable + read-only) */
   readonly deferrable?: boolean;
+  /**
+   * Transaction-local PostgreSQL settings. For example:
+   * `transaction(fn, { settings: { "app.tenant_id": id } })`.
+   */
+  readonly settings?: Record<string, string | number | boolean>;
 };
 
 /**

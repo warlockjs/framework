@@ -4,7 +4,11 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
-## 5.23.3 - 2026-09-27
+## 5.24.0 - 2026-09-27
+
+### Added
+
+- PostgreSQL transactions accept transaction-local `settings`, applied safely with parameterized `set_config` calls after `BEGIN`; use them for RLS context, `statement_timeout`, or `search_path` without leaking values to the pool.
 
 ### Fixed
 

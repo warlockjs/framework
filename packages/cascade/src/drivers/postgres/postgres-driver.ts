@@ -1269,6 +1269,13 @@ export class PostgresDriver implements DriverContract {
   public async beginTransaction(
     options?: PostgresTransactionOptions,
   ): Promise<DriverTransactionContract<PgPoolClient>> {
+    const settings = Object.entries(options?.settings ?? {});
+    for (const [name] of settings) {
+      if (!/^[A-Za-z_][A-Za-z0-9_.]*$/.test(name)) {
+        throw new Error(`Invalid PostgreSQL transaction setting name: "${name}"`);
+      }
+    }
+
     const client = await this.pool.connect();
 
     // Every checkout above must be released on every path — including the
@@ -1277,6 +1284,7 @@ export class PostgresDriver implements DriverContract {
     // the client checked out forever: under concurrency that's exactly the
     // pool-exhaustion "timeout exceeded when trying to connect" symptom in
     // card ba1193b4.
+    let transactionStarted = false;
     try {
       let beginSql = "BEGIN";
       if (options?.isolationLevel) {
@@ -1290,7 +1298,20 @@ export class PostgresDriver implements DriverContract {
       }
 
       await client.query(beginSql);
+      transactionStarted = true;
+
+      for (const [name, value] of settings) {
+        await client.query("SELECT set_config($1, $2, true)", [name, String(value)]);
+      }
     } catch (error) {
+      if (transactionStarted) {
+        try {
+          await client.query("ROLLBACK");
+        } catch {
+          // The original setup error is the useful error to callers. The
+          // client is discarded below, so a failed cleanup cannot leak it.
+        }
+      }
       // Pass the error to release() so pg destroys the client instead of
       // returning a possibly-broken connection to the pool.
       client.release(error instanceof Error ? error : new Error(String(error)));

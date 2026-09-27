@@ -99,6 +99,21 @@ await transaction(async () => {
 
 On `SERIALIZABLE`, Postgres may abort with a serialization failure when concurrent transactions conflict — wrap in retry logic at the caller.
 
+## Transaction-local settings (Postgres)
+
+Pass `settings` to configure PostgreSQL values only for the current transaction. This is useful for row-level security context, timeouts, and schema selection; Cascade applies each value with parameterized `set_config(..., true)`, so it cannot leak back into the pool:
+
+```ts
+await transaction(async () => {
+  await Invoice.query().get();
+}, {
+  settings: {
+    "app.tenant_id": tenantId,
+    statement_timeout: 5_000,
+  },
+});
+```
+
 ## Row locking — `lockForUpdate({ skipLocked })` (Postgres)
 
 Chain `lockForUpdate()` on any query to emit `SELECT ... FOR UPDATE`: the matched rows are locked until the transaction ends, so no other transaction can modify or lock them. Only meaningful **inside** a transaction — outside one the lock releases immediately.
