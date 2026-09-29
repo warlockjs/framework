@@ -6,11 +6,14 @@ import { validateAll } from "../../../src/validation/validateAll";
  * validateAll() only touches a small, well-defined slice of Request/Response,
  * so thin structural stubs stand in for the full HTTP objects.
  */
-const makeRequest = (data: Record<string, unknown>) => {
+const makeRequest = (
+  data: Record<string, unknown>,
+  params: Record<string, unknown> = {},
+) => {
   return {
     body: data,
     query: {},
-    params: {},
+    params,
     headers: {},
     allExceptParams: () => data,
     setValidatedData: vi.fn(),
@@ -29,6 +32,46 @@ const makeResponse = () => {
 };
 
 describe("validateAll - schema validation", () => {
+  it("includes a declared route param when validating the default request sources", async () => {
+    const request = makeRequest({ title: "Hello" }, { id: "post-1" });
+    const response = makeResponse();
+
+    await validateAll(
+      { schema: v.object({ id: v.string(), title: v.string() }) } as never,
+      request as never,
+      response as never,
+    );
+
+    expect(request.setValidatedData).toHaveBeenCalledWith({ id: "post-1", title: "Hello" });
+    expect(response.failedSchema).not.toHaveBeenCalled();
+  });
+
+  it("keeps a body value when it has the same name as a declared route param", async () => {
+    const request = makeRequest({ id: "body-id", title: "Hello" }, { id: "param-id" });
+    const response = makeResponse();
+
+    await validateAll(
+      { schema: v.object({ id: v.string(), title: v.string() }) } as never,
+      request as never,
+      response as never,
+    );
+
+    expect(request.setValidatedData).toHaveBeenCalledWith({ id: "body-id", title: "Hello" });
+  });
+
+  it("does not include undeclared route params in default schema validation", async () => {
+    const request = makeRequest({ title: "Hello" }, { id: "post-1", slug: "hello" });
+    const response = makeResponse();
+
+    await validateAll(
+      { schema: v.object({ id: v.string(), title: v.string() }) } as never,
+      request as never,
+      response as never,
+    );
+
+    expect(request.setValidatedData).toHaveBeenCalledWith({ id: "post-1", title: "Hello" });
+  });
+
   it("returns nothing and stores validated data when the schema passes", async () => {
     const request = makeRequest({ name: "Hasan", age: 30 });
     const response = makeResponse();

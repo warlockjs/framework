@@ -37,7 +37,8 @@ export type RequestHandlerValidation<TRequest extends Request = Request> = {
   validate?: Middleware<TRequest>;
   /**
    * Define what should be validated
-   * If not passed, it will be validating only body and query
+   * If not passed, validates body and query plus route params whose names are
+   * declared by the object schema. Body and query values take precedence.
    */
   validating?: ("body" | "query" | "params" | "headers")[];
   /**

@@ -6,6 +6,7 @@
 export * from "./start-http-development-server";
 export * from "./test-helpers";
 export * from "./vitest-setup";
+export { assertPortIsAvailable, isPortAvailable } from "../http/port-preflight";
 
 // `./test-server-port-channel` is deliberately NOT re-exported. It is the
 // internal channel `startHttpTestServer` uses to hand the resolved port to the

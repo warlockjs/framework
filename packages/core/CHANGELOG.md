@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## Unreleased
+
+### Fixed
+
+- Default route schema validation now supplies matching declared route params when body and query omit them, without overriding body or query values.
+- `isPortAvailable()` and `assertPortIsAvailable()` are exported from `@warlock.js/core/tests` for HTTP test setup.
+
 ## 5.25.0 - 2026-09-28
 
 ### Added

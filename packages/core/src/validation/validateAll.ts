@@ -6,8 +6,29 @@ import type { Request } from "../http";
 import { Response } from "../http/response";
 import type { RequestHandlerValidation, Route } from "../router";
 
-function resolveDataToParse(validating: RequestHandlerValidation["validating"], request: Request) {
-  if (!validating || validating.length === 0) return request.allExceptParams();
+function resolveDataToParse(
+  validating: RequestHandlerValidation["validating"],
+  schema: RequestHandlerValidation["schema"],
+  request: Request,
+) {
+  if (!validating || validating.length === 0) {
+    const data = request.allExceptParams();
+
+    // Duck-typed rather than `instanceof ObjectValidator`: the app's schema can
+    // come from a different copy of seal than core's, and `instanceof` would
+    // then silently fall back to ignoring params.
+    const shape = (schema as { schema?: unknown } | undefined)?.schema;
+
+    if (!shape || typeof shape !== "object") return data;
+
+    for (const [key, value] of Object.entries(request.params)) {
+      if (data[key] === undefined && Object.hasOwn(shape, key)) {
+        data[key] = value;
+      }
+    }
+
+    return data;
+  }
 
   let data: any = {};
 
@@ -47,7 +68,7 @@ export async function validateAll(
   if (validation.schema) {
     log.info("validation", "schema", "Validating request schema");
     try {
-      const data = resolveDataToParse(validation.validating, request);
+      const data = resolveDataToParse(validation.validating, validation.schema, request);
       const result = await v.validate(validation.schema, data);
 
       if (result.data && result.isValid) {
