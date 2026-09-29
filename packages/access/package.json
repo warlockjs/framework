@@ -43,6 +43,7 @@
     "@warlock.js/core": "workspace:^",
     "@warlock.js/logger": "workspace:^",
     "@warlock.js/seal": "workspace:^",
+    "typescript": "^5.9.3",
     "vitest": "4.1.10"
   },
   "packageManager": "pnpm@11.24.0"
