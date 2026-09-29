@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- MongoDB `lockForUpdate()` now throws the public `UnsupportedLockForUpdateError` with guidance to use a conditional atomic update instead of a nonexistent row lock.
 - MongoDB atomic upserts now assign the model's auto-increment `id` on insert without changing an existing document's id.
 
 ## 5.25.0 - 2026-09-28

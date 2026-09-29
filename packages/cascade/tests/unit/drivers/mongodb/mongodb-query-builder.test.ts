@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DataSource } from "../../../../src/data-source/data-source";
 import { dataSourceRegistry } from "../../../../src/data-source/data-source-registry";
 import { MongoQueryBuilder } from "../../../../src/drivers/mongodb/mongodb-query-builder";
+import { UnsupportedLockForUpdateError } from "../../../../src";
 import { createMockDriver } from "../../../helpers/mock-driver";
 
 describe("MongoQueryBuilder", () => {
@@ -1460,9 +1461,10 @@ describe("MongoQueryBuilder", () => {
   });
 
   describe("lockForUpdate()", () => {
-    it("throws a clear unsupported error — MongoDB has no row-level SELECT locking", () => {
+    it("throws the public named error with the conditional atomic-update alternative", () => {
+      expect(() => queryBuilder.lockForUpdate()).toThrow(UnsupportedLockForUpdateError);
       expect(() => queryBuilder.lockForUpdate()).toThrow(
-        /not supported by the MongoDB driver/,
+        'Model.atomic({ id, leaseUntil: { $lt: now } }, { $set: { status: "processing" } }, { trustedFilter: true })',
       );
     });
   });

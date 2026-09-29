@@ -20,6 +20,7 @@ import type {
   WhereObject,
   WhereOperator,
 } from "../../contracts";
+import { UnsupportedLockForUpdateError } from "../../errors/unsupported-lock-for-update.error";
 import { UnsupportedQueryOperationError } from "../../errors/unsupported-query-operation.error";
 import { type DataSource } from "../../data-source/data-source";
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
@@ -1923,11 +1924,7 @@ export class MongoQueryBuilder<T = unknown>
    * keeps a queue-claim pattern from silently running unlocked.
    */
   public override lockForUpdate(): this {
-    throw new Error(
-      "lockForUpdate() is not supported by the MongoDB driver — MongoDB has no " +
-        "row-level SELECT locking. Use an atomic claim instead (e.g. findOneAndUpdate " +
-        "with a reservation filter).",
-    );
+    throw new UnsupportedLockForUpdateError();
   }
 
   /**

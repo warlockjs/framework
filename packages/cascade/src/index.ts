@@ -24,6 +24,7 @@ export * from "./errors/undefined-where-value.error";
 export * from "./errors/unsafe-filter.error";
 export * from "./errors/unsafe-raw-expression.error";
 export * from "./errors/unsupported-lean-operation.error";
+export * from "./errors/unsupported-lock-for-update.error";
 export * from "./errors/unsupported-query-operation.error";
 export * from "./errors/unsupported-update-operation.error";
 
