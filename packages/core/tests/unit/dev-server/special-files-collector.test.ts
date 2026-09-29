@@ -94,6 +94,7 @@ describe("SpecialFilesCollector — accessors", () => {
       route: 2,
       event: 1,
       locale: 0,
+      worker: 0,
     });
   });
 
@@ -134,6 +135,7 @@ describe("SpecialFilesCollector — mutation", () => {
       route: 0,
       event: 0,
       locale: 0,
+      worker: 0,
     });
   });
 

@@ -212,12 +212,15 @@ export class Resource implements ResourceContract {
   protected transformOutput() {
     const localeCode = useRequestStore()?.request?.locale;
     const parsedSchema = this.resolveParsedSchema();
+    // A model is read through its accessors; anything else through the
+    // constructor's normalized input (a wrapped resource's serialized data).
+    const source = this.originalData instanceof Model ? this.originalData : this.resource;
 
     for (const [outputKey, outputSettings] of Object.entries(parsedSchema)) {
       const inputKey = outputSettings instanceof ResourceFieldBuilder
         ? outputSettings.getInputKey()
         : undefined;
-      const inputValue = this.resolveSourceValue(this.originalData, outputKey, inputKey);
+      const inputValue = this.resolveSourceValue(source, outputKey, inputKey);
       const outputValue = this.transformValue(inputValue, outputSettings, localeCode);
 
       if (outputValue !== undefined) {

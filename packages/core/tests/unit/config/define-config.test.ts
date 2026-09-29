@@ -19,6 +19,7 @@ describe("defineConfig", () => {
       outFile: "app.js",
       sourcemap: true,
       minify: true,
+      routeRegistrationTimeoutMs: 30_000,
     });
   });
 

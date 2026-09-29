@@ -67,13 +67,14 @@ describe("proof 2 — the generated test setup preserves project config and pair
     vi.spyOn(console, "log").mockImplementation(() => undefined);
   });
 
-  it("emits a bare `setupTest()` so `tests.connectors` still applies", async () => {
+  it("emits `setupTest()` without a connectors option so `tests.connectors` still applies", async () => {
     const setupFile = emittedFile(await runTestScaffold(), "src/test-setup.ts");
 
-    expect(setupFile).toContain("await setupTest();");
-    // No `setupTest` call anywhere in the emitted file may carry an argument:
-    // an explicit `connectors` value outranks `tests.connectors` config.
-    expect(setupFile).not.toMatch(/setupTest\s*\(\s*[^)]/);
+    // The only option passed is `importModule` (app modules load through
+    // vitest's module graph, 5.25); an explicit `connectors` value would
+    // outrank `tests.connectors` config, so none may appear.
+    expect(setupFile).toContain("await setupTest({ importModule: (file) => import(file) });");
+    expect(setupFile).not.toMatch(/setupTest\s*\(\s*\{[^)]*connectors/);
     expect(setupFile).not.toContain("connectors: true");
   });
 

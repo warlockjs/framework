@@ -300,4 +300,24 @@ describe("Resource accepts plain objects, resources, and dotted keys", () => {
 
     expect(json).toEqual({ id: 1, name: "Hasan" });
   });
+
+  it("exposes a Mongo record's `_id` as `id` when the record has no `id`", () => {
+    const Post = defineResource({ schema: { id: "string", title: "string" } });
+
+    expect(new Post({ _id: "abc123", title: "Hello" }).toJSON()).toEqual({
+      id: "abc123",
+      title: "Hello",
+    });
+  });
+
+  it("keeps the `_id` fallback when one resource wraps another", () => {
+    const Inner = defineResource({ schema: { id: "string", title: "string" } });
+    const inner = new Inner({ _id: "abc123", title: "Hello" });
+
+    inner.toJSON();
+
+    const Outer = defineResource({ schema: { id: "string", title: "string" } });
+
+    expect(new Outer(inner).toJSON()).toEqual({ id: "abc123", title: "Hello" });
+  });
 });

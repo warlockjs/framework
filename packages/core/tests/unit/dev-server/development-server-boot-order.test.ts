@@ -100,6 +100,12 @@ vi.mock("../../../src/dev-server/shortcuts", () => ({
   devServerShortcuts: { release: vi.fn() },
 }));
 
+// Devtools auto-registration has its own suite; here it is one boot step that
+// finds nothing installed.
+vi.mock("../../../src/dev-server/register-installed-devtools", () => ({
+  registerInstalledDevtools: vi.fn(async () => false),
+}));
+
 vi.mock("../../../src/dev-server/type-generator", () => ({
   typeGenerator: {
     executeGenerateAllCommand,

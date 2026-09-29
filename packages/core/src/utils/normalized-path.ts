@@ -57,10 +57,12 @@ export class Path {
   }
 
   /**
-   * Get directory name of a path
+   * Get directory name of a path. The input is normalized first: on POSIX a
+   * backslash is a filename character, so `a\b\c.ts` would otherwise have no
+   * directory at all.
    */
   public static dirname(filePath: string) {
-    return this.normalize(path.dirname(filePath));
+    return this.normalize(path.dirname(this.normalize(filePath)));
   }
 
   /**
