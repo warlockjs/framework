@@ -268,4 +268,26 @@ describe("attachLogSource", () => {
 
     expect(logs).toHaveLength(1);
   });
+
+  // A framework log whose context held the live request made the request
+  // detail route answer 500 ("Converting circular structure to JSON").
+  it("keeps a JSON-safe snapshot of a context that holds a live, circular object", async () => {
+    const { collector, logs } = createFakeCollector();
+    const dispose = await attachLogSource(collector);
+
+    class Socket {
+      public parser: { socket?: Socket } = {};
+    }
+
+    const socket = new Socket();
+    socket.parser.socket = socket;
+
+    await log.info("devtools-test", "live", "request seen", { method: "GET", socket, nested: { socket } });
+    dispose();
+
+    const context = logs[0]?.entry.context;
+
+    expect(() => JSON.stringify(context)).not.toThrow();
+    expect(context).toMatchObject({ method: "GET", socket: "[Socket]", nested: { socket: "[Socket]" } });
+  });
 });

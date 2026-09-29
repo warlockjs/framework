@@ -1,6 +1,7 @@
 import { applyRedact, log } from "@warlock.js/logger";
 import { captureCallerLocation } from "../caller-location";
 import { currentRequestId } from "../current-request-id";
+import { toSafeValue } from "../safe-value";
 import type { DevtoolsCollector, DevtoolsDisposer } from "../types";
 
 /** The shape of the event `dataSourceRegistry` emits for `"query"`. */
@@ -58,7 +59,7 @@ export async function attachQuerySource(collector: DevtoolsCollector): Promise<D
       connection: event.connection,
       driver: event.driver,
       sql: event.sql,
-      bindings: redactBindings(event.bindings),
+      bindings: toSafeValue(redactBindings(event.bindings)) as unknown[] | undefined,
       collection: event.collection,
       command: event.command,
       pipeline: event.pipeline,

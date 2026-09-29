@@ -1,5 +1,6 @@
 import { LogChannel, log, type LoggingData } from "@warlock.js/logger";
 import { currentRequestId } from "../current-request-id";
+import { toSafeValue } from "../safe-value";
 import type { DevtoolsCollector, DevtoolsDisposer, DevtoolsLogEntry } from "../types";
 
 /** `LoggingData.type` includes `fatal`, which devtools folds into `error`. */
@@ -19,15 +20,16 @@ class DevtoolsLogChannel extends LogChannel {
     if (!this.active) return;
 
     // Already passed through the logger's redaction floor (`Logger.log`
-    // applies it before invoking any channel), so `data.context` here is
-    // safe to store as-is.
+    // applies it before invoking any channel). It is still app data, and can
+    // hold live objects (a request, its socket), so a JSON-safe snapshot is
+    // kept instead of the object itself.
     const entry: DevtoolsLogEntry = {
       level: toDevtoolsLevel(data.type),
       module: data.module,
       action: data.action,
       message: data.message,
       at: Date.now(),
-      context: data.context,
+      context: toSafeValue(data.context),
     };
 
     this.collector.addLog(currentRequestId(), entry);
