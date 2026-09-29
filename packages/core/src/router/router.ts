@@ -992,6 +992,13 @@ export class Router {
     server.addHook(
       "onRequest",
       async (fastifyRequest: FastifyRequest, fastifyReply: FastifyReply) => {
+        // Only requests Fastify routed to the dev wildcard belong to the app's
+        // router. A plugin's own route (devtools' `/__warlock/api/requests/:id`)
+        // must keep its params even when an app catch-all matches the URL too.
+        if (fastifyRequest.routeOptions.url !== "*") {
+          return undefined;
+        }
+
         const match = resolveRouteRegistry().find(fastifyRequest.method, fastifyRequest.url);
 
         if (!match) {

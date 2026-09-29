@@ -111,4 +111,21 @@ describe("dev router parity", () => {
       statusCode: 404,
     });
   });
+
+  // Devtools (and any plugin) registers its own parametric Fastify routes. An
+  // app catch-all used to match those URLs in the dev onRequest hook, which
+  // then overwrote the plugin route's params with the catch-all's.
+  it("leaves a plugin route's own params alone when an app catch-all also matches the URL", async () => {
+    router.get("/*", (() => undefined) as any);
+    server = Fastify();
+    router.scanDevServer(server);
+    server.get("/__plugin/items/:id", async (request) => ({ params: request.params }));
+
+    await server.ready();
+
+    const response = await server.inject({ method: "GET", url: "/__plugin/items/AbC123" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ params: { id: "AbC123" } });
+  });
 });
