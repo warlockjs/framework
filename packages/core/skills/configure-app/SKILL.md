@@ -229,6 +229,8 @@ Same shape — TS validates the union; runtime picks the `default` key.
 - `socket.adapter` — adapter factory for cross-server broadcast.
 - `cache.silenceSingleServerWarning`, `storage.silenceSingleServerWarning`, `socket.silenceSingleServerWarning` — silence the production warnings for in-memory cache, local storage, and adapter-less sockets.
 
+`http.modelValidationErrorStatus` sets the status for a Cascade model-write validation failure (a model failing its own schema on save). It defaults to `500` with an opaque body, because request input is already validated with a `422` before the model is touched. Set a `4xx` (e.g. `422`) to treat it as a client error instead; the response then carries `{ errors }`.
+
 ## Per-env knobs
 
 For one-off switches gated on environment, the canonical pattern is `Application.isProduction` (also `isDevelopment`, `isTest`):

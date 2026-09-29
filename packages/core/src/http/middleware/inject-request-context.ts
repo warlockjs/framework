@@ -183,8 +183,23 @@ function handleRequestError(
   }
 
   if (error instanceof DatabaseWriterValidationError) {
-    return response.badRequest({
+    log.error("http", "model-write-validation-error", error, {
+      requestId: request.id,
       errors: error.errors,
+    });
+
+    const status = config.get("http.modelValidationErrorStatus", 500);
+
+    // A 4xx status means the app treats this as the client's fault, so the
+    // field errors are useful to it; a 5xx stays opaque.
+    if (status < 500) {
+      return response.setStatusCode(status).send({
+        errors: error.errors,
+      });
+    }
+
+    return response.setStatusCode(status).send({
+      error: "Internal server error.",
     });
   }
 

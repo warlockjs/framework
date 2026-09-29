@@ -1,4 +1,5 @@
 import config from "@mongez/config";
+import { DatabaseWriterValidationError } from "@warlock.js/cascade";
 import { afterEach, describe, expect, it } from "vitest";
 import { v } from "@warlock.js/seal";
 import {
@@ -221,6 +222,52 @@ describe("HTTP validation — schema bound", () => {
 });
 
 describe("HTTP error mapping — thrown HttpError subclasses", () => {
+  it("maps model-write validation failures to an opaque 500 by default", async () => {
+    harness = await bootHarness((router) => {
+      router.post("/model-validation-default", () => {
+        throw new DatabaseWriterValidationError("[User Model] Insert failed", [
+          { input: "email", error: "Email already exists", type: "unique" },
+        ]);
+      });
+    });
+
+    const result = await harness.inject({
+      method: "POST",
+      url: "/model-validation-default",
+      payload: {},
+    });
+
+    expect(result.statusCode).toBe(500);
+    expect(harness.json(result)).toEqual({ error: "Internal server error." });
+  });
+
+  it("honours http.modelValidationErrorStatus for model-write validation failures", async () => {
+    config.set("http.modelValidationErrorStatus", 422);
+
+    try {
+      harness = await bootHarness((router) => {
+        router.post("/model-validation-configured", () => {
+          throw new DatabaseWriterValidationError("[User Model] Insert failed", [
+            { input: "email", error: "Email already exists", type: "unique" },
+          ]);
+        });
+      });
+
+      const result = await harness.inject({
+        method: "POST",
+        url: "/model-validation-configured",
+        payload: {},
+      });
+
+      expect(result.statusCode).toBe(422);
+      expect(harness.json(result)).toEqual({
+        errors: [{ input: "email", error: "Email already exists", type: "unique" }],
+      });
+    } finally {
+      config.set("http.modelValidationErrorStatus", undefined);
+    }
+  });
+
   it("maps a thrown BadRequestError to 400 with error + payload", async () => {
     harness = await bootHarness((router) => {
       router.get("/throw-bad", () => {

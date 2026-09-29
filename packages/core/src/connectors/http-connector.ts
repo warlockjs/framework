@@ -5,6 +5,7 @@ import { Application, getRoles, servesHttp } from "../application";
 import { health } from "../http/health";
 import { assertPortIsAvailable } from "../http/port-preflight";
 import { registerHttpPlugins } from "../http/plugins";
+import { notifyHttpServerRebuilt } from "../http/server-rebuilt";
 import { setHttpReadyReport } from "../http/ready-report";
 import { isCanonicalPortValue, resolveBindPort } from "../http/resolve-bind-port";
 import {
@@ -321,6 +322,11 @@ export class HttpConnector extends BaseConnector {
   public async restart(): Promise<void> {
     await this.shutdown();
     await this.boot();
+
+    // Subscribers (the web connector's Vite middleware) re-attach to the new
+    // instance here: after it exists, before `start()` listens.
+    if (this.http) notifyHttpServerRebuilt(this.http);
+
     await this.start();
   }
 

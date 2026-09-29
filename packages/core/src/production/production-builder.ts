@@ -306,7 +306,12 @@ export class ProductionBuilder {
       return;
     }
 
-    this.namedApiRoutes = (await collectRouteRegistrationSnapshot({ cwd: rootPath() })).routes;
+    this.namedApiRoutes = (
+      await collectRouteRegistrationSnapshot({
+        cwd: rootPath(),
+        timeoutMs: this.options.routeRegistrationTimeoutMs,
+      })
+    ).routes;
   }
 
   /**
@@ -750,6 +755,7 @@ bootstrap();
     delete esbuildOptions.singleBundle;
     delete esbuildOptions.esmShim;
     delete esbuildOptions.banner;
+    delete esbuildOptions.routeRegistrationTimeoutMs;
 
     await ensureDirectoryAsync(writeOutDir);
 

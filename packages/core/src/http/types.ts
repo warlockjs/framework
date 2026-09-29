@@ -186,6 +186,15 @@ export interface PartialMiddleware {
  */
 export interface HttpConfigurations {
   /**
+   * Status used when a Cascade model fails validation during a database write.
+   * The default is 500 because request input has already been validated before
+   * a model write begins; set this only when an application deliberately needs
+   * a different response status.
+   *
+   * @default 500
+   */
+  modelValidationErrorStatus?: number;
+  /**
    * Server port
    */
   port?: number;

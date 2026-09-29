@@ -41,11 +41,12 @@ process.once("message", async (message: unknown) => {
 
     for (const file of filesOrchestrator.files.values()) {
       if (file.type === "model") {
+        await sendProgress(file.relativePath);
         await filesOrchestrator.moduleLoader.loadModule(file, "model");
       }
     }
 
-    await filesOrchestrator.moduleLoader.loadAll();
+    await filesOrchestrator.moduleLoader.loadAll({ onBeforeLoad: (file) => sendProgress(file.relativePath) });
 
     await sendAndExit({
       type: "route-registration:snapshot",
@@ -92,4 +93,13 @@ async function sendAndExit(message: unknown, exitCode = 0): Promise<never> {
   });
   process.disconnect?.();
   process.exit(exitCode);
+}
+
+async function sendProgress(module: string): Promise<void> {
+  if (typeof process.send !== "function") return;
+  await new Promise<void>((resolve, reject) => {
+    process.send!({ type: "route-registration:progress", module }, (error) =>
+      error ? reject(error) : resolve(),
+    );
+  });
 }

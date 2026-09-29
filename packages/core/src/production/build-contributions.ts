@@ -19,7 +19,7 @@ const ErrorWithCause = Error as ErrorWithCauseConstructor;
  * posture as the `tsconfig` guard in `resolve-build-config`: dropping the key
  * quietly would leave the author believing their plugin ran.
  */
-const ALLOWED_CONTRIBUTION_KEYS = ["generate", "emit"] as const;
+const ALLOWED_CONTRIBUTION_KEYS = ["generate", "emit", "typings"] as const;
 
 /**
  * What the generate pass produced, merged across every contributor.
@@ -46,8 +46,8 @@ export function assertClosedContribution(connector: Connector): void {
 
     throw new Error(
       `Connector "${connector.name}" declares an unsupported build contribution key "${key}". ` +
-        `A build contribution carries exactly two optional hooks — ` +
-        `${ALLOWED_CONTRIBUTION_KEYS.join(" and ")} — and no data. ` +
+        `A build contribution carries exactly these optional hooks — ` +
+        `${ALLOWED_CONTRIBUTION_KEYS.join(", ")} — and no data. ` +
         `Anything a hook needs (plugins, pipelines, aliases) must be constructed inside ` +
         `that hook, so it never lands in the connector's static import graph.`,
     );
@@ -116,6 +116,25 @@ export async function runEmitContributions(
 }
 
 /**
+ * Drain every connector's `typings` hook, in array order, sequentially.
+ * Connectors without one — every API-only app — are skipped without error.
+ */
+export async function runTypingsContributions(
+  connectors: readonly Connector[],
+  context: ConnectorBuildContext,
+): Promise<void> {
+  for (const connector of connectors) {
+    assertClosedContribution(connector);
+
+    const typings = connector.build?.typings;
+
+    if (!typings) continue;
+
+    await runHook(connector, "typings", () => typings(context));
+  }
+}
+
+/**
  * Merge two contributor patches. Later wins, except:
  *
  * - `define` merges per key — two contributors defining different
@@ -165,7 +184,7 @@ export function dedupe(values: string[]): string[] {
  */
 async function runHook<Result>(
   connector: Connector,
-  hook: "generate" | "emit",
+  hook: "generate" | "emit" | "typings",
   run: () => Result | Promise<Result>,
 ): Promise<Result> {
   try {

@@ -47,10 +47,14 @@ export async function teardown() {
  * registry with it, so this pair boots and closes the test runtime once per
  * test file.
  *
- * setupTest() is called with no options on purpose: an explicit connectors
+ * setupTest() gets no connectors option on purpose: an explicit connectors
  * value outranks tests.connectors from src/config/tests.ts, so passing one
  * here would erase your project config. Omitting it leaves the config in
  * charge.
+ *
+ * importModule makes Warlock load your app modules (config, routes, ...)
+ * through THIS file's import(), which Vitest handles. Tests and the framework
+ * then share one copy of every class, so "owner instanceof User" works.
  *
  * afterAll(teardownTest) is the other half of the pair: whoever calls
  * setupTest() owns closing it in the same runtime context.
@@ -58,7 +62,7 @@ export async function teardown() {
 import { setupTest, teardownTest } from "@warlock.js/core/tests";
 import { afterAll } from "vitest";
 
-await setupTest();
+await setupTest({ importModule: (file) => import(file) });
 
 afterAll(teardownTest);
 `,

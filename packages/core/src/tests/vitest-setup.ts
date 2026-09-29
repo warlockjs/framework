@@ -23,6 +23,8 @@
  */
 import { Application } from "../application/application";
 import { bootstrap } from "../bootstrap";
+import { setAppModuleImporter } from "../loader/app-module-importer";
+import type { AppModuleImporter } from "../loader/app-module-importer";
 import { loadConfigFiles } from "../config/load-config-files";
 import { connectorsManager } from "../connectors";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
@@ -57,7 +59,36 @@ export type TestSetupOptions = {
    * it.
    */
   connectors?: TestConnectorsSelection;
+  /**
+   * Import hook for APPLICATION modules (config, routes, events, ...).
+   *
+   * Pass `(file) => import(file)` from your `src/test-setup.ts`: that file is
+   * app code, so Vitest handles the `import()` and app modules land in the same
+   * module graph as your test files. Without it Warlock imports them natively,
+   * one worker holds two copies of every class (`User`, ...), and `instanceof`
+   * fails. Defaults to native import.
+   */
+  importModule?: AppModuleImporter;
 };
+
+const IMPORT_MODULE_WARNED_KEY = Symbol.for("warlock.core.importModuleWarned");
+
+/**
+ * Warn — once per process — that app modules are loaded outside Vitest's graph.
+ */
+export function warnMissingImportModule(importModule: AppModuleImporter | undefined): void {
+  if (importModule || !process.env.VITEST) return;
+
+  const holder = globalThis as Record<symbol, unknown>;
+
+  if (holder[IMPORT_MODULE_WARNED_KEY]) return;
+
+  holder[IMPORT_MODULE_WARNED_KEY] = true;
+
+  console.warn(
+    "[warlock] Warlock loads app modules outside Vitest's module graph, so classes like User exist twice and instanceof fails. Pass importModule: (file) => import(file) to setupTest().",
+  );
+}
 
 /**
  * Raised by the lifecycle itself, never by the runtime it manages — a conflict
@@ -102,6 +133,8 @@ const POISONED_MESSAGE =
  * await setupTest({ connectors: false });
  */
 export async function setupTest(options?: TestSetupOptions): Promise<void> {
+  warnMissingImportModule(options?.importModule);
+
   const registry = getTestLifecycleRegistry();
   const requested = readRequestedConnectors(options?.connectors);
 
@@ -129,7 +162,15 @@ export async function setupTest(options?: TestSetupOptions): Promise<void> {
     return attempt.completion;
   }
 
-  return startTestRuntime(requested);
+  // Scoped to this startup: the loaders read it while app modules import, and
+  // it is cleared whatever the outcome so it never leaks past setup.
+  setAppModuleImporter(options?.importModule);
+
+  try {
+    return await startTestRuntime(requested);
+  } finally {
+    setAppModuleImporter(undefined);
+  }
 }
 
 /**

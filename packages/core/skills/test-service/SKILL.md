@@ -11,13 +11,13 @@ For unit tests, you import the thing under test and call it directly. No HTTP, n
 
 ⚠ **Corrected in 4.14.0 — `setupTest` is CALLED once per TEST FILE, not once per worker.** Every version of this skill through 4.13.0 said "per worker", the generated `src/test-setup.ts` carries a `Per-Worker Test Setup` comment saying the same thing, and **both were wrong.** Vitest runs `setupFiles` before **each test file**, and the setup module's registry is rebuilt every time — measured across all four `pool` × `isolate` combinations.
 
-⛔ **If your project was generated before 4.14.0, fix BOTH the comment and the call.** The comment is false, **and** the generated `setupTest({ connectors: true })` is now an *explicit* value that overrides your `src/config/tests.ts`. **Bare `setupTest()` is the correct call.**
+⛔ **If your project was generated before 4.14.0, fix BOTH the comment and the call.** The comment is false, **and** the generated `setupTest({ connectors: true })` is now an _explicit_ value that overrides your `src/config/tests.ts`. **Bare `setupTest()` is the correct call.**
 
 **The lifetime is FILE-SCOPED, on purpose.** Your setup file bootstraps the framework and its `afterAll(teardownTest)` closes it, once per test file. **One owner, one pairing — correct under every pool, every isolation setting, and watch mode.**
 
-⚠ **A worker-scoped lifetime is possible and is deliberately not shipped yet.** Lifecycle state now lives in the worker runtime, so leaving the framework running would let every file in a worker share one bootstrap. Two things block claiming it: under `pool: "threads"` we cannot observe whether Node reclaims a torn-down thread's sockets and pools, and **in watch mode Vitest reuses workers between reruns, so there is no recycle and no cleanup owner.** It gets taken when the real cost is measured and the integration is chosen, not inherited. See *Lifecycle and repeated calls* below.
+⚠ **A worker-scoped lifetime is possible and is deliberately not shipped yet.** Lifecycle state now lives in the worker runtime, so leaving the framework running would let every file in a worker share one bootstrap. Two things block claiming it: under `pool: "threads"` we cannot observe whether Node reclaims a torn-down thread's sockets and pools, and **in watch mode Vitest reuses workers between reruns, so there is no recycle and no cleanup owner.** It gets taken when the real cost is measured and the integration is chosen, not inherited. See _Lifecycle and repeated calls_ below.
 
-⚠ **Changed in 4.13.0 — the import is a subpath now.** `setupTest` used to be re-exported from the package root; it is not any more, because that put the test helpers into every application's production module graph. `import { setupTest } from "@warlock.js/core"` now fails with *"has no exported member"* — **add `/tests` to the specifier and nothing else changes.**
+⚠ **Changed in 4.13.0 — the import is a subpath now.** `setupTest` used to be re-exported from the package root; it is not any more, because that put the test helpers into every application's production module graph. `import { setupTest } from "@warlock.js/core"` now fails with _"has no exported member"_ — **add `/tests` to the specifier and nothing else changes.**
 
 ## The shape
 
@@ -34,7 +34,7 @@ describe("registerUserService", () => {
     });
 
     expect(user.get("email")).toBe("test@example.com");
-    expect(user.get("password")).not.toBe("secret");  // hashed by useHashedPassword()
+    expect(user.get("password")).not.toBe("secret"); // hashed by useHashedPassword()
 
     const found = await usersRepository.first({ email: "test@example.com" });
     expect(found).toBeDefined();
@@ -59,18 +59,18 @@ What it does (in order):
 3. Runs `bootstrap()` — env, app, prestart hooks.
 4. Initializes the `filesOrchestrator` (module/route/config discovery, no file watching).
 5. Loads all `src/config/*.ts` files.
-6. Resolves the connector selection — **an explicit parameter wins, then `tests.connectors` from config, then the `true` default.** See *Selecting connectors* below.
+6. Resolves the connector selection — **an explicit parameter wins, then `tests.connectors` from config, then the `true` default.** See _Selecting connectors_ below.
 7. Starts the chosen connectors — but **never `http`** when you pass a boolean. HTTP is the global-setup's job.
 
 The result: DB/cache/logger/storage connections your code can use. Models save, repositories query, services run. Same code as production, just isolated to the test process.
 
 ### The `connectors` parameter
 
-| Value                  | Boots                                                            | Use when                                              |
-| ---------------------- | ---------------------------------------------------------------- | ----------------------------------------------------- |
-| `true` *(default)*     | Every connector except `http` — via `startWithout(["http"])` (db, cache, logger, storage, and socket if configured) | Most service / repository / model tests.              |
-| `false`                | None                                                             | Pure logic tests with no DB / cache touches (parsers, validators, util functions). |
-| `["database", "cache"]` | Just those, in that order                                        | A test that only needs DB but not, say, the storage driver. |
+| Value                   | Boots                                                                                                               | Use when                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `true` _(default)_      | Every connector except `http` — via `startWithout(["http"])` (db, cache, logger, storage, and socket if configured) | Most service / repository / model tests.                                           |
+| `false`                 | None                                                                                                                | Pure logic tests with no DB / cache touches (parsers, validators, util functions). |
+| `["database", "cache"]` | Just those, in that order                                                                                           | A test that only needs DB but not, say, the storage driver.                        |
 
 The default `true` is the sane choice. Reach for `false` when the unit you're testing genuinely doesn't talk to any framework subsystem — pulling up a DB connection **for every file** just to test a string parser is wasted setup time.
 
@@ -86,25 +86,25 @@ export default testsConfigurations;
 
 ⚠ **BREAKING in 4.14.0 — the precedence flipped.**
 
-| | Order |
-|---|---|
-| **4.13.0 and earlier** | `tests.connectors` config **>** `setupTest({ connectors })` parameter **>** `true` |
-| **4.14.0 onward** | **explicit `setupTest({ connectors })` parameter** **>** `tests.connectors` config **>** `true` |
+|                        | Order                                                                                           |
+| ---------------------- | ----------------------------------------------------------------------------------------------- |
+| **4.13.0 and earlier** | `tests.connectors` config **>** `setupTest({ connectors })` parameter **>** `true`              |
+| **4.14.0 onward**      | **explicit `setupTest({ connectors })` parameter** **>** `tests.connectors` config **>** `true` |
 
-**An explicit call-site value now beats project config.** If your project sets `tests.connectors` *and* some test file passes `connectors` explicitly, **that file will start a different connector set after upgrading.** Search for `setupTest({` across your tests before you upgrade — a call passing `connectors` was previously ignored and is now honoured.
+**An explicit call-site value now beats project config.** If your project sets `tests.connectors` _and_ some test file passes `connectors` explicitly, **that file will start a different connector set after upgrading.** Search for `setupTest({` across your tests before you upgrade — a call passing `connectors` was previously ignored and is now honoured.
 
 **"Explicit" means you supplied a non-`undefined` value.** Both of these fall through to config:
 
 ```ts
-await setupTest();                       // → tests.connectors, else true
-await setupTest({});                     // → tests.connectors, else true
+await setupTest(); // → tests.connectors, else true
+await setupTest({}); // → tests.connectors, else true
 await setupTest({ connectors: undefined }); // → tests.connectors, else true — NOT "start none"
 ```
 
 The `undefined` rule is deliberate: an optional variable that happens to be `undefined` must not silently erase your project config.
 
 ```ts
-await setupTest({ connectors: false });        // → none, even if config says otherwise
+await setupTest({ connectors: false }); // → none, even if config says otherwise
 await setupTest({ connectors: ["database"] }); // → exactly that, even if config differs
 ```
 
@@ -131,7 +131,7 @@ afterAll(teardownTest);
 ⛔ **Three things changed here in 4.14.0. If you generated this file earlier, replace all three — it is not a comment fix.**
 
 1. **`afterAll(teardownTest)` is new and mandatory.** Nothing else closes the framework your tests started. This is what makes the lifetime file-scoped and owned rather than left running.
-2. **The call is now bare `setupTest()`, not `setupTest({ connectors: true })`.** Under the flipped precedence, passing `true` is an *explicit* value and would override `tests.connectors` for **every file in the project.** Bare means "whatever this project configured, else the default".
+2. **The call is now bare `setupTest()`, not `setupTest({ connectors: true })`.** Under the flipped precedence, passing `true` is an _explicit_ value and would override `tests.connectors` for **every file in the project.** Bare means "whatever this project configured, else the default".
 3. **The comment used to say `Per-Worker Test Setup` / "Runs in EACH Vitest worker thread".** False — see the top of this skill.
 
 ```ts title="vite.config.ts"
@@ -142,8 +142,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
-    globalSetup: "./src/test-global-setup.ts",  // ← HTTP server (see test-http skill)
-    setupFiles: ["./src/test-setup.ts"],         // ← runs setupTest before EACH test file
+    globalSetup: "./src/test-global-setup.ts", // ← HTTP server (see test-http skill)
+    setupFiles: ["./src/test-setup.ts"], // ← runs setupTest before EACH test file
     environment: "node",
     globals: false,
     include: ["src/app/**/*.test.ts"],
@@ -152,6 +152,17 @@ export default defineConfig({
 ```
 
 The `mongezVite()` plugin handles TypeScript path resolution and the framework's module shape. Without it, your imports break the moment vitest tries to load a Warlock module. `lowerStage3Decorators()` goes **first** — it lets decorated Cascade models (`@RegisterModel`, …) load under Vitest 4 / Vite 8; see [`@warlock.js/core/lower-stage3-decorators/SKILL.md`](@warlock.js/core/lower-stage3-decorators/SKILL.md).
+
+### Keep Vitest setup out of development
+
+`warlock dev` (and `warlock build`) load your app's `vite.config.ts`. Anything you put there for tests runs in development too. Guard vitest-only setup:
+
+```ts
+// vite.config.ts
+if (process.env.VITEST) {
+  Object.assign(process.env, testEnv); // test database, test keys...
+}
+```
 
 Tests live colocated with the module: `src/app/<module>/tests/*.test.ts`. The `include` pattern picks them up.
 
@@ -178,9 +189,9 @@ describe("createProductService", () => {
   it("rejects duplicate names", async () => {
     await Product.create({ name: "Existing", price: 10 });
 
-    await expect(
-      createProductService({ name: "Existing", price: 20 }),
-    ).rejects.toThrow(/already exists/i);
+    await expect(createProductService({ name: "Existing", price: 20 })).rejects.toThrow(
+      /already exists/i,
+    );
   });
 });
 ```
@@ -250,7 +261,7 @@ afterEach(async () => {
 
 Vitest runs the tests within one file sequentially, so an `afterEach` truncate gives each test a clean slate.
 
-⚠ **Cross-*file* isolation is not solved by this.** Separate workers get separate **connections**, not separate **rows** — two files pointed at the same database see each other's committed data regardless of pool or worker count. **Truncate what your file wrote; don't assume the worker boundary did it for you.** Real data isolation (DB-per-worker, transaction-per-test) is a separate piece of work and is not in this release.
+⚠ **Cross-_file_ isolation is not solved by this.** Separate workers get separate **connections**, not separate **rows** — two files pointed at the same database see each other's committed data regardless of pool or worker count. **Truncate what your file wrote; don't assume the worker boundary did it for you.** Real data isolation (DB-per-worker, transaction-per-test) is a separate piece of work and is not in this release.
 
 ### Skipping connectors for pure logic tests
 
@@ -260,7 +271,7 @@ import { setupTest } from "@warlock.js/core/tests";
 import { slugify } from "../utils/slugify";
 
 beforeAll(async () => {
-  await setupTest({ connectors: false });  // starts no connectors at all
+  await setupTest({ connectors: false }); // starts no connectors at all
 });
 
 describe("slugify", () => {
@@ -287,7 +298,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await teardownTest();      // ← REQUIRED, see below
+  await teardownTest(); // ← REQUIRED, see below
 });
 ```
 
@@ -308,16 +319,16 @@ afterAll(async () => {
 
 `setupTest` / `teardownTest` are a pair. **The harness that calls one owns calling the other in the same context.**
 
-| Call | Behaviour |
-|---|---|
-| `setupTest(x)` while idle | bootstraps |
-| `setupTest(x)` while already ready with the **same** effective options | no-op |
-| `setupTest(y)` while ready or starting with **different** effective options | ⛔ **rejects**, naming active vs requested |
-| two concurrent `setupTest(x)` calls | share one startup |
-| `setupTest` after a failed setup | allowed — a failed setup unwinds and returns to idle |
-| `teardownTest()` while idle | no-op |
-| two concurrent `teardownTest()` calls | share one shutdown |
-| `setupTest(y)` after a **successful** teardown | allowed, different options fine |
+| Call                                                                        | Behaviour                                            |
+| --------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `setupTest(x)` while idle                                                   | bootstraps                                           |
+| `setupTest(x)` while already ready with the **same** effective options      | no-op                                                |
+| `setupTest(y)` while ready or starting with **different** effective options | ⛔ **rejects**, naming active vs requested           |
+| two concurrent `setupTest(x)` calls                                         | share one startup                                    |
+| `setupTest` after a failed setup                                            | allowed — a failed setup unwinds and returns to idle |
+| `teardownTest()` while idle                                                 | no-op                                                |
+| two concurrent `teardownTest()` calls                                       | share one shutdown                                   |
+| `setupTest(y)` after a **successful** teardown                              | allowed, different options fine                      |
 
 **"Same options" is compared by meaning, not by literal value** — connector arrays are deduplicated and compared as sets, so `["cache", "database"]` and `["database", "cache", "cache"]` are the same selection.
 
@@ -332,7 +343,7 @@ afterAll(async () => {
 ```ts title="src/config/tests.ts"
 const testsConfigurations = {
   connectors: ["database", "logger"],
-  setupTimeout: 120000,   // milliseconds — this is the default
+  setupTimeout: 120000, // milliseconds — this is the default
 };
 
 export default testsConfigurations;
@@ -351,9 +362,9 @@ in `src/config/tests.ts` — milliseconds, default 120000.
 1. **It bounds the setup ATTEMPT, not teardown separately.** `teardownTest()` awaits the same attempt, so it inherits the bound — **one timer, not two.** A second teardown-side deadline was tried and rejected: it re-introduced the unbounded re-entry this whole guard exists to remove.
 2. **Expiry poisons the lifecycle**, it does not return to `idle`. The attempt may have started connectors nobody can now account for, so pretending the runtime is clean would be worse than refusing.
 3. **⛔ An invalid `setupTimeout` throws, naming the bad value.** Zero, negative and non-numeric all fail loudly rather than falling back to the default — a silent fallback would hide a typo behind a working suite.
-4. **The bound is measured from when the attempt started**, not from when config was read. `tests.setupTimeout` is only readable after `loadConfigFiles()`, which happens *inside* the window being bounded; re-arming naively would give you the default plus your configured value.
+4. **The bound is measured from when the attempt started**, not from when config was read. `tests.setupTimeout` is only readable after `loadConfigFiles()`, which happens _inside_ the window being bounded; re-arming naively would give you the default plus your configured value.
 
-⚠ **What is proven and what is not.** The nine guards above were each seen to fail under their own mutation. **But every spec injects its scheduler**, so the default *value* is tested while the production timer — and whether its `unref` actually releases the worker — is not. **And no spec observes a real hang**: the stuck attempt is a mock gate, not a socket that never returns. These prove what the lifecycle *decides*, not what a genuinely wedged connector does.
+⚠ **What is proven and what is not.** The nine guards above were each seen to fail under their own mutation. **But every spec injects its scheduler**, so the default _value_ is tested while the production timer — and whether its `unref` actually releases the worker — is not. **And no spec observes a real hang**: the stuck attempt is a mock gate, not a socket that never returns. These prove what the lifecycle _decides_, not what a genuinely wedged connector does.
 
 ### State is per worker runtime, not per module
 
@@ -383,3 +394,13 @@ In both cases the guard's scope matches the resource's scope, which is the point
 - [`test-http/SKILL.md`](../test-http/SKILL.md) — integration tests via the real HTTP server (`startHttpTestServer` + `testGet` / `testPost` / `expectJson`).
 - [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — where tests live in a module (`tests/*.test.ts`).
 - [`write-cli-command/SKILL.md`](../write-cli-command/SKILL.md) — `warlock add test` for the initial scaffold.
+
+## App modules and `importModule`
+
+Under Vitest, test files run through vite-node while Warlock's own native `import()` of app modules (config, routes, events) does not, so app classes such as `User` can exist twice in one worker and `instanceof` fails. Pass `importModule` to `setupTest` so Warlock loads app modules through the test's own module graph:
+
+```ts
+setupTest({ importModule: (file) => import(file) });
+```
+
+The generated `src/test-setup.ts` already does this. Without it, `setupTest()` under Vitest warns once.

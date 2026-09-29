@@ -214,7 +214,10 @@ export class Resource implements ResourceContract {
     const parsedSchema = this.resolveParsedSchema();
 
     for (const [outputKey, outputSettings] of Object.entries(parsedSchema)) {
-      const inputValue = this.get(outputKey);
+      const inputKey = outputSettings instanceof ResourceFieldBuilder
+        ? outputSettings.getInputKey()
+        : undefined;
+      const inputValue = this.resolveSourceValue(this.originalData, outputKey, inputKey);
       const outputValue = this.transformValue(inputValue, outputSettings, localeCode);
 
       if (outputValue !== undefined) {
@@ -296,8 +299,7 @@ export class Resource implements ResourceContract {
       outputValue = (outputSettings as Function).call(this, value, this);
     } else if (outputSettings instanceof ResourceFieldBuilder) {
       // Builder — handles array mapping and nullable internally via isArrayField
-      const inputKey = outputSettings.getInputKey();
-      outputValue = outputSettings.transform(inputKey ? this.get(inputKey) : value, locale);
+      outputValue = outputSettings.transform(value, locale);
     } else if (
       typeof outputSettings === "object" &&
       outputSettings !== null &&
@@ -384,7 +386,10 @@ export class Resource implements ResourceContract {
         valueTransformType = outputSettings[1];
       }
 
-      const inputValue = get(item, fieldKey);
+      const inputKey = valueTransformType instanceof ResourceFieldBuilder
+        ? valueTransformType.getInputKey()
+        : undefined;
+      const inputValue = this.resolveSourceValue(item, outputKey, inputKey ?? fieldKey);
       const outputValue = this.transformValue(inputValue, valueTransformType, locale);
 
       if (outputValue !== undefined) {
@@ -393,6 +398,18 @@ export class Resource implements ResourceContract {
     }
 
     return transformedItem;
+  }
+
+  /**
+   * Resolve one schema field from a model or plain object. Mongo records use `_id`
+   * internally, while resources expose `id` by convention.
+   */
+  protected resolveSourceValue(source: GenericObject | Resource | Model, outputKey: string, inputKey?: string) {
+    const key = inputKey ?? outputKey;
+    const read = (field: string) => source instanceof Model ? source.get(field) : get(source, field);
+    const value = read(key);
+
+    return outputKey === "id" && key === "id" && value === undefined ? read("_id") : value;
   }
 
   /**

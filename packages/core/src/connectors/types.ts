@@ -148,6 +148,15 @@ export type ConnectorBuildContribution = {
    * Runs after esbuild and before `.warlock/production` is removed.
    */
   emit?(context: ConnectorBuildContext): Promise<void> | void;
+
+  /**
+   * Write the connector's generated `.d.ts` files under `.warlock/typings`.
+   *
+   * Runs from `warlock generate.typings` with the same context `generate`
+   * receives (`productionDir` is not written to), so a clean checkout can
+   * typecheck before any build has run.
+   */
+  typings?(context: ConnectorBuildContext): Promise<void> | void;
 };
 
 export type ConnectorName =

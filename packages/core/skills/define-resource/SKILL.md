@@ -221,6 +221,10 @@ export class Product extends Model {
 
 This is convention, not a framework requirement. Controllers/services that import the resource explicitly work the same way.
 
+### `id` and Mongo `_id`
+
+The output `id` falls back to `_id` when the record has no `id`; an explicit `id` always wins. If a collection uses native ObjectIds, set `public primaryKey = "_id"` on the model so `Model.find(hex)` resolves the `id` your resource emits.
+
 ## Output-only rule
 
 Resources map fields. They do not:

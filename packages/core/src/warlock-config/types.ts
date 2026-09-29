@@ -64,6 +64,13 @@ export type WarlockConfig = {
      */
     outFile?: string;
     /**
+     * Maximum time to wait for the isolated route-registration process during
+     * `warlock build`. `WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS` overrides it.
+     *
+     * @default 30000
+     */
+    routeRegistrationTimeoutMs?: number;
+    /**
      * Produce ONE self-contained file you can run with `node dist/app.js`.
      *
      * Sets `packages: "bundle"` and `splitting: false` as defaults — write

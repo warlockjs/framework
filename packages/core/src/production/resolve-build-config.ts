@@ -19,7 +19,7 @@ import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
  * that; widening them to `string | undefined` pushed the lie downstream into
  * `start-production.command.ts`, which then could not trust its own config.
  */
-type BuilderStrippedKeys = "singleBundle" | "esmShim" | "banner";
+type BuilderStrippedKeys = "singleBundle" | "esmShim" | "banner" | "routeRegistrationTimeoutMs";
 
 export type ResolvedBuildConfig = Required<
   Omit<NonNullable<WarlockConfig["build"]>, "outDirectory" | BuilderStrippedKeys>
@@ -102,6 +102,27 @@ export function resolveBuildConfig(): ResolvedBuildConfig {
 
   return {
     ...merged,
+    routeRegistrationTimeoutMs: resolveRouteRegistrationTimeoutMs(merged.routeRegistrationTimeoutMs),
     entryPath: path.resolve(merged.outdir, merged.outFile),
   };
+}
+
+const DEFAULT_ROUTE_REGISTRATION_TIMEOUT_MS = 30_000;
+const ROUTE_REGISTRATION_TIMEOUT_ENV = "WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS";
+
+function resolveRouteRegistrationTimeoutMs(configured: unknown): number {
+  const environment = process.env[ROUTE_REGISTRATION_TIMEOUT_ENV];
+  const value = environment === undefined ? configured : environment;
+  const source = environment === undefined ? "build.routeRegistrationTimeoutMs" : ROUTE_REGISTRATION_TIMEOUT_ENV;
+
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+
+  console.warn(
+    `Invalid ${source} value ${JSON.stringify(value)}; using ${DEFAULT_ROUTE_REGISTRATION_TIMEOUT_MS}ms.`,
+  );
+  return DEFAULT_ROUTE_REGISTRATION_TIMEOUT_MS;
 }

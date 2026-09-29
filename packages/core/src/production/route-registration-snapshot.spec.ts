@@ -77,13 +77,31 @@ describe("collectRouteRegistrationSnapshot", () => {
     expect(child.kill).toHaveBeenCalledOnce();
   });
 
+  it("honours a configured timeout and names the module that was still registering", async () => {
+    vi.useFakeTimers();
+    const child = new FakeChild();
+    const result = collectRouteRegistrationSnapshot({
+      timeoutMs: 25,
+      forkProcess: () => child as unknown as RouteRegistrationChildProcess,
+    });
+
+    child.emit("message", { type: "route-registration:progress", module: "src/routes/users.ts" });
+    const assertion = expect(result).rejects.toThrow(
+      "Route registration child timed out after 25ms while registering src/routes/users.ts.",
+    );
+    await vi.advanceTimersByTimeAsync(25);
+
+    await assertion;
+    expect(child.kill).toHaveBeenCalledOnce();
+  });
+
   it("keeps the registration child free of framework connector lifecycle calls", async () => {
     const source = await readFile(
       fileURLToPath(new URL("./route-registration-child.ts", import.meta.url)),
       "utf8",
     );
 
-    expect(source).toContain("filesOrchestrator.moduleLoader.loadAll()");
+    expect(source).toContain("filesOrchestrator.moduleLoader.loadAll(");
     expect(source).not.toMatch(
       /registerConfiguredConnectors|connectorsManager|startDevelopmentServer|runStartupValidators|markBooted|watchFiles|checkHealth/,
     );

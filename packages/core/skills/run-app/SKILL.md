@@ -171,6 +171,7 @@ export default defineConfig({
     sourcemap: true, // default — true | false | "inline" | "linked"
     singleBundle: false, // default — one runnable file, deps inlined
     esmShim: true, // default — require/__filename/__dirname for bundled CJS
+    routeRegistrationTimeoutMs: 30_000, // default — route-registration child deadline
   },
 });
 ```
@@ -184,6 +185,7 @@ Defaults are sensible for the typical "Node service" deployment. Knobs to actual
 - **`sourcemap: false`** — skip source maps entirely. Smaller artifact, but stack traces in production logs lose their file:line precision (and `warlock start` will not enable `--enable-source-maps` since there's nothing to map).
 - **`singleBundle: true`** — inline dependencies so `node dist/app.js` runs with no `node_modules` and no launcher. Sets `packages: "bundle"` + `splitting: false` as **defaults you can override**. ⚠ Native `.node` addons are still emitted alongside — "single bundle" is one JS file _plus_ any native addons. Do NOT reach for it as the default: keeping deps external is right when you deploy the folder.
 - **`esmShim: false`** — only if you are certain nothing in the graph is CommonJS. Leave it on.
+- **`routeRegistrationTimeoutMs`** — increase on busy CI runners when static route registration needs more than 30 seconds. `WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS` overrides this value for a build; invalid values warn and use 30,000ms.
 
 ⚠ **The trap this replaced.** Setting `packages: "bundle"` by hand used to produce a clean build whose process died on start with `Error: Dynamic require of "node:assert" is not supported`. The output is ESM; bundled CJS deps call `require(...)` and read `__dirname`, and neither exists in an ES module, so the bundler substitutes a throwing stub. **A green `warlock build` was not evidence the bundle ran.** `esmShim` now injects `createRequire(import.meta.url)` and friends automatically for any ESM build, so both `singleBundle` and a hand-written `packages: "bundle"` work. An existing hand-written `banner` is preserved — the shim is prepended, not substituted.
 

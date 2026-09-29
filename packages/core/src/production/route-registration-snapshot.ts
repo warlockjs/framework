@@ -23,7 +23,8 @@ export type RouteRegistrationChildRequest = Readonly<{
 
 type RouteRegistrationChildMessage =
   | Readonly<{ type: "route-registration:snapshot"; snapshot: unknown }>
-  | Readonly<{ type: "route-registration:error"; message: string }>;
+  | Readonly<{ type: "route-registration:error"; message: string }>
+  | Readonly<{ type: "route-registration:progress"; module: string }>;
 
 export type RouteRegistrationChildProcess = Pick<
   ChildProcess,
@@ -51,6 +52,7 @@ export function collectRouteRegistrationSnapshot(
 ): Promise<RouteRegistrationSnapshot> {
   const cwd = options.cwd ?? process.cwd();
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const startedAt = Date.now();
   const forkProcess = options.forkProcess ?? defaultForkProcess;
   // An injected fork is a protocol seam, not an installation check. Unit
   // fixtures do not have a packaged ESM child and do not need to resolve one.
@@ -64,6 +66,7 @@ export function collectRouteRegistrationSnapshot(
     let receivedSnapshot: RouteRegistrationSnapshot | undefined;
     let stdout = "";
     let stderr = "";
+    let pendingModule: string | undefined;
 
     const append = (current: string, chunk: Buffer) => {
       const remaining = MAX_DIAGNOSTIC_BYTES - Buffer.byteLength(current);
@@ -92,9 +95,10 @@ export function collectRouteRegistrationSnapshot(
     });
 
     const timeout = setTimeout(() => {
+      const elapsedMs = Date.now() - startedAt;
       finish(
         new Error(
-          `Route registration child timed out after ${timeoutMs}ms.${formatDiagnostics(stdout, stderr)}`,
+          `Route registration child timed out after ${elapsedMs}ms${pendingModule ? ` while registering ${pendingModule}` : ""}.${formatDiagnostics(stdout, stderr)}`,
         ),
       );
     }, timeoutMs);
@@ -117,6 +121,11 @@ export function collectRouteRegistrationSnapshot(
             `Route registration child failed: ${message.message}${formatDiagnostics(stdout, stderr)}`,
           ),
         );
+        return;
+      }
+
+      if (message.type === "route-registration:progress") {
+        pendingModule = message.module;
         return;
       }
 
@@ -207,8 +216,9 @@ function isChildMessage(value: unknown): value is RouteRegistrationChildMessage 
     typeof value === "object" &&
     value !== null &&
     "type" in value &&
-    ((value as { type?: unknown }).type === "route-registration:snapshot" ||
-      (value as { type?: unknown }).type === "route-registration:error")
+      ((value as { type?: unknown }).type === "route-registration:snapshot" ||
+      (value as { type?: unknown }).type === "route-registration:error" ||
+      (value as { type?: unknown }).type === "route-registration:progress")
   );
 }
 

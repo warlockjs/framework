@@ -6,13 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
-## Unreleased
-
-### Fixed
-
-- Default route schema validation now supplies matching declared route params when body and query omit them, without overriding body or query values.
-- `isPortAvailable()` and `assertPortIsAvailable()` are exported from `@warlock.js/core/tests` for HTTP test setup.
-
 ## 5.25.0 - 2026-09-28
 
 ### Added
@@ -26,6 +19,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `Application.roles`, `Application.hasRole()` and `Application.sites` expose the active set. The `warlock:ready` signal now carries `roles`.
   - With no `--role`, every role is on, so existing apps and `warlock dev` behave exactly as before.
   - Unknown roles, an empty list, or `--sites` without `web` fail before the app starts.
+
+### Changed
+
+- **Behaviour change:** model-write validation failures now return the opaque internal-error response with status 500 by default, instead of returning a 400 and validation details. Details are logged server-side. Set `http.modelValidationErrorStatus` to choose a different status; a `4xx` status returns `{ errors }` to the client.
+
+### Fixed
+
+- `onHttpServerRebuilt(listener)` fires with the new Fastify instance when the HTTP connector restarts (before it listens), so dev connectors can re-attach instance-bound hooks.
+- `warlock generate.typings` now also writes `.warlock/typings/web-routes.d.ts` (through the new optional `build.typings` connector hook, so core never imports web), so `generate.typings && tsc && warlock build` typechecks typed `href()` calls on a clean checkout. API-only apps are unchanged.
+- `warlock build` route registration now has a configurable timeout and names the module still registering when it expires.
+- `defineResource` output `id` now falls back to `_id` on Mongo records when `id` is absent; an explicit `id` still wins. Collections with native ObjectIds should set `primaryKey = "_id"` on the model so `Model.find(hex)` works.
+- `setupTest({ importModule })` lets tests load app modules (config, routes, events) through Vitest's own module graph, so classes like `User` exist once and `instanceof` works. The generated `src/test-setup.ts` passes `(file) => import(file)`; `setupTest()` under Vitest without it warns once.
+- Default route schema validation now supplies matching declared route params when body and query omit them, without overriding body or query values.
+- `isPortAvailable()` and `assertPortIsAvailable()` are exported from `@warlock.js/core/tests` for HTTP test setup.
 
 ## 5.24.0 - 2026-09-27
 

@@ -202,7 +202,7 @@ export class ResourceFieldBuilder {
 
     switch (this.type) {
       case "string":
-        return String(value);
+        return typeof value?.toHexString === "function" ? value.toHexString() : String(value);
       case "number": {
         const num = Number(value);
         return isNaN(num) ? (this.isNullable ? null : undefined) : num;

@@ -9,7 +9,7 @@ Some tests need the full stack: route matching, middleware chain, validation, co
 
 `startHttpTestServer()` is the bootstrap. `testGet` / `testPost` / `expectJson` are the call helpers. Both ship in `@warlock.js/core/tests`.
 
-⚠ **Changed in 4.13.0 — the import is a subpath now.** These helpers used to be re-exported from the package root; they are not any more, because that put the test helpers into every application's production module graph. `import { testGet } from "@warlock.js/core"` now fails with *"has no exported member"* — **add `/tests` to the specifier and nothing else changes.**
+⚠ **Changed in 4.13.0 — the import is a subpath now.** These helpers used to be re-exported from the package root; they are not any more, because that put the test helpers into every application's production module graph. `import { testGet } from "@warlock.js/core"` now fails with _"has no exported member"_ — **add `/tests` to the specifier and nothing else changes.**
 
 ## The shape
 
@@ -125,8 +125,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
-    globalSetup: "./src/test-global-setup.ts",  // ← starts the HTTP server
-    setupFiles: ["./src/test-setup.ts"],         // ← setupTest + afterAll(teardownTest), per test file
+    globalSetup: "./src/test-global-setup.ts", // ← starts the HTTP server
+    setupFiles: ["./src/test-setup.ts"], // ← setupTest + afterAll(teardownTest), per test file
     environment: "node",
     globals: false,
     include: ["src/app/**/*.test.ts"],
@@ -142,6 +142,17 @@ Both files (and this config, with `lowerStage3Decorators()` first so decorated m
 
 **HTTP is the exception and stays in `globalSetup`**, which genuinely does run once in the main vitest process and owns a real port. **That split is the point:** one server for the whole run, one framework per test file.
 
+### Keep Vitest setup out of development
+
+`warlock dev` (and `warlock build`) load your app's `vite.config.ts`. Anything you put there for tests runs in development too. Guard vitest-only setup:
+
+```ts
+// vite.config.ts
+if (process.env.VITEST) {
+  Object.assign(process.env, testEnv); // test database, test keys...
+}
+```
+
 ## HTTP request helpers
 
 Everything is built on native `fetch` — no extra dependency, no special wire format.
@@ -151,7 +162,7 @@ Everything is built on native `fetch` — no extra dependency, no special wire f
 ```ts
 import { getTestServerUrl } from "@warlock.js/core/tests";
 
-const url = getTestServerUrl();  // → "http://localhost:2031" (defaults)
+const url = getTestServerUrl(); // → "http://localhost:2031" (defaults)
 ```
 
 Reads `http.host` (default `"localhost"`) and `http.port` (default `2031`) from config — unless `startHttpTestServer` published a port, which wins, since a worker's own config never sees the `{ port }` option passed in `globalSetup`. If you change the HTTP config, helpers follow automatically.
@@ -189,9 +200,9 @@ import { expectJson, parseJsonResponse } from "@warlock.js/core/tests";
 const body = await parseJsonResponse<MyShape>(response);
 
 // Assert status + parse in one call
-const body = await expectJson<MyShape>(response);          // expects 200
-const body = await expectJson<MyShape>(response, 201);     // expects 201
-const body = await expectJson<MyShape>(response, 404);     // expects 404 (testing error paths)
+const body = await expectJson<MyShape>(response); // expects 200
+const body = await expectJson<MyShape>(response, 201); // expects 201
+const body = await expectJson<MyShape>(response, 404); // expects 404 (testing error paths)
 ```
 
 `expectJson` throws with the actual status + response body when the assertion fails — no chasing "got 500" messages without context.
@@ -227,7 +238,7 @@ describe("Products API — happy path", () => {
 
 ```ts
 it("rejects missing required fields with 400", async () => {
-  const response = await testPost("/products", { name: "" });  // price missing
+  const response = await testPost("/products", { name: "" }); // price missing
   const body = await expectJson<{ errors: Array<{ key: string }> }>(response, 400);
 
   expect(body.errors.some((e) => e.key === "price")).toBe(true);

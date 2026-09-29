@@ -24,6 +24,8 @@ export * from "./boot-port-preflight";
 export * from "./port-preflight";
 // the recorded result of a successful bind, rendered by the dev ready block
 export * from "./ready-report";
+// rebuilt-instance signal, so dev connectors can re-attach hooks after an HTTP restart
+export * from "./server-rebuilt";
 // request exports
 export * from "./request";
 // response exports

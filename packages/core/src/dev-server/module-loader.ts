@@ -1,4 +1,5 @@
 import { pathToFileURL } from "node:url";
+import { importAppModule } from "../loader/app-module-importer";
 import { router } from "../router/router";
 import { devLogError, formatModuleNotFoundError } from "./dev-logger";
 import type { CleanupFunction, FileManager } from "./file-manager";
@@ -67,12 +68,15 @@ export class ModuleLoader {
    * try/catch that logs and aborts the boot — so a broken route module aborts
    * boot loudly rather than booting into a surface that 404s.
    */
-  public async loadAll(): Promise<void> {
+  public async loadAll(
+    options: { onBeforeLoad?: (file: FileManager) => void | Promise<void> } = {},
+  ): Promise<void> {
     const failures: ModuleLoadError[] = [];
 
     for (const type of SPECIAL_TYPES) {
       for (const file of this.specialFilesCollector.getFilesByType(type)) {
         try {
+          await options.onBeforeLoad?.(file);
           await this.loadModule(file, type);
         } catch (error) {
           failures.push(
@@ -104,7 +108,7 @@ export class ModuleLoader {
       const fileUrl = pathToFileURL(file.absolutePath).href;
 
       const load = async () => {
-        const module = (await import(fileUrl)) as Record<string, unknown>;
+        const module = (await importAppModule(fileUrl)) as Record<string, unknown>;
         this.loadedModules.set(file.absolutePath, module);
         this.registerCleanup(file, module);
         if (type === "model") {

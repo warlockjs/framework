@@ -2,6 +2,7 @@ import config from "@mongez/config";
 import { colors } from "@mongez/copper";
 import { pathToFileURL } from "node:url";
 import type { FileManager } from "../dev-server/file-manager";
+import { importAppModule } from "../loader/app-module-importer";
 import { configKeyFromPath } from "./config-key-from-path";
 import { configSpecialHandlers } from "./config-special-handlers";
 
@@ -38,7 +39,7 @@ export class ConfigLoader {
 
     try {
       const fileUrl = pathToFileURL(file.absolutePath).href;
-      const configModule = await import(fileUrl);
+      const configModule = await importAppModule(fileUrl);
       const configValue = configModule.default;
 
       if (configValue === undefined) {

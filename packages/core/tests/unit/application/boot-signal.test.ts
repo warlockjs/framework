@@ -22,6 +22,7 @@ const signal: BootSignal = {
   runtimeStrategy: "production",
   bootDurationMs: 42,
   port: 3000,
+  roles: ["web", "api", "worker"],
 };
 
 /** Stand-in for `process.send`, which flushes then invokes its callback. */
