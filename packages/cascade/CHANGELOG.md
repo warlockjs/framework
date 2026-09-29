@@ -4,13 +4,6 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
-## Unreleased
-
-### Fixed
-
-- MongoDB `lockForUpdate()` now throws the public `UnsupportedLockForUpdateError` with guidance to use a conditional atomic update instead of a nonexistent row lock.
-- MongoDB atomic upserts now assign the model's auto-increment `id` on insert without changing an existing document's id.
-
 ## 5.25.0 - 2026-09-28
 
 ### Added
@@ -20,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - PostgreSQL `groupByRaw()` now emits and parses its raw GROUP BY operation correctly, including bound parameters.
+- MongoDB `lockForUpdate()` now throws the public `UnsupportedLockForUpdateError` with guidance to use a conditional atomic update instead of a nonexistent row lock.
+- MongoDB atomic upserts now assign the model's auto-increment `id` on insert without changing an existing document's id.
 
 ## 5.24.0 - 2026-09-27
 
