@@ -260,16 +260,16 @@ is the already-resolved descendant metadata chain. Metadata-less layouts are
 skipped, while the page leaf is represented even when it contributes no
 metadata. The resolver visits page, inner layout, outer layout, then root once;
 each callback sees its own loader data. A callback returns that level's complete
-metadata: its explicit fields override `child`, and fields it omits do not carry
-forward. Spread `child` when the callback should retain descendant fields:
+metadata: its explicit fields override `child.metadata`, and fields it omits do not carry
+forward. Spread `child.metadata` when the callback should retain descendant fields:
 
 ```tsx title="src/web/account/layout.tsx"
 import type { LayoutConfig } from "@warlock.js/web";
 
 export const config: LayoutConfig = {
   metadata: ({ data, child }) => ({
-    ...child,
-    title: `${data.accountName} | ${child?.title ?? "Account"}`,
+    ...child?.metadata,
+    title: `${data.accountName} | ${child?.metadata.title ?? "Account"}`,
   }),
 };
 ```
