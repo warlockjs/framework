@@ -376,9 +376,11 @@ describe("DatabaseWriter", () => {
       await writer.save();
 
       expect(mockIdGenerator.generateNextId).toHaveBeenCalledWith(
-        expect.objectContaining({
+        {
           table: "auto_id_models",
-        }),
+          initialId: 1,
+          incrementIdBy: 1,
+        },
       );
       expect(model.get("id")).toBe(42);
     });

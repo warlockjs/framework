@@ -12,6 +12,7 @@ import type {
   WriterResult,
 } from "../contracts/database-writer.contract";
 import { mergeDriverFields } from "../model/methods/accessor-methods";
+import { generateModelId } from "../model/generate-model-id";
 import type { ChildModel, Model } from "../model/model";
 import { enqueueSyncFanout } from "../sync/sync-fanout";
 import { triggerModelEvent } from "../sync/model-events";
@@ -513,21 +514,11 @@ export class DatabaseWriter implements WriterContract {
       return;
     }
 
-    const idGenerator = this.dataSource.idGenerator;
-    if (!idGenerator) {
+    const id = await generateModelId(this.ctor);
+
+    if (id === undefined) {
       return;
     }
-
-    // Resolve ID generation options from model configuration
-    const initialId = this.resolveInitialId();
-
-    const incrementIdBy = this.resolveIncrementBy();
-
-    const id = await idGenerator.generateNextId({
-      table: this.table,
-      initialId,
-      incrementIdBy,
-    });
 
     this.model.set("id", id);
   }
@@ -591,68 +582,6 @@ export class DatabaseWriter implements WriterContract {
     }
 
     return operations;
-  }
-
-  /**
-   * Resolve the initial ID from model configuration.
-   *
-   * Priority:
-   * 1. Model.initialId (explicit value)
-   * 2. Model.randomInitialId (random or function)
-   * 3. Default: 1
-   *
-   * @returns The initial ID value
-   * @private
-   */
-  private resolveInitialId(): number {
-    if (this.ctor.initialId) {
-      return this.ctor.initialId;
-    }
-
-    if (this.ctor.randomInitialId) {
-      return typeof this.ctor.randomInitialId === "function"
-        ? this.ctor.randomInitialId()
-        : this.randomInt(10000, 499999);
-    }
-
-    return 1; // Default initial ID
-  }
-
-  /**
-   * Resolve the increment value from model configuration.
-   *
-   * Priority:
-   * 1. Model.incrementIdBy (explicit value)
-   * 2. Model.randomIncrement (random or function)
-   * 3. Default: 1
-   *
-   * @returns The increment value
-   * @private
-   */
-  private resolveIncrementBy(): number {
-    if (this.ctor.randomIncrement) {
-      return typeof this.ctor.randomIncrement === "function"
-        ? this.ctor.randomIncrement()
-        : this.randomInt(1, 10);
-    }
-
-    if (this.ctor.incrementIdBy) {
-      return this.ctor.incrementIdBy;
-    }
-
-    return 1; // Default increment
-  }
-
-  /**
-   * Generate a random integer between min and max (inclusive).
-   *
-   * @param min - Minimum value
-   * @param max - Maximum value
-   * @returns Random integer
-   * @private
-   */
-  private randomInt(min: number, max: number): number {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
   /**

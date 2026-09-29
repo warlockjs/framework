@@ -67,7 +67,78 @@ describe("MongoDB auto-increment upserts", () => {
     expect(driver.findOneAndUpdate).toHaveBeenCalledWith(
       "users",
       { email: "a@b.c", id: 7 },
-      { $set: { name: "Grace" }, $setOnInsert: { id: 42 } },
+      { $set: { name: "Grace" } },
+      { upsert: true },
+    );
+  });
+
+  it("does not add $setOnInsert.id when an upsert filter supplies id", async () => {
+    const { Model, driver, idGenerator } = makeModel();
+
+    await performAtomic(Model, { id: 5 }, { $set: { name: "Ada" } }, { upsert: true });
+
+    expect(idGenerator.generateNextId).not.toHaveBeenCalled();
+    expect(driver.atomic).toHaveBeenCalledWith(
+      "users",
+      { id: 5 },
+      { $set: { name: "Ada" } },
+      { upsert: true },
+    );
+  });
+
+  it("does not add $setOnInsert.id when an upsert filter uses $eq for id", async () => {
+    const { Model, driver, idGenerator } = makeModel();
+
+    await performAtomic(
+      Model,
+      { id: { $eq: 5 } },
+      { $set: { name: "Ada" } },
+      { upsert: true, trustedFilter: true },
+    );
+
+    expect(idGenerator.generateNextId).not.toHaveBeenCalled();
+    expect(driver.atomic).toHaveBeenCalledWith(
+      "users",
+      { id: { $eq: 5 } },
+      { $set: { name: "Ada" } },
+      { upsert: true },
+    );
+  });
+
+  it("preserves a caller-supplied $setOnInsert.id", async () => {
+    const { Model, driver, idGenerator } = makeModel();
+
+    await performAtomic(
+      Model,
+      { email: "a@b.c" },
+      { $setOnInsert: { id: 8, name: "Ada" } },
+      { upsert: true },
+    );
+
+    expect(idGenerator.generateNextId).not.toHaveBeenCalled();
+    expect(driver.atomic).toHaveBeenCalledWith(
+      "users",
+      { email: "a@b.c" },
+      { $setOnInsert: { id: 8, name: "Ada" } },
+      { upsert: true },
+    );
+  });
+
+  it("does not add $setOnInsert.id when $set supplies id", async () => {
+    const { Model, driver, idGenerator } = makeModel();
+
+    await performAtomic(
+      Model,
+      { email: "a@b.c" },
+      { $set: { id: 9, name: "Ada" } },
+      { upsert: true },
+    );
+
+    expect(idGenerator.generateNextId).not.toHaveBeenCalled();
+    expect(driver.atomic).toHaveBeenCalledWith(
+      "users",
+      { email: "a@b.c" },
+      { $set: { id: 9, name: "Ada" } },
       { upsert: true },
     );
   });
