@@ -170,7 +170,8 @@ describe("Benchmark Module - measure()", () => {
       throw new Error("timed-out");
     });
 
-    expect(result.latency).toBeGreaterThanOrEqual(50);
+    // One tick of slack, as in "returns latency in milliseconds" above.
+    expect(result.latency).toBeGreaterThanOrEqual(49);
   });
 
   it("non-Error thrown values are coerced to Error", async () => {
