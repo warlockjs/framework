@@ -54,6 +54,16 @@ describe("POST /products", () => {
 
 Both run against your real code. No mocks of the framework, no in-memory replacements for the DB. The bootstraps below explain how that works without each test paying a multi-second setup cost.
 
+## Keep Vitest setup out of development
+
+`warlock dev` (and `warlock build`) load your app's `vite.config.ts`. Anything you put there for tests runs in development too. Guard vitest-only setup:
+
+```ts title="vite.config.ts"
+if (process.env.VITEST) {
+  Object.assign(process.env, testEnv); // test database, test keys...
+}
+```
+
 ## The two-worlds architecture
 
 Vitest runs test files in **worker threads** — one worker per file by default, parallelized. The HTTP server needs to live somewhere that all those workers can reach. So the framework splits the bootstrap into two layers:
@@ -106,11 +116,11 @@ await setupTest({ connectors: true });
 
 ### The `connectors` knob
 
-| Value                    | Boots                                  | Use when                            |
-| ------------------------ | -------------------------------------- | ----------------------------------- |
-| `true` *(default)*       | All Early-phase connectors **except `http`** (db, cache, logger, …) | Most service / model tests. Sensible default. |
-| `false`                  | Nothing                                | Pure logic with no framework subsystem touches. |
-| `["database", "cache"]`  | Only those, in that order              | A narrow test that needs DB but not, say, storage. |
+| Value                   | Boots                                                               | Use when                                           |
+| ----------------------- | ------------------------------------------------------------------- | -------------------------------------------------- |
+| `true` _(default)_      | All Early-phase connectors **except `http`** (db, cache, logger, …) | Most service / model tests. Sensible default.      |
+| `false`                 | Nothing                                                             | Pure logic with no framework subsystem touches.    |
+| `["database", "cache"]` | Only those, in that order                                           | A narrow test that needs DB but not, say, storage. |
 
 You can also set `tests.connectors` in `src/config/tests.ts` for a project-wide default that overrides the `setupTest` parameter:
 
@@ -151,9 +161,7 @@ describe("placeOrderService", () => {
   it("throws when the cart is empty", async () => {
     const cart = await Cart.create({ user_id: "u_1", items: [] });
 
-    await expect(placeOrderService({ cart_id: cart.id })).rejects.toThrow(
-      /empty/i,
-    );
+    await expect(placeOrderService({ cart_id: cart.id })).rejects.toThrow(/empty/i);
   });
 });
 ```
@@ -262,14 +270,14 @@ For the full HTTP-test playbook, see `test-http/SKILL.md`.
 
 ## Picking the right mode
 
-| You're testing                                | Mode                                   |
-| --------------------------------------------- | -------------------------------------- |
-| A service / use-case / repository in isolation | Unit (`test-service`)                 |
-| A model's transformers / accessors / hooks    | Unit                                   |
-| A util function with no DB                    | Unit with `connectors: false`          |
-| A route's auth / validation / response shape  | HTTP (`test-http`)                     |
-| Multi-controller flow (e.g. order placement → notification) | HTTP                       |
-| Error response status codes                   | HTTP                                   |
+| You're testing                                              | Mode                          |
+| ----------------------------------------------------------- | ----------------------------- |
+| A service / use-case / repository in isolation              | Unit (`test-service`)         |
+| A model's transformers / accessors / hooks                  | Unit                          |
+| A util function with no DB                                  | Unit with `connectors: false` |
+| A route's auth / validation / response shape                | HTTP (`test-http`)            |
+| Multi-controller flow (e.g. order placement → notification) | HTTP                          |
+| Error response status codes                                 | HTTP                          |
 
 Default to unit tests — they're faster and easier to reason about. Promote to HTTP when the value of the test is "does the full route work" rather than "does this function work."
 

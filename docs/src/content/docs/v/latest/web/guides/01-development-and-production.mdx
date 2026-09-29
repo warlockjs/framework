@@ -88,6 +88,37 @@ The manifest records derived page names. A clean diff does not prove that no
 two routes collided during registration; discovery itself remains the source
 of that failure.
 
+## Run `warlock start` from the app root
+
+The page manifest stores `clientDir` as an app-root-relative path such as
+`dist/client`. At boot the Web connector resolves it against the process
+working directory (`process.cwd()`), not against the location of `dist`. A
+built `dist` is therefore not relocatable: run `warlock start` with the app
+root as the working directory. Copying `dist` elsewhere without the app root
+means the client assets, Vite manifest, and copied public files are not found.
+
+## Dev: app modules can load twice
+
+In `warlock dev`, page loaders import app modules through Vite SSR, while HTTP
+handlers load them natively. A module-level singleton — an `AsyncLocalStorage`,
+a cache, or a registry — can therefore exist twice, and a value set through one
+copy is invisible to the other. Until a single module graph lands (planned for
+5.26), keep such singletons on `globalThis` under a `Symbol.for` key:
+
+```ts title="src/app/shared/request-context.ts"
+import { AsyncLocalStorage } from "node:async_hooks";
+
+const key = Symbol.for("my-app.requestContext");
+const store = globalThis as typeof globalThis & {
+  [key]?: AsyncLocalStorage<{ userId: string }>;
+};
+
+export const requestContext = (store[key] ??= new AsyncLocalStorage());
+```
+
+Both copies of the module now read the same instance. `warlock start` has one
+module graph and is unaffected.
+
 ## Dev SSR shares the app's framework package instances
 
 `warlock dev` runs SSR inside Vite's module graph. Before 5.13, an app

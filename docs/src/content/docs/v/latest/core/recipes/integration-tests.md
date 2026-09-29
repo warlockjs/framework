@@ -78,6 +78,16 @@ export default defineConfig({
 
 The split matters: `globalSetup` runs ONCE in the main vitest process (boots the HTTP server); `setupFiles` runs in each worker thread (gives each worker its own DB connection for direct calls).
 
+### Keep Vitest setup out of development
+
+`warlock dev` (and `warlock build`) load your app's `vite.config.ts`. Anything you put there for tests runs in development too. Guard vitest-only setup:
+
+```ts title="vite.config.ts"
+if (process.env.VITEST) {
+  Object.assign(process.env, testEnv); // test database, test keys...
+}
+```
+
 ### Running on a port of your own
 
 `startHttpTestServer()` binds `http.port` — the same port `warlock dev` uses. Pass one explicitly to run the suite alongside a live dev server, or to run two suites at once:
@@ -222,11 +232,7 @@ Then your tests get a lot shorter:
 ```ts
 const { authHeader } = await createUserAndToken();
 
-const response = await testPost(
-  "/products",
-  { name: "Pen", price: 5 },
-  { headers: authHeader },
-);
+const response = await testPost("/products", { name: "Pen", price: 5 }, { headers: authHeader });
 ```
 
 The `Date.now()` in the email is a cheap way to keep tests parallel-safe — different files get different emails, so the unique constraint on `email` doesn't bite.
