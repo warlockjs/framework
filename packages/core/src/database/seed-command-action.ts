@@ -9,6 +9,7 @@ import { filesOrchestrator } from "../dev-server/files-orchestrator";
 import { Path } from "../utils/normalized-path";
 import { getFilesFromDirectory } from "../dev-server/utils";
 import { srcPath } from "../utils";
+import { isTestFile } from "../utils/is-test-file";
 import type { Seeder } from "./seeds/seeder";
 import { SeedersManager } from "./seeds/seeders.manager";
 import type { SeedClock, SeedRecordRef } from "./seeds/types";
@@ -189,7 +190,9 @@ export async function seedCommandAction(
 }
 
 async function listSeedsFiles() {
-  const seedsFiles = await getFilesFromDirectory(srcPath("app"), "*/seeds/*.ts");
+  const seedsFiles = (await getFilesFromDirectory(srcPath("app"), "*/seeds/*.ts")).filter(
+    (file) => !isTestFile(file),
+  );
 
   const seeds = [];
 

@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `warlock seed` and `warlock migrate` skip test files (`*.spec.ts`, `*.test.ts`, …) in `seeds/` and `migrations/` folders. A spec kept beside its seeder used to abort the whole seed run.
 - `onHttpServerRebuilt(listener)` fires with the new Fastify instance when the HTTP connector restarts (before it listens), so dev connectors can re-attach instance-bound hooks.
 - `warlock generate.typings` now also writes `.warlock/typings/web-routes.d.ts` (through the new optional `build.typings` connector hook, so core never imports web), so `generate.typings && tsc && warlock build` typechecks typed `href()` calls on a clean checkout. API-only apps are unchanged.
 - `warlock build` route registration now has a configurable timeout and names the module still registering when it expires.

@@ -16,6 +16,7 @@ import { filesOrchestrator } from "../dev-server/files-orchestrator";
 import { Path } from "../utils/normalized-path";
 import { getFilesFromDirectory } from "../dev-server/utils";
 import { srcPath } from "../utils";
+import { isTestFile } from "../utils/is-test-file";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 import { exitCodeFor, PENDING_EXIT_CODE } from "./pending-exit-code";
 import {
@@ -239,7 +240,9 @@ async function migrationFiles() {
     "*/migrations/*",
   );
 
-  const migrations = [...migrationFiles, ...separateMigrationsFolderFIles];
+  const migrations = [...migrationFiles, ...separateMigrationsFolderFIles].filter(
+    (file) => !isTestFile(file),
+  );
 
   return migrations;
 }
