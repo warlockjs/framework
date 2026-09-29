@@ -79,4 +79,24 @@ describe("ObjectValidator", () => {
     expect(topLevelNull.isValid).toBe(true);
     expect(topLevelNull.data).toBe(null);
   });
+
+  // FORMAI (5.24): `.nullish()` objects validated their children on null.
+  // `.nullish()` is `.optional().nullable()`, so the 5.25 nullable fix covers it.
+  it("accepts null and a missing value on a nullish object without validating its children", async () => {
+    const schema = v.object({
+      profile: v.object({ name: v.string().required() }).nullish(),
+      deep: v.object({ inner: v.object({ id: v.string().required() }).nullish() }),
+    });
+
+    const withNull = await validate(schema, { profile: null, deep: { inner: null } });
+    expect(withNull.isValid).toBe(true);
+    expect(withNull.errors).toEqual([]);
+
+    const missing = await validate(schema, { deep: {} });
+    expect(missing.isValid).toBe(true);
+    expect(missing.errors).toEqual([]);
+
+    const topLevel = v.object({ name: v.string().required() }).nullish();
+    expect((await validate(topLevel, null)).isValid).toBe(true);
+  });
 });
