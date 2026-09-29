@@ -62,12 +62,11 @@ describe("cross-cutting modifiers", () => {
         expect("page" in result.data).toBe(false);
       });
 
-      it("v.int().optional() given '' (present but empty, e.g. ?page=) fails validation", async () => {
+      it("v.int().optional() given '' is omitted", async () => {
         const schema = v.object({ page: v.int().optional() });
         const result = await validate(schema, { page: "" });
-        expect(result.isValid).toBe(false);
-        // must never hand back a value the declared `number | undefined` output forbids
-        expect(result.data?.page).not.toBe("");
+        expect(result.isValid).toBe(true);
+        expect(result.data).toEqual({});
       });
 
       it("v.int().optional() given a real integer passes and returns it unchanged", async () => {
@@ -85,10 +84,10 @@ describe("cross-cutting modifiers", () => {
         expect(result.isValid).toBe(false);
       });
 
-      it("v.int().min(1).optional() given '' fails validation", async () => {
+      it("v.int().min(1).optional() given '' is omitted", async () => {
         const schema = v.object({ page: v.int().min(1).optional() });
         const result = await validate(schema, { page: "" });
-        expect(result.isValid).toBe(false);
+        expect(result).toMatchObject({ isValid: true, data: {} });
       });
 
       it("v.string().optional() given '' stays valid — an empty string is a fully-typed string", async () => {

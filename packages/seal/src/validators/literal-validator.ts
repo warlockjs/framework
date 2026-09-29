@@ -1,6 +1,4 @@
-import { isEmptyValue } from "../helpers/is-empty-value";
 import { literalRule } from "../rules/common/literal";
-import { presentRule } from "../rules/core/required";
 import { applyNullable } from "../standard-schema/json-schema";
 import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 import { BaseValidator } from "./base-validator";
@@ -26,6 +24,7 @@ export class LiteralValidator<
 
   public constructor(values: T, errorMessage?: string) {
     super();
+    this.blankIsMissing = true;
     this.values = values;
     this.addMutableRule(literalRule, errorMessage, { values });
 
@@ -39,9 +38,6 @@ export class LiteralValidator<
     // Dropping the rule entirely instead would make a missing key valid, which
     // is the opposite mistake — `alt=""` and no `alt` at all are different
     // things to a screen reader, and to anything else reading the schema.
-    if (values.some(value => isEmptyValue(value))) {
-      this.requiredRule = this.createRule(presentRule);
-    }
   }
 
   /**

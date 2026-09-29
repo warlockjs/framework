@@ -29,6 +29,7 @@ import type { SchemaRule, SchemaRuleOptions } from "../types";
 export class BooleanValidator extends PrimitiveValidator {
   public constructor(errorMessage?: string) {
     super();
+    this.blankIsMissing = true;
     this.addMutableRule(booleanRule, errorMessage);
   }
 

@@ -18,16 +18,16 @@ import { v } from "../src";
  */
 
 describe("v.literal with an empty-string literal", () => {
-  it("accepts the empty string it was told to accept", async () => {
+  it("treats the empty string as missing", async () => {
     const result = await v.validate(v.object({ alt: v.literal("") }), { alt: "" });
 
-    expect(result.isValid).toBe(true);
+    expect(result.isValid).toBe(false);
   });
 
-  it("does not report a present empty value as missing", async () => {
+  it("reports the normal required error", async () => {
     const result = await v.validate(v.object({ alt: v.literal("") }), { alt: "" });
 
-    expect(result.errors.map(e => e.type)).not.toContain("required");
+    expect(result.errors.map(e => e.type)).toContain("required");
   });
 
   it("still rejects a non-empty value", async () => {
@@ -68,7 +68,7 @@ describe("v.literal with an empty-string literal", () => {
   it("supports the decorative-image shape the report needed", async () => {
     const decorative = v.object({ decorative: v.literal(true), alt: v.literal("") });
 
-    expect((await v.validate(decorative, { decorative: true, alt: "" })).isValid).toBe(true);
+    expect((await v.validate(decorative, { decorative: true, alt: "" })).isValid).toBe(false);
     expect((await v.validate(decorative, { decorative: true, alt: "x" })).isValid).toBe(false);
     expect((await v.validate(decorative, { decorative: true })).isValid).toBe(false);
   });

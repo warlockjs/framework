@@ -31,6 +31,8 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
   protected shouldOmit = false;
   protected isNullable = false;
   protected isMutable = false;
+  /** Treat empty or whitespace-only form strings as an absent value. */
+  protected blankIsMissing = false;
 
   /**
    * Catch state — when `hasCatch` is true and validation fails, `catchValue`
@@ -361,8 +363,10 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
     cloned.shouldOmit = this.shouldOmit;
     cloned.description = this.description;
     cloned.attributesText = { ...this.attributesText };
+    cloned.translatedAttributes = { ...this.translatedAttributes };
     cloned.isNullable = this.isNullable;
     cloned.isOptional = this.isOptional;
+    cloned.blankIsMissing = this.blankIsMissing;
     cloned.requiredRule = this.requiredRule; // same reference is fine — rule is treated as immutable
     cloned.catchValue = this.catchValue;
     cloned.hasCatch = this.hasCatch;
@@ -666,7 +670,13 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
       return { isValid: true, errors: [], data: null };
     }
 
-    const valueForRules = data ?? this.getDefaultValue();
+    const isBlank = this.blankIsMissing && typeof data === "string" && data.trim() === "";
+
+    if (isBlank && this.isNullable) {
+      return { isValid: true, errors: [], data: null };
+    }
+
+    const valueForRules = (isBlank ? undefined : data) ?? this.getDefaultValue();
     // Optional fields with no resolved value are absent, not values to
     // transform. Skipping here protects every mutator while still allowing
     // defaults and present values through the normal mutation pipeline.
@@ -749,6 +759,7 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
       typeof this.attributesText[rule.name] === "object"
         ? (this.attributesText[rule.name] as ValidationAttributesList)
         : this.attributesText;
+    rule.context.translatedAttributes = this.translatedAttributes;
   }
 
   /**

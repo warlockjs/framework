@@ -400,7 +400,11 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
     const result = await super.validate(mutatedData, context);
 
     if (result.isValid === false) return result;
-    if (data === undefined) return result;
+
+    // Absent (no default) or null (nullable) inputs short-circuit here —
+    // BaseValidator.validate already resolved the outcome, so recursing into
+    // the shape below would wrongly re-run required checks against `undefined`.
+    if (mutatedData === undefined || mutatedData === null) return result;
 
     // ═══════════════════════════════════════════════════════════
     // PHASE 1: Validate user input fields (skip computed/managed)

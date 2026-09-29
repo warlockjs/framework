@@ -73,6 +73,7 @@ import { BaseValidator } from "./base-validator";
 export class DateValidator extends BaseValidator {
   public constructor(errorMessage?: string) {
     super();
+    this.blankIsMissing = true;
     this.addMutableMutator(dateMutator); // Normalize to Date object first
     this.addMutableRule(dateRule, errorMessage);
   }

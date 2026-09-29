@@ -131,7 +131,7 @@ export const v: ValidatorV = {
    */
   enum: ((values: any, errorMessage?: string) =>
     Array.isArray(values)
-      ? new StringValidator().oneOf(values, errorMessage)
+      ? new ScalarValidator().oneOf(values, errorMessage)
       : new ScalarValidator().enum(values, errorMessage)) as ValidatorV["enum"],
 
   /** Create a number validator */

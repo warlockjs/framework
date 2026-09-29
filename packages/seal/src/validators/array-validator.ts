@@ -23,6 +23,7 @@ export class ArrayValidator extends BaseValidator {
     errorMessage?: string,
   ) {
     super();
+    this.blankIsMissing = true;
     this.addMutableRule(arrayRule, errorMessage);
   }
 

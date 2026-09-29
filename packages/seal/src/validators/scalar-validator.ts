@@ -30,6 +30,7 @@ import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json
 export class ScalarValidator extends PrimitiveValidator {
   public constructor(errorMessage?: string) {
     super();
+    this.blankIsMissing = true;
     this.addMutableRule(
       {
         name: "scalar",

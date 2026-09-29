@@ -6,9 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.25.0 - 2026-09-28
 
+### Fixed
+
+- `ObjectValidator` no longer recurses into its shape when the input is `null` on a `.nullable()` object (or the whole object is missing on an `.optional()` one) — it now short-circuits on the already-resolved result instead of re-running child validators against `undefined`, which previously reported spurious "required" errors for a `null` value.
+- `BaseValidator` clones preserve translated attributes, and required-rule labels now resolve at validation time regardless of `.required()` / `.transAttributes()` chain order.
+
 ### Changed
 
-- Lockstep release; package APIs are unchanged.
+- **Behaviour change:** Empty and whitespace-only form values are treated as missing by non-string validators, so optional fields are omitted, nullable fields resolve to `null`, and required fields report `required`.
 
 ## 5.24.0 - 2026-09-27
 

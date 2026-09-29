@@ -48,4 +48,35 @@ describe("ObjectValidator", () => {
     const invalid = await validate(validator, { user: { address: {} } });
     expect(invalid.isValid).toBe(false);
   });
+
+  it("should accept null on a nullable object before recursing into its shape", async () => {
+    const validator = new ObjectValidator({
+      body: v
+        .object({
+          en: v.string().required(),
+          ar: v.string().required(),
+        })
+        .nullable()
+        .optional(),
+    });
+
+    const withNull = await validate(validator, { body: null });
+    expect(withNull.isValid).toBe(true);
+    expect(withNull.data.body).toBe(null);
+
+    const withUndefined = await validate(validator, {});
+    expect(withUndefined.isValid).toBe(true);
+
+    const withMissingKey = await validate(validator, { body: { en: "hello" } });
+    expect(withMissingKey.isValid).toBe(false); // ar required
+
+    const topLevel = new ObjectValidator({
+      en: v.string().required(),
+      ar: v.string().required(),
+    }).nullable();
+
+    const topLevelNull = await validate(topLevel, null);
+    expect(topLevelNull.isValid).toBe(true);
+    expect(topLevelNull.data).toBe(null);
+  });
 });
