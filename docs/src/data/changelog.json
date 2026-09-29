@@ -82,6 +82,10 @@
       "slug": "core"
     },
     {
+      "name": "@warlock.js/devtools",
+      "slug": "devtools"
+    },
+    {
       "name": "@warlock.js/fs",
       "slug": "fs"
     },
@@ -123,6 +127,713 @@
     }
   ],
   "releases": [
+    {
+      "version": "5.25.0",
+      "id": "v5-25-0",
+      "date": "September 29, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Devtools, deploy in parts, and the first release built on GitHub Actions.</strong> The new <code>@warlock.js/devtools</code> adds a development dashboard at <code>/__warlock</code>: each request's phases, SQL and MongoDB queries with EXPLAIN, cache and log activity, captured mails and N+1 warnings. Add it with <code>warlock add devtools</code>; <code>warlock dev</code> loads it automatically and production never mounts it. <code>warlock start --role=api|web|worker</code> and <code>--sites=a,b</code> run one build as separate processes. Pages get per-locale <code>alternates</code> metadata and the matched <code>route</code> in loaders and actions; <code>setupTest({ importModule })</code> loads app modules through Vitest's module graph. <strong>Behaviour changes:</strong> model-write validation failures answer 500 by default (configurable with <code>http.modelValidationErrorStatus</code>), and blank form values count as missing for non-string validators. Fixes include MongoDB upserts assigning auto ids, a clear <code>UnsupportedLockForUpdateError</code> on MongoDB, nullable objects in seal, <code>warlock seed</code> and <code>migrate</code> skipping test files, and plugin routes keeping their params in dev. Lockstep release across all 31 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.25.0 tarballs passed install, typecheck, a fresh migrate and seed, devtools in dev, a production build with browser smoke, and the <code>--role=worker</code> and <code>--role=api</code> starts.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "New package. A development-only dashboard served at <code>/__warlock</code>: request timeline, queries with EXPLAIN, N+1 detection, dev mailbox, logs, cache operations and the route map. It refuses to run outside development and answers only loopback clients."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 14,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 9
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>registerTracingHooks()</code> lets development tools subscribe to HTTP tracing at runtime, and phase tracing now includes each phase's <code>startedAt</code> timestamp."
+            },
+            {
+              "type": "Added",
+              "html": "<code>mailEvents.onCaptured()</code> (<code>mail.captured</code>): every mail sent in development or test mode is delivered in full (html, text, headers, attachments) to listeners. Development mode still logs instead of sending. <code>CapturedMail</code> gains <code>id</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Devtools:</strong> <code>warlock add devtools</code> installs <code>@warlock.js/devtools</code> as a dev dependency, and <code>warlock dev</code> loads it automatically when it is installed. You never name it in <code>warlock.config.ts</code>, so production installs, which omit dev dependencies, have nothing to resolve. <code>warlock add</code> now pins <code>@warlock.js/*</code> dev dependencies to the installed framework version too."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Deploy in parts:</strong> <code>warlock start --role=api|web|worker</code> (combinable, e.g. <code>--role=web,api</code>) runs one build as separate processes, and <code>--sites=a,b</code> limits a <code>web</code> process to those sites. - Roles are file-based. <code>routes.ts</code> is <code>api</code>, pages are <code>web</code>, and the new per-module <code>worker.ts</code> is <code>worker</code>. <code>main.ts</code> loads for every role. - A process with neither <code>api</code> nor <code>web</code> binds no HTTP port and reports <code>worker ready</code>. - <code>Application.roles</code>, <code>Application.hasRole()</code> and <code>Application.sites</code> expose the active set. The <code>warlock:ready</code> signal now carries <code>roles</code>. - With no <code>--role</code>, every role is on, so existing apps and <code>warlock dev</code> behave exactly as before. - Unknown roles, an empty list, or <code>--sites</code> without <code>web</code> fail before the app starts."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Behaviour change:</strong> model-write validation failures now return the opaque internal-error response with status 500 by default, instead of returning a 400 and validation details. Details are logged server-side. Set <code>http.modelValidationErrorStatus</code> to choose a different status; a <code>4xx</code> status returns <code>{ errors }</code> to the client."
+            },
+            {
+              "type": "Fixed",
+              "html": "In development, a plugin's own parametric route (such as devtools' <code>/__warlock/api/requests/:id</code>) keeps its params when an app catch-all route also matches the URL. The dev dispatcher used to overwrite them, so the devtools request detail answered 404."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock seed</code> and <code>warlock migrate</code> skip test files (<code>*.spec.ts</code>, <code>*.test.ts</code>, …) in <code>seeds/</code> and <code>migrations/</code> folders. A spec kept beside its seeder used to abort the whole seed run."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>onHttpServerRebuilt(listener)</code> fires with the new Fastify instance when the HTTP connector restarts (before it listens), so dev connectors can re-attach instance-bound hooks."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock generate.typings</code> now also writes <code>.warlock/typings/web-routes.d.ts</code> (through the new optional <code>build.typings</code> connector hook, so core never imports web), so <code>generate.typings &amp;&amp; tsc &amp;&amp; warlock build</code> typechecks typed <code>href()</code> calls on a clean checkout. API-only apps are unchanged."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock build</code> route registration now has a configurable timeout and names the module still registering when it expires."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>defineResource</code> output <code>id</code> now falls back to <code>_id</code> on Mongo records when <code>id</code> is absent; an explicit <code>id</code> still wins. Collections with native ObjectIds should set <code>primaryKey = \"_id\"</code> on the model so <code>Model.find(hex)</code> works."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>setupTest({ importModule })</code> lets tests load app modules (config, routes, events) through Vitest's own module graph, so classes like <code>User</code> exist once and <code>instanceof</code> works. The generated <code>src/test-setup.ts</code> passes <code>(file) =&gt; import(file)</code>; <code>setupTest()</code> under Vitest without it warns once."
+            },
+            {
+              "type": "Fixed",
+              "html": "Default route schema validation now supplies matching declared route params when body and query omit them, without overriding body or query values."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>isPortAvailable()</code> and <code>assertPortIsAvailable()</code> are exported from <code>@warlock.js/core/tests</code> for HTTP test setup."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 15,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Fixed",
+              "n": 11
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Page tracing now reports middleware, page-cache, and deferred-settlement phases."
+            },
+            {
+              "type": "Added",
+              "html": "Deploy in parts: a process started without the <code>web</code> role (<code>warlock start --role=api|worker</code>) installs no pages, public files or site dispatch, and <code>--sites=a,b</code> installs only those sites (plus shared pages). Other hosts get the normal unknown-host response. An unknown site key, or <code>--sites</code> on an app without <code>web.sites</code>, fails at boot."
+            },
+            {
+              "type": "Added",
+              "html": "New page metadata field <code>alternates</code> (<code>Record&lt;string, string&gt;</code>, keyed by locale code plus optional <code>x-default</code>) lets a page declare its own per-locale hreflang targets — for per-locale content slugs that the framework's path-swapped generated alternates can't describe — and replaces the generated set entirely, in both SSR and client navigation, when set."
+            },
+            {
+              "type": "Added",
+              "html": "Page loaders, layout loaders, metadata callbacks and page actions receive <code>route: { name, path, params }</code> — the matched page's route. Under <code>sites</code>, <code>request.route</code> is core's <code>/*</code> catch-all; <code>ctx.route</code> is the page (<code>PageRoute</code> is exported)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock dev</code> now lets <code>webConnector({ ssrFetchTimeoutMs })</code> configure Vite SSR module fetching; <code>WARLOCK_SSR_FETCH_TIMEOUT_MS</code> takes precedence. Invalid values warn and retain the 60000ms default, while timeout errors name the module and point to CPU overload and the environment override."
+            },
+            {
+              "type": "Fixed",
+              "html": "Metadata callbacks now correctly retain child metadata with <code>child.metadata</code>; diagnostic errors also identify the common mistaken <code>...child</code> spread and show the correct form."
+            },
+            {
+              "type": "Fixed",
+              "html": "The \"runtime exports must use one of ...\" page-discovery error now names the offending export and the source file, and its allowlist is built from the same list the check enforces, so it can no longer omit <code>action</code>/<code>actions</code> or drift from what's actually accepted."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock dev</code> keeps serving Vite assets (<code>theme.css</code>, <code>app.css?direct</code>, the client entry) after an HTTP-only restart: the web connector re-attaches its Vite middleware to the rebuilt HTTP instance instead of leaving pages unstyled and unhydrated."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>createWebBuildContribution()</code> gains a <code>typings</code> hook that writes <code>web-routes.d.ts</code> with the same writer and inputs as <code>generate</code>, so <code>warlock generate.typings</code> produces the route types before any build."
+            },
+            {
+              "type": "Fixed",
+              "html": "Multi-site production pages now retain their site-local translation snapshots."
+            },
+            {
+              "type": "Fixed",
+              "html": "Multi-site not-found documents now emit the site-qualified page name registered by client hydration."
+            },
+            {
+              "type": "Fixed",
+              "html": "Page-scoped request translations now fall back to global translations in the active locale when a page bag lacks the key."
+            },
+            {
+              "type": "Fixed",
+              "html": "Production hydration-client builds now resolve PostCSS configuration from the application root, matching development."
+            },
+            {
+              "type": "Fixed",
+              "html": "Page discovery now fails when a <code>*.setup.ts</code> file has no paired UI module, preventing middleware and metadata from being silently ignored."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock dev</code> now reports the same setup-file projection errors as <code>warlock build</code> (e.g. an unread top-level call like <code>const guard = requireUser(opts)</code> in a <code>*.setup.ts</code>), on first load and on every edit, instead of only failing at build time."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Drivers emit public <code>query</code> events for settled PostgreSQL SQL and MongoDB commands; <code>dataSourceRegistry</code> forwards them with the registered connection name for centralized inspection."
+            },
+            {
+              "type": "Fixed",
+              "html": "PostgreSQL <code>groupByRaw()</code> now emits and parses its raw GROUP BY operation correctly, including bound parameters."
+            },
+            {
+              "type": "Fixed",
+              "html": "MongoDB <code>lockForUpdate()</code> now throws the public <code>UnsupportedLockForUpdateError</code> with guidance to use a conditional atomic update instead of a nonexistent row lock."
+            },
+            {
+              "type": "Fixed",
+              "html": "MongoDB atomic upserts now assign the model's auto-increment <code>id</code> on insert without changing an existing document's id."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The generated app's README is rewritten for the current template: <code>dev</code> / <code>build</code> / <code>start</code>, migrations, generators, the web stack vs API-only, <code>warlock add</code>, tests and the AI agent skills."
+            },
+            {
+              "type": "Changed",
+              "html": "The generated database config explains <code>autoGenerateId</code> and when to turn it off for an existing <code>_id</code>-only MongoDB."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Removed broken template scripts:</strong> <code>gen.v</code> (called a command that doesn't exist), <code>gen.md</code> (duplicate of <code>gen.m</code>), <code>serve</code> (POSIX-only <code>nohup</code>, and tied to one package manager) and <code>lf</code> (needed <code>dos2unix</code>). Use <code>npm run build &amp;&amp; npm run start</code> instead of <code>serve</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>docs/new-module.md</code> in the generated app named <code>warlock create.module</code>; it is <code>warlock generate.module</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<strong>Behaviour change:</strong> Empty and whitespace-only form values are treated as missing by non-string validators, so optional fields are omitted, nullable fields resolve to <code>null</code>, and required fields report <code>required</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>ObjectValidator</code> no longer recurses into its shape when the input is <code>null</code> on a <code>.nullable()</code> object (or the whole object is missing on an <code>.optional()</code> one) — it now short-circuits on the already-resolved result instead of re-running child validators against <code>undefined</code>, which previously reported spurious \"required\" errors for a <code>null</code> value."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>BaseValidator</code> clones preserve translated attributes, and required-rule labels now resolve at validation time regardless of <code>.required()</code> / <code>.transAttributes()</code> chain order."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>authMiddleware</code> now returns its normal <code>401</code> missing-credential response for an unsafe dual-source request that presents neither access nor refresh cookies, instead of treating the configured refresh descriptor as a presented credential and rejecting its Origin with <code>403</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Token-pair issuance now ensures its durable token family once, and repeated ensures return the existing family without another upsert."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>invalidated</code> cache event: <code>tags([...]).invalidate()</code> now emits it once, with the tags, the keys it removed and <code>durationMs</code>. The per-key <code>removed</code> events still fire."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>startWorkers()</code> (and the <code>queueConnector</code>'s <code>start()</code>, which calls it) no longer starts in-process workers on a process that doesn't serve the <code>worker</code> role (<code>WARLOCK_ROLES</code>), logging <code>queue: workers not started (role: ...)</code> instead. Producers (<code>dispatch</code>) and the dashboard mount are unaffected. With no <code>--role</code> passed, every role is on and nothing changes."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>scheduler.start()</code> is now a no-op, logging <code>scheduler: not started (role: ...)</code>, on a process that doesn't serve the <code>worker</code> role (<code>WARLOCK_ROLES</code>) — so an app calling it in <code>main.ts</code> doesn't run its jobs on every <code>web</code>/<code>api</code> node. The \"jobs registered but <code>start()</code> never called\" development warning no longer fires on such a process. With no <code>--role</code> passed, every role is on and nothing changes."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/sitemap",
+          "slug": "sitemap",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        }
+      ]
+    },
     {
       "version": "5.24.0",
       "id": "v5-24-0",
@@ -10670,11 +11381,11 @@
           "items": [
             {
               "type": "Security",
-              "html": "<strong>NoSQL operator injection via equality filters is now rejected.</strong> <code>where({ field: value })</code>, <code>where(field, value)</code> and the filter-accepting model statics (<code>first</code>, <code>findFirst</code>, <code>findAll</code>, <code>count</code>, <code>paginate</code>, <code>deleteMany</code>, <code>deleteOne</code>, …) treated the value verbatim, so a request-controlled payload such as <code>{ password: { $ne: null } }</code> compiled into a MongoDB *operator* query instead of an equality match — the textbook auth-bypass primitive (<code>User.first({ email, password })</code> matched any user). Equality-position values (and top-level object-form keys) containing <code>$</code>-prefixed keys now throw <code>UnsafeFilterError</code>. Explicit operator APIs are unaffected: <code>where(field, operator, value)</code>, <code>whereIn</code>/<code>whereNull</code>/<code>whereBetween</code>/…, and the object form of <code>whereRaw</code>. Dotted paths (<code>\"profile.name\"</code>) and plain sub-document equality values remain valid. A <code>sanitizeFilter</code> / <code>sanitizeFilterValue</code> helper pair is exported for callers who forward request objects to other driver-level APIs"
+              "html": "<strong>NoSQL operator injection via equality filters is now rejected.</strong> <code>where({ field: value })</code>, <code>where(field, value)</code> and the filter-accepting model statics (<code>first</code>, <code>findFirst</code>, <code>findAll</code>, <code>count</code>, <code>paginate</code>, <code>deleteMany</code>, <code>deleteOne</code>, …) treated the value verbatim, so a request-controlled payload such as <code>{ password: { $ne: null } }</code> compiled into a MongoDB _operator_ query instead of an equality match — the textbook auth-bypass primitive (<code>User.first({ email, password })</code> matched any user). Equality-position values (and top-level object-form keys) containing <code>$</code>-prefixed keys now throw <code>UnsafeFilterError</code>. Explicit operator APIs are unaffected: <code>where(field, operator, value)</code>, <code>whereIn</code>/<code>whereNull</code>/<code>whereBetween</code>/…, and the object form of <code>whereRaw</code>. Dotted paths (<code>\"profile.name\"</code>) and plain sub-document equality values remain valid. A <code>sanitizeFilter</code> / <code>sanitizeFilterValue</code> helper pair is exported for callers who forward request objects to other driver-level APIs"
             },
             {
               "type": "Security",
-              "html": "<strong>String-mode <code>whereRaw()</code> / <code>orWhereRaw()</code> no longer compiles to <code>$where</code> on the MongoDB driver.</strong> Any string expression was wrapped as <code>{ $where: \"&lt;js&gt;\" }</code> — JavaScript executed *inside* <code>mongod</code> for every scanned document (an injection sink whenever any part of the string was request-influenced, and an unindexed full-scan DoS even when trusted), with <code>?</code>-bindings substituted by string concatenation rather than real parameterization. The MongoDB parser now throws <code>UnsafeRawExpressionError</code> for string expressions and directs callers to the object form (<code>whereRaw({ $expr: … })</code>), which keeps working. SQL drivers keep string mode with real bindings"
+              "html": "<strong>String-mode <code>whereRaw()</code> / <code>orWhereRaw()</code> no longer compiles to <code>$where</code> on the MongoDB driver.</strong> Any string expression was wrapped as <code>{ $where: \"&lt;js&gt;\" }</code> — JavaScript executed _inside_ <code>mongod</code> for every scanned document (an injection sink whenever any part of the string was request-influenced, and an unindexed full-scan DoS even when trusted), with <code>?</code>-bindings substituted by string concatenation rather than real parameterization. The MongoDB parser now throws <code>UnsafeRawExpressionError</code> for string expressions and directs callers to the object form (<code>whereRaw({ $expr: … })</code>), which keeps working. SQL drivers keep string mode with real bindings"
             },
             {
               "type": "Security",
@@ -10690,7 +11401,7 @@
             },
             {
               "type": "Security",
-              "html": "<strong>A <code>merge()</code>d primary key can no longer retarget a write at another document.</strong> <code>performUpdate()</code> built its filter from <code>model.get(primaryKey)</code> *after* <code>merge()</code> had run, so the canonical update-my-profile shape — <code>model.merge(req.body); await model.save()</code> — let a body carrying <code>{ id: \"&lt;victim-id&gt;\", role: \"admin\" }</code> redirect the UPDATE (and the mass-assigned fields with it) onto somebody else's row. Two independent controls now stand between a payload and the write target: (1) an instance captures its primary key at the moment it becomes persisted (<code>isNew</code> flipping to <code>false</code> — hydration, or the writer after an insert), and <code>update</code>/<code>replace</code>/<code>destroy</code> build their filter from that captured value, exposed as <code>model.trustedPrimaryKey</code>; (2) <code>merge()</code> on an already-persisted model drops the identity columns (<code>id</code>, <code>_id</code>, and the configured primary key) instead of applying them — which also covers <code>save({ merge })</code>. Identity columns are additionally excluded from the update's <code>$set</code>/<code>$unset</code>, so an explicit <code>set(\"id\", …)</code> on a loaded record no longer rewrites the key of the row it is pinned to (<code>_id</code> was never writable in MongoDB anyway); changing a primary key is now a deliberate operation through the atomic/raw APIs. <strong>Creating</strong> a record with an explicit id is unchanged — a new model accepts identity columns — and the writer still merges driver-returned values (generated <code>_id</code>, <code>RETURNING *</code>) back onto the instance through a framework-internal path that request data never reaches"
+              "html": "<strong>A <code>merge()</code>d primary key can no longer retarget a write at another document.</strong> <code>performUpdate()</code> built its filter from <code>model.get(primaryKey)</code> _after_ <code>merge()</code> had run, so the canonical update-my-profile shape — <code>model.merge(req.body); await model.save()</code> — let a body carrying <code>{ id: \"&lt;victim-id&gt;\", role: \"admin\" }</code> redirect the UPDATE (and the mass-assigned fields with it) onto somebody else's row. Two independent controls now stand between a payload and the write target: (1) an instance captures its primary key at the moment it becomes persisted (<code>isNew</code> flipping to <code>false</code> — hydration, or the writer after an insert), and <code>update</code>/<code>replace</code>/<code>destroy</code> build their filter from that captured value, exposed as <code>model.trustedPrimaryKey</code>; (2) <code>merge()</code> on an already-persisted model drops the identity columns (<code>id</code>, <code>_id</code>, and the configured primary key) instead of applying them — which also covers <code>save({ merge })</code>. Identity columns are additionally excluded from the update's <code>$set</code>/<code>$unset</code>, so an explicit <code>set(\"id\", …)</code> on a loaded record no longer rewrites the key of the row it is pinned to (<code>_id</code> was never writable in MongoDB anyway); changing a primary key is now a deliberate operation through the atomic/raw APIs. <strong>Creating</strong> a record with an explicit id is unchanged — a new model accepts identity columns — and the writer still merges driver-returned values (generated <code>_id</code>, <code>RETURNING *</code>) back onto the instance through a framework-internal path that request data never reaches"
             },
             {
               "type": "Security",
@@ -12235,7 +12946,7 @@
             },
             {
               "type": "Fixed",
-              "html": "migration ordering now lives in <code>migration-order.ts</code> with an explicit <code>sortMigrationsForRollback</code>. The descending sort is required, not cosmetic: the executed list is read back ordered by <code>batch, name</code>, so it is alphabetical rather than chronological and simply *not* re-sorting after the reverse would have produced reverse-alphabetical order — a different wrong answer"
+              "html": "migration ordering now lives in <code>migration-order.ts</code> with an explicit <code>sortMigrationsForRollback</code>. The descending sort is required, not cosmetic: the executed list is read back ordered by <code>batch, name</code>, so it is alphabetical rather than chronological and simply _not_ re-sorting after the reverse would have produced reverse-alphabetical order — a different wrong answer"
             }
           ]
         },

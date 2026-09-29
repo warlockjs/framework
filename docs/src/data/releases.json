@@ -1,4 +1,14 @@
 {
+  "5.25.0": {
+    "publishedAt": "2026-09-29T16:38:38.118Z",
+    "matrix": "none",
+    "summary": "**Devtools, deploy in parts, and the first release built on GitHub Actions.** The new `@warlock.js/devtools` adds a development dashboard at `/__warlock`: each request's phases, SQL and MongoDB queries with EXPLAIN, cache and log activity, captured mails and N+1 warnings. Add it with `warlock add devtools`; `warlock dev` loads it automatically and production never mounts it. `warlock start --role=api|web|worker` and `--sites=a,b` run one build as separate processes. Pages get per-locale `alternates` metadata and the matched `route` in loaders and actions; `setupTest({ importModule })` loads app modules through Vitest's module graph. **Behaviour changes:** model-write validation failures answer 500 by default (configurable with `http.modelValidationErrorStatus`), and blank form values count as missing for non-string validators. Fixes include MongoDB upserts assigning auto ids, a clear `UnsupportedLockForUpdateError` on MongoDB, nullable objects in seal, `warlock seed` and `migrate` skipping test files, and plugin routes keeping their params in dev. Lockstep release across all 31 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.25.0 tarballs passed install, typecheck, a fresh migrate and seed, devtools in dev, a production build with browser smoke, and the `--role=worker` and `--role=api` starts.",
+    "featured": [
+      "@warlock.js/devtools",
+      "@warlock.js/core",
+      "@warlock.js/web"
+    ]
+  },
   "5.24.0": {
     "publishedAt": "2026-09-27T16:45:17.156Z",
     "matrix": "none",
