@@ -29,7 +29,11 @@ describe("Benchmark Module - measure()", () => {
       return "done";
     });
 
-    expect(result.latency).toBeGreaterThanOrEqual(50);
+    // Timers may fire a fraction of a millisecond early on some hosts (a 50ms
+    // sleep measured 49ms on a CI runner); the claim is "milliseconds, not
+    // seconds or microseconds", so allow one tick either way.
+    expect(result.latency).toBeGreaterThanOrEqual(49);
+    expect(result.latency).toBeLessThan(1_000);
   });
 
   it("works with async functions", async () => {
