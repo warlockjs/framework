@@ -24,8 +24,15 @@ function parseFrame(frame: string): DevtoolsCallerLocation | undefined {
   return { file, line: Number(line), column: Number(column) };
 }
 
+/** A drive-letter file URL names a Windows path on whichever host decodes it. */
+const WINDOWS_DRIVE_FILE_URL = /^file:\/\/\/[A-Za-z]:/;
+
 function normalizePath(path: string): string {
-  const decoded = path.startsWith("file:") ? fileURLToPath(path) : path;
+  const decoded = !path.startsWith("file:")
+    ? path
+    : WINDOWS_DRIVE_FILE_URL.test(path)
+      ? fileURLToPath(path, { windows: true })
+      : fileURLToPath(path);
   return decoded.replace(/\\/g, "/");
 }
 
