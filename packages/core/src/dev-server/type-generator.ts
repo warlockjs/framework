@@ -6,7 +6,7 @@ import { join, resolve } from "path";
 import { pathToFileURL } from "node:url";
 import ts from "typescript";
 import { warlockPath } from "../utils";
-import { devLogError, devLogInfo, devLogSuccess, devServeLog } from "./dev-logger";
+import { devLogDim, devLogError, devLogInfo, devLogSuccess, devServeLog } from "./dev-logger";
 import { readConfigAst } from "./read-config-ast";
 import { runTypingsGeneration, type TypingsGenerationPorts } from "./run-typings-generation";
 import { filesOrchestrator } from "./files-orchestrator";
@@ -18,6 +18,13 @@ import {
 } from "./translation-keys-sources";
 import { parseLocaleDictionary } from "../localization";
 import { getFilesFromDirectory } from "./utils";
+import {
+  extractModelResourceEntries,
+  renderModelResourceRegistry,
+  writeFileIfChanged,
+  type ModelResourceEntry,
+} from "./model-resource-typings";
+import { parseImports } from "./parse-imports";
 
 type RouteLocaleBuildModule = {
   listRouteLocaleKeys?: (options: {
@@ -163,6 +170,7 @@ export class TypeGenerator {
     }
 
     await this.generateTranslationTypes();
+    await this.generateModelResourceTypes();
 
     await this.saveManifest();
   }
@@ -495,6 +503,70 @@ ${entries}
 
     await writeFile(join(this.outputDir, "translations.d.ts"), content, "utf-8");
     devLogSuccess(`Generated translation types: ${keys.size} keys`);
+  }
+
+  /**
+   * Files that contributed to the last `model-resources.d.ts`: the model files
+   * and the modules their resources were resolved to. Kept for the same reason
+   * as {@link translationSourceFiles}: a deleted file is already gone from the
+   * orchestrator when the batch reaches {@link executeTypingsGenerator}.
+   */
+  private modelResourceSourceFiles = new Set<string>();
+
+  /**
+   * Generate `model-resources.d.ts`: the `ModelResourceRegistry` augmentation
+   * behind `Serialized<Model>`.
+   *
+   * Reads every discovered model file (`*.model.ts`) and records the ones that
+   * declare `static resource = <Identifier>`. Static AST read only, no app
+   * module is imported; see `model-resource-typings.ts` for what is skipped.
+   * The file is rewritten only when its text changes.
+   */
+  private async generateModelResourceTypes(): Promise<void> {
+    try {
+      const entries: ModelResourceEntry[] = [];
+      const sourceFiles = new Set<string>();
+      const skippedModels: string[] = [];
+
+      for (const [path, fileManager] of filesOrchestrator.getFiles()) {
+        if (fileManager.type !== "model" || !fileManager.source.includes("resource")) continue;
+
+        const imports = await parseImports(fileManager.source, fileManager.absolutePath);
+        const extraction = extractModelResourceEntries({
+          source: fileManager.source,
+          absolutePath: fileManager.absolutePath,
+          resolveImport: (specifier) => imports.get(specifier)?.absolutePath,
+        });
+
+        if (extraction.entries.length > 0) sourceFiles.add(path);
+
+        for (const entry of extraction.entries) {
+          entries.push(entry);
+          sourceFiles.add(Path.toRelative(entry.resourceFile));
+        }
+
+        for (const skipped of extraction.skipped) {
+          skippedModels.push(`${skipped.className} (${skipped.reason})`);
+        }
+      }
+
+      this.modelResourceSourceFiles = sourceFiles;
+
+      const written = await writeFileIfChanged(
+        join(this.outputDir, "model-resources.d.ts"),
+        renderModelResourceRegistry(entries, this.outputDir),
+      );
+
+      if (written) devLogSuccess(`Generated model resource types: ${entries.length} models`);
+
+      if (skippedModels.length > 0) {
+        devLogDim(
+          `Model resources not typed (not statically resolvable): ${skippedModels.join(", ")}`,
+        );
+      }
+    } catch (error) {
+      devServeLog(`⚠️ Failed to generate model resource types: ${error}`);
+    }
   }
 
   private isLocalesFile(path: string): boolean {
@@ -887,14 +959,21 @@ ${keyEntries}
       (path) => !files.has(path),
     );
 
+    const aKnownModelResourceSourceVanished = Array.from(this.modelResourceSourceFiles).some(
+      (path) => !files.has(path),
+    );
+
     const touchedAConfig =
       aKnownTranslationSourceVanished ||
+      aKnownModelResourceSourceVanished ||
       Array.from(new Set(upcomingFiles)).some((file) => {
         const normalizedPath = Path.normalize(file);
         if (normalizedPath.includes("src/config/")) return true;
         if (isRouteLocalesJsonPath(normalizedPath)) return true;
         if (isModuleLocaleDictionaryPath(normalizedPath)) return true;
         if (this.translationSourceFiles.has(normalizedPath)) return true;
+        if (this.modelResourceSourceFiles.has(normalizedPath)) return true;
+        if (files.get(normalizedPath)?.type === "model") return true;
 
         const fileManager = files.get(normalizedPath);
         return (
