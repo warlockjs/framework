@@ -3,6 +3,14 @@ import type { GenerateContentResponse, GoogleGenAI } from "@google/genai";
 import { describe, expect, it } from "vitest";
 import { GoogleModel } from "./model";
 
+/** The first recorded request; fails the test when none was made. */
+function firstCall<T>(calls: readonly T[]): T {
+  const call = calls[0];
+  if (call === undefined) throw new Error("expected the fake client to have been called");
+  return call;
+}
+
+
 function makeFakeAI(options: {
   response?: Partial<GenerateContentResponse>;
   streamChunks?: Array<Partial<GenerateContentResponse>>;
@@ -105,9 +113,9 @@ describe("GoogleModel.complete()", () => {
       { role: "user", content: "hi" },
     ]);
 
-    expect(calls[0].model).toBe("gemini-2.5-flash");
-    expect(calls[0].contents).toEqual([{ role: "user", parts: [{ text: "hi" }] }]);
-    expect(calls[0].config).toMatchObject({
+    expect(firstCall(calls).model).toBe("gemini-2.5-flash");
+    expect(firstCall(calls).contents).toEqual([{ role: "user", parts: [{ text: "hi" }] }]);
+    expect(firstCall(calls).config).toMatchObject({
       systemInstruction: "Be concise.",
       temperature: 0.4,
       maxOutputTokens: 256,
@@ -239,7 +247,7 @@ describe("GoogleModel.complete()", () => {
       reasoning: { maxTokens: 4096 },
     });
 
-    expect(calls[0].config).toMatchObject({ thinkingConfig: { thinkingBudget: 4096 } });
+    expect(firstCall(calls).config).toMatchObject({ thinkingConfig: { thinkingBudget: 4096 } });
   });
 
   it("buckets every reasoning.effort into a supported thinkingBudget; maxTokens wins when both set", async () => {
@@ -256,7 +264,7 @@ describe("GoogleModel.complete()", () => {
       reasoning: { effort: "low", maxTokens: 9999 },
     });
 
-    expect((calls[0].config as Record<string, unknown>).thinkingConfig).toEqual({
+    expect((firstCall(calls).config as Record<string, unknown>).thinkingConfig).toEqual({
       thinkingBudget: 1024,
     });
     expect((calls[1].config as Record<string, unknown>).thinkingConfig).toEqual({
@@ -287,7 +295,7 @@ describe("GoogleModel.complete()", () => {
     await model.complete([{ role: "user", content: "hi" }]);
     await model.complete([{ role: "user", content: "hi" }], { reasoning: {} });
 
-    expect("thinkingConfig" in (calls[0].config as Record<string, unknown>)).toBe(false);
+    expect("thinkingConfig" in (firstCall(calls).config as Record<string, unknown>)).toBe(false);
     expect("thinkingConfig" in (calls[1].config as Record<string, unknown>)).toBe(false);
   });
 
@@ -297,7 +305,7 @@ describe("GoogleModel.complete()", () => {
 
     await model.complete([{ role: "user", content: "hi" }], { reasoning: { maxTokens: 2048 } });
 
-    expect("thinkingConfig" in (calls[0].config as Record<string, unknown>)).toBe(false);
+    expect("thinkingConfig" in (firstCall(calls).config as Record<string, unknown>)).toBe(false);
   });
 
   it("maps effort 'none' to thinkingBudget 0 (Gemini's reasoning-off switch)", async () => {
@@ -311,7 +319,7 @@ describe("GoogleModel.complete()", () => {
       reasoning: { effort: "none" },
     });
 
-    expect((calls[0].config as Record<string, unknown>).thinkingConfig).toEqual({
+    expect((firstCall(calls).config as Record<string, unknown>).thinkingConfig).toEqual({
       thinkingBudget: 0,
     });
   });
@@ -346,7 +354,7 @@ describe("GoogleModel.complete()", () => {
     const schema = { type: "object", properties: { summary: { type: "string" } } };
     await model.complete([{ role: "user", content: "hi" }], { responseSchema: schema });
 
-    expect(calls[0].config).toMatchObject({
+    expect(firstCall(calls).config).toMatchObject({
       responseMimeType: "application/json",
       responseJsonSchema: schema,
     });
@@ -498,7 +506,7 @@ describe("GoogleModel.complete()", () => {
       tools: [tool],
     });
 
-    const config = calls[0].config as Record<string, unknown>;
+    const config = firstCall(calls).config as Record<string, unknown>;
     expect(config.temperature).toBe(0.9);
     expect(config.maxOutputTokens).toBe(42);
     expect(config.abortSignal).toBe(controller.signal);
@@ -521,7 +529,7 @@ describe("GoogleModel.complete()", () => {
 
     await model.complete([{ role: "user", content: "hi" }]);
 
-    const config = calls[0].config as Record<string, unknown>;
+    const config = firstCall(calls).config as Record<string, unknown>;
     expect("temperature" in config).toBe(false);
     expect("maxOutputTokens" in config).toBe(false);
     expect("abortSignal" in config).toBe(false);
@@ -536,7 +544,7 @@ describe("GoogleModel.complete()", () => {
       responseSchema: { type: "object" },
     });
 
-    const config = calls[0].config as Record<string, unknown>;
+    const config = firstCall(calls).config as Record<string, unknown>;
     expect("responseJsonSchema" in config).toBe(false);
     expect("responseMimeType" in config).toBe(false);
   });
@@ -747,7 +755,7 @@ describe("GoogleModel.stream()", () => {
       void _event;
     }
 
-    expect(calls[0].config).toMatchObject({ thinkingConfig: { thinkingBudget: 24576 } });
+    expect(firstCall(calls).config).toMatchObject({ thinkingConfig: { thinkingBudget: 24576 } });
   });
 
   it("interleaves text deltas with a tool-call lacking a thoughtSignature", async () => {
@@ -825,7 +833,7 @@ describe("GoogleModel.stream()", () => {
       void _event;
     }
 
-    expect(calls[0].config).toMatchObject({
+    expect(firstCall(calls).config).toMatchObject({
       systemInstruction: "be terse",
       responseMimeType: "application/json",
       responseJsonSchema: schema,
