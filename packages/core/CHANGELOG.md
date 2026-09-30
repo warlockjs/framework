@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Development now warns once when it auto-loads legacy module `utils/locales.ts` files, and `warlock add access` now writes its access translation to `src/app/access/utils/locales.json`.
 - **Behaviour change:** rate limits group IPv6 clients by their `/64` network, and IPv4-mapped addresses (`::ffff:1.2.3.4`) count as the IPv4 address. This applies to the global limiter and to the per-route `rateLimit()` middleware. Before, a client could rotate through addresses in its own `/64` to get a fresh bucket each time. Users behind one IPv6 `/64`, such as one home or office, now share a bucket.
 - `response.clearCookie()` now also sends `Max-Age=0` alongside the past `Expires` date.
 

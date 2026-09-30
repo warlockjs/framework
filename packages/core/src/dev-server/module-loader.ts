@@ -6,6 +6,7 @@ import { router } from "../router/router";
 import { devLogError, formatModuleNotFoundError } from "./dev-logger";
 import { extractTranslationKeys } from "./extract-translation-keys";
 import type { CleanupFunction, FileManager } from "./file-manager";
+import { warnForLegacyLocales } from "./legacy-locales-warning";
 import { getDevelopmentModelModuleRegistry } from "./model-module-registry";
 import type { SpecialFileType, SpecialFilesCollector } from "./special-files-collector";
 
@@ -104,6 +105,12 @@ export class ModuleLoader {
    */
   public async loadModule<T = unknown>(file: FileManager, type: string): Promise<T | undefined> {
     if (file.relativePath.endsWith(".env")) return undefined;
+
+    if (type === "locale" && /\/utils\/locales\.(ts|tsx)$/.test(file.relativePath)) {
+      warnForLegacyLocales(
+        this.specialFilesCollector.getFilesByType("locale").map((locale) => locale.relativePath),
+      );
+    }
 
     if (type === "locale" && file.relativePath.endsWith(".json")) {
       const cleanup = registerLocaleDictionary({

@@ -16,53 +16,70 @@ import { migrationTimestamp } from "./shared/migration-timestamp";
 import { type FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
 
 async function registerAccessLocale() {
-  // Register the access locale in the project's shared translations file so a
-  // denied check returns a real sentence, not the raw "access.errors.forbidden"
-  // key. Append when the file exists, create it otherwise; skip if already there.
-  const localesPath = srcPath("app/shared/utils/locales.ts");
+  const legacyLocalesPath = srcPath("app/shared/utils/locales.ts");
+  const localesPath = srcPath("app/access/utils/locales.json");
+  const forbidden = {
+    en: "You do not have permission to perform this action.",
+    ar: "ليس لديك صلاحية لتنفيذ هذا الإجراء.",
+  };
 
-  const accessLocale = `groupedTranslations("access", {
-  errors: {
-    forbidden: {
-      en: "You do not have permission to perform this action.",
-      ar: "ليس لديك صلاحية لتنفيذ هذا الإجراء.",
-    },
-  },
-});
-`;
+  if (await fileExistsAsync(legacyLocalesPath)) {
+    const legacy = await getFileAsync(legacyLocalesPath);
+    if (legacy.includes(`groupedTranslations("access"`)) {
+      console.log(`${colors.yellowBright("access")} locale already registered, skipping...`);
+      return;
+    }
+  }
 
   if (await fileExistsAsync(localesPath)) {
     const current = await getFileAsync(localesPath);
-
-    if (current.includes(`groupedTranslations("access"`)) {
-      console.log(`${colors.yellowBright("access")} locale already registered, skipping...`);
-
+    let dictionary: Record<string, unknown>;
+    try {
+      const parsed: unknown = JSON.parse(current);
+      if (parsed === null || Array.isArray(parsed) || typeof parsed !== "object") throw new Error();
+      dictionary = parsed as Record<string, unknown>;
+    } catch {
+      console.log(
+        `${colors.yellowBright("access")} locale JSON is invalid; add errors.forbidden to src/app/access/utils/locales.json manually.`,
+      );
       return;
     }
 
-    // The file uses groupedTranslations already iff it calls it — only inject the
-    // import when no call is present yet.
-    const importLine = `import { groupedTranslations } from "@warlock.js/core";`;
-    const prefix = current.includes("groupedTranslations(") ? "" : `${importLine}\n\n`;
+    // A root `$group` renames the whole file's namespace; merging there would
+    // register the sentence under a key the access checks never read.
+    if (dictionary.$group !== undefined && dictionary.$group !== "access") {
+      console.log(
+        `${colors.yellowBright("access")} locale JSON declares a different $group; add access.errors.forbidden manually.`,
+      );
+      return;
+    }
 
-    await putFileAsync(localesPath, `${prefix}${current.trimEnd()}\n\n${accessLocale}`);
+    const errors = dictionary.errors;
+    if (
+      errors !== undefined &&
+      (errors === null || Array.isArray(errors) || typeof errors !== "object")
+    ) {
+      console.log(
+        `${colors.yellowBright("access")} locale JSON cannot safely add errors.forbidden; update src/app/access/utils/locales.json manually.`,
+      );
+      return;
+    }
+    const entries = (errors ?? {}) as Record<string, unknown>;
+    if (entries.forbidden !== undefined) return;
 
+    entries.forbidden = forbidden;
+    dictionary.errors = entries;
+    await putFileAsync(localesPath, `${JSON.stringify(dictionary, null, 2)}\n`);
     console.log(
-      `${colors.green("✓")} Registered the access locale in src/app/shared/utils/locales.ts`,
+      `${colors.green("✓")} Registered the access locale in src/app/access/utils/locales.json`,
     );
-
     return;
   }
 
-  await ensureDirectoryAsync(srcPath("app/shared/utils"));
-
-  await putFileAsync(
-    localesPath,
-    `import { groupedTranslations } from "@warlock.js/core";\n\n${accessLocale}`,
-  );
-
+  await ensureDirectoryAsync(srcPath("app/access/utils"));
+  await putFileAsync(localesPath, `${JSON.stringify({ errors: { forbidden } }, null, 2)}\n`);
   console.log(
-    `${colors.green("✓")} Created src/app/shared/utils/locales.ts with the access locale`,
+    `${colors.green("✓")} Created src/app/access/utils/locales.json with the access locale`,
   );
 }
 
@@ -140,7 +157,7 @@ async function completeAccessInstallation(_options: CommandActionData) {
 
 export const accessFeature: FeatureDefinition = {
   description:
-    "Installs @warlock.js/access — authorization (RBAC + ABAC): permission checks, ABAC policies, and roles. Ejects config/access.ts, the DatabaseAccessResolver + Role/UserRole models and migrations into src/app/access, and registers the access locale in src/app/shared/utils/locales.ts",
+    "Installs @warlock.js/access — authorization (RBAC + ABAC): permission checks, ABAC policies, and roles. Ejects config/access.ts, the DatabaseAccessResolver + Role/UserRole models and migrations into src/app/access, and registers the access locale in src/app/access/utils/locales.json",
   dependencies: {
     "@warlock.js/access": INSTALLED_WARLOCK_VERSION,
   },
