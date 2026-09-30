@@ -128,6 +128,705 @@
   ],
   "releases": [
     {
+      "version": "5.26.0",
+      "id": "v5-26-0",
+      "date": "September 30, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Security upgrades, module <code>locales.json</code>, typed URLs, and loaders that return resources.</strong> Fastify and its plugins move up a major for security fixes (only <code>router.directory()</code> <code>setHeaders</code> callers change code: use <code>reply.header()</code>). Modules register translations from <code>utils/locales.json</code>; <code>warlock doctor --fix</code> converts legacy <code>locales.ts</code>, which is deprecated for v6. Route params validate with <code>validation.params</code> (<code>v.int()</code> turns <code>:id</code> into a number). <code>href()</code>, <code>navigateTo()</code> and the new <code>apiHref()</code> take <code>{ name, params, query }</code>. Page and layout loaders can return resources, serialized like response bodies. <code>whereTrusted()</code> allows code-authored Mongo operators, auth cookies can be scoped per request with <code>cookieDomain(request)</code>, and the AI adapters gain wider reasoning-effort levels, prompt caching controls and correct parameters for current Claude and OpenAI reasoning models. <strong>Behaviour changes:</strong> IPv6 rate limits group by /64, package migrations run before app migrations, <code>navigateTo()</code> hard-navigates before hydration, and <code>request.user</code> and <code>RequestUserMovedError</code> are removed (use <code>request.locals.user</code>). <code>t()</code>, <code>request.t()</code> and <code>request.trans()</code> are typed as <code>string</code>. Lockstep release across all 31 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.26.0 tarballs passed install, typecheck, a fresh migrate and seed, devtools in dev, a production build with browser smoke, and the <code>--role=worker</code> and <code>--role=api</code> starts.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 14,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 5
+            },
+            {
+              "type": "Removed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>http.rateLimit.ipv6Subnet</code> sets the IPv6 prefix length the global rate limiter groups clients by (default <code>64</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "Module <code>src/app/&lt;module&gt;/utils/locales.json</code> dictionaries register translations with the module folder as their default group; root <code>$group</code> overrides it. Dictionaries strictly validate their JSON and translation shape, and reject duplicate key ownership. <code>utils/locales.ts</code> still works but is deprecated and will be removed in v6 (its warning ships separately)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>parseLocaleDictionary()</code> is public for tooling that needs to validate and flatten a module locale dictionary without loading application code."
+            },
+            {
+              "type": "Added",
+              "html": "<code>validation.params</code> validates route parameters with a Seal object schema. Number and boolean validators coerce the string segments, the parsed values replace <code>request.params</code>, and they merge into the validated data (params win over body keys). Failures answer like a body-schema failure. Routes without <code>params</code> still see raw strings."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock doctor</code> warns about each legacy <code>utils/locales.ts</code> file, and <code>warlock doctor --fix</code> converts the safe ones (a single <code>groupedTranslations</code> call with a literal object) to <code>locales.json</code>. It checks the JSON flattens to the same keys before deleting the <code>.ts</code> file. Anything else is reported as a manual migration with the reason. Comments in the converted file are not kept."
+            },
+            {
+              "type": "Changed",
+              "html": "Development now warns once when it auto-loads legacy module <code>utils/locales.ts</code> files, and <code>warlock add access</code> now writes its access translation to <code>src/app/access/utils/locales.json</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Behaviour change:</strong> rate limits group IPv6 clients by their <code>/64</code> network, and IPv4-mapped addresses (<code>::ffff:1.2.3.4</code>) count as the IPv4 address. This applies to the global limiter and to the per-route <code>rateLimit()</code> middleware. Before, a client could rotate through addresses in its own <code>/64</code> to get a fresh bucket each time. Users behind one IPv6 <code>/64</code>, such as one home or office, now share a bucket."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>response.clearCookie()</code> now also sends <code>Max-Age=0</code> alongside the past <code>Expires</code> date."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock generate.typings</code> honours <code>build.routeRegistrationTimeoutMs</code> / <code>WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS</code>, like <code>warlock build</code>. It always used 30 seconds, so <code>generate.typings &amp;&amp; tsc &amp;&amp; warlock build</code> could fail on a loaded machine even with a longer timeout configured."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>request.t()</code>, <code>request.trans()</code> and <code>t()</code> are typed as returning <code>string</code> (they were <code>any</code>), so <code>title: request.t(\"...\")</code> type-checks without a <code>String(...)</code> wrapper."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock migrate</code> runs package migrations (such as @warlock.js/auth's token tables) before your app's migrations, whatever their dates. On a fresh database, an app migration that alters a package table used to run before the table existed. The order inside each group is unchanged."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>startHttpTestServer({ web: false })</code> now starts an API-only test server: it skips the optional web connector before its lazy lifecycle delegate constructs <code>WebConnector</code> or creates Vite. Omitting the option preserves the existing full-stack startup."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>response.cookie()</code> truncates a fractional <code>maxAge</code> to whole seconds. <code>@fastify/cookie</code> 11 rejects a non-whole <code>maxAge</code>, so a computed value such as <code>ttl / 1000</code> used to fail the response."
+            },
+            {
+              "type": "Removed",
+              "html": "<strong>BREAKING (only if something still reads <code>request.user</code>):</strong> the <code>request.user</code> getter and <code>RequestUserMovedError</code>, the development-time diagnostic kept since the 5.12.0 move. The user lives at <code>request.locals.user</code> (set by <code>@warlock.js/auth</code>); TypeScript now reports any remaining <code>request.user</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>href(name, { params, query })</code> now supports an object form alongside its positional arguments; <code>navigateTo({ name, params, query })</code> and new <code>apiHref(name, { params, query })</code> keep generated page/API route names and required path params type-safe while using the shared query-string grammar. Object form is reserved for objects containing only object-shaped <code>params</code>/<code>query</code> options, so route params literally named <code>params</code> or <code>query</code> remain positional."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Behaviour change:</strong> in a browser with no client runtime connected (before hydration), <code>navigateTo()</code> now starts a real browser navigation (<code>location.assign</code>, or <code>location.replace</code> with <code>replace: true</code>) and returns <code>true</code>. It used to return <code>false</code> and do nothing, so apps wrote that fallback by hand. On the server it still returns <code>false</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Page and layout loaders can now return resources and other class instances with <code>toJSON()</code>; their JSON representation is used safely in hydration and deferred page-data payloads."
+            },
+            {
+              "type": "Fixed",
+              "html": "Initial client hydration now seeds <code>useUser()</code> from the session payload before React's first render, preventing signed-in server markup from mismatching the client."
+            },
+            {
+              "type": "Fixed",
+              "html": "Production <code>/assets/*</code> responses set <code>Vary: Accept-Encoding</code> through the Fastify reply. With <code>@fastify/static</code> 10, the old callback threw on every asset request, so production pages loaded without their scripts and styles."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>ReasoningEffort</code> now accepts <code>\"none\" | \"minimal\" | \"low\" | \"medium\" | \"high\" | \"xhigh\" | \"max\"</code>. Adapters clamp unsupported values to their nearest supported provider level rather than rejecting a request."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 8,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 6
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>thinkingMode: \"adaptive\" | \"budget\"</code> on <code>anthropic.model({ ... })</code> overrides the thinking shape inferred from the model name. Use it for gateway model ids that don't follow Anthropic's naming, or to move Opus/Sonnet 4.6 onto adaptive thinking. It also decides whether <code>temperature</code> is sent. The <code>AnthropicThinkingMode</code> type is exported."
+            },
+            {
+              "type": "Added",
+              "html": "<code>promptCaching: true</code> now enables Anthropic's request-level automatic cache placement when a call has no explicit cache breakpoint, so the longest reusable prefix is cached. <code>promptCacheTtl?: \"5m\" | \"1h\"</code> controls the TTL for automatic and explicit cache markers; omission keeps Anthropic's five-minute default."
+            },
+            {
+              "type": "Fixed",
+              "html": "Adaptive Claude reasoning now maps <code>minimal</code> to <code>output_config.effort: \"low\"</code> and supports <code>xhigh</code> and <code>max</code>; budget-mode models map them to 1,024, 24,000, and 32,000 thinking tokens respectively."
+            },
+            {
+              "type": "Fixed",
+              "html": "Claude reasoning-token usage is now included in responses when the API reports it, including streamed responses."
+            },
+            {
+              "type": "Fixed",
+              "html": "Responses stopped because the model context window was exceeded now report a length finish reason."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Behaviour change:</strong> Reasoning now works on current Claude models. Claude Opus 4.7, 4.8, 5 and 5.5, Sonnet 5 and 5.5, Fable 5 and 5.1, and any model id the adapter does not recognise now get <code>thinking: { type: \"adaptive\" }</code> with <code>output_config.effort</code> (<code>low</code>, <code>medium</code> or <code>high</code>, taken from <code>reasoning.effort</code>; <code>medium</code> when only <code>reasoning.maxTokens</code> is given). Before, every model got <code>budget_tokens</code>, which these models reject with a 400. Claude Haiku 4.5, Opus 4.6, Sonnet 4.6 and older models keep the <code>budget_tokens</code> shape. The default <code>max_tokens</code> is unchanged in both modes."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Behaviour change:</strong> <code>temperature</code> is no longer sent to models released after Claude Opus 4.6 (the same adaptive-thinking models listed above), because they reject any value other than the default with a 400. Haiku 4.5, the 4.6 models and older models still receive it."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Behaviour change:</strong> Claude 5-series models (<code>claude-opus-5*</code>, <code>claude-sonnet-5*</code>, <code>claude-fable-5*</code>, <code>claude-mythos-5*</code>) are now recognised as vision-capable, so image attachments are no longer rejected for them."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 5
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>reasoning.effort</code> now accepts every OpenAI SDK 7.23.0 <code>reasoning_effort</code> level: <code>none</code>, <code>minimal</code>, <code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>, and <code>max</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "OpenAI-labelled Chat Completions models now support explicit prompt caching: <code>promptCacheKey</code>, <code>promptCacheRetention</code>, and <code>cacheControl.breakpoints</code> map to the OpenAI SDK's request fields. These fields are deliberately omitted for OpenAI-compatible wrapper providers."
+            },
+            {
+              "type": "Changed",
+              "html": "Capability inference now recognizes the GPT-6 family as reasoning- and vision-capable, plus GPT-5 and o4 as vision-capable."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Behaviour change:</strong> requests send <code>max_completion_tokens</code> and never the legacy <code>max_tokens</code>, which current OpenAI models (the gpt-5 family and later) reject with <code>400 unsupported_parameter</code>. <code>maxTokens</code> in config and call options is unchanged."
+            },
+            {
+              "type": "Changed",
+              "html": "Reasoning-capable models (o-series, gpt-5 family) no longer receive <code>temperature</code>; they accept only the default value and reject any other."
+            },
+            {
+              "type": "Fixed",
+              "html": "A provider error now keeps the parameter OpenAI rejected (<code>context.param</code>) and the request id (<code>context.requestId</code>, read from the SDK's <code>requestID</code>), next to the status and code."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>whereTrusted(conditions)</code> on the query builder contract applies a code-authored filter without the unsafe-operator check, so MongoDB operators such as <code>$in</code> and <code>$lt</code> pass through. Never pass request input to it. The PostgreSQL builder throws <code>UnsupportedQueryOperationError</code> for operator objects, because its <code>where()</code> parser would otherwise bind them as plain values. Custom query builders must implement the new method."
+            },
+            {
+              "type": "Added",
+              "html": "Migrations can be registered with an origin (<code>\"package\"</code> or <code>\"app\"</code>). Package migrations run before every app migration while preserving the existing <code>order</code>, <code>createdAt</code>, and name sort within each partition. Direct <code>register()</code> calls default to <code>\"app\"</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Migrations now reject colliding unnamed index definitions before sending DDL to MongoDB or PostgreSQL, with guidance to provide an explicit index name. Declarative alter migrations with a custom <code>up()</code> but no <code>down()</code> now emit one rollback warning."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>trustedFilter: true</code> now works on <code>atomic()</code>, <code>findOneAndUpdate()</code> and <code>findAndUpdate()</code> with an operator filter such as <code>{ id: { $in: ids } }</code>. The scoped-write lookup re-ran the filter through <code>where()</code>, which rejected the operator, so these calls threw <code>UnsafeFilterError</code> even when the filter was trusted. Global scopes (tenant, soft delete) still apply to the write. <code>findAndUpdate()</code> now accepts <code>trustedFilter</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Map all neutral reasoning effort levels to valid Bedrock extended-thinking budgets."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Clamp all neutral reasoning effort levels to Gemini thinking budgets, preserving the adapter's 24,576-token supported ceiling."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Clamp neutral reasoning effort levels to Ollama's supported <code>think</code> literals."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Cookie sessions now support <code>auth.cookie.cookieDomain(request)</code> and <code>pageSession</code>/<code>sessionMiddleware</code>'s <code>cookieDomain(request)</code> override. Returning a Domain scopes issued and renewed cookies to it; returning <code>undefined</code> preserves host-only cookies. Clearing a Domain-scoped session also clears the legacy host-only cookie names. When configured, pass <code>request</code> to <code>setSessionCookies(response, tokens, request)</code>, <code>clearSessionCookies(response, request)</code>, and <code>clearAuthCookie(response, options, request)</code>; omitting it throws <code>CookieDomainRequestRequiredError</code> rather than issuing or clearing a host-only cookie."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Dependencies: <code>fastify</code> ^5.12.5 (security fixes)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Dependencies: <code>fastify</code> ^5.12.5 (security fixes). <code>@bull-board/*</code> ^9.10.2."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/sitemap",
+          "slug": "sitemap",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "The generated <code>src/config/app.ts</code> falls back to <code>Warlock</code> as the app name when <code>APP_NAME</code> is unset (it said <code>Mongez</code>). New apps still get their project name in <code>.env</code>."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.25.0",
       "id": "v5-25-0",
       "date": "September 29, 2026",
@@ -12358,7 +13057,7 @@
             },
             {
               "type": "Fixed",
-              "html": "A bare number (<code>expiresIn: 2592000</code>) is now rejected instead of silently corrupting the expiry. <code>ms</code> *formats* numbers rather than parsing them (<code>2592000</code> ⇒ <code>\"43m\"</code>), which then poisoned <code>Date.now() + expiresIn</code> into <code>Invalid Date</code>. Write <code>\"30d\"</code>."
+              "html": "A bare number (<code>expiresIn: 2592000</code>) is now rejected instead of silently corrupting the expiry. <code>ms</code> _formats_ numbers rather than parsing them (<code>2592000</code> ⇒ <code>\"43m\"</code>), which then poisoned <code>Date.now() + expiresIn</code> into <code>Invalid Date</code>. Write <code>\"30d\"</code>."
             },
             {
               "type": "Security",
@@ -12366,7 +13065,7 @@
             },
             {
               "type": "Security",
-              "html": "<strong>The persisted <code>expires_at</code> is now enforced on every request.</strong> <code>authMiddleware</code> previously checked only that the access-token row *existed*; a row whose own expiry had passed still opened the gate, because nothing ever asked. The row is now checked against the clock and deleted on rejection."
+              "html": "<strong>The persisted <code>expires_at</code> is now enforced on every request.</strong> <code>authMiddleware</code> previously checked only that the access-token row _existed_; a row whose own expiry had passed still opened the gate, because nothing ever asked. The row is now checked against the clock and deleted on rejection."
             }
           ]
         },

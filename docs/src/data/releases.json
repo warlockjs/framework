@@ -1,4 +1,14 @@
 {
+  "5.26.0": {
+    "publishedAt": "2026-09-30T17:41:20.771Z",
+    "matrix": "none",
+    "summary": "**Security upgrades, module `locales.json`, typed URLs, and loaders that return resources.** Fastify and its plugins move up a major for security fixes (only `router.directory()` `setHeaders` callers change code: use `reply.header()`). Modules register translations from `utils/locales.json`; `warlock doctor --fix` converts legacy `locales.ts`, which is deprecated for v6. Route params validate with `validation.params` (`v.int()` turns `:id` into a number). `href()`, `navigateTo()` and the new `apiHref()` take `{ name, params, query }`. Page and layout loaders can return resources, serialized like response bodies. `whereTrusted()` allows code-authored Mongo operators, auth cookies can be scoped per request with `cookieDomain(request)`, and the AI adapters gain wider reasoning-effort levels, prompt caching controls and correct parameters for current Claude and OpenAI reasoning models. **Behaviour changes:** IPv6 rate limits group by /64, package migrations run before app migrations, `navigateTo()` hard-navigates before hydration, and `request.user` and `RequestUserMovedError` are removed (use `request.locals.user`). `t()`, `request.t()` and `request.trans()` are typed as `string`. Lockstep release across all 31 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.26.0 tarballs passed install, typecheck, a fresh migrate and seed, devtools in dev, a production build with browser smoke, and the `--role=worker` and `--role=api` starts.",
+    "featured": [
+      "@warlock.js/core",
+      "@warlock.js/web",
+      "@warlock.js/ai"
+    ]
+  },
   "5.25.0": {
     "publishedAt": "2026-09-29T16:38:38.118Z",
     "matrix": "none",
