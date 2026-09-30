@@ -102,6 +102,10 @@ Two pieces:
 
 If validation fails, the framework returns a 400 with an `errors` payload and your handler never runs.
 
+### Validating route params
+
+`handler.validation = { params: v.object({ id: v.int().min(1) }) }` validates path segments (e.g. `/posts/:id`). Number and boolean validators convert the string segments; the app's schema object is never changed. Parsed values replace `request.params` (`request.input("id")` is a number) and merge into `request.validated()`, with params winning over body fields. Failures answer like a `schema` failure.
+
 ### Typing a guarded handler
 
 Routes behind `authMiddleware` need `request.locals.user` typed. Project conventions add a `GuardedRequest<TSchema>` (overriding `locals` to `RequestLocals & { user: User }`) and a paired `GuardedRequestHandler<TSchema>` alias in `app/auth/requests/guarded.request`:
