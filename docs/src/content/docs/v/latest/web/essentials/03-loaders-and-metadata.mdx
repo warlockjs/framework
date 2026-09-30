@@ -354,10 +354,10 @@ export default function ProductPage({ data }: PageProps<typeof loader>) {
 | a function-valued key                                       | dropped from the type; devalue still refuses a function at render, so do not return one |
 | a `defer()` key holding a promise                           | a `Promise` of the serialized settled value, for `use()`                     |
 
-A model reads as its resource once you register the pair in
-`ModelResourceRegistry`, which core does not generate. See
+A model reads as its resource automatically when it declares `static resource`:
+`warlock generate.typings` and `warlock dev` generate the `ModelResourceRegistry` entries. See
 [Serialized output on the wire](/v/latest/core/the-basics/resources-deep/#serialized-output-on-the-wire)
-for the registration and the full rules.
+for the generated file and the full rules.
 
 A promise nested in plain loader data (not a top-level `defer()` key) is
 awaited, and its settled value is serialized too. A model or resource resolved

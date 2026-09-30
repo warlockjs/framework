@@ -513,20 +513,17 @@ The rules mirror the serializer, in the same order:
 
 ### Mapping a model to its resource
 
-A model type cannot reveal its resource on its own (`Model.resource` is loosely typed), so you register the pair by augmenting `ModelResourceRegistry`, once per model, in a file that imports both:
+A model type cannot reveal its resource on its own (`Model.resource` is loosely typed), so Warlock generates the mapping. `warlock generate.typings` and `warlock dev` write `.warlock/typings/model-resources.d.ts`, with one `ModelResourceRegistry` entry for every model that declares `static resource = SomeResource`:
 
-```ts title="src/app/users/user-resource.type.ts"
-import type { User } from "app/users/models/user";
-import type { UserResource } from "app/users/resources/user.resource";
-
+```ts title=".warlock/typings/model-resources.d.ts (generated)"
 declare module "@warlock.js/core" {
   interface ModelResourceRegistry {
-    User: { model: User; resource: typeof UserResource };
+    "User": { model: import("../../src/app/users/models/user.model").User; resource: typeof import("../../src/app/users/resources/user.resource").UserResource };
   }
 }
 ```
 
-`Serialized<User>` then resolves to `ResourceOutput<typeof UserResource>`; the entry matches a model type that is mutually assignable with `model`. There is no generator, so write the entry yourself. `@warlock.js/web` uses the same registry to type the `data` a page receives from its loader; see [Loaders and metadata](/v/latest/web/essentials/loaders-and-metadata/).
+`Serialized<User>` then resolves to `ResourceOutput<typeof UserResource>`, so columns the resource leaves out (a password hash, say) never appear in the type. The generator reads model files statically and resolves the resource through the file's imports; a declaration it cannot resolve (a computed value, `lazy(...)`, a namespace import) is skipped, and that model keeps its raw data type. Keep `.warlock/typings/*.d.ts` in your `tsconfig.json` `include` (new apps have it). `@warlock.js/web` uses the same registry to type the `data` a page receives from its loader; see [Loaders and metadata](/v/latest/web/essentials/loaders-and-metadata/).
 
 ## Wiring the resource to the model
 

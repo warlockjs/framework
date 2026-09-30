@@ -1280,7 +1280,7 @@ Internal `@warlock.js/*` packages read from `config.get("<name>")` the same way 
 
 ---
 name: create-controller
-description: 'Author HTTP controllers in @warlock.js/core — RequestHandler signature, validated input via seal schemas, response helpers, attaching metadata. Controllers are thin functions; business logic moves to services or use-cases. Triggers: `RequestHandler`, `Request<TSchema>`, `GuardedRequestHandler`, `request.validated`, `request.input`, `controller.validation`, `response.success`, `response.successCreate`; "write a controller", "attach a schema to a handler", "thin controller pattern", "guarded request type"; typical import `import { type RequestHandler } from "@warlock.js/core"`. Skip: response helper menu — `@warlock.js/core/send-response/SKILL.md`; schema authoring — `@warlock.js/core/validate-input/SKILL.md`; URL wiring — `@warlock.js/core/register-route/SKILL.md`; competing patterns: `express` middleware functions, `@nestjs/common` `@Controller`/`@Get` decorators.'
+description: 'Author HTTP controllers in @warlock.js/core — RequestHandler signature, validated input via seal schemas, response helpers, attaching metadata. Controllers are thin functions; business logic moves to services or use-cases. Triggers: `RequestHandler`, `Request<TSchema>`, `GuardedRequestHandler`, `request.validated`, `request.input`, `controller.validation`, `controller.responseSchema`, `response.success`, `response.successCreate`; "write a controller", "attach a schema to a handler", "thin controller pattern", "guarded request type", "type the API response"; typical import `import { type RequestHandler } from "@warlock.js/core"`. Skip: response helper menu — `@warlock.js/core/send-response/SKILL.md`; schema authoring — `@warlock.js/core/validate-input/SKILL.md`; URL wiring — `@warlock.js/core/register-route/SKILL.md`; competing patterns: `express` middleware functions, `@nestjs/common` `@Controller`/`@Get` decorators.'
 ---
 
 # Warlock — create a controller
@@ -1414,7 +1414,44 @@ Use `RequestHandler<Request<TSchema>>` for public routes, `GuardedRequestHandler
 createProductController.description = "Create a new product (admin only)";
 ```
 
-Used by OpenAPI/Swagger generation (planned per `domains/core/backlog.md`) and surfaces in dev-server logs.
+`description` feeds the OpenAPI document (`warlock generate.openapi`, see [`generate-openapi`](../generate-openapi/SKILL.md)) and surfaces in dev-server logs.
+
+## Declaring response types with `responseSchema`
+
+Set `responseSchema` on the handler, next to `validation`, to declare the body per status code. The same declaration types the client (web's `ApiRouteRegistry`, `useSubmitForm`) and fills the `responses` of the OpenAPI document.
+
+```ts title="src/app/auth/controllers/login.controller.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import { loginUseCase } from "app/auth/use-cases/login.use-case";
+import { UserResource } from "app/users/resources/user.resource";
+
+export const loginController: RequestHandler = async ({ request, response }) => {
+  const { user, token } = await loginUseCase(request.all());
+
+  return response.success({ user, token });
+};
+
+loginController.responseSchema = {
+  200: { body: { user: UserResource, token: "string" } },
+  400: { body: { error: "string" } },
+};
+```
+
+A body is an object whose values are one of:
+
+| Value                                           | Meaning                                     |
+| ----------------------------------------------- | ------------------------------------------- |
+| a cast string, with the resource suffixes       | `"string"`, `"number?"`, `"string[]"`, `"date[]?"` (`?` is `T \| null`, key always present) |
+| a resource                                      | one `ResourceOutput` object                 |
+| `[Resource]`                                    | an array of that resource                   |
+| a nested plain object of any of the above       | recursed                                    |
+
+The output types follow the same rules as `defineResource` (`ResponseBodyOutput<B>` and `ResponseSchemaOutput<S>` are exported if you need the type of a body or of the whole schema).
+
+- Types are generated, not annotated: `warlock generate.typings` and `warlock dev` load the routes, read each `responseSchema` and hand the response types of every named route to the web route-types generator. A route without `responseSchema` gets no `response` entry.
+- A resource is mapped back to its `*.resource.ts(x)` export by identity. A resource defined inline or outside such a file is typed `unknown`, and a warning names the route and field. Export each resource from its own `*.resource.ts` file.
+- `responseSchema` is kept when a route is bound from an array handler (`[controller, "action"]`) or a restful resource method.
+- Nothing checks the response against the schema at runtime: it is documentation and types.
 
 ## What belongs in a controller (and what doesn't)
 
@@ -1719,7 +1756,7 @@ await warmupProductCache();
 
 ---
 name: define-resource
-description: 'Map model fields to wire-shape via `defineResource()` or `Resource` subclasses. Output-only — never put business logic, hydration, or reconciliation in a resource. Triggers: `defineResource`, `Resource`, `RegisterResource`, `toJSON`, `"self"`, `"localized"`, `"uploadsUrl"`; "shape an API response", "nest related resources", "rename a field on output", "self-referential tree resource"; typical import `import { defineResource } from "@warlock.js/core"`. Skip: localized columns — `@warlock.js/core/use-localization/SKILL.md`; URL casting — `@warlock.js/core/build-url/SKILL.md`; controller side — `@warlock.js/core/create-controller/SKILL.md`; competing libs `@nestjs/swagger` `@ApiProperty`, `class-transformer`, hand-rolled DTO mappers.'
+description: 'Map model fields to wire-shape via `defineResource()` or `Resource` subclasses. Output-only — never put business logic, hydration, or reconciliation in a resource. Also covers the typed output: `ResourceOutput<typeof R>`, `defineResource<Out>()`, `Serialized<T, W>` and `ModelResourceRegistry`. Triggers: `defineResource`, `Resource`, `RegisterResource`, `toJSON`, `ResourceOutput`, `Serialized`, `ModelResourceRegistry`, `"self"`, `"localized"`, `"uploadsUrl"`; "shape an API response", "type a resource''s output", "what does the client receive", "nest related resources", "rename a field on output", "self-referential tree resource"; typical import `import { defineResource } from "@warlock.js/core"`. Skip: localized columns — `@warlock.js/core/use-localization/SKILL.md`; URL casting — `@warlock.js/core/build-url/SKILL.md`; controller side — `@warlock.js/core/create-controller/SKILL.md`; competing libs `@nestjs/swagger` `@ApiProperty`, `class-transformer`, hand-rolled DTO mappers.'
 ---
 
 # Warlock — define a resource
@@ -1915,6 +1952,8 @@ export const ChatResource = defineResource({
   transform(data, resource) {
     // final pass — mutate `data` in place; the return value is ignored
     data.slug = String(data.title).toLowerCase();
+
+    return data;
   },
 });
 ```
@@ -1922,6 +1961,103 @@ export const ChatResource = defineResource({
 `transform` runs inside `extend()` as `transform.call(this, this.data, this)` — the framework discards whatever it returns, so you must mutate the passed `data` object directly. Returning a fresh object silently drops your changes.
 
 Hooks are an escape hatch. If you find yourself running queries or reconciling state inside a hook, stop — that work belongs in a service or in a `prepare-*` step before the resource is constructed.
+
+## Typed output
+
+`defineResource()` reads the literal cast strings in `schema` and types `toJSON()` with them. Nothing is annotated by hand.
+
+```ts title="src/app/users/resources/user.resource.ts"
+import { defineResource, type ResourceOutput } from "@warlock.js/core";
+
+export const UserResource = defineResource({
+  schema: {
+    id: "number",
+    name: "string?",
+    tags: "string[]",
+    createdAt: "date",
+  },
+});
+
+export type UserJson = ResourceOutput<typeof UserResource>;
+// { id: number; name: string | null; tags: string[]; createdAt: { iso: string; format: string; timestamp: number; humanTime: string } }
+
+const json = new UserResource(user).toJSON(); // typed as UserJson
+```
+
+`ResourceOutput<R>` takes the resource class or an instance (`InstanceType<typeof UserResource>`).
+
+How each schema entry is typed:
+
+| Schema entry                                                      | Output type                                                           |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `"string"`, `"localized"`, `"url"`, `"uploadsUrl"`, `"storageUrl"` | `string`                                                              |
+| `"number"`, `"float"`, `"int"`                                    | `number`                                                              |
+| `"boolean"`                                                       | `boolean`                                                             |
+| `"date"`                                                          | `{ iso: string; format: string; timestamp: number; humanTime: string }` (the default date output) |
+| `"object"` / `"array"`                                            | `Record<string, unknown>` / `unknown[]`                               |
+| `"x[]"`                                                           | array of the base type                                                |
+| `"x?"`                                                            | `T \| null`; the key is always present, never optional               |
+| a nested resource, `lazy(() => R)`                                | that resource's output (one object, even if the model holds an array) |
+| `"self"` / `"self[]"`                                             | this resource's own output / an array of it                           |
+| `["inputKey", "cast"]` tuple                                      | the cast's type                                                       |
+| a resolver function                                               | its return type (an `any` return becomes `unknown`)                   |
+| a field builder (`this.date()...`, `new ResourceFieldBuilder(...)`) | `unknown`                                                             |
+
+The type reflects the schema only, not the data: mark a field `?` when the model may not have a value. `boot`, `extend`, `transform` and builders can change the real shape; when they do, state the output with a type argument, which replaces the inferred type:
+
+```ts title="src/app/products/resources/product.resource.ts"
+import { defineResource } from "@warlock.js/core";
+
+type ProductJson = { id: number; title: string; priceLabel: string };
+
+export const ProductResource = defineResource<ProductJson>({
+  schema: { id: "number", title: "string", price: "number" },
+  transform: (data) => {
+    data.priceLabel = `$${data.price}`;
+    delete data.price;
+
+    return data;
+  },
+});
+```
+
+`transform` still mutates `data` in place (see Hooks); the returned value is ignored at runtime, but the option type requires a return. `ProductJson` is what consumers of `ResourceOutput<typeof ProductResource>` see.
+
+### `Serialized<T, W>` — what the client receives
+
+`Serialized<T, W>` is the type of a value after Warlock serializes it. `W` is the wire: `"json"` (default) for API responses, `"devalue"` for web page loader data. It is exported from `@warlock.js/core`.
+
+```ts
+import type { Serialized } from "@warlock.js/core";
+
+type Payload = Serialized<{ createdAt: Date; note?: string }>;
+// { createdAt: string; note?: string }
+```
+
+Rules, in the order the runtime applies them:
+
+- Primitives, `Buffer` and `Uint8Array` pass through. `any` and `unknown` stay as they are.
+- On `"devalue"`, `Date`, `RegExp`, `URL`, `Map` and `Set` stay native. On `"json"`, a `Map` becomes a record and a `Set` an array.
+- A cascade model becomes its resource's output (next section); with no registry entry it becomes its serialized `data` type.
+- Anything with `toJSON()` becomes the (awaited) serialized result, which is how a `Date` becomes a `string` on `"json"`.
+- Arrays map item by item. Functions are dropped from objects.
+- On `"json"`, a key whose value can be `undefined` becomes optional, because `JSON.stringify` omits it.
+- A class with private or protected members and no `toJSON()` maps to its public data on `"json"` and to `never` on `"devalue"` (devalue throws on it at render). `Error` is `{}` on `"json"`.
+- Nesting is walked to a fixed depth (8), then the type is `unknown`.
+
+### `ModelResourceRegistry` — map a model to its resource
+
+`Model.resource` is typed loosely, so a model type cannot reveal its resource by itself. You don't write the mapping: `warlock generate.typings` and `warlock dev` generate `.warlock/typings/model-resources.d.ts` from every model that declares `static resource = SomeResource`:
+
+```ts title=".warlock/typings/model-resources.d.ts (generated)"
+declare module "@warlock.js/core" {
+  interface ModelResourceRegistry {
+    "User": { model: import("../../src/app/users/models/user.model").User; resource: typeof import("../../src/app/users/resources/user.resource").UserResource };
+  }
+}
+```
+
+`Serialized<User>` then resolves to `ResourceOutput<typeof UserResource>` instead of the raw model data (so hidden columns such as a password never appear in the type). The generator reads the model file statically and resolves the identifier through its imports (named, aliased or default, or a resource declared in the same file). It skips anything it cannot resolve statically (a computed value, `lazy(...)`, a namespace import): that model keeps its raw data type. Your `tsconfig.json` must include `.warlock/typings/*.d.ts` (new apps do). `@warlock.js/web` uses the same registry to type page loader data.
 
 ## Attaching to a model
 
@@ -2230,6 +2366,130 @@ Password hashing (`hashPassword`) needs `bcryptjs`, which is its own install —
 - [`hash-password/SKILL.md`](../hash-password/SKILL.md) — bcrypt password hashing (the third member of the encryption module, but a different job entirely).
 - [`configure-app/SKILL.md`](../configure-app/SKILL.md) — `src/config/encryption.ts` and env wiring.
 - [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — service layering, where the encryption boundary should sit.
+
+
+## generate-openapi  `@warlock.js/core/generate-openapi/SKILL.md`
+
+---
+name: generate-openapi
+description: 'Generate an OpenAPI 3.1 document from the registered routes with `warlock generate.openapi` (default `storage/openapi/openapi.json`) and read it live in the dev-only API docs page at `/__warlock/docs`. Documents paths, path/query parameters, request bodies from Seal validation, responses from `handler.responseSchema`, 401/422 and bearer/cookie security from `authMiddleware()`. Triggers: `generate.openapi`, `openApiGeneratorCommand`, `buildOpenApiDocument`, `getDevelopmentOpenApiDocument`, `responseSchema`, `--include-pages`, `/__warlock/docs`; "OpenAPI", "Swagger", "API docs", "import my API into Postman or Insomnia", "document my routes". Skip: declaring response types on a handler — `@warlock.js/core/create-controller/SKILL.md`; the devtools dashboard — `@warlock.js/devtools/devtools-overview/SKILL.md`; listing routes — `@warlock.js/core/warlock-routes/SKILL.md`.'
+---
+
+# Warlock — generate an OpenAPI document
+
+`warlock generate.openapi` writes an OpenAPI 3.1 JSON document derived from the routes your app registers. Nothing is annotated by hand: the document reads the route table, each handler's `validation`, `description` and `responseSchema`, and the auth middleware on the route.
+
+```bash
+npx warlock generate.openapi
+# OpenAPI 3.1.0 written to <root>/storage/openapi/openapi.json (12 paths, 17 operations).
+```
+
+Routes are read in the same isolated registration child process `warlock build` uses: your route modules are imported, **no connector starts** (no database, cache or socket), and the running dev server is untouched. If the app cannot be loaded the command fails; gaps in a single route never fail it, they are printed as warnings. The child honours `WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS`.
+
+## Options
+
+| Option            | Default                                        | Meaning                                                      |
+| ----------------- | ---------------------------------------------- | ------------------------------------------------------------ |
+| `--out`, `-o`     | `storage/openapi/openapi.json`                 | Output file, relative to the project root. Parent folders are created. |
+| `--title`         | `name` in `package.json` (else `Warlock API`)  | `info.title`. `info.version` is the `package.json` version (else `0.0.0`); `info.description` is its `description`. |
+| `--server`        | `http://<host>:<port>` from the `http` config  | `servers[0].url`. A wildcard host (`0.0.0.0`, `::`) becomes `localhost`. |
+| `--include-pages` | off                                            | Also document page (SSR) routes; each is a `200` with `text/html`. |
+
+```bash
+npx warlock generate.openapi --out docs/openapi.json --title "Shop API" --server https://api.shop.test
+```
+
+## What is documented
+
+| Part                    | Source                                                                                          |
+| ----------------------- | ----------------------------------------------------------------------------------------------- |
+| Paths                   | `:id` becomes `{id}`. An `all` route expands into one operation per verb (get, post, put, patch, delete, options, head). |
+| `operationId`           | The route `name` (`name.<verb>` when an `all` route expands), else `<verb>_<path_slug>`. Duplicates are renamed with a warning. |
+| Tag                     | The first static path segment (`/users/:id` is tagged `users`).                                  |
+| Summary / description   | The route `label`; the route or handler `description`, plus a line about required user types and the cookie CSRF rule when the route is guarded. |
+| Path parameters         | `validation.params` gives typed ones; a path segment with no schema is a required `string`.       |
+| Request body / query    | `validation.schema`, converted with the Seal schema's JSON Schema output. It is the JSON request body for POST/PUT/PATCH and query parameters for GET/HEAD/DELETE, following `validating` the way validation reads the request. |
+| Responses               | `handler.responseSchema`, one response per declared status (see below). A route with no 2xx declared gets a `200` description only. |
+| `422`                   | Added when the route has `validation.schema`, shaped by `validation.response` (`errors`, `inputKey`, `inputError`, `status`; `Response.failedSchema` defaults to 422). Stored once as `components.schemas.ValidationFailed`. A route with only `validation.params` gets none. |
+| `401`                   | Added when the route is guarded, as `{ error: string }` (`components.schemas.Unauthorized`). A status you declare yourself is kept. |
+| Security                | `authMiddleware()` tags the middleware it returns with a `Symbol.for("warlock.auth")` descriptor (`{ sources, userTypes }`); core reads it without importing auth. A header source is `bearerAuth` (HTTP bearer), a cookie source is `cookieAuth` (API key in that cookie); header plus cookie is an OR. Only the schemes a route uses are emitted. Middleware without a descriptor adds nothing. |
+
+### Responses from `responseSchema`
+
+The grammar is the one described in [`create-controller`](../create-controller/SKILL.md#declaring-response-types-with-responseschema): cast strings with suffixes, a resource, `[Resource]`, nested objects.
+
+```ts
+loginController.responseSchema = {
+  200: { body: { user: UserResource, token: "string" } },
+  400: { body: { error: "string" } },
+};
+```
+
+becomes
+
+```json
+"200": {
+  "description": "Successful response",
+  "content": {
+    "application/json": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "user": { "$ref": "#/components/schemas/UserResource" },
+          "token": { "type": "string" }
+        },
+        "required": ["user", "token"]
+      }
+    }
+  }
+}
+```
+
+- A cast maps to JSON Schema: `string` and `localized` to `string`, `url`/`uploadsUrl`/`storageUrl` to `string` with `format: uri`, `number`/`float` to `number`, `int` to `integer`, `boolean`, `object`, `array`, and `date` to the default date object (`iso`, `format`, `timestamp`, `humanTime`). `x[]` is an array; `x?` is `type: [T, "null"]`.
+- A resource becomes a `components.schemas` entry named after its export (`UserResource`) and every use is a `$ref`. Nested, lazy and `"self"` fields reference the same entry. A resource that is not exported from a `*.resource.ts(x)` file gets a generic name.
+- Every listed key is marked `required`.
+
+## Warnings
+
+What cannot be described statically is documented as `{}` and listed after the run. Common ones: a field builder or resolver function in a resource, an unknown cast, a `validation.validate` hook (custom middleware is not documented), a `validation.schema` that is not an object schema, an already-documented method+path, and a malformed auth descriptor. Fix them by declaring the field with a cast string.
+
+## Live in development
+
+With `@warlock.js/devtools` installed (`warlock add devtools`), `warlock dev` serves the same document:
+
+- `http://localhost:<port>/__warlock/docs` renders it with Scalar. The dashboard has an **API** tab that embeds the same page.
+- `GET /__warlock/api/openapi.json` returns the raw document, rebuilt from the routes registered in the running process on every request; it answers `503` when the host provides no generator.
+- It is built in-process by `getDevelopmentOpenApiDocument()` (exported from `@warlock.js/core`; it throws outside `warlock dev`), so it follows your edits with no CLI run. Page routes are not included; each distinct warning is logged once per process.
+- Devtools is dev-only and loopback-only, and the page makes no outside request (Scalar is vendored, no CDN).
+
+## Use the file in a client
+
+The output is plain OpenAPI 3.1 JSON, so any tool that reads an OpenAPI file can use it: import `storage/openapi/openapi.json` into Postman or Insomnia (their Import action), or feed it to a client generator. Support for 3.1 is the tool's; if an old version refuses it, update the tool. Regenerate the file whenever routes change, or commit it if you publish it.
+
+## Programmatic use
+
+`buildOpenApiDocument(routes, context)` is exported from `@warlock.js/core`: a pure function from `router.list()` routes to `{ document, warnings }`. `context` carries `info`, `servers`, `includePages`, `resolveResourceName` and `validationResponse`. Use it to build the document inside your own tooling; the CLI uses the same function inside the registration child.
+
+```ts
+import { buildOpenApiDocument, router } from "@warlock.js/core";
+
+const { document, warnings } = buildOpenApiDocument(router.list(), {
+  info: { title: "Shop API", version: "1.0.0" },
+});
+```
+
+## Gotchas
+
+- **The document describes what you declare.** A route with no `responseSchema` documents only a `200` description; nothing is inferred from the controller body.
+- **Export each resource from its own `*.resource.ts` file** so the schema component is named after it.
+- **Seal validators are converted in the child process**, so the document always reflects the schema the app actually registers.
+- **The 401 body is `{ error: string }`.** The auth middleware's real rejection also carries an `errorCode`; the document does not list it.
+
+## See also
+
+- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — `validation`, `description` and `responseSchema` on a handler.
+- [`define-resource/SKILL.md`](../define-resource/SKILL.md) — resources, which become `components.schemas`.
+- [`warlock-routes/SKILL.md`](../warlock-routes/SKILL.md) — list the routes the document is built from.
 
 
 ## hash-password  `@warlock.js/core/hash-password/SKILL.md`
@@ -8428,10 +8688,10 @@ const updateAvatarSchema = v.object({
 
 ## What the framework sends on failure
 
-The framework calls `response.failedSchema(result)` which sends `400` with the shape configured under `validation.response` (defaults shown):
+The framework calls `response.failedSchema(result)` which sends `422` by default (set `validation.response.status` to change it) with the shape configured under `validation.response` (defaults shown):
 
 ```jsonc
-// 400 Bad Request
+// 422 Unprocessable Entity
 {
   "errors": [
     { "input": "email", "error": "The email must be a valid email" },
