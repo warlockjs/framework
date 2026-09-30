@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `http.rateLimit.ipv6Subnet` sets the IPv6 prefix length the global rate limiter groups clients by (default `64`).
 - Module `src/app/<module>/utils/locales.json` dictionaries register translations with the module folder as their default group; root `$group` overrides it. Dictionaries strictly validate their JSON and translation shape, and reject duplicate key ownership. `utils/locales.ts` still works but is deprecated and will be removed in v6 (its warning ships separately).
 - `parseLocaleDictionary()` is public for tooling that needs to validate and flatten a module locale dictionary without loading application code.
+- `validation.params` validates route parameters with a Seal object schema. Number and boolean validators coerce the string segments, the parsed values replace `request.params`, and they merge into the validated data (params win over body keys). Failures answer like a body-schema failure. Routes without `params` still see raw strings.
+- `warlock doctor` warns about each legacy `utils/locales.ts` file, and `warlock doctor --fix` converts the safe ones (a single `groupedTranslations` call with a literal object) to `locales.json`. It checks the JSON flattens to the same keys before deleting the `.ts` file. Anything else is reported as a manual migration with the reason. Comments in the converted file are not kept.
 
 ### Changed
 
