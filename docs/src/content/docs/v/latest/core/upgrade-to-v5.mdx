@@ -20,7 +20,7 @@ For the upgrade itself, move the `@warlock.js/*` packages you use to v5 together
 
 ### `request.user` moved to `request.locals.user` (BREAKING)
 
-The authenticated user no longer lives at `request.user`. It's now `request.locals.user`, written by `@warlock.js/auth`'s middleware — `RequestUser`, the augmentable interface your app narrows to its own model, moved from `@warlock.js/core` into `@warlock.js/auth` alongside it. In development, reading `request.user` throws a new `RequestUserMovedError` naming the new location (kept for one release as a migration diagnostic — not silent, but not present forever either); `request.clearCurrentUser()` is removed with no direct replacement.
+The authenticated user no longer lives at `request.user`. It's now `request.locals.user`, written by `@warlock.js/auth`'s middleware — `RequestUser`, the augmentable interface your app narrows to its own model, moved from `@warlock.js/core` into `@warlock.js/auth` alongside it. From 5.12 to 5.25, reading `request.user` in development threw `RequestUserMovedError` naming the new location; 5.26 removed that diagnostic, so `request.user` no longer exists on `Request` and TypeScript flags any remaining use; `request.clearCurrentUser()` is removed with no direct replacement.
 
 **Before (removed)**
 
