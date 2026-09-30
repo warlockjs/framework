@@ -92,8 +92,8 @@ export const bullBoardFeature: FeatureDefinition = {
     "Installs @bull-board/api and @bull-board/fastify and adds a dashboard block to src/config/queue.ts. Adds the queue feature first when it is missing.",
   requires: ["queue"],
   dependencies: {
-    "@bull-board/api": "^9.10.1",
-    "@bull-board/fastify": "^9.10.1",
+    "@bull-board/api": "^9.10.2",
+    "@bull-board/fastify": "^9.10.2",
   },
   onExecuting: completeBullBoardInstallation,
 };
