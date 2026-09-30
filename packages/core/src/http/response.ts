@@ -1077,12 +1077,20 @@ export class Response {
     const { raw, ...cookieOptions } = options;
     const defaultOptions = config.get("http.cookies.options", {});
     const serializedValue = raw ? String(value) : JSON.stringify(value);
-
-    this.baseResponse.setCookie(name, serializedValue, {
+    const mergedCookieOptions = {
       ...secureCookieDefaults(),
       ...defaultOptions,
       ...cookieOptions,
-    });
+    };
+
+    if (
+      typeof mergedCookieOptions.maxAge === "number" &&
+      Number.isFinite(mergedCookieOptions.maxAge)
+    ) {
+      mergedCookieOptions.maxAge = Math.trunc(mergedCookieOptions.maxAge);
+    }
+
+    this.baseResponse.setCookie(name, serializedValue, mergedCookieOptions);
 
     return this;
   }
