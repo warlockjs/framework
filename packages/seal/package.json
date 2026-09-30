@@ -25,7 +25,7 @@
     "environment": "universal"
   },
   "dependencies": {
-    "@mongez/supportive-is": "^2.1.5",
+    "@mongez/supportive-is": "^3.0.0",
     "@mongez/reinforcements": "^4.0.2",
     "dayjs": "^1.11.9"
   },

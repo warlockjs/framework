@@ -6,6 +6,14 @@ import { BaseValidator } from "./base-validator";
 import { LiteralValidator } from "./literal-validator";
 import { ObjectValidator } from "./object-validator";
 
+/** A literal value a discriminator field can hold (the key type of the branch map). */
+type DiscriminatorValue = string | number | boolean;
+
+/** Whether a value read from the payload can be a discriminator key. */
+function isDiscriminatorValue(value: unknown): value is DiscriminatorValue {
+  return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+}
+
 /**
  * Discriminated union validator — routes payloads by a shared discriminator field.
  *
@@ -42,7 +50,7 @@ export class DiscriminatedUnionValidator<
   Branches extends ReadonlyArray<ObjectValidator<any>> = ReadonlyArray<ObjectValidator<any>>,
 > extends BaseValidator {
   /** Map from discriminator literal value → matching branch validator. */
-  private branches: Map<string | number | boolean, ObjectValidator<any>>;
+  private branches: Map<DiscriminatorValue, ObjectValidator<any>>;
 
   public constructor(
     public discriminator: K,
@@ -61,8 +69,8 @@ export class DiscriminatedUnionValidator<
   private static buildBranchMap(
     discriminator: string,
     validators: ReadonlyArray<ObjectValidator<any>>,
-  ): Map<string | number | boolean, ObjectValidator<any>> {
-    const map = new Map<string | number | boolean, ObjectValidator<any>>();
+  ): Map<DiscriminatorValue, ObjectValidator<any>> {
+    const map = new Map<DiscriminatorValue, ObjectValidator<any>>();
 
     for (const branch of validators) {
       const discriminatorValidator = branch.schema?.[discriminator];
@@ -116,7 +124,9 @@ export class DiscriminatedUnionValidator<
     }
 
     const discriminatorValue = data[this.discriminator];
-    const branch = this.branches.get(discriminatorValue);
+    const branch = isDiscriminatorValue(discriminatorValue)
+      ? this.branches.get(discriminatorValue)
+      : undefined;
 
     if (!branch) {
       const allowed = [...this.branches.keys()].map((k) => String(k)).join(", ");
