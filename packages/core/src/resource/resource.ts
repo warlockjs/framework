@@ -18,7 +18,7 @@ const MAX_SELF_DEPTH = 10;
 /**
  * Resource contract
  */
-export interface ResourceContract {
+export interface ResourceContract<Out = GenericObject> {
   /**
    * Resource data
    */
@@ -37,7 +37,7 @@ export interface ResourceContract {
   /**
    * Convert resource to JSON
    */
-  toJSON(): GenericObject;
+  toJSON(): Out;
 
   /**
    * Transform the given value with given type
@@ -108,8 +108,8 @@ export interface ResourceContract {
 /**
  * Resource constructor
  */
-export interface ResourceConstructor {
-  new (originalData: GenericObject | Resource | Model): ResourceContract;
+export interface ResourceConstructor<Out = GenericObject> {
+  new (originalData: GenericObject | Resource | Model): ResourceContract<Out>;
 }
 
 export class Resource implements ResourceContract {

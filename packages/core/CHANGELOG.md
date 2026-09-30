@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.27.0
+
+### Added
+
+- **Typed resource output.** `defineResource()` infers the `toJSON()` output type from the schema's cast strings (`"string?"` is `string | null`, `"date"` is the default `{ iso; format; timestamp; humanTime }` object, nested and `"self"` resources resolve to their own output). Read it with `ResourceOutput<typeof UserResource>`. When `transform`/`boot`/builders change the shape, state it: `defineResource<ProductJson>({ ... })`. Builder fields are `unknown`.
+- **`Serialized<T, W>`**: the type of what the client receives after Warlock serializes `T`, for API responses (`"json"`, default) and page loader data (`"devalue"`). Dates become strings on JSON, `toJSON()` results are used, functions are dropped, and models map to their resource through the augmentable `ModelResourceRegistry`.
+
 ## 5.26.0 - 2026-09-30
 
 ### Upgrading

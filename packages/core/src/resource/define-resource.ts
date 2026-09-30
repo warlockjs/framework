@@ -1,14 +1,16 @@
 import { Resource, type ResourceConstructor, type ResourceContract } from "./resource";
-import type { ResourceSchema } from "./types";
+import type { ResourceOutputOf, ResourceSchema } from "./types";
 
 /**
  * Options for defining a resource
+ *
+ * `S` is the literal schema type; it is what `defineResource` reads the output type from.
  */
-export type DefineResourceOptions = {
+export type DefineResourceOptions<S extends ResourceSchema = ResourceSchema> = {
   /**
    * Resource schema - field mapping configuration
    */
-  schema: ResourceSchema;
+  schema: S;
 
   /**
    * Optional: Boot hook - called before transformation
@@ -32,6 +34,20 @@ export type DefineResourceOptions = {
  * This utility creates a Resource class without the boilerplate,
  * perfect for simple use cases.
  *
+ * The JSON output type is inferred from the literal cast strings in `schema`,
+ * so `toJSON()` is typed instead of a generic object:
+ * - `"string"`, `"localized"`, `"url"`, `"uploadsUrl"`, `"storageUrl"` -> `string`
+ * - `"number"`, `"float"`, `"int"` -> `number`; `"boolean"` -> `boolean`
+ * - `"date"` -> `{ iso; format; timestamp; humanTime }` (the default date output)
+ * - `"object"` -> `Record<string, unknown>`; `"array"` -> `unknown[]`
+ * - `[]` -> array of the cast, `?` -> `T | null` (always present, never an optional key)
+ * - nested resources, lazy resources, `["inputKey", cast]` tuples, resolver functions,
+ *   `arrayOf` schemas and `"self"` / `"self[]"` resolve to their own output type
+ * - builder fields (`this.date().format(...)`) are `unknown`
+ *
+ * The type reflects the schema only. When `transform`, `boot`, `extend` or a builder
+ * changes the real shape, declare the output yourself with an explicit type argument.
+ *
  * @param options - Resource configuration
  * @returns A Resource class
  *
@@ -41,32 +57,51 @@ export type DefineResourceOptions = {
  * export const UserResource = defineResource({
  *   schema: {
  *     id: "number",
- *     name: "string",
- *     email: "string",
+ *     name: "string?",
+ *     tags: "string[]",
  *   },
  * });
  *
- * // With hooks
+ * // Usage — json is { id: number; name: string | null; tags: string[] }
+ * const json = new UserResource(user).toJSON();
+ *
+ * // Read the output type elsewhere
+ * type UserJson = ResourceOutput<typeof UserResource>;
+ *
+ * // Self reference
  * export const CategoryResource = defineResource({
  *   schema: {
  *     id: "number",
  *     name: "localized",
- *     children: CategoryResource,
+ *     children: "self[]",
  *   },
+ * });
+ *
+ * // Explicit output: the hooks change the shape, so you state it.
+ * // `defineResource<Out>(...)` replaces the inferred type with `Out`.
+ * type ProductJson = { id: number; title: string; priceLabel: string };
+ *
+ * export const ProductResource = defineResource<ProductJson>({
+ *   schema: { id: "number", title: "string", price: "number" },
  *   transform: (data) => {
- *     // Filter inactive children
- *     if (data.children) {
- *       data.children = data.children.filter(c => c.isActive);
- *     }
+ *     data.priceLabel = "$" + data.price;
+ *     delete data.price;
+ *
  *     return data;
  *   },
  * });
  *
- * // Usage
- * const json = new UserResource(user).toJSON();
+ * // A cast also works when the declared type overlaps the inferred one:
+ * // defineResource({ schema, transform }) as ResourceConstructor<ProductJson>
  * ```
  */
-export function defineResource(options: DefineResourceOptions): ResourceConstructor {
+export function defineResource<const S extends ResourceSchema>(
+  options: DefineResourceOptions<S>,
+): ResourceConstructor<ResourceOutputOf<S>>;
+export function defineResource<Out extends object, const S extends ResourceSchema = ResourceSchema>(
+  options: DefineResourceOptions<S>,
+): ResourceConstructor<Out>;
+export function defineResource(options: DefineResourceOptions): ResourceConstructor<unknown> {
   const resource = class AnonymousResource extends Resource {
     static schema = options.schema;
 
@@ -91,5 +126,6 @@ export function defineResource(options: DefineResourceOptions): ResourceConstruc
   // (including [] and ? suffixes) into pre-built ResourceFieldBuilder instances
   resource.parsedSchema = Resource.normalizeSchema(resource.schema);
 
-  return resource as any as ResourceConstructor;
+  // The runtime class is untyped; the overloads above carry the output type.
+  return resource as unknown as ResourceConstructor<unknown>;
 }
