@@ -6,12 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
-## 5.26.1 - 2026-09-30
-
-### Fixed
-
-- Republish of 5.26.0 with no code changes. npm accepted `@warlock.js/ai@5.26.0` but held it in a staged state that never became visible (npm/cli#9889), so 5.26.0 cannot be installed together with the AI packages. Use 5.26.1; 5.26.0 is deprecated.
-
 ## 5.26.0 - 2026-09-30
 
 ### Upgrading
