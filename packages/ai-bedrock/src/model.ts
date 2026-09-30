@@ -362,6 +362,10 @@ export class BedrockModel implements ModelContract {
     const last = messages.length - 1;
     const lastMessage = messages[last];
 
+    if (!lastMessage) {
+      return messages;
+    }
+
     return [
       ...messages.slice(0, last),
       {

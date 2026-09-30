@@ -10,6 +10,14 @@ import {
 import { describe, expect, it } from "vitest";
 import { BedrockModel } from "./model";
 
+/** The first recorded request; fails the test when none was made. */
+function firstCall<T>(calls: readonly T[]): T {
+  const call = calls[0];
+  if (call === undefined) throw new Error("expected the fake client to have been called");
+  return call;
+}
+
+
 type AnyCommand = ConverseCommand | ConverseStreamCommand;
 
 function makeFakeClient(options: {
@@ -103,10 +111,10 @@ describe("BedrockModel.complete()", () => {
       { role: "user", content: "hi" },
     ]);
 
-    expect(calls[0].modelId).toBe("anthropic.claude-sonnet-4-5-20250929-v1:0");
-    expect(calls[0].system).toEqual([{ text: "Be concise." }]);
-    expect(calls[0].messages).toEqual([{ role: "user", content: [{ text: "hi" }] }]);
-    expect(calls[0].inferenceConfig).toEqual({ maxTokens: 512, temperature: 0.4 });
+    expect(firstCall(calls).modelId).toBe("anthropic.claude-sonnet-4-5-20250929-v1:0");
+    expect(firstCall(calls).system).toEqual([{ text: "Be concise." }]);
+    expect(firstCall(calls).messages).toEqual([{ role: "user", content: [{ text: "hi" }] }]);
+    expect(firstCall(calls).inferenceConfig).toEqual({ maxTokens: 512, temperature: 0.4 });
   });
 
   it("omits unset inference params and per-call options override config", async () => {
@@ -114,7 +122,7 @@ describe("BedrockModel.complete()", () => {
     const model = new BedrockModel(client, { name: "amazon.nova-pro-v1:0" });
 
     await model.complete([{ role: "user", content: "hi" }]);
-    expect(calls[0].inferenceConfig).toEqual({});
+    expect(firstCall(calls).inferenceConfig).toEqual({});
 
     await model.complete([{ role: "user", content: "hi" }], { maxTokens: 64, temperature: 0.9 });
     expect(calls[1].inferenceConfig).toEqual({ maxTokens: 64, temperature: 0.9 });
@@ -209,7 +217,7 @@ describe("BedrockModel.complete()", () => {
     const schema = { type: "object", properties: { summary: { type: "string" } } };
     await model.complete([{ role: "user", content: "hi" }], { responseSchema: schema });
 
-    expect(calls[0].outputConfig).toEqual({
+    expect(firstCall(calls).outputConfig).toEqual({
       textFormat: {
         type: "json_schema",
         structure: { jsonSchema: { name: "response", schema: JSON.stringify(schema) } },
@@ -398,7 +406,7 @@ describe("BedrockModel.complete()", () => {
       ],
     });
 
-    expect(calls[0].toolConfig).toEqual({
+    expect(firstCall(calls).toolConfig).toEqual({
       tools: [
         {
           toolSpec: {
@@ -887,10 +895,10 @@ describe("BedrockModel.stream()", () => {
       ]),
     );
 
-    expect(calls[0].modelId).toBe("amazon.nova-pro-v1:0");
-    expect(calls[0].system).toEqual([{ text: "S" }]);
-    expect(calls[0].messages).toEqual([{ role: "user", content: [{ text: "hi" }] }]);
-    expect(calls[0].inferenceConfig).toEqual({ maxTokens: 100, temperature: 0.3 });
+    expect(firstCall(calls).modelId).toBe("amazon.nova-pro-v1:0");
+    expect(firstCall(calls).system).toEqual([{ text: "S" }]);
+    expect(firstCall(calls).messages).toEqual([{ role: "user", content: [{ text: "hi" }] }]);
+    expect(firstCall(calls).inferenceConfig).toEqual({ maxTokens: 100, temperature: 0.3 });
   });
 });
 
@@ -1021,7 +1029,7 @@ describe("BedrockModel cost-truth — cacheControl breakpoints", () => {
 
     await model.complete([{ role: "user", content: "hi" }], { cacheControl: { breakpoints: 1 } });
 
-    expect(calls[0].messages).toEqual([
+    expect(firstCall(calls).messages).toEqual([
       { role: "user", content: [{ text: "hi" }, { cachePoint: { type: "default" } }] },
     ]);
   });
@@ -1032,7 +1040,7 @@ describe("BedrockModel cost-truth — cacheControl breakpoints", () => {
 
     await model.complete([{ role: "user", content: "hi" }], { cacheControl: { breakpoints: 1 } });
 
-    expect(calls[0].messages).toEqual([{ role: "user", content: [{ text: "hi" }] }]);
+    expect(firstCall(calls).messages).toEqual([{ role: "user", content: [{ text: "hi" }] }]);
   });
 
   it("no-ops the cachePoint when breakpoints is absent or zero", async () => {
@@ -1042,7 +1050,7 @@ describe("BedrockModel cost-truth — cacheControl breakpoints", () => {
     });
 
     await model.complete([{ role: "user", content: "hi" }]);
-    expect(calls[0].messages).toEqual([{ role: "user", content: [{ text: "hi" }] }]);
+    expect(firstCall(calls).messages).toEqual([{ role: "user", content: [{ text: "hi" }] }]);
 
     await model.complete([{ role: "user", content: "hi" }], { cacheControl: { breakpoints: 0 } });
     expect(calls[1].messages).toEqual([{ role: "user", content: [{ text: "hi" }] }]);
@@ -1063,7 +1071,7 @@ describe("BedrockModel cost-truth — cacheControl breakpoints", () => {
       { cacheControl: { breakpoints: 1 } },
     );
 
-    expect(calls[0].messages).toEqual([
+    expect(firstCall(calls).messages).toEqual([
       { role: "user", content: [{ text: "first" }] },
       { role: "assistant", content: [{ text: "reply" }] },
       { role: "user", content: [{ text: "second" }, { cachePoint: { type: "default" } }] },
@@ -1080,7 +1088,7 @@ describe("BedrockModel cost-truth — reasoning / thinking", () => {
 
     await model.complete([{ role: "user", content: "hi" }], { reasoning: { maxTokens: 2048 } });
 
-    expect(calls[0].additionalModelRequestFields).toEqual({
+    expect(firstCall(calls).additionalModelRequestFields).toEqual({
       thinking: { type: "enabled", budget_tokens: 2048 },
     });
   });
@@ -1136,7 +1144,7 @@ describe("BedrockModel cost-truth — reasoning / thinking", () => {
     await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "xhigh" } });
     await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "max" } });
 
-    expect(calls[0].additionalModelRequestFields).toEqual({
+    expect(firstCall(calls).additionalModelRequestFields).toEqual({
       thinking: { type: "enabled", budget_tokens: 1024 },
     });
     expect(calls[1].additionalModelRequestFields).toEqual({
@@ -1166,7 +1174,7 @@ describe("BedrockModel cost-truth — reasoning / thinking", () => {
       reasoning: { effort: "low", maxTokens: 9000 },
     });
 
-    expect(calls[0].additionalModelRequestFields).toEqual({
+    expect(firstCall(calls).additionalModelRequestFields).toEqual({
       thinking: { type: "enabled", budget_tokens: 9000 },
     });
   });
@@ -1218,7 +1226,7 @@ describe("BedrockModel cost-truth — reasoning / thinking", () => {
       model.stream([{ role: "user", content: "hi" }], { reasoning: { effort: "medium" } }),
     );
 
-    expect(calls[0].additionalModelRequestFields).toEqual({
+    expect(firstCall(calls).additionalModelRequestFields).toEqual({
       thinking: { type: "enabled", budget_tokens: 4096 },
     });
   });
