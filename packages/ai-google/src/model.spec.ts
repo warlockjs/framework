@@ -242,13 +242,16 @@ describe("GoogleModel.complete()", () => {
     expect(calls[0].config).toMatchObject({ thinkingConfig: { thinkingBudget: 4096 } });
   });
 
-  it("buckets reasoning.effort into a thinkingBudget; maxTokens wins when both set", async () => {
+  it("buckets every reasoning.effort into a supported thinkingBudget; maxTokens wins when both set", async () => {
     const { ai, calls } = makeFakeAI({ response: baseResponse });
     const model = new GoogleModel(ai, { name: "gemini-2.5-flash" });
 
+    await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "minimal" } });
     await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "low" } });
     await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "medium" } });
     await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "high" } });
+    await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "xhigh" } });
+    await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "max" } });
     await model.complete([{ role: "user", content: "hi" }], {
       reasoning: { effort: "low", maxTokens: 9999 },
     });
@@ -257,13 +260,22 @@ describe("GoogleModel.complete()", () => {
       thinkingBudget: 1024,
     });
     expect((calls[1].config as Record<string, unknown>).thinkingConfig).toEqual({
-      thinkingBudget: 8192,
+      thinkingBudget: 1024,
     });
     expect((calls[2].config as Record<string, unknown>).thinkingConfig).toEqual({
+      thinkingBudget: 8192,
+    });
+    expect((calls[3].config as Record<string, unknown>).thinkingConfig).toEqual({
+      thinkingBudget: 24576,
+    });
+    expect((calls[4].config as Record<string, unknown>).thinkingConfig).toEqual({
+      thinkingBudget: 24576,
+    });
+    expect((calls[5].config as Record<string, unknown>).thinkingConfig).toEqual({
       thinkingBudget: 24576,
     });
     // explicit maxTokens overrides the effort bucket
-    expect((calls[3].config as Record<string, unknown>).thinkingConfig).toEqual({
+    expect((calls[6].config as Record<string, unknown>).thinkingConfig).toEqual({
       thinkingBudget: 9999,
     });
   });

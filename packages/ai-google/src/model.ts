@@ -34,12 +34,18 @@ const LOG_MODULE = "ai.google";
  * `reasoning.effort` levels when the caller gives no explicit
  * `reasoning.maxTokens`. Gemini 2.5 accepts a positive budget as a cap
  * on the thinking phase; these mirror the spread the OpenAI
- * `reasoning_effort` low/medium/high tiers imply.
+ * `reasoning_effort` low/medium/high tiers imply. The installed
+ * `@google/genai` `ThinkingConfig` declaration documents that allowed
+ * ranges are model-dependent, so retain the existing conservative 24,576
+ * cap for the new tiers rather than sending a budget unsupported by Flash.
  */
 const EFFORT_THINKING_BUDGET: Record<Exclude<ReasoningEffort, "none">, number> = {
+  minimal: 1024,
   low: 1024,
   medium: 8192,
   high: 24576,
+  xhigh: 24576,
+  max: 24576,
 };
 
 /**
