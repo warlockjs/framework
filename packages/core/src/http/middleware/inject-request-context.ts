@@ -218,7 +218,7 @@ function handleRequestError(
 /**
  * Translate a keyword (uses request context for locale)
  */
-export function t(keyword: string, placeholders?: any) {
+export function t(keyword: string, placeholders?: Record<string, unknown>): string {
   return (
     requestContextInstance.getRequest()?.trans(keyword, placeholders) ||
     trans(keyword, placeholders)

@@ -41,6 +41,9 @@ type StandardHeaders = {
 
 type HeaderKeys = keyof StandardHeaders;
 
+/** A request-bound translator: keyword in, translated string out. */
+export type RequestTranslator = (keyword: string, placeholders?: Record<string, unknown>) => string;
+
 export class Request<RequestValidation = any> {
   /**
    * Underlying Fastify request — a public escape hatch to capabilities the
@@ -168,15 +171,15 @@ export class Request<RequestValidation = any> {
   public static current: Request;
 
   /**
-   * Translation method
-   * Type of it is the same as the type of trans function
+   * Translate a keyword in this request's locale. Returns the translated
+   * string, or the keyword itself when no translation exists.
    */
-  public trans: ReturnType<typeof trans> = trans;
+  public trans: RequestTranslator = trans;
 
   /**
    * Alias to trans method
    */
-  public t: ReturnType<typeof trans> = trans;
+  public t: RequestTranslator = trans;
 
   /*
    * v5 removed the `[key: string]: any` index signature (eed20184). Attaching

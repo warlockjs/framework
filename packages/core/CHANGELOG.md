@@ -30,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `request.t()`, `request.trans()` and `t()` are typed as returning `string` (they were `any`), so `title: request.t("...")` type-checks without a `String(...)` wrapper.
 - `warlock migrate` runs package migrations (such as @warlock.js/auth's token tables) before your app's migrations, whatever their dates. On a fresh database, an app migration that alters a package table used to run before the table existed. The order inside each group is unchanged.
 - `startHttpTestServer({ web: false })` now starts an API-only test server: it skips the optional web connector before its lazy lifecycle delegate constructs `WebConnector` or creates Vite. Omitting the option preserves the existing full-stack startup.
 - `response.cookie()` truncates a fractional `maxAge` to whole seconds. `@fastify/cookie` 11 rejects a non-whole `maxAge`, so a computed value such as `ttl / 1000` used to fail the response.
