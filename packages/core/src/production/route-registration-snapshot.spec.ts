@@ -65,6 +65,60 @@ describe("collectRouteRegistrationSnapshot", () => {
     expect(child.kill).toHaveBeenCalledOnce();
   });
 
+  it("accepts the optional response record as the only extra key", async () => {
+    const child = new FakeChild();
+    const result = collectRouteRegistrationSnapshot({
+      forkProcess: () => child as unknown as RouteRegistrationChildProcess,
+    });
+    const response = { "200": '{ "token": import("@warlock.js/core").CastOutput<"string"> }' };
+
+    child.emit("message", {
+      type: "route-registration:snapshot",
+      snapshot: {
+        version: 1,
+        routes: [
+          { name: "auth.login", path: "/login", method: "post", response },
+          { name: "ping", path: "/ping", method: "GET" },
+        ],
+      },
+    });
+    child.emit("close", 0);
+
+    const snapshot = await result;
+
+    expect(snapshot.routes).toEqual([
+      { name: "auth.login", path: "/login", method: "POST", response },
+      { name: "ping", path: "/ping", method: "GET" },
+    ]);
+    expect(Object.keys(snapshot.routes[1])).toEqual(["name", "path", "method"]);
+    expect(Object.isFrozen(snapshot.routes[0].response)).toBe(true);
+  });
+
+  it.each([
+    ["an unknown fourth key", { handler: "unsafe" }],
+    ["response plus another key", { response: { "200": "string" }, handler: "unsafe" }],
+    ["a non-record response", { response: "string" }],
+    ["an array response", { response: ["string"] }],
+    ["a response with a non-string type", { response: { "200": 1 } }],
+    ["a null response", { response: null }],
+  ])("refuses a route record with %s", async (_label, extra) => {
+    const child = new FakeChild();
+    const result = collectRouteRegistrationSnapshot({
+      forkProcess: () => child as unknown as RouteRegistrationChildProcess,
+    });
+
+    child.emit("message", {
+      type: "route-registration:snapshot",
+      snapshot: {
+        version: 1,
+        routes: [{ name: "users.create", path: "/users", method: "POST", ...extra }],
+      },
+    });
+
+    await expect(result).rejects.toThrow("non-browser-safe fields");
+    expect(child.kill).toHaveBeenCalledOnce();
+  });
+
   it("rejects an explicit child import failure instead of returning a stale snapshot", async () => {
     const child = new FakeChild();
     const result = collectRouteRegistrationSnapshot({

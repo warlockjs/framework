@@ -237,18 +237,32 @@ function validateSnapshot(value: unknown): RouteRegistrationSnapshot {
       throw new Error("Route registration child sent an invalid route record.");
     }
 
-    if (Object.keys(route).length !== 3) {
+    const response = route.response;
+    const allowedKeys = response === undefined ? 3 : 4;
+
+    if (
+      Object.keys(route).length !== allowedKeys ||
+      (response !== undefined && !isResponseTypeRecord(response))
+    ) {
       throw new Error("Route registration child sent a route record with non-browser-safe fields.");
     }
 
-    return Object.freeze({
+    const base = {
       name: route.name,
       path: route.path,
       method: normalizeRequestMethod(route.method),
-    });
+    };
+
+    return Object.freeze(
+      response === undefined ? base : { ...base, response: Object.freeze({ ...response }) },
+    );
   });
 
   return Object.freeze({ version: PROTOCOL_VERSION, routes: Object.freeze(routes) });
+}
+
+function isResponseTypeRecord(value: unknown): value is Record<string, string> {
+  return isRecord(value) && Object.values(value).every((entry) => typeof entry === "string");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

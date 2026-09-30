@@ -27,6 +27,7 @@ import type {
   GroupedRoutesOptions,
   HttpContext,
   NamedApiRoute,
+  NamedApiRoutesOptions,
   RequestHandler,
   RequestHandlerType,
   RequestHandlerValidation,
@@ -106,6 +107,33 @@ async function runRouteHooks(
   }
 
   return undefined;
+}
+
+/**
+ * Bound functions do not inherit static properties, so the handler metadata that
+ * documentation and typings read (`responseSchema`) is copied onto the bound copy.
+ */
+function copyResponseSchema(source: unknown, target: RequestHandler): void {
+  const responseSchema = (source as RequestHandler | undefined)?.responseSchema;
+
+  if (responseSchema) {
+    target.responseSchema = responseSchema;
+  }
+}
+
+/**
+ * Bind a restful resource method to its resource, keeping its `responseSchema`.
+ */
+function bindResourceHandler(
+  resource: RouteResource,
+  method: ResourceMethod | "bulkDelete",
+): RequestHandler {
+  const source = resource[method];
+  const handler = source?.bind(resource) as RequestHandler;
+
+  copyResponseSchema(source, handler);
+
+  return handler;
 }
 
 /**
@@ -347,6 +375,7 @@ export class Router {
       }
 
       handler = controller[action].bind(controller) as RequestHandler;
+      copyResponseSchema(controller[action], handler);
 
       if (!handler.validation) {
         handler.validation = {};
@@ -522,7 +551,7 @@ export class Router {
       };
 
       if (routeResource.list && isAcceptableResource("list")) {
-        this.get(path, options.replace?.list || routeResource.list.bind(routeResource), {
+        this.get(path, options.replace?.list || bindResourceHandler(routeResource, "list"), {
           ...options,
           name: "list",
           restful: true,
@@ -530,7 +559,7 @@ export class Router {
       }
 
       if (routeResource.get && isAcceptableResource("get")) {
-        this.get(path + "/:id", options.replace?.get || routeResource.get.bind(routeResource), {
+        this.get(path + "/:id", options.replace?.get || bindResourceHandler(routeResource, "get"), {
           ...options,
           name: "single",
           restful: true,
@@ -570,7 +599,7 @@ export class Router {
       if (routeResource.delete && isAcceptableResource("delete")) {
         this.delete(
           path + "/:id",
-          options.replace?.delete || routeResource.delete.bind(routeResource),
+          options.replace?.delete || bindResourceHandler(routeResource, "delete"),
           {
             ...options,
             name: "delete",
@@ -582,7 +611,7 @@ export class Router {
       if (routeResource.bulkDelete && isAcceptableResource("delete")) {
         this.delete(
           path,
-          options.replace?.bulkDelete || routeResource.bulkDelete.bind(routeResource),
+          options.replace?.bulkDelete || bindResourceHandler(routeResource, "bulkDelete"),
           {
             ...options,
             name: "bulkDelete",
@@ -788,7 +817,7 @@ export class Router {
    * Manage validation system for the given resource
    */
   private manageValidation(resource: RouteResource, method: "create" | "update" | "patch") {
-    const handler = resource[method]?.bind(resource) as RequestHandler;
+    const handler = bindResourceHandler(resource, method);
 
     const methodValidation = resource?.validation?.[method];
 
@@ -873,11 +902,20 @@ export class Router {
    * Names are the registered names, including method suffixes. `all` stays
    * intact as route metadata; consumers decide whether their use supports it.
    */
-  public getNamedApiRoutes(): readonly NamedApiRoute[] {
+  public getNamedApiRoutes(options: NamedApiRoutesOptions = {}): readonly NamedApiRoute[] {
     return Object.freeze(
       this.routes
         .filter((route) => !route.isPage && typeof route.name === "string" && route.name.length > 0)
-        .map((route) => Object.freeze({ name: route.name!, path: route.path, method: route.method })),
+        .map((route) => {
+          const snapshot = { name: route.name!, path: route.path, method: route.method };
+          const schema = route.handler?.responseSchema;
+          const response = schema ? options.resolveResponse?.(schema, route) : undefined;
+
+          // A route without a declared schema keeps exactly the three-key record.
+          if (!response || Object.keys(response).length === 0) return Object.freeze(snapshot);
+
+          return Object.freeze({ ...snapshot, response: Object.freeze({ ...response }) });
+        }),
     );
   }
 

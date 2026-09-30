@@ -4,7 +4,6 @@ import { fileExistsAsync, unlinkAsync } from "@warlock.js/fs";
 import { Application } from "../application";
 import { connectorsManager } from "../connectors/connectors-manager";
 import { ConnectorLifecyclePhase } from "../connectors/types";
-import { router } from "../router/router";
 import { warlockConfigManager } from "../warlock-config";
 import { BootPreconditionError } from "./boot-precondition-error";
 import { devLogInfo, devLogSection, devLogWarn, devServeLog } from "./dev-logger";
@@ -15,6 +14,7 @@ import { LayerExecutor } from "./layer-executor";
 import { printReadyBlock } from "./ready-block";
 import { registerInstalledDevtools } from "./register-installed-devtools";
 import { restartDevServer } from "./restart-dev-server";
+import { collectDevelopmentApiRoutes } from "./collect-development-api-routes";
 import { publishCurrentRouteTypes } from "./route-types-publisher";
 import { devServerShortcuts } from "./shortcuts";
 import type { StartDevServerOptions } from "./start-development-server";
@@ -97,7 +97,7 @@ export class DevelopmentServer {
 
       // Web installs its page table from its late connector. Generate only
       // after that installation so `href()` and the declaration table agree.
-      await publishCurrentRouteTypes(process.cwd(), router.getNamedApiRoutes());
+      await publishCurrentRouteTypes(process.cwd(), await collectDevelopmentApiRoutes());
 
       this.layerExecutor = new LayerExecutor(
         filesOrchestrator.getDependencyGraph(),
@@ -217,7 +217,7 @@ export class DevelopmentServer {
       // `executeBatchReload` includes route re-imports and affected connector
       // restarts. Publishing earlier could freeze a partial page/API view.
       // This also refreshes deletion-only batches after their cleanup/restart.
-      await publishCurrentRouteTypes(process.cwd(), router.getNamedApiRoutes());
+      await publishCurrentRouteTypes(process.cwd(), await collectDevelopmentApiRoutes());
 
       typeGenerator.executeTypingsGenerator([...batch.added, ...batch.changed, ...batch.deleted]);
 

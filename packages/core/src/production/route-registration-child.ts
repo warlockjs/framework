@@ -3,7 +3,7 @@ import { Application } from "../application";
 import { bootstrap } from "../bootstrap";
 import { loadConfigFiles } from "../config/load-config-files";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
-import { router } from "../router/router";
+import { collectNamedApiRoutesWithResponses } from "../router/named-api-routes-with-responses";
 import { loadEnvironmentFiles } from "../utils/load-environment";
 import { appPath } from "../utils/paths";
 import type { Environment, RuntimeStrategy } from "../utils/environment";
@@ -48,9 +48,17 @@ process.once("message", async (message: unknown) => {
 
     await filesOrchestrator.moduleLoader.loadAll({ onBeforeLoad: (file) => sendProgress(file.relativePath) });
 
+    const routes = await collectNamedApiRoutesWithResponses({
+      appRoot: request.cwd,
+      files: filesOrchestrator.files.values(),
+      onWarn: (warning) => {
+        process.stderr.write(`[warlock] ${warning}\n`);
+      },
+    });
+
     await sendAndExit({
       type: "route-registration:snapshot",
-      snapshot: { version: PROTOCOL_VERSION, routes: router.getNamedApiRoutes() },
+      snapshot: { version: PROTOCOL_VERSION, routes },
     });
   } catch (error) {
     const message = error instanceof Error ? error.stack || error.message : String(error);

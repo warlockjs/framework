@@ -228,6 +228,25 @@ export type NamedApiRoute = Readonly<{
   name: string;
   path: string;
   method: RequestMethod;
+  /**
+   * TypeScript type expression of the response body per status code, present only when the
+   * route handler declares `responseSchema`. Self-contained: it references `CastOutput` and
+   * `ResourceOutput` from `@warlock.js/core`, `typeof import(...)` of resource modules
+   * (paths relative to `.warlock/typings/`), object literal types and arrays.
+   */
+  response?: Readonly<Record<string, string>>;
+}>;
+
+/** Options for `router.getNamedApiRoutes()`. */
+export type NamedApiRoutesOptions = Readonly<{
+  /**
+   * Describe the response types of a route that declares `responseSchema`.
+   * Returning `undefined` (or an empty record) leaves the route without a `response` key.
+   */
+  resolveResponse?: (
+    schema: ResponseSchema,
+    route: Route,
+  ) => Readonly<Record<string, string>> | undefined;
 }>;
 
 /**

@@ -95,12 +95,17 @@ export type ResourceFieldBuilderDateOutputOptions =
 
 /**
  * Allowed value types in a response schema body.
- * - Cast type string for primitive fields (e.g. "string", "number")
+ * - Cast type string for primitive fields, with the same suffixes as resource schemas
+ *   (e.g. "string", "number?", "string[]", "date[]?")
  * - ResourceConstructor for a single nested resource object
  * - [ResourceConstructor] (tuple) for an array of a nested resource
+ * - A nested plain object of any of the above
  */
 export type ResponseBodyValue =
-  ResourceOutputValueCastType | ResourceConstructor | [ResourceConstructor];
+  | ResourceCastType
+  | ResourceConstructor
+  | [ResourceConstructor]
+  | { [key: string]: ResponseBodyValue };
 
 /**
  * Response schema for a controller — used for documentation / OpenAPI generation.
@@ -108,7 +113,7 @@ export type ResponseBodyValue =
  */
 export type ResponseSchema = {
   [statusCode in ResponseStatus]?: {
-    body: Record<string, ResponseBodyValue>;
+    body: { [key: string]: ResponseBodyValue };
   };
 };
 
@@ -210,3 +215,32 @@ export type ResourceOutput<R> = R extends new (...args: any[]) => { toJSON(): in
   : R extends { toJSON(): infer O }
     ? O
     : never;
+
+/**
+ * Output type of one response schema body value, with the same rules as a resource schema:
+ * a cast string resolves through `CastOutput`, a resource through `ResourceOutput`,
+ * `[Resource]` to an array of it, and a nested object recurses.
+ *
+ * @example
+ * type Out = ResponseBodyOutput<{ user: typeof UserResource; token: "string"; tags: "string[]?" }>;
+ */
+export type ResponseBodyOutput<B> = B extends string
+  ? CastOutput<B>
+  : B extends readonly [infer R]
+    ? ResourceOutput<R>[]
+    : B extends new (...args: any[]) => unknown
+      ? ResourceOutput<B>
+      : B extends object
+        ? { -readonly [K in keyof B]: ResponseBodyOutput<B[K]> }
+        : never;
+
+/**
+ * Output type of a whole response schema: the body output per declared status code.
+ *
+ * @example
+ * type LoginResponses = ResponseSchemaOutput<typeof loginSchema>;
+ * // { 200: { user: UserJson; token: string }; 400: { error: string } }
+ */
+export type ResponseSchemaOutput<S extends ResponseSchema> = {
+  -readonly [K in keyof S]-?: S[K] extends { body: infer B } ? ResponseBodyOutput<B> : never;
+};
