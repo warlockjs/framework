@@ -30,7 +30,7 @@
     "@mongez/localization": "^3.5.1",
     "@mongez/reinforcements": "^4.0.2",
     "@mongez/slug": "^1.0.7",
-    "@mongez/supportive-is": "^2.1.5",
+    "@mongez/supportive-is": "^3.0.0",
     "@mongez/time-wizard": "^1.0.6",
     "@warlock.js/cache": "workspace:^",
     "@warlock.js/cascade": "workspace:^",

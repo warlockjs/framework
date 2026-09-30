@@ -21,6 +21,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`getDevelopmentOpenApiDocument()`** returns the same document for the routes registered in the running dev process (`warlock dev` registers the builder at startup; outside it the call throws), reusing the CLI child's builder (resource export map, `package.json` info, `http` server, `validation.response`). `@warlock.js/devtools` calls it to serve its API docs page at `/__warlock/docs`; warnings are logged once per process.
 - **Models resolve to their resource in `Serialized`.** `warlock generate.typings` and `warlock dev` now write `.warlock/typings/model-resources.d.ts`, a `ModelResourceRegistry` augmentation with one entry per model class that declares `static resource = <Identifier>`, so `Serialized<User>` is the resource output instead of the raw model data. The identifier is followed through the model file's own imports (named, aliased, default, tsconfig aliases) or its own declarations, by reading the source only; a computed expression, `lazy(...)`, a generic or unexported model is left out and keeps the raw-data type. Duplicate class names get `_2`, `_3` keys, output is sorted, and the file is rewritten only when it changes. The app's `tsconfig.json` must include `.warlock/typings/*.d.ts` (the scaffold already does).
 
+### Changed
+
+- Dependency: @mongez/supportive-is 3.0 (type-predicate checkers).
+
 ## 5.26.0 - 2026-09-30
 
 ### Upgrading
