@@ -1,6 +1,7 @@
 import type { CommandActionData } from "../../../commands/types";
 import { bootForDiagnostics } from "./boot-for-diagnostics";
 import { defaultDoctorChecks } from "./checks";
+import { fixLocaleSources } from "./checks/locales-ts-deprecated.check";
 import { printReport } from "./format-report";
 import { runChecks } from "./run-checks";
 
@@ -25,9 +26,15 @@ import { runChecks } from "./run-checks";
  * banner and exits zero — which also disposes of the handles the boot pass
  * left open (a Fastify instance, a Vite dev server for `web` apps).
  *
- * @param _data Parsed CLI args (unused — doctor takes no positional args).
+ * @param data Parsed CLI args, including the optional safe migration flag.
  */
-export async function doctorCommandAction(_data: CommandActionData): Promise<void> {
+export async function doctorCommandAction(data: CommandActionData): Promise<void> {
+  if (data.options.fix === true) {
+    for (const result of fixLocaleSources()) {
+      const file = result.file.replace(process.cwd(), ".").replaceAll("\\", "/");
+      console.log(`${result.convertible ? "converted" : "manual"} ${file}: ${result.reason}`);
+    }
+  }
   const context = await bootForDiagnostics();
 
   const report = await runChecks(defaultDoctorChecks, context);

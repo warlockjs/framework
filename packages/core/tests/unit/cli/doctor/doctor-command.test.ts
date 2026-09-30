@@ -27,9 +27,14 @@ describe("doctorCommand definition", () => {
     expect(doctorCommand.commandPreload?.connectors).toBeUndefined();
   });
 
-  it("defines an action and takes no options", () => {
+  it("defines an action and exposes the safe locale migration option", () => {
     expect(doctorCommand.commandAction).toBeTypeOf("function");
-    expect(doctorCommand.commandOptions).toEqual([]);
+    expect(doctorCommand.commandOptions).toHaveLength(1);
+    expect(doctorCommand.commandOptions[0]).toMatchObject({
+      text: "--fix",
+      description: "Convert safely auto-convertible legacy utils/locales.ts files to locales.json",
+      type: "boolean",
+    });
   });
 });
 
@@ -51,6 +56,7 @@ describe("default doctor check set", () => {
       "optional-peers",
       "jwt-secret",
       "health",
+      "locales-ts-deprecated",
       "release-hygiene",
     ]);
   });

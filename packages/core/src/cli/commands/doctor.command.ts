@@ -24,6 +24,13 @@ export const doctorCommand = command({
   description:
     "Boot the app read-only (no connections, no port) and report on its routes, config, connectors, drivers and health endpoints",
   action: doctorCommandAction,
+  options: [
+    {
+      text: "--fix",
+      description: "Convert safely auto-convertible legacy utils/locales.ts files to locales.json",
+      type: "boolean",
+    },
+  ],
   preload: {
     runtimeStrategy: "development",
     config: true,
