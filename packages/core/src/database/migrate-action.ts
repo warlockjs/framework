@@ -191,7 +191,7 @@ export async function migrateAction(options: CommandActionData) {
   await runMigrations();
 }
 
-async function loadMigrationFile(absPath: string) {
+export async function loadMigrationFile(absPath: string) {
   const relativePath = Path.toRelative(absPath);
 
   // MigrationConstructor, not `typeof Migration`: a migration file default-exports a
@@ -226,7 +226,7 @@ async function loadMigrationFile(absPath: string) {
     }
   }
 
-  migrationRunner.register(MigrationClass);
+  migrationRunner.register(MigrationClass, "app");
 }
 
 /**
@@ -247,7 +247,7 @@ async function migrationFiles() {
   return migrations;
 }
 
-async function loadAllMigrations() {
+export async function loadAllMigrations() {
   // Load config-registered migrations (from packages like @warlock.js/auth)
   const configMigrations = warlockConfigManager.get("database")?.migrations || [];
 
@@ -256,7 +256,7 @@ async function loadAllMigrations() {
     if (!MigrationClass.migrationName) {
       MigrationClass.migrationName = MigrationClass.name;
     }
-    migrationRunner.register(MigrationClass);
+    migrationRunner.register(MigrationClass, "package");
   }
 
   // Always load file-based migrations from src/app, regardless of config
