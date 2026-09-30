@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## Unreleased
+
+### Upgrading
+
+- **Fastify plugins moved up a major:** `@fastify/static` 10, `@fastify/cookie` 11, `@fastify/rate-limit` 11 and `@fastify/multipart` 10, with `fastify` ^5.12.5 and `@fastify/http-proxy` ^11.6.3. This picks up the security fixes that those versions carry. Nothing changes unless you use one of the options below.
+- **BREAKING (only if you pass `setHeaders` to `router.directory()`):** the callback now receives the Fastify reply, not the raw response. Replace `res.setHeader(name, value)` with `reply.header(name, value)`.
+- On Windows and macOS, a static-folder URL with the wrong letter case (`/public/Logo.png` for `logo.png`) now answers 404, as it already did on Linux.
+
+### Added
+
+- `http.rateLimit.ipv6Subnet` sets the IPv6 prefix length the global rate limiter groups clients by (default `64`).
+
+### Changed
+
+- **Behaviour change:** rate limits group IPv6 clients by their `/64` network, and IPv4-mapped addresses (`::ffff:1.2.3.4`) count as the IPv4 address. This applies to the global limiter and to the per-route `rateLimit()` middleware. Before, a client could rotate through addresses in its own `/64` to get a fresh bucket each time. Users behind one IPv6 `/64`, such as one home or office, now share a bucket.
+- `response.clearCookie()` now also sends `Max-Age=0` alongside the past `Expires` date.
+
+### Fixed
+
+- `response.cookie()` truncates a fractional `maxAge` to whole seconds. `@fastify/cookie` 11 rejects a non-whole `maxAge`, so a computed value such as `ttl / 1000` used to fail the response.
+
 ## 5.25.0 - 2026-09-28
 
 ### Added
