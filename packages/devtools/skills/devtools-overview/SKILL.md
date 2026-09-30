@@ -1,6 +1,6 @@
 ---
 name: devtools-overview
-description: 'Development-only dashboard for Warlock.js apps at `/__warlock`: request timeline (router + page middleware, loaders, render, deferred values), every SQL/Mongo query with EXPLAIN, N+1 warnings naming the file and line, a dev mailbox, logs, cache operations and the route map. Use for: "why is this page slow", "which queries does this request run", "find N+1 queries", "see the email my app just sent in dev", "open the dashboard". Install with `warlock add devtools`; never registered in warlock.config.ts. Not this package: production monitoring/APM or OpenTelemetry export — use `http.tracing` hooks in @warlock.js/core; slow-query logging in production — subscribe to cascade `dataSourceRegistry.on("query")` yourself.'
+description: 'Development-only dashboard for Warlock.js apps at `/__warlock`: request timeline (router + page middleware, loaders, render, deferred values), every SQL/Mongo query with EXPLAIN, N+1 warnings naming the file and line, a dev mailbox, logs, cache operations, the route map and an API docs page (`/__warlock/docs`, the OpenAPI 3.1 document of the app rendered with Scalar). Use for: "why is this page slow", "which queries does this request run", "find N+1 queries", "see the email my app just sent in dev", "open the dashboard", "browse my API docs in dev", "see the OpenAPI for my routes". Install with `warlock add devtools`; never registered in warlock.config.ts. Not this package: production monitoring/APM or OpenTelemetry export — use `http.tracing` hooks in @warlock.js/core; slow-query logging in production — subscribe to cascade `dataSourceRegistry.on("query")` yourself.'
 ---
 
 # `@warlock.js/devtools` — overview
@@ -45,9 +45,19 @@ of it would fail to resolve there.
 | **Logs** | Log entries per request, filterable by level and module | a logger channel |
 | **Cache** | hit / miss / set / removed / `invalidated` (tags, keys removed) | cache `cache.on(...)` |
 | **Routes** | Every HTTP route with its method, path, name and middleware | core router |
+| **API** | The app's API reference: every route with its parameters, request body, responses and auth | core `getDevelopmentOpenApiDocument()` |
 
 Work outside a request (boot, scheduler ticks, queue jobs) goes to a separate
 background list, so it never clutters a request's timeline.
+
+## API docs
+
+`/__warlock/docs` renders the app's OpenAPI 3.1 document with [Scalar](https://github.com/scalar/scalar); the dashboard's **API** tab shows the same page. The document comes from `GET /__warlock/api/openapi.json`, built in-process by core's `getDevelopmentOpenApiDocument()` from the routes already registered, so it is the same generator as `warlock generate.openapi` and follows your edits with no CLI run. It covers API routes (not pages): paths, parameters, request bodies from Seal validation, responses from each handler's `responseSchema`, `401`/`422` and bearer/cookie security from `authMiddleware()`. See core's `generate-openapi` topic for what is documented and how to declare it.
+
+- It answers `503` from `/__warlock/api/openapi.json` when the host provides no generator.
+- Same guard as the rest of devtools: dev-only and loopback-only.
+- Scalar's prebuilt bundle is vendored and served as `assets/scalar.js`, so apps install nothing extra. The page fetches nothing from a CDN, and Scalar's web fonts, telemetry, AI agent and MCP are turned off.
+- To keep a file for Postman or Insomnia, run `warlock generate.openapi` (default `storage/openapi/openapi.json`) instead.
 
 ## Options
 
