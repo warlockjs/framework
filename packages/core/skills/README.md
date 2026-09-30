@@ -34,7 +34,7 @@ Each folder holds one `SKILL.md` (an agent-facing how-to for a single task). The
 - [use-app-context](use-app-context/SKILL.md) — read app-wide context via the `Application` static class and the `app` runtime accessor.
 - [add-connector](add-connector/SKILL.md) — extend the lifecycle with a `BaseConnector` subclass (`start`/`shutdown`/`watchedFiles`).
 - [wire-socket](wire-socket/SKILL.md) — configure Socket.IO, reach the live server via `getSocketServer()` / `app.socket`.
-- [use-localization](use-localization/SKILL.md) — multi-locale translations: `groupedTranslations`, `t()` / `request.t()`, locale resolution.
+- [use-localization](use-localization/SKILL.md) — multi-locale translations: `groupedTranslations`, `t()` (always, never `request.t()`), locale resolution.
 
 ## Use-cases & services
 

@@ -1,6 +1,6 @@
 ---
 name: use-localization
-description: 'Multi-locale translations via `groupedTranslations` (declare keys), `t()` / `request.t()` / `request.trans()` (look up), `request.getLocaleCode()` (detect locale from headers/query), `getLocalized` (pick the right value from a localized-array column). Triggers: `groupedTranslations`, `t`, `request.t`, `request.trans`, `request.transFrom`, `request.getLocaleCode`, `request.setLocaleCode`, `getLocalized`; "add a translation key", "resolve a localized error message", "detect request locale", "pick the right per-locale column value"; typical import `import { t, getLocalized } from "@warlock.js/core"`. Skip: resource output — `@warlock.js/core/define-resource/SKILL.md`; module scaffold — `@warlock.js/core/create-module/SKILL.md`; competing libs `i18next`, `react-intl`, raw `@mongez/localization`.'
+description: 'Multi-locale translations via `groupedTranslations` (declare keys), `t()` (look up; always use it in app code, never `request.t()`), `request.getLocaleCode()` (detect locale from headers/query), `getLocalized` (pick the right value from a localized-array column). Triggers: `groupedTranslations`, `t`, `request.t`, `request.trans`, `request.transFrom`, `request.getLocaleCode`, `request.setLocaleCode`, `getLocalized`; "add a translation key", "resolve a localized error message", "detect request locale", "pick the right per-locale column value"; typical import `import { t, getLocalized } from "@warlock.js/core"`. Skip: resource output — `@warlock.js/core/define-resource/SKILL.md`; module scaffold — `@warlock.js/core/create-module/SKILL.md`; competing libs `i18next`, `react-intl`, raw `@mongez/localization`.'
 ---
 
 # Warlock — translate keys + pick localized values
@@ -27,8 +27,7 @@ groupedTranslations("products", {
 import { t } from "@warlock.js/core";
 
 throw new ResourceNotFoundError(t("products.notFound"));
-// or via the request:
-return response.success({ message: request.t("products.created") });
+return response.success({ message: t("products.created") });
 
 // 3. Pick a value from a localized-array column
 import { getLocalized } from "@warlock.js/core";
@@ -93,27 +92,21 @@ t("products.outOfStock", { name: "Pen", count: 0 });
 
 Placeholders use the `:name` syntax. The lookup helper substitutes them from the second argument.
 
-## Looking up translations — `t()`, `request.t()`, `request.trans()`
+## Looking up translations — always `t()`
 
-Three calls, same job, slightly different reachability:
+**Rule: app code translates with `t()` from `@warlock.js/core`.** It works everywhere: controllers, services, page and layout loaders, `metadata`, events and jobs. It returns a `string`.
 
 ```ts
-// 1. Top-level helper — works inside or outside a request.
-//    Inside a request: uses request's locale.
-//    Outside: uses the global default locale.
 import { t } from "@warlock.js/core";
 
 t("products.notFound");
 t("products.outOfStock", { name: "Pen", count: 0 });
-
-// 2. On the request object — explicit, scoped to that request.
-request.t("products.notFound");
-
-// 3. Alias for request.t — same behavior.
-request.trans("products.notFound");
 ```
 
-All three lookups go through `@mongez/localization`'s `trans()` under the hood, with the locale pulled from the request context (or the global default).
+- Inside a request (a controller or a page loader) it uses the request's locale. In a page it first checks the route's `locales.json` snapshot, then falls back to module translations (`groupedTranslations` or module `locales.json`).
+- Outside a request (jobs, CLI) it uses the configured default locale.
+- `request.t()` / `request.trans()` are the per-request binding that `t()` delegates to. Don't call them in app code: `t()` gives the same result without threading `request` through services.
+- Don't wrap it in `String(...)`; it is already typed `string`.
 
 ### Web `useTrans()` key checking
 
@@ -163,7 +156,7 @@ export default {
 request.setLocaleCode("ar");
 ```
 
-After this, every `request.t(...)` and `getLocalized(...)` in the same request returns Arabic. Useful for user-preference overrides (e.g. "this user has set their language to ar in their profile — switch the request's locale on auth").
+After this, every `t(...)` and `getLocalized(...)` in the same request returns Arabic. Useful for user-preference overrides (e.g. "this user has set their language to ar in their profile — switch the request's locale on auth").
 
 ## Localized columns — `getLocalized`
 
@@ -260,6 +253,7 @@ The error's message is locale-aware — the `inject-request-context` middleware 
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { type CreateProductSchema } from "../schema/create-product.schema";
 import { createProductService } from "../services/create-product.service";
+import { t } from "@warlock.js/core";
 
 export const createProductController: GuardedRequestHandler<CreateProductSchema> = async ({
   request,
@@ -267,7 +261,7 @@ export const createProductController: GuardedRequestHandler<CreateProductSchema>
 }) => {
   const product = await createProductService(request.validated());
   return response.success({
-    message: request.t("products.created"),
+    message: t("products.created"),
     product,
   });
 };
@@ -307,7 +301,7 @@ await Product.create({
 GET /products/42?locale=ar
 ```
 
-`request.getLocaleCode()` returns `"ar"` — every `request.t(...)` and resource-output `getLocalized` returns Arabic. No app code changes required.
+`request.getLocaleCode()` returns `"ar"` — every `t(...)` and resource-output `getLocalized` returns Arabic. No app code changes required.
 
 ## Gotchas
 
@@ -339,6 +333,6 @@ GET /products/42?locale=ar
 }
 ```
 
-This produces `account.title` and `account.actions.save`. Keep every leaf complete for the configured locale list. The page pipeline selects an immutable snapshot for its route source and locale. `useTrans()`, `request.t()`, and `request.trans()` use that snapshot; a missing scoped key returns the key itself. With no route-locales manifest, the existing global `@mongez/localization` registry remains the legacy fallback path.
+This produces `account.title` and `account.actions.save`. Keep every leaf complete for the configured locale list. The page pipeline selects an immutable snapshot for its route source and locale. `useTrans()` and `t()` use that snapshot; a missing scoped key returns the key itself. With no route-locales manifest, the existing global `@mongez/localization` registry remains the legacy fallback path.
 
-When a route-locales snapshot applies, `request.t()`, `request.trans()`, and `request.transFrom(locale, key, placeholders?)` resolve through it; without one, they retain the existing global-registry behavior. The underlying `transFromKeywords(locale, keywords, key, placeholders?, converter?)` is supplied by `@mongez/localization` 3.5.0. Error pages rebind to their own snapshot, while framework fallback uses the app/root snapshot. Development HMR add/edit/delete publishes a new snapshot, and the snapshot revision keeps page-cache entries from reusing old JSON. Generated `.warlock` typings contain the flattened route keys; do not maintain a second handwritten key union.
+When a route-locales snapshot applies, `t()` (through the request binding) and `request.transFrom(locale, key, placeholders?)` resolve through it; without one, they retain the existing global-registry behavior. The underlying `transFromKeywords(locale, keywords, key, placeholders?, converter?)` is supplied by `@mongez/localization` 3.5.0. Error pages rebind to their own snapshot, while framework fallback uses the app/root snapshot. Development HMR add/edit/delete publishes a new snapshot, and the snapshot revision keeps page-cache entries from reusing old JSON. Generated `.warlock` typings contain the flattened route keys; do not maintain a second handwritten key union.
