@@ -457,6 +457,14 @@ export interface QueryBuilderContract<T = unknown> {
   where(callback: WhereCallback<T>): this;
 
   /**
+   * Add a code-authored object filter without rejecting `$` operator keys.
+   *
+   * This is for internal trusted filters only. Never pass request input here:
+   * `where()` remains the safe default for externally supplied filters.
+   */
+  whereTrusted(conditions: WhereObject): this;
+
+  /**
    * Add a raw where clause expressed in the native query language.
    *
    * String expressions are SQL-only ("age > ?" with bindings). The MongoDB

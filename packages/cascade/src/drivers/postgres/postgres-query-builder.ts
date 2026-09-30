@@ -69,6 +69,25 @@ function toParserOps(ops: Op[]): PostgresParserOperation[] {
   return ops as unknown as PostgresParserOperation[];
 }
 
+function containsOperatorKey(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.some(containsOperatorKey);
+  }
+
+  if (value === null || typeof value !== "object") {
+    return false;
+  }
+
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    return false;
+  }
+
+  return Object.entries(value).some(
+    ([key, nested]) => key.startsWith("$") || containsOperatorKey(nested),
+  );
+}
+
 // ============================================================================
 // JOIN RELATIONS MAP TYPE
 // ============================================================================
@@ -118,6 +137,21 @@ export class PostgresQueryBuilder<T = unknown>
 
   /** Data source backing this builder. */
   public readonly dataSource: DataSource;
+
+  /**
+   * PostgreSQL has no parser for MongoDB-style object operators such as
+   * `{ id: { $in: [1, 2] } }`; accepting one would bind the object as `=`.
+   */
+  public override whereTrusted(conditions: WhereObject): this {
+    if (containsOperatorKey(conditions)) {
+      throw new UnsupportedQueryOperationError(
+        "whereTrusted with MongoDB-style operators",
+        "postgres",
+        "Use the portable whereIn()/where(field, operator, value) APIs instead.",
+      );
+    }
+    return super.whereTrusted(conditions);
+  }
 
   /** Hydration callback for transforming result rows into model instances. */
   public hydrateCallback?: (data: unknown, index: number) => unknown;

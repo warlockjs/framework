@@ -265,6 +265,18 @@ export class MongoQueryBuilder<T = unknown>
   }
 
   /**
+   * Add a code-authored MongoDB filter without the `$`-operator safety guard.
+   * Never use this with request input; callers must use where() for that.
+   */
+  public override whereTrusted(conditions: WhereObject): this {
+    for (const [field, value] of Object.entries(conditions)) {
+      assertDefined(value, field);
+    }
+    this.operationsHelper.addMatchOperation("where:object", conditions);
+    return this;
+  }
+
+  /**
    * Adds an OR WHERE clause. Works like where() but uses OR logic.
    * @param field - Field name, or conditions object, or callback
    * @param operator - Comparison operator

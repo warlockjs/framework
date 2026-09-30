@@ -1885,14 +1885,14 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * Find one and update multiple records that matches the provided filter and return the updated record
    * @param filter - Filter conditions
    * @param update - Update operators, or an aggregation pipeline (MongoDB only)
-   * @param options - `upsert`, `arrayFilters` (MongoDB only)
+   * @param options - `upsert`, `arrayFilters` (MongoDB only), `trustedFilter`
    * @returns The updated records
    */
   public static async findAndUpdate<TModel extends Model = Model>(
     this: ChildModel<TModel>,
     filter: Record<string, unknown>,
     update: AtomicUpdate,
-    options?: Omit<AtomicUpdateOptions, "trustedFilter">,
+    options?: AtomicUpdateOptions,
   ): Promise<TModel[]> {
     return findAndUpdateRecords(this, filter, update, options);
   }

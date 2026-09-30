@@ -213,6 +213,23 @@ function toDriverOptions<TOptions extends AtomicUpdateOptions>(
   return rest;
 }
 
+function applyWriteFilter<TModel extends Model>(
+  query: QueryBuilderContract<TModel>,
+  filter: Record<string, unknown>,
+  trustedFilter: boolean,
+): QueryBuilderContract<TModel> {
+  // Query builders supplied by integrations predating `whereTrusted` can
+  // still apply a code-authored filter through their regular `where` method.
+  // Concrete Cascade builders implement `whereTrusted`, which is required for
+  // MongoDB operator filters; retain the fallback for compatible custom
+  // builders and test doubles.
+  if (trustedFilter && typeof query.whereTrusted === "function") {
+    return query.whereTrusted(filter);
+  }
+
+  return query.where(filter);
+}
+
 /**
  * Add the same generated `id` that normal Mongo inserts receive to an upsert's
  * insert branch. `$setOnInsert` keeps an existing document's id immutable.
@@ -268,9 +285,11 @@ export async function scopeWriteFilter(
   ModelClass: ChildModel<any>,
   filter: Record<string, unknown>,
   single: boolean,
+  trustedFilter = false,
 ): Promise<Record<string, unknown> | null> {
   const primaryKey = ModelClass.primaryKey;
-  const ids = await ModelClass.query().where(filter).pluck(primaryKey);
+  const query = ModelClass.query();
+  const ids = await applyWriteFilter(query, filter, trustedFilter).pluck(primaryKey);
 
   if (ids.length === 0) {
     return null;
@@ -287,14 +306,16 @@ export async function scopeWriteFilter(
 export async function scopeUpsertFilter(
   ModelClass: ChildModel<any>,
   filter: Record<string, unknown>,
+  trustedFilter = false,
 ): Promise<Record<string, unknown>> {
-  const scoped = await scopeWriteFilter(ModelClass, filter, true);
+  const scoped = await scopeWriteFilter(ModelClass, filter, true, trustedFilter);
 
   if (scoped) {
     return scoped;
   }
 
-  const hidden = await ModelClass.query().withoutGlobalScopes().where(filter).exists();
+  const query = ModelClass.query().withoutGlobalScopes();
+  const hidden = await applyWriteFilter(query, filter, trustedFilter).exists();
 
   if (hidden) {
     throw new Error(
@@ -317,8 +338,8 @@ export async function performAtomic<TModel extends Model>(
 ): Promise<number> {
   const resolved = resolveFilter(filter, options);
   const scoped = options?.upsert
-    ? await scopeUpsertFilter(ModelClass, resolved)
-    : await scopeWriteFilter(ModelClass, resolved, false);
+    ? await scopeUpsertFilter(ModelClass, resolved, options?.trustedFilter)
+    : await scopeWriteFilter(ModelClass, resolved, false, options?.trustedFilter);
 
   if (!scoped) {
     return 0;
@@ -362,14 +383,17 @@ export async function findAndUpdateRecords<TModel extends Model>(
   ModelClass: ChildModel<TModel>,
   filter: Record<string, unknown>,
   update: AtomicUpdate,
-  options?: Omit<AtomicUpdateOptions, "trustedFilter">,
+  options?: AtomicUpdateOptions,
 ): Promise<TModel[]> {
   const primaryKey = ModelClass.primaryKey;
-  const safeFilter = sanitizeFilter(filter);
+  const safeFilter = resolveFilter(filter, options);
 
   // Capture the matching ids first: the update usually changes the very field
   // the filter matches on, so re-querying with the filter would find nothing.
-  const ids = await ModelClass.query().where(safeFilter).pluck(primaryKey);
+  const query = ModelClass.query();
+  const ids = await applyWriteFilter(query, safeFilter, options?.trustedFilter ?? false).pluck(
+    primaryKey,
+  );
 
   if (ids.length === 0) {
     if (!options?.upsert) {
@@ -396,8 +420,8 @@ export async function findOneAndUpdateRecord<TModel extends Model>(
 ): Promise<TModel | null> {
   const resolved = resolveFilter(filter, options);
   const scoped = options?.upsert
-    ? await scopeUpsertFilter(ModelClass, resolved)
-    : await scopeWriteFilter(ModelClass, resolved, true);
+    ? await scopeUpsertFilter(ModelClass, resolved, options?.trustedFilter)
+    : await scopeWriteFilter(ModelClass, resolved, true, options?.trustedFilter);
 
   if (!scoped) return null;
 

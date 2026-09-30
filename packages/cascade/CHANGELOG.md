@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## Unreleased
+
+### Added
+
+- `whereTrusted(conditions)` on the query builder contract applies a code-authored filter without the unsafe-operator check, so MongoDB operators such as `$in` and `$lt` pass through. Never pass request input to it. The PostgreSQL builder throws `UnsupportedQueryOperationError` for operator objects, because its `where()` parser would otherwise bind them as plain values. Custom query builders must implement the new method.
+
+### Fixed
+
+- `trustedFilter: true` now works on `atomic()`, `findOneAndUpdate()` and `findAndUpdate()` with an operator filter such as `{ id: { $in: ids } }`. The scoped-write lookup re-ran the filter through `where()`, which rejected the operator, so these calls threw `UnsafeFilterError` even when the filter was trusted. Global scopes (tenant, soft delete) still apply to the write. `findAndUpdate()` now accepts `trustedFilter`.
+
 ## 5.25.0 - 2026-09-28
 
 ### Added

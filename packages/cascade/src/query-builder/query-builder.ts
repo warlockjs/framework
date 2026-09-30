@@ -352,6 +352,18 @@ export class QueryBuilder<T = unknown> {
   }
 
   /**
+   * Add a code-authored object filter without the `$`-operator safety guard.
+   * Never use this with request input; callers must use where() for that.
+   */
+  public whereTrusted(conditions: WhereObject): this {
+    for (const [field, value] of Object.entries(conditions)) {
+      assertDefined(value, field);
+      this.addOperation("where", { field, operator: "=", value });
+    }
+    return this;
+  }
+
+  /**
    * Add an OR WHERE clause.
    *
    * @example
