@@ -23,6 +23,7 @@ export * from "./encryption";
 export * from "./http";
 export * from "./image";
 export * from "./logger";
+export * from "./localization";
 export * from "./mail";
 export * from "./react";
 export * from "./repositories";
