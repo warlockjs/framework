@@ -1654,7 +1654,17 @@ const jobs = await transaction(async () => {
 
 `{ noWait: true }` errors immediately when a matching row is locked (instead of waiting or skipping) — mutually exclusive with `skipLocked`.
 
-**Postgres-only.** MongoDB has no row-level SELECT locking — the MongoDB driver **throws** on `lockForUpdate()`. On Mongo, claim atomically instead (`findOneAndUpdate` with a reservation filter — see `@warlock.js/cascade/perform-atomic-ops/SKILL.md`).
+**Postgres-only.** MongoDB has no row-level SELECT locking — the MongoDB driver **throws** `UnsupportedLockForUpdateError` (exported from `@warlock.js/cascade`) on `lockForUpdate()`, inside or outside a transaction. On Mongo, claim atomically with a conditional update instead. Operator-bearing filters are explicit, so pass `trustedFilter: true` only for a filter built in application code:
+
+```ts
+const claimed = await Job.atomic(
+  { id, leaseUntil: { $lt: now } },
+  { $set: { leaseUntil: nextLeaseUntil, status: "processing" } },
+  { trustedFilter: true },
+);
+```
+
+See `@warlock.js/cascade/perform-atomic-ops/SKILL.md` for `atomic` / `findOneAndUpdate`.
 
 ## Outside the transaction
 

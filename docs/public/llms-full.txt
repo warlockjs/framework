@@ -1206,6 +1206,8 @@ Same shape — TS validates the union; runtime picks the `default` key.
 - `socket.adapter` — adapter factory for cross-server broadcast.
 - `cache.silenceSingleServerWarning`, `storage.silenceSingleServerWarning`, `socket.silenceSingleServerWarning` — silence the production warnings for in-memory cache, local storage, and adapter-less sockets.
 
+`http.modelValidationErrorStatus` sets the status for a Cascade model-write validation failure (a model failing its own schema on save). It defaults to `500` with an opaque body, because request input is already validated with a `422` before the model is touched. Set a `4xx` (e.g. `422`) to treat it as a client error instead; the response then carries `{ errors }`.
+
 ## Per-env knobs
 
 For one-off switches gated on environment, the canonical pattern is `Application.isProduction` (also `isDevelopment`, `isTest`):
@@ -1388,6 +1390,10 @@ Two pieces:
 2. **`controller.validation = { schema }`** at module top level so the framework knows to validate before calling the handler.
 
 If validation fails, the framework returns a 400 with an `errors` payload and your handler never runs.
+
+### Validating route params
+
+`handler.validation = { params: v.object({ id: v.int().min(1) }) }` validates path segments (e.g. `/posts/:id`). Number and boolean validators convert the string segments; the app's schema object is never changed. Parsed values replace `request.params` (`request.input("id")` is a number) and merge into `request.validated()`, with params winning over body fields. Failures answer like a `schema` failure.
 
 ### Typing a guarded handler
 
@@ -1942,6 +1948,10 @@ export class Product extends Model {
 ```
 
 This is convention, not a framework requirement. Controllers/services that import the resource explicitly work the same way.
+
+### `id` and Mongo `_id`
+
+The output `id` falls back to `_id` when the record has no `id`; an explicit `id` always wins. If a collection uses native ObjectIds, set `public primaryKey = "_id"` on the model so `Model.find(hex)` resolves the `id` your resource emits.
 
 ## Output-only rule
 
@@ -3795,6 +3805,7 @@ export default defineConfig({
     sourcemap: true, // default — true | false | "inline" | "linked"
     singleBundle: false, // default — one runnable file, deps inlined
     esmShim: true, // default — require/__filename/__dirname for bundled CJS
+    routeRegistrationTimeoutMs: 30_000, // default — route-registration child deadline
   },
 });
 ```
@@ -3808,6 +3819,7 @@ Defaults are sensible for the typical "Node service" deployment. Knobs to actual
 - **`sourcemap: false`** — skip source maps entirely. Smaller artifact, but stack traces in production logs lose their file:line precision (and `warlock start` will not enable `--enable-source-maps` since there's nothing to map).
 - **`singleBundle: true`** — inline dependencies so `node dist/app.js` runs with no `node_modules` and no launcher. Sets `packages: "bundle"` + `splitting: false` as **defaults you can override**. ⚠ Native `.node` addons are still emitted alongside — "single bundle" is one JS file _plus_ any native addons. Do NOT reach for it as the default: keeping deps external is right when you deploy the folder.
 - **`esmShim: false`** — only if you are certain nothing in the graph is CommonJS. Leave it on.
+- **`routeRegistrationTimeoutMs`** — increase on busy CI runners when static route registration needs more than 30 seconds. `WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS` overrides this value for a build; invalid values warn and use 30,000ms.
 
 ⚠ **The trap this replaced.** Setting `packages: "bundle"` by hand used to produce a clean build whose process died on start with `Error: Dynamic require of "node:assert" is not supported`. The output is ESM; bundled CJS deps call `require(...)` and read `__dirname`, and neither exists in an ES module, so the bundler substitutes a throwing stub. **A green `warlock build` was not evidence the bundle ran.** `esmShim` now injects `createRequire(import.meta.url)` and friends automatically for any ESM build, so both `singleBundle` and a hand-written `packages: "bundle"` work. An existing hand-written `banner` is preserved — the shim is prepended, not substituted.
 
@@ -5274,7 +5286,7 @@ Some tests need the full stack: route matching, middleware chain, validation, co
 
 `startHttpTestServer()` is the bootstrap. `testGet` / `testPost` / `expectJson` are the call helpers. Both ship in `@warlock.js/core/tests`.
 
-⚠ **Changed in 4.13.0 — the import is a subpath now.** These helpers used to be re-exported from the package root; they are not any more, because that put the test helpers into every application's production module graph. `import { testGet } from "@warlock.js/core"` now fails with *"has no exported member"* — **add `/tests` to the specifier and nothing else changes.**
+⚠ **Changed in 4.13.0 — the import is a subpath now.** These helpers used to be re-exported from the package root; they are not any more, because that put the test helpers into every application's production module graph. `import { testGet } from "@warlock.js/core"` now fails with _"has no exported member"_ — **add `/tests` to the specifier and nothing else changes.**
 
 ## The shape
 
@@ -5315,7 +5327,7 @@ import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core/tests"
 - Loads `warlock.config.ts` + bootstrap + `filesOrchestrator` (without file watching).
 - Loads `src/config/*.ts`.
 - Loads every module (`routes.ts`, `main.ts`, `events/*.ts`).
-- Starts **ALL** connectors, including HTTP.
+- Starts **ALL** connectors, including HTTP, by default.
 
 Unlike the dev server, it doesn't watch files, doesn't do HMR, doesn't run health checkers. Just a working HTTP endpoint listening on the configured port.
 
@@ -5334,6 +5346,14 @@ The explicit port wins over `http.port` — including over `HTTP_PORT` in `.env`
 **Nothing else can move the server.** `startHttpTestServer()` bootstraps the app itself, and that bootstrap re-reads `.env` (dotenv overrides by default), so any value you set before calling it is gone before the port is read. Assigning `process.env.HTTP_PORT` does not work either: `env()` reads dotenv's own store and never falls back to `process.env`. The option is applied after the bootstrap, immediately before the connector binds — that is why it is the only channel that survives.
 
 The request helpers follow with no extra wiring: the bound port is published as `WARLOCK_TEST_SERVER_PORT`, which the workers inherit, and `getTestServerUrl()` prefers it over their own `.env`-resolved `http.port`. `stopHttpTestServer()` withdraws it.
+
+### API-only suites — `startHttpTestServer({ web: false })`
+
+```ts
+await startHttpTestServer({ web: false });
+```
+
+Use this in `globalSetup` for a suite that exercises API routes only. It still boots the HTTP connector and every other configured connector, but excludes the optional `web` connector before its lifecycle begins. That means web's lazy delegate never constructs `WebConnector`, and Vite is never created. Omitting `web` keeps the default full-stack behavior.
 
 ### The port is preflighted
 
@@ -5390,8 +5410,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
-    globalSetup: "./src/test-global-setup.ts",  // ← starts the HTTP server
-    setupFiles: ["./src/test-setup.ts"],         // ← setupTest + afterAll(teardownTest), per test file
+    globalSetup: "./src/test-global-setup.ts", // ← starts the HTTP server
+    setupFiles: ["./src/test-setup.ts"], // ← setupTest + afterAll(teardownTest), per test file
     environment: "node",
     globals: false,
     include: ["src/app/**/*.test.ts"],
@@ -5407,6 +5427,17 @@ Both files (and this config, with `lowerStage3Decorators()` first so decorated m
 
 **HTTP is the exception and stays in `globalSetup`**, which genuinely does run once in the main vitest process and owns a real port. **That split is the point:** one server for the whole run, one framework per test file.
 
+### Keep Vitest setup out of development
+
+`warlock dev` (and `warlock build`) load your app's `vite.config.ts`. Anything you put there for tests runs in development too. Guard vitest-only setup:
+
+```ts
+// vite.config.ts
+if (process.env.VITEST) {
+  Object.assign(process.env, testEnv); // test database, test keys...
+}
+```
+
 ## HTTP request helpers
 
 Everything is built on native `fetch` — no extra dependency, no special wire format.
@@ -5416,7 +5447,7 @@ Everything is built on native `fetch` — no extra dependency, no special wire f
 ```ts
 import { getTestServerUrl } from "@warlock.js/core/tests";
 
-const url = getTestServerUrl();  // → "http://localhost:2031" (defaults)
+const url = getTestServerUrl(); // → "http://localhost:2031" (defaults)
 ```
 
 Reads `http.host` (default `"localhost"`) and `http.port` (default `2031`) from config — unless `startHttpTestServer` published a port, which wins, since a worker's own config never sees the `{ port }` option passed in `globalSetup`. If you change the HTTP config, helpers follow automatically.
@@ -5454,9 +5485,9 @@ import { expectJson, parseJsonResponse } from "@warlock.js/core/tests";
 const body = await parseJsonResponse<MyShape>(response);
 
 // Assert status + parse in one call
-const body = await expectJson<MyShape>(response);          // expects 200
-const body = await expectJson<MyShape>(response, 201);     // expects 201
-const body = await expectJson<MyShape>(response, 404);     // expects 404 (testing error paths)
+const body = await expectJson<MyShape>(response); // expects 200
+const body = await expectJson<MyShape>(response, 201); // expects 201
+const body = await expectJson<MyShape>(response, 404); // expects 404 (testing error paths)
 ```
 
 `expectJson` throws with the actual status + response body when the assertion fails — no chasing "got 500" messages without context.
@@ -5492,7 +5523,7 @@ describe("Products API — happy path", () => {
 
 ```ts
 it("rejects missing required fields with 400", async () => {
-  const response = await testPost("/products", { name: "" });  // price missing
+  const response = await testPost("/products", { name: "" }); // price missing
   const body = await expectJson<{ errors: Array<{ key: string }> }>(response, 400);
 
   expect(body.errors.some((e) => e.key === "price")).toBe(true);
@@ -5617,13 +5648,13 @@ For unit tests, you import the thing under test and call it directly. No HTTP, n
 
 ⚠ **Corrected in 4.14.0 — `setupTest` is CALLED once per TEST FILE, not once per worker.** Every version of this skill through 4.13.0 said "per worker", the generated `src/test-setup.ts` carries a `Per-Worker Test Setup` comment saying the same thing, and **both were wrong.** Vitest runs `setupFiles` before **each test file**, and the setup module's registry is rebuilt every time — measured across all four `pool` × `isolate` combinations.
 
-⛔ **If your project was generated before 4.14.0, fix BOTH the comment and the call.** The comment is false, **and** the generated `setupTest({ connectors: true })` is now an *explicit* value that overrides your `src/config/tests.ts`. **Bare `setupTest()` is the correct call.**
+⛔ **If your project was generated before 4.14.0, fix BOTH the comment and the call.** The comment is false, **and** the generated `setupTest({ connectors: true })` is now an _explicit_ value that overrides your `src/config/tests.ts`. **Bare `setupTest()` is the correct call.**
 
 **The lifetime is FILE-SCOPED, on purpose.** Your setup file bootstraps the framework and its `afterAll(teardownTest)` closes it, once per test file. **One owner, one pairing — correct under every pool, every isolation setting, and watch mode.**
 
-⚠ **A worker-scoped lifetime is possible and is deliberately not shipped yet.** Lifecycle state now lives in the worker runtime, so leaving the framework running would let every file in a worker share one bootstrap. Two things block claiming it: under `pool: "threads"` we cannot observe whether Node reclaims a torn-down thread's sockets and pools, and **in watch mode Vitest reuses workers between reruns, so there is no recycle and no cleanup owner.** It gets taken when the real cost is measured and the integration is chosen, not inherited. See *Lifecycle and repeated calls* below.
+⚠ **A worker-scoped lifetime is possible and is deliberately not shipped yet.** Lifecycle state now lives in the worker runtime, so leaving the framework running would let every file in a worker share one bootstrap. Two things block claiming it: under `pool: "threads"` we cannot observe whether Node reclaims a torn-down thread's sockets and pools, and **in watch mode Vitest reuses workers between reruns, so there is no recycle and no cleanup owner.** It gets taken when the real cost is measured and the integration is chosen, not inherited. See _Lifecycle and repeated calls_ below.
 
-⚠ **Changed in 4.13.0 — the import is a subpath now.** `setupTest` used to be re-exported from the package root; it is not any more, because that put the test helpers into every application's production module graph. `import { setupTest } from "@warlock.js/core"` now fails with *"has no exported member"* — **add `/tests` to the specifier and nothing else changes.**
+⚠ **Changed in 4.13.0 — the import is a subpath now.** `setupTest` used to be re-exported from the package root; it is not any more, because that put the test helpers into every application's production module graph. `import { setupTest } from "@warlock.js/core"` now fails with _"has no exported member"_ — **add `/tests` to the specifier and nothing else changes.**
 
 ## The shape
 
@@ -5640,7 +5671,7 @@ describe("registerUserService", () => {
     });
 
     expect(user.get("email")).toBe("test@example.com");
-    expect(user.get("password")).not.toBe("secret");  // hashed by useHashedPassword()
+    expect(user.get("password")).not.toBe("secret"); // hashed by useHashedPassword()
 
     const found = await usersRepository.first({ email: "test@example.com" });
     expect(found).toBeDefined();
@@ -5665,18 +5696,18 @@ What it does (in order):
 3. Runs `bootstrap()` — env, app, prestart hooks.
 4. Initializes the `filesOrchestrator` (module/route/config discovery, no file watching).
 5. Loads all `src/config/*.ts` files.
-6. Resolves the connector selection — **an explicit parameter wins, then `tests.connectors` from config, then the `true` default.** See *Selecting connectors* below.
+6. Resolves the connector selection — **an explicit parameter wins, then `tests.connectors` from config, then the `true` default.** See _Selecting connectors_ below.
 7. Starts the chosen connectors — but **never `http`** when you pass a boolean. HTTP is the global-setup's job.
 
 The result: DB/cache/logger/storage connections your code can use. Models save, repositories query, services run. Same code as production, just isolated to the test process.
 
 ### The `connectors` parameter
 
-| Value                  | Boots                                                            | Use when                                              |
-| ---------------------- | ---------------------------------------------------------------- | ----------------------------------------------------- |
-| `true` *(default)*     | Every connector except `http` — via `startWithout(["http"])` (db, cache, logger, storage, and socket if configured) | Most service / repository / model tests.              |
-| `false`                | None                                                             | Pure logic tests with no DB / cache touches (parsers, validators, util functions). |
-| `["database", "cache"]` | Just those, in that order                                        | A test that only needs DB but not, say, the storage driver. |
+| Value                   | Boots                                                                                                               | Use when                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `true` _(default)_      | Every connector except `http` — via `startWithout(["http"])` (db, cache, logger, storage, and socket if configured) | Most service / repository / model tests.                                           |
+| `false`                 | None                                                                                                                | Pure logic tests with no DB / cache touches (parsers, validators, util functions). |
+| `["database", "cache"]` | Just those, in that order                                                                                           | A test that only needs DB but not, say, the storage driver.                        |
 
 The default `true` is the sane choice. Reach for `false` when the unit you're testing genuinely doesn't talk to any framework subsystem — pulling up a DB connection **for every file** just to test a string parser is wasted setup time.
 
@@ -5692,25 +5723,25 @@ export default testsConfigurations;
 
 ⚠ **BREAKING in 4.14.0 — the precedence flipped.**
 
-| | Order |
-|---|---|
-| **4.13.0 and earlier** | `tests.connectors` config **>** `setupTest({ connectors })` parameter **>** `true` |
-| **4.14.0 onward** | **explicit `setupTest({ connectors })` parameter** **>** `tests.connectors` config **>** `true` |
+|                        | Order                                                                                           |
+| ---------------------- | ----------------------------------------------------------------------------------------------- |
+| **4.13.0 and earlier** | `tests.connectors` config **>** `setupTest({ connectors })` parameter **>** `true`              |
+| **4.14.0 onward**      | **explicit `setupTest({ connectors })` parameter** **>** `tests.connectors` config **>** `true` |
 
-**An explicit call-site value now beats project config.** If your project sets `tests.connectors` *and* some test file passes `connectors` explicitly, **that file will start a different connector set after upgrading.** Search for `setupTest({` across your tests before you upgrade — a call passing `connectors` was previously ignored and is now honoured.
+**An explicit call-site value now beats project config.** If your project sets `tests.connectors` _and_ some test file passes `connectors` explicitly, **that file will start a different connector set after upgrading.** Search for `setupTest({` across your tests before you upgrade — a call passing `connectors` was previously ignored and is now honoured.
 
 **"Explicit" means you supplied a non-`undefined` value.** Both of these fall through to config:
 
 ```ts
-await setupTest();                       // → tests.connectors, else true
-await setupTest({});                     // → tests.connectors, else true
+await setupTest(); // → tests.connectors, else true
+await setupTest({}); // → tests.connectors, else true
 await setupTest({ connectors: undefined }); // → tests.connectors, else true — NOT "start none"
 ```
 
 The `undefined` rule is deliberate: an optional variable that happens to be `undefined` must not silently erase your project config.
 
 ```ts
-await setupTest({ connectors: false });        // → none, even if config says otherwise
+await setupTest({ connectors: false }); // → none, even if config says otherwise
 await setupTest({ connectors: ["database"] }); // → exactly that, even if config differs
 ```
 
@@ -5737,7 +5768,7 @@ afterAll(teardownTest);
 ⛔ **Three things changed here in 4.14.0. If you generated this file earlier, replace all three — it is not a comment fix.**
 
 1. **`afterAll(teardownTest)` is new and mandatory.** Nothing else closes the framework your tests started. This is what makes the lifetime file-scoped and owned rather than left running.
-2. **The call is now bare `setupTest()`, not `setupTest({ connectors: true })`.** Under the flipped precedence, passing `true` is an *explicit* value and would override `tests.connectors` for **every file in the project.** Bare means "whatever this project configured, else the default".
+2. **The call is now bare `setupTest()`, not `setupTest({ connectors: true })`.** Under the flipped precedence, passing `true` is an _explicit_ value and would override `tests.connectors` for **every file in the project.** Bare means "whatever this project configured, else the default".
 3. **The comment used to say `Per-Worker Test Setup` / "Runs in EACH Vitest worker thread".** False — see the top of this skill.
 
 ```ts title="vite.config.ts"
@@ -5748,8 +5779,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
-    globalSetup: "./src/test-global-setup.ts",  // ← HTTP server (see test-http skill)
-    setupFiles: ["./src/test-setup.ts"],         // ← runs setupTest before EACH test file
+    globalSetup: "./src/test-global-setup.ts", // ← HTTP server (see test-http skill)
+    setupFiles: ["./src/test-setup.ts"], // ← runs setupTest before EACH test file
     environment: "node",
     globals: false,
     include: ["src/app/**/*.test.ts"],
@@ -5758,6 +5789,17 @@ export default defineConfig({
 ```
 
 The `mongezVite()` plugin handles TypeScript path resolution and the framework's module shape. Without it, your imports break the moment vitest tries to load a Warlock module. `lowerStage3Decorators()` goes **first** — it lets decorated Cascade models (`@RegisterModel`, …) load under Vitest 4 / Vite 8; see [`@warlock.js/core/lower-stage3-decorators/SKILL.md`](@warlock.js/core/lower-stage3-decorators/SKILL.md).
+
+### Keep Vitest setup out of development
+
+`warlock dev` (and `warlock build`) load your app's `vite.config.ts`. Anything you put there for tests runs in development too. Guard vitest-only setup:
+
+```ts
+// vite.config.ts
+if (process.env.VITEST) {
+  Object.assign(process.env, testEnv); // test database, test keys...
+}
+```
 
 Tests live colocated with the module: `src/app/<module>/tests/*.test.ts`. The `include` pattern picks them up.
 
@@ -5784,9 +5826,9 @@ describe("createProductService", () => {
   it("rejects duplicate names", async () => {
     await Product.create({ name: "Existing", price: 10 });
 
-    await expect(
-      createProductService({ name: "Existing", price: 20 }),
-    ).rejects.toThrow(/already exists/i);
+    await expect(createProductService({ name: "Existing", price: 20 })).rejects.toThrow(
+      /already exists/i,
+    );
   });
 });
 ```
@@ -5856,7 +5898,7 @@ afterEach(async () => {
 
 Vitest runs the tests within one file sequentially, so an `afterEach` truncate gives each test a clean slate.
 
-⚠ **Cross-*file* isolation is not solved by this.** Separate workers get separate **connections**, not separate **rows** — two files pointed at the same database see each other's committed data regardless of pool or worker count. **Truncate what your file wrote; don't assume the worker boundary did it for you.** Real data isolation (DB-per-worker, transaction-per-test) is a separate piece of work and is not in this release.
+⚠ **Cross-_file_ isolation is not solved by this.** Separate workers get separate **connections**, not separate **rows** — two files pointed at the same database see each other's committed data regardless of pool or worker count. **Truncate what your file wrote; don't assume the worker boundary did it for you.** Real data isolation (DB-per-worker, transaction-per-test) is a separate piece of work and is not in this release.
 
 ### Skipping connectors for pure logic tests
 
@@ -5866,7 +5908,7 @@ import { setupTest } from "@warlock.js/core/tests";
 import { slugify } from "../utils/slugify";
 
 beforeAll(async () => {
-  await setupTest({ connectors: false });  // starts no connectors at all
+  await setupTest({ connectors: false }); // starts no connectors at all
 });
 
 describe("slugify", () => {
@@ -5893,7 +5935,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await teardownTest();      // ← REQUIRED, see below
+  await teardownTest(); // ← REQUIRED, see below
 });
 ```
 
@@ -5914,16 +5956,16 @@ afterAll(async () => {
 
 `setupTest` / `teardownTest` are a pair. **The harness that calls one owns calling the other in the same context.**
 
-| Call | Behaviour |
-|---|---|
-| `setupTest(x)` while idle | bootstraps |
-| `setupTest(x)` while already ready with the **same** effective options | no-op |
-| `setupTest(y)` while ready or starting with **different** effective options | ⛔ **rejects**, naming active vs requested |
-| two concurrent `setupTest(x)` calls | share one startup |
-| `setupTest` after a failed setup | allowed — a failed setup unwinds and returns to idle |
-| `teardownTest()` while idle | no-op |
-| two concurrent `teardownTest()` calls | share one shutdown |
-| `setupTest(y)` after a **successful** teardown | allowed, different options fine |
+| Call                                                                        | Behaviour                                            |
+| --------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `setupTest(x)` while idle                                                   | bootstraps                                           |
+| `setupTest(x)` while already ready with the **same** effective options      | no-op                                                |
+| `setupTest(y)` while ready or starting with **different** effective options | ⛔ **rejects**, naming active vs requested           |
+| two concurrent `setupTest(x)` calls                                         | share one startup                                    |
+| `setupTest` after a failed setup                                            | allowed — a failed setup unwinds and returns to idle |
+| `teardownTest()` while idle                                                 | no-op                                                |
+| two concurrent `teardownTest()` calls                                       | share one shutdown                                   |
+| `setupTest(y)` after a **successful** teardown                              | allowed, different options fine                      |
 
 **"Same options" is compared by meaning, not by literal value** — connector arrays are deduplicated and compared as sets, so `["cache", "database"]` and `["database", "cache", "cache"]` are the same selection.
 
@@ -5938,7 +5980,7 @@ afterAll(async () => {
 ```ts title="src/config/tests.ts"
 const testsConfigurations = {
   connectors: ["database", "logger"],
-  setupTimeout: 120000,   // milliseconds — this is the default
+  setupTimeout: 120000, // milliseconds — this is the default
 };
 
 export default testsConfigurations;
@@ -5957,9 +5999,9 @@ in `src/config/tests.ts` — milliseconds, default 120000.
 1. **It bounds the setup ATTEMPT, not teardown separately.** `teardownTest()` awaits the same attempt, so it inherits the bound — **one timer, not two.** A second teardown-side deadline was tried and rejected: it re-introduced the unbounded re-entry this whole guard exists to remove.
 2. **Expiry poisons the lifecycle**, it does not return to `idle`. The attempt may have started connectors nobody can now account for, so pretending the runtime is clean would be worse than refusing.
 3. **⛔ An invalid `setupTimeout` throws, naming the bad value.** Zero, negative and non-numeric all fail loudly rather than falling back to the default — a silent fallback would hide a typo behind a working suite.
-4. **The bound is measured from when the attempt started**, not from when config was read. `tests.setupTimeout` is only readable after `loadConfigFiles()`, which happens *inside* the window being bounded; re-arming naively would give you the default plus your configured value.
+4. **The bound is measured from when the attempt started**, not from when config was read. `tests.setupTimeout` is only readable after `loadConfigFiles()`, which happens _inside_ the window being bounded; re-arming naively would give you the default plus your configured value.
 
-⚠ **What is proven and what is not.** The nine guards above were each seen to fail under their own mutation. **But every spec injects its scheduler**, so the default *value* is tested while the production timer — and whether its `unref` actually releases the worker — is not. **And no spec observes a real hang**: the stuck attempt is a mock gate, not a socket that never returns. These prove what the lifecycle *decides*, not what a genuinely wedged connector does.
+⚠ **What is proven and what is not.** The nine guards above were each seen to fail under their own mutation. **But every spec injects its scheduler**, so the default _value_ is tested while the production timer — and whether its `unref` actually releases the worker — is not. **And no spec observes a real hang**: the stuck attempt is a mock gate, not a socket that never returns. These prove what the lifecycle _decides_, not what a genuinely wedged connector does.
 
 ### State is per worker runtime, not per module
 
@@ -5989,6 +6031,16 @@ In both cases the guard's scope matches the resource's scope, which is the point
 - [`test-http/SKILL.md`](../test-http/SKILL.md) — integration tests via the real HTTP server (`startHttpTestServer` + `testGet` / `testPost` / `expectJson`).
 - [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — where tests live in a module (`tests/*.test.ts`).
 - [`write-cli-command/SKILL.md`](../write-cli-command/SKILL.md) — `warlock add test` for the initial scaffold.
+
+## App modules and `importModule`
+
+Under Vitest, test files run through vite-node while Warlock's own native `import()` of app modules (config, routes, events) does not, so app classes such as `User` can exist twice in one worker and `instanceof` fails. Pass `importModule` to `setupTest` so Warlock loads app modules through the test's own module graph:
+
+```ts
+setupTest({ importModule: (file) => import(file) });
+```
+
+The generated `src/test-setup.ts` already does this. Without it, `setupTest()` under Vitest warns once.
 
 
 ## update-packages  `@warlock.js/core/update-packages/SKILL.md`
@@ -6766,7 +6818,7 @@ Both pivot on **the request's locale** — auto-detected from headers / query st
 ## The shape
 
 ```ts
-// 1. Declare keys (auto-loaded from src/app/<module>/utils/locales.ts)
+// 1. Declare keys (auto-loaded from src/app/<module>/utils/locales.json)
 import { groupedTranslations } from "@mongez/localization";
 
 groupedTranslations("products", {
@@ -6788,7 +6840,26 @@ const name = getLocalized(product.get("name_translations"));
 // → reads the current request's locale, returns the matching value
 ```
 
-## Declaring translations — `groupedTranslations`
+## Declaring translations — module `locales.json`
+
+Prefer a data-only dictionary in `src/app/<module>/utils/locales.json`. The
+module folder is its default group, so this example registers
+`products.notFound`; a root `$group` string replaces that group when a module
+needs a different namespace. The module loader validates the strict JSON
+shape, flattens nested keys, and rejects duplicate ownership. Do not import the
+file yourself.
+
+```json title="src/app/products/utils/locales.json"
+{
+  "notFound": { "en": "Product not found", "ar": "المنتج غير موجود" },
+  "errors": { "outOfStock": { "en": "Product out of stock", "ar": "المنتج غير متوفر" } }
+}
+```
+
+`utils/locales.ts` with `groupedTranslations` remains supported but is
+deprecated and will be removed in v6. Migrate it with `warlock doctor --fix`.
+
+### Legacy `groupedTranslations`
 
 Every module owns its translation namespace under `src/app/<module>/utils/locales.ts`. The file is auto-loaded at boot — you don't import it from anywhere; the framework picks it up via the module loader.
 
@@ -6849,7 +6920,7 @@ All three lookups go through `@mongez/localization`'s `trans()` under the hood, 
 
 ### Web `useTrans()` key checking
 
-When an app uses `@warlock.js/web`, `warlock dev` writes `.warlock/typings/translations.d.ts` from literal `groupedTranslations("group", { key: ... })` registrations. It augments web's `TranslationKeyRegistry`, so `useTrans()("products.notFound")` is checked against registered keys and a typo fails TypeScript. Before the generated file exists, `useTrans()` accepts `string` for a non-breaking first boot. Dynamic groups/keys and placeholders are not inferred.
+When an app uses `@warlock.js/web`, `warlock dev` writes `.warlock/typings/translations.d.ts` from module `locales.json` dictionaries and literal `groupedTranslations("group", { key: ... })` registrations. It augments web's `TranslationKeyRegistry`, so `useTrans()("products.notFound")` is checked against registered keys and a typo fails TypeScript. Before the generated file exists, `useTrans()` accepts `string` for a non-breaking first boot. Dynamic TypeScript groups/keys and placeholders are not inferred.
 
 `useTrans()` now works correctly across hydration (5.15.0): the hydration
 payload ships a `translations` key with the active locale's keywords, and
@@ -7043,7 +7114,7 @@ GET /products/42?locale=ar
 
 ## Gotchas
 
-- **Locales files are auto-loaded — don't import them.** `src/app/<module>/utils/locales.ts` is picked up by the module loader on boot. Importing it manually causes double-registration warnings.
+- **Locales files are auto-loaded — don't import them.** `src/app/<module>/utils/locales.json` is picked up by the module loader on boot. Importing legacy `locales.ts` manually causes double-registration warnings.
 - **Group names should match module URL slugs.** `groupedTranslations("products", ...)` for the `/products` module. Mismatch breaks the convention but doesn't throw.
 - **Every key needs every locale.** If a key is missing for the active locale, the lookup falls back to the key string itself (`"products.notFound"` literally appears in the response). Always ship all locales together when adding a key.
 - **`t()` outside a request uses the global default.** `Application.environment === "test"` or background jobs without a request context get the configured `app.localeCode`, not whatever the most recent request used.
@@ -7056,8 +7127,8 @@ GET /products/42?locale=ar
 
 - [`send-response/SKILL.md`](../send-response/SKILL.md) — error helpers that pair with translated messages (`response.notFound({ error: t("...") })`).
 - [`define-resource/SKILL.md`](../define-resource/SKILL.md) — using `getLocalized` inside resource output for clean per-locale responses.
-- [`create-module/SKILL.md`](../create-module/SKILL.md) — the `utils/locales.ts` file is part of the generated module scaffold.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — `utils/locales.ts` is auto-loaded; the suffix is mandatory.
+- [`create-module/SKILL.md`](../create-module/SKILL.md) — the `utils/locales.json` file is part of the generated module scaffold.
+- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — `utils/locales.json` is auto-loaded; the suffix is mandatory.
 
 ## Route-owned web translations (5.17)
 
@@ -12092,7 +12163,17 @@ const jobs = await transaction(async () => {
 
 `{ noWait: true }` errors immediately when a matching row is locked (instead of waiting or skipping) — mutually exclusive with `skipLocked`.
 
-**Postgres-only.** MongoDB has no row-level SELECT locking — the MongoDB driver **throws** on `lockForUpdate()`. On Mongo, claim atomically instead (`findOneAndUpdate` with a reservation filter — see `@warlock.js/cascade/perform-atomic-ops/SKILL.md`).
+**Postgres-only.** MongoDB has no row-level SELECT locking — the MongoDB driver **throws** `UnsupportedLockForUpdateError` (exported from `@warlock.js/cascade`) on `lockForUpdate()`, inside or outside a transaction. On Mongo, claim atomically with a conditional update instead. Operator-bearing filters are explicit, so pass `trustedFilter: true` only for a filter built in application code:
+
+```ts
+const claimed = await Job.atomic(
+  { id, leaseUntil: { $lt: now } },
+  { $set: { leaseUntil: nextLeaseUntil, status: "processing" } },
+  { trustedFilter: true },
+);
+```
+
+See `@warlock.js/cascade/perform-atomic-ops/SKILL.md` for `atomic` / `findOneAndUpdate`.
 
 ## Outside the transaction
 
@@ -13624,10 +13705,9 @@ v.string().min(3).trim()
 ## `.required()` / `.optional()` / `.present()`
 
 ```ts
-v.string()             // already required inside v.object — no need to call .required()
+v.string()             // already required inside v.object
 v.string().optional()  // type: string | undefined — { isOptional: true } brand
 v.string().present()   // must exist, may be "" / null
-v.string().required()  // explicit form — same behavior, redundant
 ```
 
 **Required is the default inside `v.object`.** Most schemas read cleaner without `.required()` — `Infer<>` already shows what's required (no `?`) vs optional (`?`). Calling `.required()` explicitly is harmless and accepted, but the canonical seal style is to skip it. Keep `.optional()` explicit (it changes behavior); skip `.required()` (it doesn't).
@@ -13635,7 +13715,6 @@ v.string().required()  // explicit form — same behavior, redundant
 The `{ isOptional: true }` brand survives chaining (`.optional().min(3)` is still optional) and `Infer<>` reads it to make the key optional.
 
 **When `.required()` is still useful:**
-- Visual contrast next to `.optional()` siblings when you want the asymmetry to be loud — style call.
 - It's not needed for conditional rules — `.requiredIf(field, value)` and friends *replace* the default required-condition slot, so they work standalone.
 
 Conditional variants (run inside `v.object` only):
@@ -13832,7 +13911,7 @@ Validators are **immutable by default**. Every chain method returns a clone:
 
 ```ts
 const baseString = v.string();
-const required = baseString.required();
+const short = baseString.min(3);
 // baseString is unchanged
 ```
 
@@ -13841,7 +13920,7 @@ This matters because schemas are often shared (`Model.schema = v.object({...})`)
 Toggle in-place with the `.mutable` getter (rare):
 
 ```ts
-const schema = v.string().mutable.required().min(3);
+const schema = v.string().mutable.min(3);
 // Same instance throughout — useful when building dynamically
 ```
 
@@ -14184,8 +14263,8 @@ The default is to **reject** unknown keys, which is what you want for inbound pa
 
 ```ts
 const publicArticle = v.object({
-  id: v.string().required(),
-  title: v.string().required(),
+  id: v.string(),
+  title: v.string(),
 }).stripUnknown();
 
 const { isValid, data } = await v.validate(publicArticle, record);
@@ -15635,7 +15714,7 @@ import { object } from "@warlock.js/seal/object";
 import { string } from "@warlock.js/seal/string";
 
 const commentSchema = object({
-  comment: string().trim().required().minLength(3),
+  comment: string().trim().minLength(3),
 });
 
 const result = await commentSchema["~standard"].validate({
@@ -20978,6 +21057,17 @@ process.on("SIGTERM", async () => {
 
 > Registering jobs alone runs nothing — you must call `scheduler.start()`. As a safety net, in development (`NODE_ENV !== "production"`) the scheduler logs a one-shot `console.warn` if jobs are registered but `start()` is never called.
 
+## Run scheduled jobs inside a context
+
+Use `scheduler.around(hook)` to wrap every callback execution — each retry attempt too — for example in an `AsyncLocalStorage` context:
+
+```ts
+scheduler.around((job, run) => storage.run({ job: job.name }, run));
+```
+
+- First registered hook is the outermost; `around` returns an unsubscribe function.
+- A hook that never calls `run` skips the execution (`job:skip`, `result.skipped`); a hook that throws is treated as a callback error (retry/error path applies).
+
 ## Pick a skill
 
 | If the task is about… | Load |
@@ -21128,6 +21218,22 @@ Option precedence: dispatch options > `defineJob` > `queue.defaultJobOptions`.
 const job = await sendInvoice.find(id);
 // { id, name, queue, state, payload, progress, attemptsMade, result, failedReason, createdAt, finishedAt }
 ```
+
+## Carry request context into jobs
+
+```ts
+setQueueContext(
+  defineQueueContext({
+    capture: () => tenantStorage.getStore(), // runs inside dispatch()
+    restore: (tenant, run) => tenantStorage.run(tenant, run), // wraps handle()
+  }),
+);
+```
+
+- `undefined` from `capture` carries nothing; the value must be JSON-safe. Read it in a handler as `ctx.context` (`unknown`).
+- Jobs dispatched from a restored handler capture the same context.
+- `defineJob({ context: false })` opts a job out.
+- Throw `UnrecoverableJobError` from a handler or `restore` to fail the job without retries.
 
 ## Rules
 
@@ -21779,13 +21885,17 @@ import { type RequestHandler } from "@warlock.js/core";
 import { User } from "app/users/models/user/user.model";
 
 export const loginController: RequestHandler = async ({ request, response }) => {
-  const result = await authService.login(User, {
-    email: request.input("email"),
-    password: request.input("password"),
-  }, {
-    userAgent: request.header("user-agent"),
-    ip: request.ip,
-  });
+  const result = await authService.login(
+    User,
+    {
+      email: request.input("email"),
+      password: request.input("password"),
+    },
+    {
+      userAgent: request.header("user-agent"),
+      ip: request.ip,
+    },
+  );
 
   if (!result) {
     return response.unauthorized({ error: "Invalid credentials" });
@@ -21837,8 +21947,8 @@ The optional `deviceInfo` carries metadata into the refresh token row:
 authService.login(User, credentials, {
   userAgent: request.header("user-agent"),
   ip: request.ip,
-  deviceId: "...",          // your client-side device fingerprint
-  familyId: "...",          // pre-existing family for token rotation, usually omitted
+  deviceId: "...", // your client-side device fingerprint
+  familyId: "...", // pre-existing family for token rotation, usually omitted
 });
 ```
 
@@ -21852,8 +21962,8 @@ import { type RequestHandler } from "@warlock.js/core";
 export const logoutController: RequestHandler = async ({ request, response }) => {
   await authService.logout(
     request.locals.user!,
-    request.authorizationValue,        // access token from the Authorization header
-    request.input("refreshToken"),     // refresh token from the request body
+    request.authorizationValue, // access token from the Authorization header
+    request.input("refreshToken"), // refresh token from the request body
   );
 
   return response.success({ message: "Logged out" });
@@ -21861,6 +21971,7 @@ export const logoutController: RequestHandler = async ({ request, response }) =>
 ```
 
 The contract:
+
 - **Pass the access token** → that specific access-token row is deleted.
 - **Pass the refresh token** → that specific refresh-token row is revoked.
 - **Omit refresh token** → behavior depends on `config.auth.refreshToken.logoutWithoutToken`:
@@ -21884,10 +21995,10 @@ Useful for "logout from all devices" buttons. Fires `token.revoked` per token + 
 import { type RequestHandler } from "@warlock.js/core";
 
 export const refreshController: RequestHandler = async ({ request, response }) => {
-  const tokens = await authService.refreshTokens(
-    request.input("refreshToken"),
-    { userAgent: request.header("user-agent"), ip: request.ip },
-  );
+  const tokens = await authService.refreshTokens(request.input("refreshToken"), {
+    userAgent: request.header("user-agent"),
+    ip: request.ip,
+  });
 
   if (!tokens) {
     return response.unauthorized({ error: "Invalid refresh token" });
@@ -21906,11 +22017,21 @@ Returns a new token pair or `null` (token expired, revoked, or replay-detected).
 ```ts
 import { authEvents } from "@warlock.js/auth";
 
-authEvents.on("login.success", (user, tokens, deviceInfo) => { /* audit */ });
-authEvents.on("login.failed",  (credentials, reason) => { /* alert on brute force */ });
-authEvents.on("logout",        (user) => { /* clear server-side session, if any */ });
-authEvents.on("token.refreshed", (user, newPair, oldToken) => { /* track rotation */ });
-authEvents.on("cleanup.completed", (count) => { /* metrics */ });
+authEvents.on("login.success", (user, tokens, deviceInfo) => {
+  /* audit */
+});
+authEvents.on("login.failed", (credentials, reason) => {
+  /* alert on brute force */
+});
+authEvents.on("logout", (user) => {
+  /* clear server-side session, if any */
+});
+authEvents.on("token.refreshed", (user, newPair, oldToken) => {
+  /* track rotation */
+});
+authEvents.on("cleanup.completed", (count) => {
+  /* metrics */
+});
 ```
 
 Full event list: `login.attempt`, `login.success`, `login.failed`, `logout`, `logout.all`, `logout.failsafe`, `token.created`, `token.refreshed`, `token.revoked`, `token.expired`, `token.familyRevoked`, `session.created`, `session.destroyed`, `cleanup.completed`.
@@ -21927,6 +22048,10 @@ Full event list: `login.attempt`, `login.success`, `login.failed`, `logout`, `lo
 - [`@warlock.js/auth/manage-tokens/SKILL.md`](@warlock.js/auth/manage-tokens/SKILL.md) — token lifecycle, rotation, family revocation
 - [`@warlock.js/auth/register-user/SKILL.md`](@warlock.js/auth/register-user/SKILL.md) — sign-up that issues tokens after creation
 - [`@warlock.js/auth/protect-routes/SKILL.md`](@warlock.js/auth/protect-routes/SKILL.md) — where the access token gets consumed
+
+## Browser sessions for Web pages
+
+For cookie sessions read by `@warlock.js/web` pages, log in with `authService.loginWithSessionCookies(request, response, Model, credentials)`. It requires a same-origin `Origin`/`Referer` even without cookies (login CSRF) and sets the access and refresh cookies (`auth.cookie.name`, `auth.cookie.refreshName`, `Path=/`). To share a session across subdomains, configure `auth.cookie.cookieDomain(request)` to return (for example) `".example.com"`; return `undefined` for host-only cookies. With `cookieDomain` configured, always pass the request to cookie helpers so they select the same Domain: `authService.setSessionCookies(response, tokens, request)`, `authService.clearSessionCookies(response, request)`, and `authService.clearAuthCookie(response, options, request)`. Omitting it throws `CookieDomainRequestRequiredError`. Domain clears also remove the legacy host-only names. Resolve pages with `pageSession({ project })` (`web.session`); header beats cookie; `auth.session.maxAge` defaults to `"30d"`. A page session with multiple `userTypes` cannot renew its cookie: the resolver only supplies a renewal user type when exactly one type is allowed, so it reads the session but skips automatic renewal. Multi-instance: share the JWT secret and the cache store, keep clocks in sync.
 
 
 ## login-with-providers  `@warlock.js/auth/login-with-providers/SKILL.md`
@@ -25825,7 +25950,7 @@ database: inApp.configure({ repository: notificationsRepository }),
 
 ---
 name: write-notification-migration
-description: 'Create the notifications table with the `notificationColumns(Notification)` factory + cascade `Migration.create`. Column NAMES come from the model''s `columnMap` (recipient / tenant / readAt / isRead); the fixed columns are `type` / `title` / `body` / `payload` / `idempotency_key`. Read-state follows columnMap presence: `readAt` → nullable timestamp, `isRead` → indexed boolean, both → both. Defaults to `user_id` + `read_at` when no columnMap. Spread + extend for extras (FK references, composite indexes). Triggers: `notificationColumns`, `Migration.create` for notifications, "create the notifications table", "notification migration", "add organization_id to notifications", `is_read` column, `read_at` column, `idempotency_key` column; typical import `import { Migration } from "@warlock.js/cascade"; import { notificationColumns } from "@warlock.js/notifications"`. Skip: generic cascade migration writing — `@warlock.js/cascade/write-migration/SKILL.md`; the model itself — `@warlock.js/notifications/use-in-app/SKILL.md`.'
+description: 'Create the notifications table with the `notificationColumns(Notification)` factory + cascade `Migration.create`. Column NAMES come from the model''s `columnMap` (recipient / tenant / readAt / isRead); the fixed columns are `type` / `title` / `body` / `payload` / `idempotency_key`. Set `{ idType: "bigint" }` for integer-key apps; UUID remains the default. Read-state follows columnMap presence: `readAt` → nullable timestamp, `isRead` → indexed boolean, both → both. Defaults to `user_id` + `read_at` when no columnMap. Spread + extend for extras (FK references, composite indexes). Triggers: `notificationColumns`, `Migration.create` for notifications, "create the notifications table", "notification migration", "add organization_id to notifications", `is_read` column, `read_at` column, `idempotency_key` column; typical import `import { Migration } from "@warlock.js/cascade"; import { notificationColumns } from "@warlock.js/notifications"`. Skip: generic cascade migration writing — `@warlock.js/cascade/write-migration/SKILL.md`; the model itself — `@warlock.js/notifications/use-in-app/SKILL.md`.'
 ---
 
 # Write the notifications migration
@@ -25858,6 +25983,16 @@ The recipient / tenant / read-state column NAMES come from `columnMap`; `type` /
 `title` / `body` / `payload` / `idempotency_key` are fixed. `id` / `createdAt` /
 `updatedAt` are added automatically by cascade.
 
+## Match your app's identifier type
+
+Recipient and tenant columns default to UUID. For applications whose primary keys
+are `bigint`, `integer`, or strings, pass `idType`; it is applied to every
+identifier column the factory creates:
+
+```ts
+export default Migration.create(Notification, notificationColumns(Notification, { idType: "bigint" }));
+```
+
 ## With extras — spread + extend
 
 Add your own columns — a category, a source channel, a tenant id, anything:
@@ -25868,7 +26003,7 @@ import { notificationColumns } from "@warlock.js/notifications";
 import { Notification } from "../notification.model";
 
 export default Migration.create(Notification, {
-  ...notificationColumns(Notification),
+  ...notificationColumns(Notification, { idType: "bigint" }),
   category: string().index().nullable(),
 });
 ```
@@ -25916,6 +26051,17 @@ description: 'Install the SSR page layer with `warlock add web`: add React/Vite 
 
 `warlock add web` turns an existing Warlock API application into an application that can also serve SSR React pages. It installs the web and React packages, adds the Vite development peers, scaffolds the smallest page layer, and registers the late-phase web connector.
 
+## Keep Vitest setup out of development
+
+`warlock dev` (and `warlock build`) load your app's `vite.config.ts`. Anything you put there for tests runs in development too. Guard vitest-only setup:
+
+```ts
+// vite.config.ts
+if (process.env.VITEST) {
+  Object.assign(process.env, testEnv); // test database, test keys...
+}
+```
+
 ## The shape
 
 ```bash
@@ -25939,6 +26085,8 @@ Every added `@warlock.js/*` package is saved at the exact version of the Core CL
 ## Connector registration
 
 The command adds `webConnector()` to `warlock.config.ts`. If the config cannot be patched safely, add the same wiring yourself:
+
+For development-only connector tuning, `webConnector({ ssrFetchTimeoutMs })` sets the Vite SSR module-fetch bound; `WARLOCK_SSR_FETCH_TIMEOUT_MS` overrides it.
 
 ```ts title="warlock.config.ts"
 import { defineConfig } from "@warlock.js/core";
@@ -26005,6 +26153,7 @@ The desired result is one page route at `/` and, when the stock JSON route exist
 - **A partial scaffold exits non-zero.** `root.tsx` and connector registration may still have been written; complete only the missing home page after resolving the collision.
 - **Do not register the connector twice.** Use `warlock.config.ts`, not an additional `connectorsManager.register(...)` call.
 - **Do not import the hydration entry.** The connector and build contribution own it.
+- **Run `warlock start` with the app root as cwd.** The manifest's `clientDir` (e.g. `dist/client`) resolves from `process.cwd()`, so copying `dist` elsewhere without the app root won't find client assets.
 
 ## See also
 
@@ -26411,18 +26560,36 @@ export const config: PageConfig = {
 };
 ```
 
-Supported fields are `title`, `description`, `keywords`, `canonical`, `robots`, `openGraph`, and `twitter`. A title may be a string, `{ default?, template? }`, or `{ absolute }`. Function metadata runs after a successful loader. If a loader fails, Warlock uses error metadata instead of calling the page function with missing data. Layout and root metadata use the same input shape; their callbacks receive readonly `{ data, shared, child? }` and run server-side only. A callback returns its complete level: explicit returned fields override `child`, and omitted child fields are not retained. Spread `child` when retaining descendant metadata:
+Supported fields are `title`, `description`, `keywords`, `canonical`, `robots`, `openGraph`, and `twitter`. A title may be a string, `{ default?, template? }`, or `{ absolute }`. Function metadata runs after a successful loader. If a loader fails, Warlock uses error metadata instead of calling the page function with missing data. Layout and root metadata use the same input shape; their callbacks receive readonly `{ data, shared, child? }` and run server-side only. A callback returns its complete level: explicit returned fields override `child.metadata`, and omitted child fields are not retained. Spread `child.metadata` when retaining descendant metadata:
 
 ```tsx
 export const config: LayoutConfig = {
   metadata: ({ data, child }) => ({
-    ...child,
-    title: `${data.sectionName} | ${child?.title ?? "Products"}`,
+    ...child?.metadata,
+    title: `${data.sectionName} | ${child?.metadata.title ?? "Products"}`,
   }),
 };
 ```
 
 That callback may override the child title; an absolute child title remains authoritative. A supplied title resolves to a string in SSR and navigation output.
+
+### Per-locale content slugs (`metadata.alternates`)
+
+A locale-routed page's hreflang alternates are generated automatically from the current request's path (swapping only the locale prefix). That is wrong for a page whose SLUG also differs per locale — a listing page like `/en/apartments-for-rent-in-zamalek` vs. `/ar/شقق-للإيجار-في-الزمالك`. Set `metadata.alternates` to replace the generated set with the page's real per-locale URLs:
+
+```tsx
+export const config: PageConfig<typeof loader> = {
+  metadata: ({ data }) => ({
+    alternates: {
+      en: `/apartments-for-rent-in-${data.listing.slug.en}`,
+      ar: `/شقق-للإيجار-في-${data.listing.slug.ar}`,
+      "x-default": `/apartments-for-rent-in-${data.listing.slug.en}`,
+    },
+  }),
+};
+```
+
+Keys are locale codes plus the optional `"x-default"` key; values are paths (joined onto the public URL, same as `canonical`) or absolute URLs, taken as-is. Setting `alternates` REPLACES the generated locale-alternate `<link>` set entirely — no generated entries render alongside it — and it travels through client navigation the same way any other metadata field does. A page with no `alternates` keeps the generated set unchanged. `metadata.links` entries with `rel: "alternate"` for the same locale code are dropped in favor of `alternates`; don't declare both for the same hreflang.
 
 ## The error boundary — `error.page.tsx`
 
@@ -27016,6 +27183,8 @@ below.
 
 All receive one context object with `request`, `response`, `shared`, and `signal`. Page loaders add generics that connect their sibling `validation` and `route` exports to `request.validated()` and `request.input()`.
 
+Page loaders, layout loaders, metadata callbacks, and page actions also receive `route: { name, path, params }` — the MATCHED page's route. Read it instead of `request.route`: under `sites`, core registers one `/*` catch-all per method, so `request.route` is that catch-all there. `name` is the page's `config.route.name`, or its generated name (never a `<site>.` prefixed or internal key); it is `undefined` only if the page has none.
+
 ## Abandoned-request signal
 
 `ctx.signal` is an `AbortSignal` that fires when the client disconnects before the response finishes. Hand it to anything cancelable:
@@ -27188,6 +27357,7 @@ Only put browser-safe data in `shared`: scalars, arrays, plain objects, or value
 - **Do not use loader return values as cross-level communication.** Levels run in order but are not wired to each other; use `shared`, written in middleware.
 - **`404.page.tsx` never runs its own loader.** The not-found page's module is registered and rendered for real — `register()` and its middleware still run — but the page loader is omitted from the request in both dev and production, so a missing URL cannot trigger application data work or fail a second time. Its ancestry contributes nothing either: the 404 page renders with an empty layout chain by construction. **The root `AppLoader` in `root.tsx` still runs** for a 404 request, so keep it cheap and make sure it tolerates a request that matched nothing.
 - **`process.env` is refused in the client/universal graph, with no `PUBLIC_` exception.** Read it in a loader and return it as page data.
+- **In `warlock dev`, app modules can load twice.** Loaders import through Vite SSR while HTTP handlers load natively, so a module-level singleton (`AsyncLocalStorage`, cache, registry) may exist in two copies. Until the single module graph (planned 5.26), store it on `globalThis[Symbol.for("your-app.name")]`; `warlock start` has one graph and is unaffected.
 - **Server actions are not supported.** POST to an ordinary Warlock API route and call `refresh()` after success.
 - **Responses now stream via React's streaming renderer.** The response still waits for every loader, middleware short-circuit and validation to settle before the first byte goes out — status codes, headers and cookies are unchanged — so this is not an API change for apps built on the framework.
 
@@ -27926,7 +28096,7 @@ Modified clicks, middle clicks, downloads, another browsing context, or an earli
 
 ## Build a URL without React
 
-`href(name, params?, query?)` is the durable primitive for redirects, headers, email bodies, and other non-component callers:
+`href(name, params?, query?)` is the durable primitive for redirects, headers, email bodies, and other non-component callers. It also accepts `href(name, { params, query })`:
 
 ```ts
 import { href } from "@warlock.js/web";
@@ -27936,7 +28106,19 @@ const productUrl = href(
   { id: "42" },
   { tab: "reviews", tags: ["featured", "sale"] },
 );
+
+const productApiUrl = apiHref("products.show", {
+  params: { id: "42" },
+  query: { include: "reviews" },
+});
 ```
+
+Import `apiHref` from `@warlock.js/web` for a generated named API route. It uses
+the separate `ApiRouteRegistry`, requires its path params, and serializes query
+values exactly like `href()`. Object form is recognized only for objects whose
+only keys are object-shaped `params` and/or `query`; therefore a positional
+route-param object such as `{ params: "one", query: "two" }` is never
+misread as options.
 
 Generated declarations make known route names and parameters type-safe when
 they are available. Runtime validation remains active before generation, and
@@ -27947,15 +28129,11 @@ eager module initializer before boot.
 ## Programmatic navigation
 
 ```tsx title="src/web/components/checkout-button.tsx"
-import { href, navigateBack, navigateTo } from "@warlock.js/web";
+import { navigateBack, navigateTo } from "@warlock.js/web";
 
 export function CheckoutButtons() {
   const openCheckout = () => {
-    const url = href("checkout.index");
-
-    if (!navigateTo(url)) {
-      window.location.assign(url);
-    }
+    navigateTo({ name: "checkout.index", query: { step: "shipping" } });
   };
 
   return (
@@ -27971,7 +28149,7 @@ export function CheckoutButtons() {
 }
 ```
 
-`navigateTo(path, { replace?: boolean })` accepts a path, not a route name. Resolve a name with `href()` first. It returns `false` when no client runtime accepted the navigation; use a real browser navigation when arrival is mandatory. `navigateBack()` is a no-op without a browser.
+`navigateTo(pathOrTarget, { replace?: boolean })` accepts a path or a `{ name, params, query }` route target. In a browser with no client runtime connected (before hydration), it falls back to a real browser navigation and returns `true`, so callers never hand-write `window.location.assign`. It returns `false` on the server, or when the runtime declines a same-origin URL. `navigateBack()` is a no-op without a browser.
 
 ## Re-fetch after a mutation
 
@@ -28043,6 +28221,7 @@ correlated:
 
 ```ts
 navigateTo({ name: "products.details", params: { id: "42" } });
+navigateTo({ name: "products.details", params: { id: "42" }, query: { tab: "reviews" } });
 ```
 
 The existing string form remains a literal URL/path. A route declared with a
@@ -29083,14 +29262,14 @@ A layout is projected for the browser the same way a page is: `config` and `load
 loader data, readonly shared state, and resolved child metadata; they run only
 on the server after loaders. Titles accept a string, `{ default?, template? }`,
 or `{ absolute }`. A callback returns that layout's complete metadata: explicit
-fields override `child`, and fields omitted from its result are not retained.
-Spread `child` when retaining descendant fields:
+fields override `child.metadata`, and fields omitted from its result are not retained.
+Spread `child.metadata` when retaining descendant fields:
 
 ```tsx
 export const config: LayoutConfig = {
   metadata: ({ data, child }) => ({
-    ...child,
-    title: `${data.workspaceName} | ${child?.title ?? "Workspace"}`,
+    ...child?.metadata,
+    title: `${data.workspaceName} | ${child?.metadata.title ?? "Workspace"}`,
   }),
 };
 ```
@@ -29321,14 +29500,14 @@ export const config: RootConfig = {
 `sitemap` or route-policy exports are invalid. Root metadata may be static or a
 server-only callback; it participates in title and field composition with
 layouts and the page. A callback returns the root's complete level: explicit
-fields override `child`, while omitted child fields are not retained. Preserve
-descendant metadata deliberately by spreading `child`:
+fields override `child.metadata`, while omitted child fields are not retained. Preserve
+descendant metadata deliberately by spreading `child.metadata`:
 
 ```tsx
 export const config: RootConfig = {
   metadata: ({ data, child }) => ({
-    ...child,
-    title: `${data.applicationName} | ${child?.title ?? "Home"}`,
+    ...child?.metadata,
+    title: `${data.applicationName} | ${child?.metadata.title ?? "Home"}`,
   }),
 };
 ```
@@ -35330,7 +35509,7 @@ Returns a `ModelContract` you pass straight into `ai.agent({ model })`.
 | `structuredOutput` | `true`, unless `responseFormat` is set to `"json_object"` or `"text"` (loose modes) — then `false`. |
 | `vision` | Inferred from model name. `true` for `gpt-4o*`, `gpt-4-turbo*`, `gpt-4.1*`, `o1*`, `o3*`, `chatgpt-4o*`; `false` otherwise. |
 | `reasoning` | Inferred from model name. `true` for the o-series (`o1*`, `o3*`, `o4*`) and the `gpt-5*` family; `false` otherwise. Drives whether `reasoning_effort` is forwarded. |
-| `promptCaching` | Always `true`. OpenAI caches long prompt prefixes automatically and reports hits via `usage.cachedTokens` — there are no caller-supplied write breakpoints. |
+| `promptCaching` | `true` for the direct OpenAI provider. It supports automatic cache hits plus explicit content-part write breakpoints; OpenAI-compatible wrapper providers leave the OpenAI-only fields off. |
 | `pdf` | `false` by default (opt-in `.model({ pdf: true })`). OpenAI accepts PDF `file` parts only on specific models (the `gpt-4o` family) — honest off until you set it. |
 | `audio` | `false` by default (opt-in `.model({ audio: true })`). Only the `gpt-4o-audio-preview` family accepts `input_audio`. |
 
@@ -35434,6 +35613,14 @@ await model.complete(messages, { tools, reasoning: { effort: "high" } }); // you
 await model.complete(messages, { tools, reasoning: { effort: "none" } }); // same effect as the default, explicit
 ```
 
+The gpt-6 models (`gpt-6-astra` / `gpt-6-sol` / `gpt-6-luna`) are hard-400 cases, verified live on `gpt-6-sol`:
+
+```
+400 Function tools with reasoning_effort are not supported for gpt-6-sol in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.
+```
+
+Tools work with reasoning off (the adapter's default when tools are present and no reasoning is set). Responses API support, planned for 5.27, lifts this.
+
 Calling **without** `tools` is unaffected — `reasoning_effort` is still omitted by default in that case (provider default reasoning, nothing to unblock). Trade-off of the `"none"` default: you lose reasoning on that call. For tool-heavy agent work (function calls + good replies rather than deep analysis) this is the right call — it's the difference between empty replies and working ones. When you need reasoning **and** tools together, use the Responses API (planned).
 
 ## Token usage — what's reported
@@ -35448,7 +35635,21 @@ Calling **without** `tools` is unaffected — `reasoning_effort` is still omitte
 
 Both `cachedTokens` and `reasoningTokens` are omitted (not set to `0`) when the provider reports zero, so non-reasoning / uncached calls keep the lean `{ input, output, total }` shape. Reported identically on `complete()` and the streaming `done` event.
 
-`cacheControl` write breakpoints (`ModelCallOptions.cacheControl`) are a **no-op** — OpenAI has no caller-driven cache marker on the Chat Completions wire. The read-side `cachedTokens` accounting above works without any caller action.
+### Explicit prompt caching (direct OpenAI only)
+
+Chat Completions exposes OpenAI-specific cache controls on current SDK types. Configure a stable cache bucket and (when needed) its maximum retention policy per model:
+
+```ts
+const model = openai.model({
+  name: "gpt-5.6",
+  promptCacheKey: "tenant:acme",
+  promptCacheRetention: "24h", // or "in_memory"
+});
+```
+
+`promptCacheKey` improves matching for related requests. `promptCacheRetention` is OpenAI's maximum policy (`"in_memory" | "24h"`). `cacheControl.breakpoints` maps to `prompt_cache_breakpoint: { mode: "explicit" }` on the final user content parts (up to OpenAI's four-request limit); use it when you need to pin a reusable prefix rather than rely only on OpenAI's implicit breakpoint.
+
+These fields are sent only when the SDK provider label is exactly `"openai"`. `DeepSeekSDK`, `GroqSDK`, `XaiSDK`, and `MistralSDK` label their wrapped endpoint differently, so their requests omit every OpenAI-only cache field even though they reuse this transport. Read-side `usage.cachedTokens` accounting remains available whenever the upstream reports it.
 
 ## Token counting
 
@@ -35508,7 +35709,7 @@ Raw OpenAI SDK errors are wrapped into the typed `@warlock.js/ai` `AIError` hier
 
 ---
 name: setup-anthropic
-description: 'Wire @warlock.js/ai-anthropic — new AnthropicSDK({apiKey, baseURL?, provider?}) for Claude, .model({name, vision?, structuredOutput?, reasoning?, promptCaching?, maxTokens?}). System-prompt hoisting, max_tokens required (default 4096), extended thinking via options.reasoning → thinking budget_tokens, prompt caching via promptCaching + options.cacheControl, cost-truth usage (cachedTokens/cacheWriteTokens), no first-party embeddings. Triggers: `AnthropicSDK`, `anthropic.model`, `anthropic.count`, `maxTokens`, `reasoning`, `thinking`, `budget_tokens`, `cacheControl`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-7`; "wire claude into warlock agent", "configure anthropic provider", "use claude sonnet", "anthropic gateway baseURL", "claude extended thinking", "anthropic prompt caching cost"; typical import `import { AnthropicSDK } from "@warlock.js/ai-anthropic"`. Skip: embeddings — `@warlock.js/ai-openai/setup-openai/SKILL.md`; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `@anthropic-ai/sdk`; Vercel `@ai-sdk/anthropic`.'
+description: 'Wire @warlock.js/ai-anthropic — new AnthropicSDK({apiKey, baseURL?, provider?}) for Claude, .model({name, vision?, structuredOutput?, reasoning?, thinkingMode?, promptCaching?, maxTokens?}). System-prompt hoisting, max_tokens required (default 4096), extended thinking via options.reasoning → adaptive thinking + output_config.effort (current/unknown models) or budget_tokens (Haiku 4.5, 4.6 and older; override with thinkingMode), prompt caching via promptCaching + options.cacheControl, cost-truth usage (cachedTokens/cacheWriteTokens), no first-party embeddings. Triggers: `AnthropicSDK`, `anthropic.model`, `anthropic.count`, `maxTokens`, `reasoning`, `thinking`, `budget_tokens`, `thinkingMode`, `adaptive`, `cacheControl`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-7`; "wire claude into warlock agent", "configure anthropic provider", "use claude sonnet", "anthropic gateway baseURL", "claude extended thinking", "anthropic prompt caching cost"; typical import `import { AnthropicSDK } from "@warlock.js/ai-anthropic"`. Skip: embeddings — `@warlock.js/ai-openai/setup-openai/SKILL.md`; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `@anthropic-ai/sdk`; Vercel `@ai-sdk/anthropic`.'
 ---
 
 # `@warlock.js/ai-anthropic`
@@ -35535,23 +35736,23 @@ const proxied = new AnthropicSDK({
 ## Producing a model
 
 ```ts
-anthropic.model({ name: "claude-sonnet-4-6" })                  // common case
-anthropic.model({ name: "claude-haiku-4-5", temperature: 0.2 }) // sampling controls
-anthropic.model({ name: "claude-opus-4-7", maxTokens: 8192 })   // raise the cap
+anthropic.model({ name: "claude-sonnet-4-6" }); // common case
+anthropic.model({ name: "claude-haiku-4-5", temperature: 0.2 }); // sampling controls
+anthropic.model({ name: "claude-opus-4-7", maxTokens: 8192 }); // raise the cap
 ```
 
 ## Capabilities — what's auto-set
 
-| Flag | Default |
-| --- | --- |
-| `structuredOutput` | `true` (via Anthropic's native `output_config.format`) |
-| `vision` | Inferred from model name. `true` for Claude 3 / 3.5 / 3.7 / 4 family; `false` for pre-3 and unknown. |
-| `reasoning` | `true` — every modern Claude model accepts extended thinking. Override with `reasoning: false` for legacy/proxied targets that reject the `thinking` param. |
-| `promptCaching` | `true` — the adapter places `cache_control` breakpoints and reports both cache reads (`Usage.cachedTokens`) and writes (`Usage.cacheWriteTokens`). |
-| `pdf` | `true` — the Messages API accepts PDF/document content blocks on vision-capable models. |
-| `audio` | absent (`false`) — Anthropic has no audio-input block, so the agent rejects audio attachments upfront. |
+| Flag               | Default                                                                                                                                                                                                  |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `structuredOutput` | `true` (via Anthropic's native `output_config.format`)                                                                                                                                                   |
+| `vision`           | Inferred from model name. `true` for Claude 3 / 3.5 / 3.7 / 4 and Claude 5-series (`claude-opus-5*`, `claude-sonnet-5*`, `claude-fable-5*`, `claude-mythos-5*`); `false` for pre-3 and unknown ids.      |
+| `reasoning`        | `true` — forwarded in the shape the model accepts (see [Extended thinking](#extended-thinking-reasoning)). Override with `reasoning: false` for legacy/proxied targets that reject the `thinking` param. |
+| `promptCaching`    | `true` — the adapter places `cache_control` breakpoints and reports both cache reads (`Usage.cachedTokens`) and writes (`Usage.cacheWriteTokens`).                                                       |
+| `pdf`              | `true` — the Messages API accepts PDF/document content blocks on vision-capable models.                                                                                                                  |
+| `audio`            | absent (`false`) — Anthropic has no audio-input block, so the agent rejects audio attachments upfront.                                                                                                   |
 
-Explicit config always wins (`structuredOutput`, `vision`, `reasoning`).
+Explicit config always wins (`structuredOutput`, `vision`, `reasoning`, `thinkingMode`).
 
 ## Pricing & cost
 
@@ -35562,7 +35763,7 @@ Pricing is opt-in. Supply USD-per-million-token rates and every report this SDK'
 const anthropic = new AnthropicSDK({
   apiKey,
   pricing: {
-    "claude-haiku-4-5":  { input: 1, output: 5,  cachedInput: 0.1 },
+    "claude-haiku-4-5": { input: 1, output: 5, cachedInput: 0.1 },
     "claude-sonnet-4-6": { input: 3, output: 15, cachedInput: 0.3 },
   },
 });
@@ -35577,11 +35778,11 @@ Resolution at `model()` time: per-model `pricing` > SDK registry entry for that 
 
 Every `ModelResponse.usage` (and the streaming terminal `done`) is normalized to the neutral `Usage` shape. Anthropic reports `input_tokens` / `output_tokens` separately with no pre-summed total, so `total` is computed (`input + output`). The two cache channels are surfaced only when non-zero:
 
-| Neutral field | Anthropic source | Meaning / billing |
-| --- | --- | --- |
-| `usage.cachedTokens` | `cache_read_input_tokens` | Subset of input served from the prompt cache. Bills at `cachedInput` (falls back to `input` when unset). |
-| `usage.cacheWriteTokens` | `cache_creation_input_tokens` | Input tokens **written** to the cache on this call (the ~1.25x write surcharge). Bills at `cachedOutput` when set. |
-| `usage.reasoningTokens` | — *(not reported separately)* | Anthropic bills extended-thinking tokens **inside** `output_tokens`, so this stays unset — populating it would double-count against `output`. |
+| Neutral field            | Anthropic source              | Meaning / billing                                                                                                                             |
+| ------------------------ | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `usage.cachedTokens`     | `cache_read_input_tokens`     | Subset of input served from the prompt cache. Bills at `cachedInput` (falls back to `input` when unset).                                      |
+| `usage.cacheWriteTokens` | `cache_creation_input_tokens` | Input tokens **written** to the cache on this call (the ~1.25x write surcharge). Bills at `cachedOutput` when set.                            |
+| `usage.reasoningTokens`  | — _(not reported separately)_ | Anthropic bills extended-thinking tokens **inside** `output_tokens`, so this stays unset — populating it would double-count against `output`. |
 
 In streaming, `cachedTokens` / `cacheWriteTokens` are seeded from `message_start` and then **overwritten by the cumulative counts on `message_delta`** when those are present and non-zero, so the terminal `done` carries the final tally.
 
@@ -35589,7 +35790,9 @@ In streaming, `cachedTokens` / `cacheWriteTokens` are seeded from `message_start
 
 Unlike OpenAI, Anthropic **requires** `max_tokens` on every request. Resolution: per-call `options.maxTokens` > `config.maxTokens` > **default `4096`**. A caller who never sets a cap still gets a complete answer instead of a 400.
 
-With extended thinking enabled and no explicit cap, the adapter reserves answer room: `max_tokens = thinking budget + 4096`. An explicit `maxTokens` must be greater than the thinking budget or the call throws before it reaches Anthropic.
+With extended thinking enabled and no explicit cap, the adapter reserves answer room in both modes: `max_tokens = thinking budget + 4096`. In budget mode an explicit `maxTokens` must be greater than `budget_tokens` or the call throws before it reaches Anthropic.
+
+**Tiny caps + adaptive thinking:** thinking tokens count inside `max_tokens`, so a very small cap can be spent entirely on thinking. Live check: Sonnet 5.5 with `maxTokens: 60` returned `finishReason: "length"` and empty content. For tiny outputs give thinking room (raise `maxTokens`) or turn reasoning off (`reasoning: false` on the model, or no `options.reasoning`).
 
 ## System prompt
 
@@ -35608,31 +35811,70 @@ When the agent passes `responseSchema` and the model is `structuredOutput`-capab
 
 ## Extended thinking (reasoning)
 
-When the model is `reasoning`-capable (default `true`) and the agent passes `options.reasoning`, the adapter forwards Anthropic extended thinking as `thinking: { type: "enabled", budget_tokens }`:
+When the model is `reasoning`-capable (default `true`) and the agent passes `options.reasoning`, the adapter forwards Anthropic thinking in one of two shapes, chosen per model (`thinkingMode`):
 
-- `reasoning.maxTokens` → `budget_tokens` verbatim.
-- `reasoning.effort` (`"low" | "medium" | "high"`) → a tiered budget (`1024` / `4096` / `12000`) when no explicit `maxTokens` is given.
-- Any resolved budget is floored at Anthropic's `1024`-token minimum.
-- `reasoning` with neither `effort` nor `maxTokens` emits nothing.
+| Mode         | Models (inferred from the name)                                                                                                 | Wire shape                                                |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `"adaptive"` | Current Claude models — Opus 4.7 / 4.8 / 5 / 5.5, Sonnet 5 / 5.5, Fable 5 / 5.1 — **and any id the adapter does not recognise** | `thinking: { type: "adaptive" }` + `output_config.effort` |
+| `"budget"`   | Haiku 4.5, Opus 4.6, Sonnet 4.6, and every older model (Claude 3.x, 4.0 / 4.1 / 4.5, 2, instant)                                | `thinking: { type: "enabled", budget_tokens }`            |
 
-Because Anthropic 400s when `thinking` is combined with an explicit `temperature`, the adapter **drops `temperature`** for that request (thinking pins sampling to the default). Set `reasoning: false` on the model config to suppress the param entirely for proxied/legacy targets.
+Adaptive models reject `budget_tokens` with a 400, so the shape matters.
+
+- **Adaptive:** `reasoning.effort` (`"low" | "medium" | "high"`) → `output_config.effort` of the same name. With only `reasoning.maxTokens` set, effort is `"medium"`; `maxTokens` then only sizes the reserved `max_tokens` room, it is not sent as a budget.
+- **Budget:** `reasoning.maxTokens` → `budget_tokens` verbatim; `reasoning.effort` → a tiered budget (`1024` / `4096` / `12000`) when no `maxTokens` is given. Any resolved budget is floored at Anthropic's `1024` minimum.
+- `reasoning` with neither `effort` nor `maxTokens`, or `effort: "none"`, emits nothing.
+
+### `thinkingMode` override
+
+`anthropic.model({ name, thinkingMode: "adaptive" | "budget" })` beats the name-based detection. Use it when the id does not look like an Anthropic id: region-prefixed / Bedrock-style ids (`us.anthropic.claude-…`) and custom or gateway ids are _unrecognised_, so they default to adaptive. If they front an older model (Haiku 4.5, 4.6 or earlier) set `thinkingMode: "budget"`. It can also move Opus/Sonnet 4.6 onto adaptive. The `AnthropicThinkingMode` type is exported.
 
 ```ts
-await agent.execute("Prove it.", { reasoning: { effort: "high" } });   // budget_tokens: 12000
-await model.complete(messages, { reasoning: { maxTokens: 8000 } });     // budget_tokens: 8000
+import { AnthropicSDK, type AnthropicThinkingMode } from "@warlock.js/ai-anthropic";
+
+const anthropic = new AnthropicSDK({ apiKey: process.env.ANTHROPIC_API_KEY! });
+
+const mode: AnthropicThinkingMode = "budget";
+
+anthropic.model({ name: "claude-opus-5-5" }); // adaptive (detected)
+anthropic.model({ name: "claude-haiku-4-5" }); // budget (detected)
+anthropic.model({ name: "us.anthropic.claude-haiku-4-5", thinkingMode: mode }); // region-prefixed id of an older model
+anthropic.model({ name: "claude-sonnet-4-6", thinkingMode: "adaptive" }); // opt 4.6 into adaptive
+```
+
+### Temperature
+
+`temperature` is **not sent** to models after Opus 4.6 (adaptive mode) — they reject any non-default value with a 400. It is also dropped on any request that enables thinking, since Anthropic 400s on thinking plus an explicit temperature. So it is forwarded only in budget mode on requests without thinking; `thinkingMode` decides this too. Set `reasoning: false` on the model config to suppress the thinking param entirely for proxied/legacy targets.
+
+```ts
+await agent.execute("Prove it.", { reasoning: { effort: "high" } });
+// adaptive model: thinking { type: "adaptive" }, output_config.effort "high"
+// budget model:   thinking { type: "enabled", budget_tokens: 12000 }
+await model.complete(messages, { reasoning: { maxTokens: 8000 } });
+// adaptive model: effort "medium"; budget model: budget_tokens 8000
 ```
 
 When a thinking-enabled response also makes tool calls, its signed `thinking` and `redacted_thinking` blocks are retained in each call's `providerMetadata.anthropic.thinkingBlocks`. The adapter replays those opaque blocks automatically on the next assistant turn, preserving Anthropic's required signatures; application code should leave that metadata intact when persisting message history.
 
 ## Prompt caching (`cache_control`)
 
+Caching is opt-in: `model({ promptCaching: true })` sends request-level
+`cache_control: { type: "ephemeral" }` when a call has no explicit
+`options.cacheControl.breakpoints`. Anthropic then marks the last cacheable
+block itself, caching the longest reusable request prefix (including growing
+message history). A caller-supplied breakpoint remains authoritative, so its
+request has no top-level automatic marker.
+
+Set `promptCacheTtl: "1h"` on the model to apply a one-hour TTL to automatic
+caching and emitted explicit markers. Omit it (or use `"5m"`) for Anthropic's
+default five-minute TTL; the one-hour cache has a higher write cost.
+
 Two independent breakpoint sites, both reported back via `usage.cachedTokens` / `usage.cacheWriteTokens`:
 
-- **Tools** — set `model({ promptCaching: true })` to mark the *last* tool definition with `cache_control: ephemeral`. One breakpoint caches the whole tool prefix; off by default since a write costs ~1.25x and only pays off across multiple trips.
-- **System prompt** — a per-call `options.cacheControl.breakpoints >= 1` emits the system prompt as a `TextBlockParam` carrying `cache_control: ephemeral` (the longest stable prefix on a turn). Without the hint the system prompt stays a plain string (uncached), so a one-shot call never pays the write surcharge. No system prompt → no block.
+- **Tools** — set `model({ promptCaching: true })` to mark the _last_ tool definition with `cache_control: ephemeral`. One breakpoint caches the whole tool prefix; off by default since a write costs ~1.25x and only pays off across multiple trips.
+- **System prompt** — a per-call `options.cacheControl.breakpoints >= 1` emits the system prompt as a `TextBlockParam` carrying `cache_control: ephemeral` (the longest stable prefix on a turn). Without the hint the system prompt stays a plain string with no marker of its own, but with `promptCaching: true` the automatic request-level marker still caches the longest reusable prefix, system prompt included (a live check read back 10,090 cached tokens of a large system prompt on the second call). With `promptCaching` off and no hint, nothing is cached, so a one-shot call never pays the write surcharge. A system prompt with per-turn placeholders changes the prefix each turn: write surcharge, no reads. No system prompt → no block.
 
 ```ts
-await agent.execute("…", { cacheControl: { breakpoints: 1 } });  // cache the system prefix
+await agent.execute("…", { cacheControl: { breakpoints: 1 } }); // cache the system prefix
 ```
 
 ## Multipart messages (vision)
@@ -35669,7 +35911,7 @@ Raw SDK errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy. 
 ## Token counting
 
 ```ts
-await anthropic.count("some text")  // approximate heuristic, offline
+await anthropic.count("some text"); // approximate heuristic, offline
 ```
 
 ## No embeddings

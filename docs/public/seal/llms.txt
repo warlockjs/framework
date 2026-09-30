@@ -7,7 +7,7 @@
 ## Skills
 
 - [bridge-standard-schema](@warlock.js/seal/bridge-standard-schema/SKILL.md): (no description)
-- [compose-seal-modifiers](@warlock.js/seal/compose-seal-modifiers/SKILL.md): (no description)
+- [compose-seal-modifiers](@warlock.js/seal/compose-seal-modifiers/SKILL.md): Apply cross-cutting modifiers — `.optional` / `.nullable` / `.default` / `.catch` / `.omit` / membership rules — plus the mutator-vs-transformer pipeline and `Infer.Input` vs `Infer.Output`. Triggers: `.optional`, `.required`, `.nullable`, `.default`, `.catch`, `.present`, `.requiredIf`, `.requiredWith`, `.in`, `.oneOf`, `.notIn`, `.omit`, `.attribute`, `.mutable`, `.addMutator`, `Infer.Input`, `Infer.Output`; "mark field optional in seal", "default value in schema", "mutator vs transformer", "when does .catch fire"; typical import `import { v, type Infer } from "@warlock.js/seal"`. Skip: primitives — `@warlock.js/seal/pick-seal-primitive/SKILL.md`; containers — `@warlock.js/seal/define-structural-shape/SKILL.md`; errors — `@warlock.js/seal/handle-seal-errors/SKILL.md`; competing `zod` `.optional`/`.default`.
 - [define-structural-shape](@warlock.js/seal/define-structural-shape/SKILL.md): (no description)
 - [extend-seal-with-plugins](@warlock.js/seal/extend-seal-with-plugins/SKILL.md): (no description)
 - [generate-json-schema](@warlock.js/seal/generate-json-schema/SKILL.md): (no description)
