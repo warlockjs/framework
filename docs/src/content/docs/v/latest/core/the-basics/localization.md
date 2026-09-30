@@ -6,7 +6,7 @@ sidebar:
   label: "Localization (i18n)"
 ---
 
-Localization in Warlock is **one resolved locale per request, plus a translation registry and a pair of multi-locale primitives** — a validator for input and a resource cast for output. The framework reads the locale once from the incoming request, binds the translation helpers to it, and every downstream layer (`t()`, the `"localized"` resource cast, `request.trans(...)`) reads from that same value. You rarely pass a locale around by hand.
+Localization in Warlock is **one resolved locale per request, plus a translation registry and a pair of multi-locale primitives** — a validator for input and a resource cast for output. The framework reads the locale once from the incoming request, binds the translation helpers to it, and every downstream layer (`t()`, the `"localized"` resource cast) reads from that same value. You rarely pass a locale around by hand.
 
 This page is the concept home: how the locale is **actually** resolved (the precedence is more than the obvious header), where translations live, how to validate multi-locale input, how to ship per-locale output, and what to do outside the HTTP lifecycle. For an end-to-end worked example — wiring every layer for a real product endpoint — see the [Localized responses recipe](../recipes/localized-responses.md).
 
@@ -149,9 +149,9 @@ The group name becomes the namespace: `t("products.notFound")` resolves `product
 | ----------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------- |
 | `t(key, placeholders?)`             | the **current request's** locale                       | inside a request (controllers, services, resources)           |
 | `trans(key, placeholders?)`         | the process-global "current locale"                    | outside a request, or when you've set the locale manually     |
-| `request.trans(key, placeholders?)` | this request's resolved locale (bound at construction) | the same as `t()`, but called on an explicit request instance |
+| `request.trans(key, placeholders?)` | this request's resolved locale (bound at construction) | internal binding `t()` delegates to; app code should use `t()` |
 
-Inside a request, prefer `t()`. The framework binds `request.trans`/`request.t` to `transFrom.bind(null, localeCode)` at request construction, and the core `t()` helper delegates to the current request's `trans` (falling back to the global `trans` when there is no request). You never pass the locale — the binding carries it.
+Always use `t()` in app code. The framework binds `request.trans`/`request.t` to `transFrom.bind(null, localeCode)` at request construction, and the core `t()` helper delegates to the current request's `trans` (falling back to the global `trans` when there is no request). You never pass the locale — the binding carries it.
 
 ```ts
 import { t } from "@warlock.js/core";
@@ -284,7 +284,7 @@ const message = trans("auth.otpExpired");
 - **The default-locale config key is `app.localeCode`, not `app.locale`.** The runtime reads `config.key("app.localeCode")`. `app.locales` (plural) is the separate allowed-list used to preload `dayjs` locale data — it is **not** the default.
 - **`t()` / `trans()` return the key itself when nothing matches.** `t("products.unknown")` returns `"products.unknown"` (or the fallback locale's value). Treat an unresolved key as a development bug, not a user-facing string.
 - **`v.localized()` validates an array of `{ localeCode, value }`, and the `"localized"` cast expects the same shape.** A `{ en: "...", ar: "..." }` object is neither — convert at the model level if your storage uses that shape.
-- **`setCurrentLocaleCode` is process-global.** Outside a request it is the only lever, but it bleeds across jobs if you forget to set it per-job. Inside a request, never call it — use the request-bound `t()`.
+- **`setCurrentLocaleCode` is process-global.** Outside a request it is the only lever, but it bleeds across jobs if you forget to set it per-job. Inside a request, never call it — use `t()`.
 
 ## See also
 

@@ -30,7 +30,7 @@ flowchart LR
     intl --> response
 ```
 
-The framework reads the locale once from the request and stashes it. Every translation helper, every `"localized"` resource field, every `request.trans(...)` call uses that same value. You configure the fallback chain once in `src/config/app.ts`; everything downstream reads from there.
+The framework reads the locale once from the request and stashes it. Every translation helper, every `"localized"` resource field, every `t()` call uses that same value. You configure the fallback chain once in `src/config/app.ts`; everything downstream reads from there.
 
 ## Step 1 — Configure the app locale
 
@@ -66,7 +66,7 @@ public getLocaleCode(defaultLocaleCode: string = config.key("app.localeCode") ||
 }
 ```
 
-That `getLocaleCode()` is what every other locale-aware helper calls under the hood. You almost never call it yourself — the framework binds `request.trans` and `request.t` to the resolved locale during request construction.
+That `getLocaleCode()` is what every other locale-aware helper calls under the hood. You almost never call it yourself — the framework binds the request's translator (which `t()` delegates to) to the resolved locale during request construction.
 
 ### What about `Accept-Language`?
 

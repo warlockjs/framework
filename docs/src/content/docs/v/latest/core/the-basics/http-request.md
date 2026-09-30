@@ -17,7 +17,7 @@ A `Request` wraps one HTTP request for its full lifetime. It carries:
 - The **payload** — query string, route params, parsed body — already normalised into one merged map and individual buckets you can read.
 - A **handle to the user** (`request.locals.user`) once `authMiddleware` has run.
 - The **route** that matched and the **response** the controller will eventually use.
-- **Locale-aware translation** via `request.t(...)`.
+- **Locale-aware translation** via `t(...)` from `@warlock.js/core`.
 - An **identity dictionary** — `request.id`, `request.ip`, `request.userAgent`.
 
 You never construct a `Request` yourself. The framework hands one to every middleware and controller. Type it as `Request<Schema>` when a validation schema is attached so `request.validated()` returns the right shape.
@@ -315,11 +315,15 @@ The user model is your project's class — typically `User` from `src/app/users/
 
 ## Translation
 
-Every request carries a locale-bound translator. Reach it via `request.t(...)` (alias of `request.trans(...)`):
+Every request carries a locale-bound translator. Translate with `t(...)` from `@warlock.js/core`; it uses the current request's locale:
 
 ```ts
-const message = request.t("welcome.greeting", { name: request.locals.user.firstName });
+import { t } from "@warlock.js/core";
+
+const message = t("welcome.greeting", { name: request.locals.user.firstName });
 ```
+
+> `request.t()` and `request.trans()` exist as the per-request binding that `t()` delegates to. App code should call `t()`.
 
 The locale is resolved from (in order):
 
@@ -333,7 +337,7 @@ You can force a different locale on a single call with `request.transFrom("ar", 
 request.setLocaleCode("ar");
 ```
 
-There's also a standalone `t(keyword, placeholders?)` exported from `@warlock.js/core` that reads from the request context — useful inside services and use-cases where you don't have a request parameter:
+`t(keyword, placeholders?)` reads from the request context, so it also works inside services and use-cases where you don't have a request parameter:
 
 ```ts
 import { t } from "@warlock.js/core";

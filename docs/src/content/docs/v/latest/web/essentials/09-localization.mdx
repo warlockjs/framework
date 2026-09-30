@@ -77,8 +77,8 @@ export function Greeting() {
 `useTrans()` translates against the current request/page locale directly,
 without consulting any process-global locale.
 
-On the server, Web supplies the same scoped snapshot to `request.t()`,
-`request.trans()`, and explicit `request.transFrom(locale, key, placeholders?)`.
+On the server, Web supplies the same scoped snapshot to `t()` from
+`@warlock.js/core` (via the per-request binding), and explicit `request.transFrom(locale, key, placeholders?)`.
 That override applies only while the Web request is rendering; code outside a
 route snapshot keeps the configured localization behavior. A JSON key absent
 from the selected snapshot returns its key rather than falling back to another

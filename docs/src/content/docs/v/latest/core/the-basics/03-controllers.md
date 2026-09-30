@@ -66,7 +66,7 @@ The `Request` object exposes everything you need to pull data off the wire. The 
 | `request.header("X-Foo")`          | header value                                    | reading request metadata                                     |
 | `request.ip`, `request.realIp`     | client IP (proxy-aware via `realIp`)            | logging, rate limiting, geolocation                          |
 | `request.userAgent`                | user-agent string                               | device-info capture                                          |
-| `request.locale`, `request.t(...)` | locale code + scoped translator                 | localized responses                                          |
+| `request.locale`, `t(...)`         | locale code + translator (`t` from core)        | localized responses                                          |
 
 There are also typed shortcuts: `request.int("id")`, `request.bool("active")`, `request.float("price")`, `request.string("name")`, `request.email()`. Use them when you want a coerced value without writing the conversion yourself.
 

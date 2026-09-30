@@ -249,10 +249,11 @@ The general rule: **prefer `response.<helper>()` over `throw`** for HTTP-shaped 
 
 ## Translation and locale
 
-The lifecycle stamps a locale on the request from the `locale` header (or `?locale=` query param). Two helpers tap into it:
+The lifecycle stamps a locale on the request from the `locale` header (or `?locale=` query param). Translate with `t()`:
 
-- **`request.t("key.path", placeholders?)`** — request-scoped, automatically uses the caller's locale.
-- **`t("key.path", placeholders?)`** — module-scoped helper imported from `@warlock.js/core`. Uses the current request's locale via the request context.
+- **`t("key.path", placeholders?)`** — imported from `@warlock.js/core`. Uses the current request's locale via the request context, and works in controllers, services, loaders, and jobs.
+
+`request.t()` is the internal per-request binding `t()` delegates to — app code should call `t()`.
 
 ```ts
 import { t } from "@warlock.js/core";
