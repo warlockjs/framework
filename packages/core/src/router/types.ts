@@ -45,6 +45,14 @@ export type RequestHandlerValidation<TRequest extends Request = Request> = {
    * Validation schema
    */
   schema?: ObjectValidator;
+  /**
+   * Route-parameter schema. Its successful output replaces the matching
+   * request params, so `request.input()` sees coerced values.
+   *
+   * Unlike `schema`, this opt-in never changes how routes without a params
+   * schema expose their raw string params.
+   */
+  params?: ObjectValidator;
 };
 
 export interface RequestControllerContract {
