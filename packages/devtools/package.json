@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/devtools",
-  "version": "5.26.1",
+  "version": "5.26.0",
   "type": "module",
   "description": "Development-only dashboard for Warlock.js apps at /__warlock: request timeline, queries with EXPLAIN, N+1 detection, dev mailbox, logs, cache operations and the route map. Refuses to run outside development.",
   "main": "./src/index.ts",
@@ -32,10 +32,10 @@
     "generate:llms": "node scripts/generate-llms.mjs"
   },
   "peerDependencies": {
-    "@warlock.js/cache": "5.26.1",
-    "@warlock.js/cascade": "5.26.1",
-    "@warlock.js/core": "5.26.1",
-    "@warlock.js/logger": "5.26.1"
+    "@warlock.js/cache": "5.26.0",
+    "@warlock.js/cascade": "5.26.0",
+    "@warlock.js/core": "5.26.0",
+    "@warlock.js/logger": "5.26.0"
   },
   "peerDependenciesMeta": {
     "@warlock.js/cache": {
