@@ -50,6 +50,11 @@ async function createFixture(): Promise<{
           module: "ESNext",
           moduleResolution: "bundler",
           noEmit: true,
+          // This fixture only exercises configured roots. Avoid loading the
+          // host project's full standard-library/type-declaration graph.
+          noLib: true,
+          skipLibCheck: true,
+          types: [],
           strict: true,
         },
         include: ["src", ".warlock/typings/*.d.ts"],
