@@ -1123,16 +1123,36 @@ describe("BedrockModel cost-truth — reasoning / thinking", () => {
     expect(calls[0]).not.toHaveProperty("additionalModelRequestFields");
   });
 
-  it("maps a reasoning.effort tier to a conventional thinking budget when no maxTokens is given", async () => {
+  it("maps every reasoning.effort tier to a conventional thinking budget when no maxTokens is given", async () => {
     const { client, calls } = makeFakeClient({ converse: baseConverse });
     const model = new BedrockModel(client, {
       name: "anthropic.claude-3-7-sonnet-20250219-v1:0",
     });
 
+    await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "minimal" } });
+    await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "low" } });
+    await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "medium" } });
     await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "high" } });
+    await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "xhigh" } });
+    await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "max" } });
 
     expect(calls[0].additionalModelRequestFields).toEqual({
+      thinking: { type: "enabled", budget_tokens: 1024 },
+    });
+    expect(calls[1].additionalModelRequestFields).toEqual({
+      thinking: { type: "enabled", budget_tokens: 1024 },
+    });
+    expect(calls[2].additionalModelRequestFields).toEqual({
+      thinking: { type: "enabled", budget_tokens: 4096 },
+    });
+    expect(calls[3].additionalModelRequestFields).toEqual({
       thinking: { type: "enabled", budget_tokens: 16384 },
+    });
+    expect(calls[4].additionalModelRequestFields).toEqual({
+      thinking: { type: "enabled", budget_tokens: 24000 },
+    });
+    expect(calls[5].additionalModelRequestFields).toEqual({
+      thinking: { type: "enabled", budget_tokens: 32000 },
     });
   });
 

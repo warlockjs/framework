@@ -43,9 +43,12 @@ const MIN_THINKING_BUDGET = 1024;
  * vendor-neutral option behaves consistently across providers.
  */
 const EFFORT_THINKING_BUDGET: Record<string, number | undefined> = {
+  minimal: 1024,
   low: 1024,
   medium: 4096,
   high: 16384,
+  xhigh: 24000,
+  max: 32000,
 };
 
 /**
