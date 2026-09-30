@@ -4,6 +4,7 @@ import { registerExplainRoute } from "./explain-route";
 import { registerDevtoolsGuard } from "./guard";
 import { registerLogRoutes } from "./log-routes";
 import { registerMailRoutes } from "./mail-routes";
+import { registerOpenApiRoutes } from "./openapi-routes";
 import { registerRequestsRoutes } from "./requests-routes";
 import { registerRouteRoutes } from "./route-routes";
 import { registerStreamRoute } from "./stream-route";
@@ -33,6 +34,7 @@ export function mountDevtoolsRoutes(server: FastifyInstance, deps: MountDevtools
       registerMailRoutes(instance, deps);
       registerLogRoutes(instance, deps);
       registerRouteRoutes(instance, deps);
+      registerOpenApiRoutes(instance, deps);
       registerExplainRoute(instance, deps);
       registerStreamRoute(instance, deps);
     },

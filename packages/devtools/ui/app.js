@@ -467,6 +467,10 @@ async function routesView() {
   return section;
 }
 
+function apiView() {
+  return el("iframe", { class: "docs-frame", src: "docs", title: "API reference" });
+}
+
 async function render() {
   try {
     const view =
@@ -478,7 +482,9 @@ async function render() {
             ? await mailView()
             : state.tab === "logs"
               ? await logsView()
-              : await routesView();
+              : state.tab === "routes"
+                ? await routesView()
+                : apiView();
     app.replaceChildren(view);
   } catch (error) {
     app.replaceChildren(errorView(error));

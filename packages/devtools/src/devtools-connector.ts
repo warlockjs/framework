@@ -85,6 +85,7 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
         isDevelopment: () => Application.runtimeStrategy === "development",
         explain: (query) => explainQuery(query),
         listRoutes: () => listRoutes(),
+        getOpenApiDocument: () => getOpenApiDocument(),
       });
 
       // An N+1 is worth a terminal line, not just a badge the developer has
@@ -161,4 +162,16 @@ async function listRoutes(): Promise<DevtoolsRouteRow[]> {
     name: route.name,
     middleware: route.middleware?.map((middleware) => middleware.name || "anonymous"),
   }));
+}
+
+/**
+ * Builds the OpenAPI 3.1 document from the routes registered in this process —
+ * the same generator behind `warlock generate.openapi`. Core is imported
+ * lazily so this module stays free of a load-time dependency on it.
+ */
+async function getOpenApiDocument(): Promise<object> {
+  const { getDevelopmentOpenApiDocument } = await import("@warlock.js/core");
+  const { document } = await getDevelopmentOpenApiDocument();
+
+  return document;
 }

@@ -14,7 +14,7 @@ export type DevtoolsRouteRow = {
 /**
  * Dependencies the connector injects so the dashboard's routes need no core
  * boot to test: the collector, the resolved options, a development check,
- * and the optional EXPLAIN and route-listing hooks.
+ * and the optional EXPLAIN, route-listing and OpenAPI hooks.
  */
 export type MountDevtoolsRoutesDeps = {
   collector: DevtoolsCollector;
@@ -22,4 +22,6 @@ export type MountDevtoolsRoutesDeps = {
   isDevelopment: () => boolean;
   explain?: (query: DevtoolsQuery) => Promise<unknown>;
   listRoutes?: () => DevtoolsRouteRow[] | Promise<DevtoolsRouteRow[]>;
+  /** Builds the OpenAPI 3.1 document for the registered routes; injected so devtools never imports core at load. */
+  getOpenApiDocument?: () => Promise<object>;
 };

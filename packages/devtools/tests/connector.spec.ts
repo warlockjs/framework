@@ -65,11 +65,42 @@ describe("devtoolsConnector", () => {
         isDevelopment: expect.any(Function),
         explain: expect.any(Function),
         listRoutes: expect.any(Function),
+        getOpenApiDocument: expect.any(Function),
       }),
     );
     expect(connector.isActive()).toBe(true);
 
     await connector.shutdown();
     expect(connector.isActive()).toBe(false);
+  });
+});
+
+describe("devtoolsConnector OpenAPI hook", () => {
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it("injects a getOpenApiDocument that returns the document core builds", async () => {
+    const core = await import("@warlock.js/core");
+    (core.Application as { runtimeStrategy: string }).runtimeStrategy = "development";
+    const document = { openapi: "3.1.0", paths: {} };
+    (core as Record<string, unknown>).getDevelopmentOpenApiDocument = vi.fn(async () => ({
+      document,
+      warnings: [],
+    }));
+    mountDevtoolsRoutes.mockClear();
+
+    const { devtoolsConnector } = await import("../src/devtools-connector");
+    const connector = devtoolsConnector();
+
+    await connector.boot();
+
+    const deps = mountDevtoolsRoutes.mock.calls[0][1] as {
+      getOpenApiDocument: () => Promise<object>;
+    };
+
+    await expect(deps.getOpenApiDocument()).resolves.toBe(document);
+
+    await connector.shutdown();
   });
 });

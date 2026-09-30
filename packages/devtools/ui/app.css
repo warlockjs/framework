@@ -330,6 +330,14 @@ details summary {
 .log-success {
   color: var(--good);
 }
+.docs-frame {
+  display: block;
+  width: 100%;
+  height: calc(100vh - 110px);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+}
 @media (max-width: 700px) {
   .topbar {
     gap: 10px;

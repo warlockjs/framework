@@ -3,12 +3,31 @@ import path from "node:path";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { resolveUiRoot } from "../ui-root";
 
-const ASSET_CONTENT_TYPES: Record<string, string> = {
-  "app.js": "text/javascript; charset=utf-8",
-  "app.css": "text/css; charset=utf-8",
+/**
+ * Where an asset's bytes come from: a file in this package's `ui/` folder.
+ */
+type UiAsset = {
+  contentType: string;
+  file: () => string;
 };
 
-function sendFile(reply: FastifyReply, file: string, contentType: string): void {
+const uiFile = (name: string) => () => path.join(resolveUiRoot(), name);
+
+/**
+ * The only assets that can be requested. The request's asset name is looked
+ * up here and never joined into a filesystem path.
+ */
+const UI_ASSETS: Record<string, UiAsset> = {
+  "app.js": { contentType: "text/javascript; charset=utf-8", file: uiFile("app.js") },
+  "app.css": { contentType: "text/css; charset=utf-8", file: uiFile("app.css") },
+  "scalar.js": {
+    contentType: "text/javascript; charset=utf-8",
+    file: uiFile("vendor/scalar/standalone.js"),
+  },
+};
+
+/** Sends `file` with `contentType` and no caching. */
+export function sendFile(reply: FastifyReply, file: string, contentType: string): void {
   reply
     .header("Cache-Control", "no-store")
     .header("Content-Type", contentType)
@@ -17,27 +36,27 @@ function sendFile(reply: FastifyReply, file: string, contentType: string): void 
 
 /**
  * Serves the static dashboard: `index.html` at the dashboard root and the
- * two named assets. The asset name is matched against a fixed whitelist —
- * never joined into a filesystem path — so no request can traverse outside
- * `ui/`.
+ * whitelisted assets (`app.js`, `app.css`, and the vendored Scalar bundle
+ * as `scalar.js`). The asset name is matched against a fixed whitelist — never
+ * joined into a filesystem path — so no request can traverse outside it.
  */
 export function registerUiAssets(server: FastifyInstance): void {
   const serveIndex = (_request: unknown, reply: FastifyReply): void => {
-    const uiRoot = resolveUiRoot();
-    sendFile(reply, path.join(uiRoot, "index.html"), "text/html; charset=utf-8");
+    sendFile(reply, path.join(resolveUiRoot(), "index.html"), "text/html; charset=utf-8");
   };
 
   server.get("/", serveIndex);
 
   server.get<{ Params: { name: string } }>("/assets/:name", (request, reply) => {
-    const contentType = ASSET_CONTENT_TYPES[request.params.name];
+    const asset = Object.hasOwn(UI_ASSETS, request.params.name)
+      ? UI_ASSETS[request.params.name]
+      : undefined;
 
-    if (!contentType) {
+    if (!asset) {
       reply.code(404).header("Cache-Control", "no-store").send();
       return;
     }
 
-    const uiRoot = resolveUiRoot();
-    sendFile(reply, path.join(uiRoot, request.params.name), contentType);
+    sendFile(reply, asset.file(), asset.contentType);
   });
 }
