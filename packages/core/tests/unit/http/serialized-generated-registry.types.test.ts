@@ -1,7 +1,7 @@
 import { describe, expectTypeOf, it } from "vitest";
-import type AuditEntry from "../../tests/fixtures/model-resources/src/app/users/models/audit-entry.model";
-import type { FixtureUser } from "../../tests/fixtures/model-resources/src/app/users/models/fixture-user.model";
-import type { Serialized } from "./serialized";
+import type AuditEntry from "../../fixtures/model-resources/src/app/users/models/audit-entry.model";
+import type { FixtureUser } from "../../fixtures/model-resources/src/app/users/models/fixture-user.model";
+import type { Serialized } from "../../../src/http/serialized";
 
 /**
  * Type-level proof that the declaration `warlock generate.typings` emits makes

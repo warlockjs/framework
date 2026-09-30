@@ -21,7 +21,7 @@ export function toOpenApiPath(path: string): string {
  * Names of the path parameters of a Warlock path, in order of appearance.
  */
 export function extractPathParamNames(path: string): string[] {
-  return [...path.matchAll(PATH_PARAM_PATTERN)].map((match) => match[1]);
+  return [...path.matchAll(PATH_PARAM_PATTERN)].flatMap((match) => match[1] ?? []);
 }
 
 /**

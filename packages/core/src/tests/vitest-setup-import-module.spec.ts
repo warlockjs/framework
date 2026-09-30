@@ -15,7 +15,7 @@ describe("setupTest importModule", () => {
     warnMissingImportModule(undefined);
 
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0][0])).toContain("importModule: (file) => import(file)");
+    expect(String(warn.mock.calls[0]?.[0])).toContain("importModule: (file) => import(file)");
   });
 
   it("does not warn when importModule is provided", () => {

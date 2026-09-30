@@ -111,7 +111,7 @@ describe("buildOpenApiForChild", () => {
 
     expect(Object.keys(without.document.paths)).toEqual(["/x"]);
     expect(Object.keys(withPages.document.paths)).toEqual(["/about", "/x"]);
-    expect(Object.keys(without.document.paths["/x"].post.responses)).toEqual(["200", "400"]);
+    expect(Object.keys(without.document.paths["/x"]?.post?.responses ?? {})).toEqual(["200", "400"]);
   });
 });
 

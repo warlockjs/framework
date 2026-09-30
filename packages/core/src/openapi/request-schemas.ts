@@ -15,6 +15,12 @@ type ObjectSchemaParts = {
   required: Set<string>;
 };
 
+/** A `validation.schema` property placed in a request location, with its JSON Schema. */
+type LocatedProperty = {
+  key: string;
+  schema: OpenApiSchema;
+};
+
 export type RequestParts = {
   parameters: OpenApiParameter[];
   requestBody?: OpenApiRequestBody;
@@ -172,7 +178,11 @@ export function buildRequestParts(input: BuildRequestPartsInput): RequestParts {
   const primary = resolvePrimaryLocation(method, validating, warn);
   const takesPathNames = validating.length === 0 || validating.includes("params");
 
-  const located: Record<"body" | "query" | "header", string[]> = { body: [], query: [], header: [] };
+  const located: Record<"body" | "query" | "header", LocatedProperty[]> = {
+    body: [],
+    query: [],
+    header: [],
+  };
 
   if (paramsSchema) {
     for (const name of pathNames) {
@@ -198,29 +208,22 @@ export function buildRequestParts(input: BuildRequestPartsInput): RequestParts {
         continue;
       }
 
-      located[primary].push(key);
+      located[primary].push({ key, schema: propertySchema });
     }
   }
+
+  const requiredKeys = mainSchema?.required ?? new Set<string>();
 
   const parameters: OpenApiParameter[] = pathNames.map((name) =>
     describeParameter(name, "path", pathSchemas.get(name) ?? { type: "string" }, true),
   );
 
-  for (const key of located.query) {
-    parameters.push(
-      describeParameter(key, "query", mainSchema!.properties[key], mainSchema!.required.has(key)),
-    );
+  for (const { key, schema } of located.query) {
+    parameters.push(describeParameter(key, "query", schema, requiredKeys.has(key)));
   }
 
-  for (const key of located.header) {
-    parameters.push(
-      describeParameter(
-        key.toLowerCase(),
-        "header",
-        mainSchema!.properties[key],
-        mainSchema!.required.has(key),
-      ),
-    );
+  for (const { key, schema } of located.header) {
+    parameters.push(describeParameter(key.toLowerCase(), "header", schema, requiredKeys.has(key)));
   }
 
   if (located.body.length === 0 || !mainSchema) {
@@ -229,11 +232,11 @@ export function buildRequestParts(input: BuildRequestPartsInput): RequestParts {
 
   const properties: Record<string, OpenApiSchema> = {};
 
-  for (const key of located.body) {
-    properties[key] = mainSchema.properties[key];
+  for (const { key, schema } of located.body) {
+    properties[key] = schema;
   }
 
-  const required = located.body.filter((key) => mainSchema.required.has(key));
+  const required = located.body.filter(({ key }) => mainSchema.required.has(key)).map(({ key }) => key);
   const bodySchema: OpenApiSchema = { ...mainSchema.schema, properties };
 
   if (required.length > 0) {

@@ -34,8 +34,8 @@ describe("buildDevelopmentOpenApiDocument", () => {
 
     expect(document.openapi).toBe("3.1.0");
     expect(Object.keys(document.paths).sort()).toEqual(["/orders", "/ping"]);
-    expect(document.paths["/ping"].get.operationId).toBe("ping");
-    expect(document.paths["/orders"].post).toBeDefined();
+    expect(document.paths["/ping"]?.get?.operationId).toBe("ping");
+    expect(document.paths["/orders"]?.post).toBeDefined();
   });
 
   it("returns an empty document when no route is registered", async () => {

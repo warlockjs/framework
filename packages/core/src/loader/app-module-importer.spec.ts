@@ -46,6 +46,6 @@ describe("ModuleLoader wiring", () => {
     await loader.loadModule(file as never, "other");
 
     expect(hook).toHaveBeenCalledTimes(1);
-    expect(hook.mock.calls[0][0]).toMatch(/^file:\/\/.*user\.model\.ts$/);
+    expect(hook.mock.calls[0]?.[0]).toMatch(/^file:\/\/.*user\.model\.ts$/);
   });
 });

@@ -2,7 +2,14 @@ import { lazy } from "@mongez/reinforcements";
 import { v } from "@warlock.js/seal";
 import { describe, expect, it } from "vitest";
 import { buildOpenApiDocument } from "./build-openapi-document";
-import type { OpenApiContext, OpenApiOperation, OpenApiRouteInput } from "./types";
+import type {
+  OpenApiContext,
+  OpenApiDocument,
+  OpenApiOperation,
+  OpenApiResponse,
+  OpenApiRouteInput,
+  OpenApiSchema,
+} from "./types";
 
 const AUTH = Symbol.for("warlock.auth");
 const info = { title: "Shop API", version: "1.2.3" };
@@ -38,13 +45,40 @@ function build(routes: OpenApiRouteInput[], context: Partial<OpenApiContext> = {
   return buildOpenApiDocument(routes, { info, ...context });
 }
 
+/**
+ * Return `value`, or throw when a lookup missed so the spec fails loudly instead of narrowing with `!`.
+ */
+function defined<T>(value: T | undefined, description: string): T {
+  if (value === undefined) {
+    throw new Error(`Expected ${description} to be defined.`);
+  }
+
+  return value;
+}
+
+function pathItem(document: OpenApiDocument, path: string): Record<string, OpenApiOperation> {
+  return defined(document.paths[path], `path item "${path}"`);
+}
+
+function opAt(document: OpenApiDocument, path: string, method: string): OpenApiOperation {
+  return defined(pathItem(document, path)[method], `${method} operation of "${path}"`);
+}
+
+function responseOf(op: OpenApiOperation, status: string): OpenApiResponse {
+  return defined(op.responses[status], `${status} response`);
+}
+
+function jsonSchemaOf(content: OpenApiResponse["content"]): OpenApiSchema {
+  return defined(content?.["application/json"], "application/json content").schema;
+}
+
 function operation(
   routes: OpenApiRouteInput[],
   path: string,
   method: string,
   context: Partial<OpenApiContext> = {},
 ): OpenApiOperation {
-  return build(routes, context).document.paths[path][method];
+  return opAt(build(routes, context).document, path, method);
 }
 
 class UserResource {
@@ -109,7 +143,7 @@ describe("buildOpenApiDocument — paths and operations", () => {
   it("converts :param segments to {param} and adds string path parameters", () => {
     const { document } = build([route("GET", "/users/:id/posts/:postId")]);
 
-    expect(document.paths["/users/{id}/posts/{postId}"].get.parameters).toEqual([
+    expect(opAt(document, "/users/{id}/posts/{postId}", "get").parameters).toEqual([
       { name: "id", in: "path", required: true, schema: { type: "string" } },
       { name: "postId", in: "path", required: true, schema: { type: "string" } },
     ]);
@@ -118,7 +152,7 @@ describe("buildOpenApiDocument — paths and operations", () => {
   it("expands an all route into every verb with a unique operationId", () => {
     const { document } = build([route("all", "/ping", {}, { name: "ping" })]);
 
-    expect(Object.keys(document.paths["/ping"])).toEqual([
+    expect(Object.keys(pathItem(document, "/ping"))).toEqual([
       "get",
       "post",
       "put",
@@ -127,8 +161,8 @@ describe("buildOpenApiDocument — paths and operations", () => {
       "options",
       "head",
     ]);
-    expect(document.paths["/ping"].patch.operationId).toBe("ping.patch");
-    expect(new Set(Object.values(document.paths["/ping"]).map((op) => op.operationId)).size).toBe(7);
+    expect(opAt(document, "/ping", "patch").operationId).toBe("ping.patch");
+    expect(new Set(Object.values(pathItem(document, "/ping")).map((op) => op.operationId)).size).toBe(7);
   });
 
   it("keeps a route name as operationId and slugs unnamed routes", () => {
@@ -137,8 +171,8 @@ describe("buildOpenApiDocument — paths and operations", () => {
       route("DELETE", "/users/:id"),
     ]);
 
-    expect(document.paths["/users/{id}"].get.operationId).toBe("users.show");
-    expect(document.paths["/users/{id}"].delete.operationId).toBe("delete_users_id");
+    expect(opAt(document, "/users/{id}", "get").operationId).toBe("users.show");
+    expect(opAt(document, "/users/{id}", "delete").operationId).toBe("delete_users_id");
   });
 
   it("renames a duplicate operationId and says so", () => {
@@ -147,14 +181,14 @@ describe("buildOpenApiDocument — paths and operations", () => {
       route("GET", "/b", {}, { name: "same" }),
     ]);
 
-    expect(document.paths["/b"].get.operationId).toBe("same_2");
+    expect(opAt(document, "/b", "get").operationId).toBe("same_2");
     expect(warnings).toEqual(['GET /b: operationId "same" is already used; renamed to "same_2".']);
   });
 
   it("skips a second route on the same path and method", () => {
     const { document, warnings } = build([route("GET", "/a"), route("GET", "/a")]);
 
-    expect(Object.keys(document.paths["/a"])).toEqual(["get"]);
+    expect(Object.keys(pathItem(document, "/a"))).toEqual(["get"]);
     expect(warnings).toHaveLength(1);
   });
 
@@ -182,8 +216,8 @@ describe("buildOpenApiDocument — paths and operations", () => {
   it("tags by the first path segment and skips a leading parameter", () => {
     const { document } = build([route("GET", "/orders/:id"), route("GET", "/:slug")]);
 
-    expect(document.paths["/orders/{id}"].get.tags).toEqual(["orders"]);
-    expect(document.paths["/{slug}"].get).not.toHaveProperty("tags");
+    expect(opAt(document, "/orders/{id}", "get").tags).toEqual(["orders"]);
+    expect(opAt(document, "/{slug}", "get")).not.toHaveProperty("tags");
   });
 
   it("excludes page routes unless includePages is set", () => {
@@ -191,7 +225,7 @@ describe("buildOpenApiDocument — paths and operations", () => {
 
     expect(Object.keys(build(routes).document.paths)).toEqual(["/api/x"]);
 
-    const included = build(routes, { includePages: true }).document.paths["/about"].get;
+    const included = opAt(build(routes, { includePages: true }).document, "/about", "get");
 
     expect(included.responses["200"]).toEqual({
       description: "HTML page",
@@ -269,7 +303,7 @@ describe("buildOpenApiDocument — request schemas", () => {
       { name: "id", in: "path", required: true, schema: { type: "integer" } },
     ]);
     expect(
-      (op.requestBody?.content["application/json"].schema as { properties: object }).properties,
+      (jsonSchemaOf(defined(op.requestBody, "request body").content) as { properties: object }).properties,
     ).toEqual({ name: { type: "string" } });
   });
 
@@ -330,7 +364,7 @@ describe("buildOpenApiDocument — request schemas", () => {
       }),
     ]);
 
-    expect(document.paths["/users/{id}"].get.parameters).toEqual([
+    expect(opAt(document, "/users/{id}", "get").parameters).toEqual([
       { name: "id", in: "path", required: true, schema: { type: "integer" } },
     ]);
     expect(warnings).toEqual([
@@ -346,8 +380,8 @@ describe("buildOpenApiDocument — request schemas", () => {
       route("GET", "/a", { validation: { validating: ["body", "query"], schema } }),
     ]);
 
-    expect(post.document.paths["/a"].post.requestBody).toBeDefined();
-    expect(get.document.paths["/a"].get.parameters).toHaveLength(2);
+    expect(opAt(post.document, "/a", "post").requestBody).toBeDefined();
+    expect(opAt(get.document, "/a", "get").parameters).toHaveLength(2);
     expect(post.warnings[0]).toContain("the request body");
     expect(get.warnings[0]).toContain("query parameters");
   });
@@ -430,8 +464,8 @@ describe("buildOpenApiDocument — request schemas", () => {
     };
     const { document, warnings } = build([route("POST", "/a", { validation: { schema: broken } })]);
 
-    expect(document.paths["/a"].post).not.toHaveProperty("requestBody");
-    expect(document.paths["/a"].post.responses).toHaveProperty("422");
+    expect(opAt(document, "/a", "post")).not.toHaveProperty("requestBody");
+    expect(opAt(document, "/a", "post").responses).toHaveProperty("422");
     expect(warnings).toEqual([
       "POST /a: validation.schema could not be converted to JSON Schema and is not documented: computed validators have no schema",
     ]);
@@ -516,13 +550,13 @@ describe("buildOpenApiDocument — responses from responseSchema", () => {
     );
     const ref = { $ref: "#/components/schemas/UserResource" };
 
-    expect(document.paths["/me"].get.responses["200"].content?.["application/json"].schema).toEqual({
+    expect(jsonSchemaOf(responseOf(opAt(document, "/me", "get"), "200").content)).toEqual({
       type: "object",
       properties: { user: ref },
       required: ["user"],
     });
     expect(
-      document.paths["/users"].get.responses["200"].content?.["application/json"].schema,
+      jsonSchemaOf(responseOf(opAt(document, "/users", "get"), "200").content),
     ).toEqual({
       type: "object",
       properties: { users: { type: "array", items: ref } },
@@ -683,7 +717,7 @@ describe("buildOpenApiDocument — responses from responseSchema", () => {
     );
 
     expect(Object.keys(op.responses)).toEqual(["200", "404"]);
-    expect(op.responses["404"].description).toBe("Not found");
+    expect(responseOf(op, "404").description).toBe("Not found");
   });
 
   it("a declared status without a body is description-only", () => {
@@ -699,7 +733,7 @@ describe("buildOpenApiDocument — automatic 422 and 401", () => {
   it("adds 422 with the default failed-validation shape when validation.schema exists", () => {
     const { document } = build([route("POST", "/a", { validation })]);
 
-    expect(document.paths["/a"].post.responses["422"]).toEqual({
+    expect(opAt(document, "/a", "post").responses["422"]).toEqual({
       description: "Validation failed",
       content: {
         "application/json": { schema: { $ref: "#/components/schemas/ValidationFailed" } },
@@ -731,7 +765,7 @@ describe("buildOpenApiDocument — automatic 422 and 401", () => {
       },
     });
 
-    expect(Object.keys(document.paths["/a"].post.responses)).toEqual(["200", "400"]);
+    expect(Object.keys(opAt(document, "/a", "post").responses)).toEqual(["200", "400"]);
     expect(document.components?.schemas?.ValidationFailed).toMatchObject({
       properties: {
         problems: {
@@ -751,7 +785,7 @@ describe("buildOpenApiDocument — automatic 422 and 401", () => {
       "post",
     );
 
-    expect(declared.responses["422"].content?.["application/json"].schema).toMatchObject({
+    expect(jsonSchemaOf(responseOf(declared, "422").content)).toMatchObject({
       properties: { custom: { type: "string" } },
     });
   });
@@ -762,7 +796,7 @@ describe("buildOpenApiDocument — automatic 422 and 401", () => {
     ]);
     const plain = build([route("GET", "/a", {}, { middleware: [() => undefined] })]);
 
-    expect(guarded.document.paths["/a"].get.responses["401"]).toEqual({
+    expect(opAt(guarded.document, "/a", "get").responses["401"]).toEqual({
       description: "Unauthorized",
       content: { "application/json": { schema: { $ref: "#/components/schemas/Unauthorized" } } },
     });
@@ -771,7 +805,7 @@ describe("buildOpenApiDocument — automatic 422 and 401", () => {
       properties: { error: { type: "string" } },
       required: ["error"],
     });
-    expect(plain.document.paths["/a"].get.responses).not.toHaveProperty("401");
+    expect(opAt(plain.document, "/a", "get").responses).not.toHaveProperty("401");
     expect(plain.warnings).toEqual([]);
   });
 });
@@ -782,7 +816,7 @@ describe("buildOpenApiDocument — security from the warlock.auth descriptor", (
       route("GET", "/a", {}, { middleware: guard({ sources: ["header"], userTypes: [] }) }),
     ]);
 
-    expect(document.paths["/a"].get.security).toEqual([{ bearerAuth: [] }]);
+    expect(opAt(document, "/a", "get").security).toEqual([{ bearerAuth: [] }]);
     expect(document.components?.securitySchemes).toEqual({
       bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
     });
@@ -798,11 +832,11 @@ describe("buildOpenApiDocument — security from the warlock.auth descriptor", (
       ),
     ]);
 
-    expect(document.paths["/a"].post.security).toEqual([{ cookieAuth: [] }]);
+    expect(opAt(document, "/a", "post").security).toEqual([{ cookieAuth: [] }]);
     expect(document.components?.securitySchemes).toEqual({
       cookieAuth: { type: "apiKey", in: "cookie", name: "session" },
     });
-    expect(document.paths["/a"].post.description).toBe(
+    expect(opAt(document, "/a", "post").description).toBe(
       "Requires an authenticated user of type: admin.\n\nWhen authenticating with the cookie, the request must also carry a same-origin Origin or Referer header (CSRF guard).",
     );
   });
@@ -817,12 +851,12 @@ describe("buildOpenApiDocument — security from the warlock.auth descriptor", (
       ),
     ]);
 
-    expect(document.paths["/a"].get.security).toEqual([{ bearerAuth: [] }, { cookieAuth: [] }]);
+    expect(opAt(document, "/a", "get").security).toEqual([{ bearerAuth: [] }, { cookieAuth: [] }]);
     expect(Object.keys(document.components?.securitySchemes ?? {})).toEqual([
       "bearerAuth",
       "cookieAuth",
     ]);
-    expect(document.paths["/a"].get).not.toHaveProperty("description");
+    expect(opAt(document, "/a", "get")).not.toHaveProperty("description");
   });
 
   it("gives a second, different cookie its own scheme", () => {
@@ -831,7 +865,7 @@ describe("buildOpenApiDocument — security from the warlock.auth descriptor", (
       route("GET", "/b", {}, { middleware: guard({ sources: [{ cookie: "two" }], userTypes: [] }) }),
     ]);
 
-    expect(document.paths["/b"].get.security).toEqual([{ cookieAuth_two: [] }]);
+    expect(opAt(document, "/b", "get").security).toEqual([{ cookieAuth_two: [] }]);
     expect(document.components?.securitySchemes?.cookieAuth_two).toEqual({
       type: "apiKey",
       in: "cookie",
@@ -843,7 +877,7 @@ describe("buildOpenApiDocument — security from the warlock.auth descriptor", (
     const { document } = build([route("GET", "/a", {}, { middleware: [() => undefined] })]);
 
     expect(document).not.toHaveProperty("components");
-    expect(document.paths["/a"].get).not.toHaveProperty("security");
+    expect(opAt(document, "/a", "get")).not.toHaveProperty("security");
   });
 
   it.each([
@@ -858,8 +892,8 @@ describe("buildOpenApiDocument — security from the warlock.auth descriptor", (
       route("GET", "/a", {}, { middleware: guard(descriptor) }),
     ]);
 
-    expect(document.paths["/a"].get).not.toHaveProperty("security");
-    expect(document.paths["/a"].get.responses).not.toHaveProperty("401");
+    expect(opAt(document, "/a", "get")).not.toHaveProperty("security");
+    expect(opAt(document, "/a", "get").responses).not.toHaveProperty("401");
     expect(warnings).toEqual([
       "GET /a: a middleware carries a malformed warlock.auth descriptor; the route is documented without security.",
     ]);
@@ -870,7 +904,7 @@ describe("buildOpenApiDocument — security from the warlock.auth descriptor", (
       route("GET", "/a", {}, { middleware: guard({ sources: ["header"] }) }),
     ]);
 
-    expect(document.paths["/a"].get.security).toEqual([{ bearerAuth: [] }]);
+    expect(opAt(document, "/a", "get").security).toEqual([{ bearerAuth: [] }]);
   });
 
   it("merges several guards on one route", () => {
@@ -880,8 +914,8 @@ describe("buildOpenApiDocument — security from the warlock.auth descriptor", (
     ];
     const { document } = build([route("GET", "/a", {}, { middleware })]);
 
-    expect(document.paths["/a"].get.security).toEqual([{ bearerAuth: [] }, { cookieAuth: [] }]);
-    expect(document.paths["/a"].get.description).toBe(
+    expect(opAt(document, "/a", "get").security).toEqual([{ bearerAuth: [] }, { cookieAuth: [] }]);
+    expect(opAt(document, "/a", "get").description).toBe(
       "Requires an authenticated user of type: admin, vendor.",
     );
   });

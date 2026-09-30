@@ -90,8 +90,8 @@ describe("collectRouteRegistrationSnapshot", () => {
       { name: "auth.login", path: "/login", method: "POST", response },
       { name: "ping", path: "/ping", method: "GET" },
     ]);
-    expect(Object.keys(snapshot.routes[1])).toEqual(["name", "path", "method"]);
-    expect(Object.isFrozen(snapshot.routes[0].response)).toBe(true);
+    expect(Object.keys(snapshot.routes[1] ?? {})).toEqual(["name", "path", "method"]);
+    expect(Object.isFrozen(snapshot.routes[0]?.response)).toBe(true);
   });
 
   it.each([

@@ -16,6 +16,19 @@ const schema = {
   400: { body: { error: "string" } },
 } as const;
 
+/**
+ * Return the item at `index`, or throw so a missing route fails the spec instead of narrowing with `!`.
+ */
+function at<T>(items: readonly T[], index: number): T {
+  const item = items[index];
+
+  if (item === undefined) {
+    throw new Error(`Expected an item at index ${index}, got ${items.length} item(s).`);
+  }
+
+  return item;
+}
+
 const handler = (): RequestHandler => (() => undefined) as unknown as RequestHandler;
 
 const declared = (): RequestHandler => {
@@ -44,7 +57,9 @@ describe("responseSchema on bound handlers", () => {
     router.post("/login", [controller, "login"] as any, { name: "login" });
     router.post("/logout", [controller, "logout"] as any, { name: "logout" });
 
-    const [login, logout] = router.list();
+    const routesList = router.list();
+    const login = at(routesList, 0);
+    const logout = at(routesList, 1);
 
     expect(login.handler).not.toBe(controller.login);
     expect(login.handler.responseSchema).toBe(controller.login.responseSchema);
@@ -77,7 +92,7 @@ describe("responseSchema on bound handlers", () => {
   it("leaves a restful route without a declared schema untouched", () => {
     router.restfulResource("/users", { list: handler() } as any);
 
-    expect(router.list()[0].handler.responseSchema).toBeUndefined();
+    expect(at(router.list(), 0).handler.responseSchema).toBeUndefined();
   });
 });
 
@@ -98,7 +113,7 @@ describe("router.getNamedApiRoutes responses", () => {
       { name: "ping", path: "/ping", method: "GET" },
       { name: "login", path: "/login", method: "POST" },
     ]);
-    expect(Object.keys(router.getNamedApiRoutes()[1])).toEqual(["name", "path", "method"]);
+    expect(Object.keys(at(router.getNamedApiRoutes(), 1))).toEqual(["name", "path", "method"]);
   });
 
   it("adds response only to routes that declare a schema and the resolver describes", () => {
@@ -109,9 +124,9 @@ describe("router.getNamedApiRoutes responses", () => {
       resolveResponse: () => ({ "200": "{ }" }),
     });
 
-    expect(Object.keys(routes[0])).toEqual(["name", "path", "method"]);
-    expect(routes[1]).toEqual({ name: "login", path: "/login", method: "POST", response: { "200": "{ }" } });
-    expect(Object.isFrozen(routes[1].response)).toBe(true);
+    expect(Object.keys(at(routes, 0))).toEqual(["name", "path", "method"]);
+    expect(at(routes, 1)).toEqual({ name: "login", path: "/login", method: "POST", response: { "200": "{ }" } });
+    expect(Object.isFrozen(at(routes, 1).response)).toBe(true);
   });
 
   it("omits response when the resolver has nothing to say", () => {
@@ -119,7 +134,7 @@ describe("router.getNamedApiRoutes responses", () => {
 
     const routes = router.getNamedApiRoutes({ resolveResponse: () => undefined });
 
-    expect(Object.keys(routes[0])).toEqual(["name", "path", "method"]);
+    expect(Object.keys(at(routes, 0))).toEqual(["name", "path", "method"]);
   });
 });
 
@@ -152,8 +167,8 @@ describe("collectNamedApiRoutesWithResponses", () => {
 
     const routes = await collectNamedApiRoutesWithResponses({ appRoot, files });
 
-    expect(Object.keys(routes[0])).toEqual(["name", "path", "method"]);
-    expect(routes[1].response).toEqual({
+    expect(Object.keys(at(routes, 0))).toEqual(["name", "path", "method"]);
+    expect(at(routes, 1).response).toEqual({
       "200": `{ "user": import("@warlock.js/core").ResourceOutput<typeof import("../../src/app/users/resources/user.resource")["userResource"]>; "token": import("@warlock.js/core").CastOutput<"string"> }`,
       "400": `{ "error": import("@warlock.js/core").CastOutput<"string"> }`,
     });
@@ -174,7 +189,7 @@ describe("collectNamedApiRoutesWithResponses", () => {
 
     const routes = await collectNamedApiRoutesWithResponses({ appRoot, files: [], onWarn });
 
-    expect(routes[0].response?.["200"]).toContain(`"user": unknown`);
+    expect(at(routes, 0).response?.["200"]).toContain(`"user": unknown`);
     expect(onWarn).toHaveBeenCalledWith(expect.stringContaining('Route "login"'));
     expect(onWarn).toHaveBeenCalledWith(expect.stringContaining("200.body.user"));
   });
@@ -188,7 +203,7 @@ describe("collectNamedApiRoutesWithResponses", () => {
 
     const routes = await collectNamedApiRoutesWithResponses({ appRoot, files, onWarn });
 
-    expect(routes[0].response?.["200"]).toContain(`"user": unknown`);
+    expect(at(routes, 0).response?.["200"]).toContain(`"user": unknown`);
     expect(onWarn).toHaveBeenCalledWith(expect.stringContaining("syntax error"));
   });
 });
