@@ -1,21 +1,30 @@
 import { compareCreatedAt } from "./parse-created-at";
+import type { MigrationOrigin } from "./migration";
 
 /** The minimum shape ordering needs — the runner passes full migration classes. */
 type Orderable = {
   createdAt?: string;
   migrationName: string;
   order?: number;
+  origin?: MigrationOrigin;
 };
 
 /**
  * Comparator for applying migrations — oldest first.
  *
  * Priority:
- *   1. `order` override (lower = earlier, default 0)
- *   2. `createdAt` timestamp (older = earlier)
- *   3. Alphabetical by migration name (last resort)
+ *   1. package origin before app origin
+ *   2. `order` override (lower = earlier, default 0)
+ *   3. `createdAt` timestamp (older = earlier)
+ *   4. Alphabetical by migration name (last resort)
  */
 export function sortMigrations(a: Orderable, b: Orderable): number {
+  const byOrigin = Number(a.origin === "app") - Number(b.origin === "app");
+
+  if (byOrigin !== 0) {
+    return byOrigin;
+  }
+
   const byOrder = (a.order ?? 0) - (b.order ?? 0);
 
   if (byOrder !== 0) {

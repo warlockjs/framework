@@ -5,7 +5,12 @@ import path from "path";
 import type { MigrationDriverContract } from "../contracts/migration-driver.contract";
 import type { DataSource } from "../data-source/data-source";
 import { dataSourceRegistry } from "../data-source/data-source-registry";
-import { type Migration, type MigrationContract, type MigrationStep } from "./migration";
+import {
+  type Migration,
+  type MigrationContract,
+  type MigrationOrigin,
+  type MigrationStep,
+} from "./migration";
 import { sortMigrations, sortMigrationsForRollback } from "./migration-order";
 import { parseCreatedAt } from "./parse-created-at";
 import { SQLGrammar } from "./sql-grammar";
@@ -17,6 +22,7 @@ import type { MigrationRecord, MigrationResult, TaggedSQL } from "./types";
 type MigrationClass = (new () => Migration) & {
   migrationName: string;
   createdAt?: string;
+  origin?: MigrationOrigin;
 };
 
 /**
@@ -38,6 +44,7 @@ type MigrationClass = (new () => Migration) & {
 type RegisterableMigration = (new () => MigrationContract) & {
   migrationName?: string;
   createdAt?: string;
+  origin?: MigrationOrigin;
 };
 
 /**
@@ -415,7 +422,7 @@ export class MigrationRunner {
    * The migration name is read from `MigrationClass.migrationName`.
    *
    * @param MigrationClass - Migration class (must have static `name` set)
-   * @param createdAt - Optional timestamp for ordering
+   * @param origin - Registration source; defaults to `"app"` for direct registrations.
    * @returns This runner for chaining
    *
    * @example
@@ -424,7 +431,7 @@ export class MigrationRunner {
    * runner.register(CreateUsersTable);
    * ```
    */
-  public register(MigrationClass: RegisterableMigration): this {
+  public register(MigrationClass: RegisterableMigration, origin: MigrationOrigin = "app"): this {
     const name = MigrationClass.migrationName;
     if (!name) {
       throw new Error(
@@ -449,6 +456,7 @@ export class MigrationRunner {
 
     // `name` is proven present by the throw above, so this satisfies the stricter
     // stored type that every reader downstream relies on.
+    MigrationClass.origin = origin;
     this.migrations.push(MigrationClass as MigrationClass);
 
     return this;
@@ -805,7 +813,9 @@ export class MigrationRunner {
    * Export migrations as phase-ordered SQL files in database/sql/ directory.
    * By default, it exports all registered migrations. Use `pendingOnly: true` to export only pending ones.
    */
-  public async exportSQL(options: { pendingOnly?: boolean; compact?: boolean } = {}): Promise<void> {
+  public async exportSQL(
+    options: { pendingOnly?: boolean; compact?: boolean } = {},
+  ): Promise<void> {
     if (this.getDataSource().driver.supportsSqlSerialization === false) {
       throw new Error(
         "SQL export is not supported on this data source — its driver has no SQL dialect. " +
@@ -1398,8 +1408,7 @@ export class MigrationRunner {
 
     // Newest batch first, then newest migration first within a batch.
     return migrations.sort(
-      (a, b) =>
-        (batchOf.get(b) ?? 0) - (batchOf.get(a) ?? 0) || sortMigrationsForRollback(a, b),
+      (a, b) => (batchOf.get(b) ?? 0) - (batchOf.get(a) ?? 0) || sortMigrationsForRollback(a, b),
     );
   }
 

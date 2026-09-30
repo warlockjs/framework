@@ -381,11 +381,7 @@ export interface MigrationContract {
   arrayFloat(column: string): ColumnBuilder;
 
   /** DECIMAL[] — array of decimals (optional precision/scale). */
-  arrayDecimal(
-    column: string,
-    precision?: number,
-    scale?: number,
-  ): ColumnBuilder;
+  arrayDecimal(column: string, precision?: number, scale?: number): ColumnBuilder;
 
   /** BOOLEAN[] — array of booleans. */
   arrayBoolean(column: string): ColumnBuilder;
@@ -514,10 +510,7 @@ export interface MigrationContract {
   /**
    * Create a full-text search index.
    */
-  fullText(
-    columns: string | string[],
-    options?: FullTextIndexOptions,
-  ): MigrationContract;
+  fullText(columns: string | string[], options?: FullTextIndexOptions): MigrationContract;
 
   /**
    * Drop a full-text search index.
@@ -578,10 +571,7 @@ export interface MigrationContract {
    *
    * When omitted, `columnOrConstraint` is used as the raw constraint name.
    */
-  dropForeign(
-    columnOrConstraint: string,
-    referencesTable?: string,
-  ): MigrationContract;
+  dropForeign(columnOrConstraint: string, referencesTable?: string): MigrationContract;
 
   /**
    * Set JSON schema validation rules on the collection.
@@ -646,6 +636,9 @@ export interface MigrationContract {
   vector(column: string, dimensions: number): ColumnBuilder;
 }
 
+/** The source that registered a migration with a runner. */
+export type MigrationOrigin = "package" | "app";
+
 /**
  * Constructor for the migration class.
  */
@@ -655,6 +648,7 @@ export interface MigrationConstructor {
   createdAt?: string;
   transactional?: boolean;
   order?: number;
+  origin?: MigrationOrigin;
 }
 
 /**
@@ -829,9 +823,7 @@ export abstract class Migration implements MigrationContract {
    * }
    * ```
    */
-  public static for<T extends ChildModel<Model>>(
-    model: T,
-  ): MigrationConstructor {
+  public static for<T extends ChildModel<Model>>(model: T): MigrationConstructor {
     abstract class BoundMigration extends Migration {
       public readonly table = model.table;
       public readonly dataSource = model.dataSource;
@@ -1096,17 +1088,11 @@ export abstract class Migration implements MigrationContract {
       }
 
       case "modifyColumn":
-        await this.driver.modifyColumn(
-          this.table,
-          op.payload as ColumnDefinition,
-        );
+        await this.driver.modifyColumn(this.table, op.payload as ColumnDefinition);
         break;
 
       case "createIndex":
-        await this.driver.createIndex(
-          this.table,
-          op.payload as IndexDefinition,
-        );
+        await this.driver.createIndex(this.table, op.payload as IndexDefinition);
         break;
 
       case "dropIndex":
@@ -1179,10 +1165,7 @@ export abstract class Migration implements MigrationContract {
         break;
 
       case "addForeignKey":
-        await this.driver.addForeignKey(
-          this.table,
-          op.payload as ForeignKeyDefinition,
-        );
+        await this.driver.addForeignKey(this.table, op.payload as ForeignKeyDefinition);
         break;
 
       case "dropForeignKey":
@@ -1255,9 +1238,7 @@ export abstract class Migration implements MigrationContract {
               "raw() is SQL-only and is not supported on MongoDB. Use withConnection() for direct driver access.",
             );
           } else {
-            throw new Error(
-              "Unsupported database driver for statement execution",
-            );
+            throw new Error("Unsupported database driver for statement execution");
           }
         });
         break;
@@ -2150,11 +2131,7 @@ export abstract class Migration implements MigrationContract {
    * this.arrayDecimal("amounts");        // DECIMAL[]
    * ```
    */
-  public arrayDecimal(
-    column: string,
-    precision?: number,
-    scale?: number,
-  ): ColumnBuilder {
+  public arrayDecimal(column: string, precision?: number, scale?: number): ColumnBuilder {
     const builder = new ColumnBuilder(this, column, "arrayDecimal", {
       precision,
       scale,
@@ -2595,10 +2572,7 @@ export abstract class Migration implements MigrationContract {
    * @param options - Full-text options
    * @returns This migration for chaining
    */
-  public fullText(
-    columns: string | string[],
-    options?: FullTextIndexOptions,
-  ): this {
+  public fullText(columns: string | string[], options?: FullTextIndexOptions): this {
     const cols = Array.isArray(columns) ? columns : [columns];
     this.pendingOperations.push({
       type: "createFullTextIndex",
@@ -2851,10 +2825,7 @@ export abstract class Migration implements MigrationContract {
    * @param referencesTable - Referenced table name; triggers auto-name computation when provided
    * @returns This migration for chaining
    */
-  public dropForeign(
-    columnOrConstraint: string,
-    referencesTable?: string,
-  ): this {
+  public dropForeign(columnOrConstraint: string, referencesTable?: string): this {
     const constraintName = referencesTable
       ? `fk_${this.table}_${columnOrConstraint}_${referencesTable}`
       : columnOrConstraint;
@@ -2930,9 +2901,7 @@ export abstract class Migration implements MigrationContract {
    * });
    * ```
    */
-  public async withConnection<T>(
-    callback: (connection: unknown) => Promise<T>,
-  ): Promise<T> {
+  public async withConnection<T>(callback: (connection: unknown) => Promise<T>): Promise<T> {
     // The callback is queued behind the schema operations declared before it and
     // runs in authored order at execution time. Dry runs and SQL exports never
     // run it. Its result is therefore always `undefined` here.
@@ -3055,15 +3024,7 @@ export type IndexEntry = {
    * Index access method (PostgreSQL).
    * Defaults to `"btree"` when omitted.
    */
-  using?:
-    | "btree"
-    | "hash"
-    | "gin"
-    | "gist"
-    | "brin"
-    | "ivfflat"
-    | "hnsw"
-    | (string & {});
+  using?: "btree" | "hash" | "gin" | "gist" | "brin" | "ivfflat" | "hnsw" | (string & {});
   /** Extra columns to include in a covering index (PostgreSQL `INCLUDE`). */
   include?: string[];
   /** Build the index without locking the table (PostgreSQL). */
@@ -3213,10 +3174,7 @@ export type MigrationCreateOptions = {
  * Keys become the column names; values are `DetachedColumnBuilder` instances
  * produced by the standalone column helpers (`uuid()`, `text()`, etc.).
  */
-export type ColumnMap = Record<
-  string,
-  import("./column-helpers").DetachedColumnBuilder
->;
+export type ColumnMap = Record<string, import("./column-helpers").DetachedColumnBuilder>;
 
 /**
  * Options accepted by `Migration.alter()`.
@@ -3549,9 +3507,7 @@ function wireColumns(migration: Migration, columns: ColumnMap): void {
     // Transfer any index operations registered via .unique() / .index()
     // Replace the placeholder column name with the real column name before transfer.
     for (const idx of detached.sink.pendingIndexes) {
-      idx.columns = idx.columns.map((col) =>
-        col === "__placeholder__" ? columnName : col,
-      );
+      idx.columns = idx.columns.map((col) => (col === "__placeholder__" ? columnName : col));
       migration.addPendingIndex(idx);
     }
 
@@ -3654,15 +3610,9 @@ Migration.create = function createMigration(
       // deletedAt column so the schema matches what destroy() writes at
       // runtime. Opt out with { softDeletes: false }; force on with `true`.
       if (options.softDeletes !== false) {
-        const deletedAtColumn = resolveSoftDeleteColumn(
-          model,
-          options.softDeletes,
-        );
+        const deletedAtColumn = resolveSoftDeleteColumn(model, options.softDeletes);
 
-        if (
-          deletedAtColumn &&
-          !Object.prototype.hasOwnProperty.call(columns, deletedAtColumn)
-        ) {
+        if (deletedAtColumn && !Object.prototype.hasOwnProperty.call(columns, deletedAtColumn)) {
           this.softDeletes(deletedAtColumn);
         }
       }
@@ -3688,9 +3638,7 @@ Migration.create = function createMigration(
       }
 
       if (options.raw) {
-        const rawQueries = Array.isArray(options.raw)
-          ? options.raw
-          : [options.raw];
+        const rawQueries = Array.isArray(options.raw) ? options.raw : [options.raw];
         for (const query of rawQueries) {
           this.raw(query);
         }
@@ -3822,11 +3770,7 @@ Migration.alter = function alterMigration(
 
       // ── Expression Indexes ───────────────────────────────────────────────
       if (schema.addExpressionIndex) {
-        for (const {
-          expressions,
-          name,
-          options: opts,
-        } of schema.addExpressionIndex) {
+        for (const { expressions, name, options: opts } of schema.addExpressionIndex) {
           this.expressionIndex(expressions, name, opts);
         }
       }
@@ -3883,10 +3827,7 @@ Migration.alter = function alterMigration(
       // ── Foreign Keys ──────────────────────────────────────────────────────
       if (schema.addForeign) {
         for (const fk of schema.addForeign) {
-          const tableName =
-            typeof fk.references === "string"
-              ? fk.references
-              : fk.references.table;
+          const tableName = typeof fk.references === "string" ? fk.references : fk.references.table;
 
           this.foreign(fk.column)
             .references(tableName, fk.on ?? "id")
@@ -3896,10 +3837,7 @@ Migration.alter = function alterMigration(
       }
 
       if (schema.dropForeign) {
-        for (const {
-          columnOrConstraint,
-          referencesTable,
-        } of schema.dropForeign) {
+        for (const { columnOrConstraint, referencesTable } of schema.dropForeign) {
           this.dropForeign(columnOrConstraint, referencesTable);
         }
       }
@@ -3919,9 +3857,7 @@ Migration.alter = function alterMigration(
 
       // ── Raw SQL ───────────────────────────────────────────────────────────
       if (schema.raw) {
-        const rawQueries = Array.isArray(schema.raw)
-          ? schema.raw
-          : [schema.raw];
+        const rawQueries = Array.isArray(schema.raw) ? schema.raw : [schema.raw];
         for (const query of rawQueries) {
           this.raw(query);
         }

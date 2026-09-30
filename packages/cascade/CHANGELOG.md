@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `whereTrusted(conditions)` on the query builder contract applies a code-authored filter without the unsafe-operator check, so MongoDB operators such as `$in` and `$lt` pass through. Never pass request input to it. The PostgreSQL builder throws `UnsupportedQueryOperationError` for operator objects, because its `where()` parser would otherwise bind them as plain values. Custom query builders must implement the new method.
+- Migrations can be registered with an origin (`"package"` or `"app"`). Package migrations run before every app migration while preserving the existing `order`, `createdAt`, and name sort within each partition. Direct `register()` calls default to `"app"`.
 
 ### Fixed
 

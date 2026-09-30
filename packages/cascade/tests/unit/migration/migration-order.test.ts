@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  sortMigrations,
-  sortMigrationsForRollback,
-} from "../../../src/migration/migration-order";
+import { sortMigrations, sortMigrationsForRollback } from "../../../src/migration/migration-order";
 
 /**
  * Regression cover for the rollback ordering bug reported from kafr-yasef on
@@ -42,6 +39,19 @@ describe("sortMigrations — apply order", () => {
       "a-add-summary-to-news",
     ]);
   });
+
+  it("runs package migrations before apps without changing either partition's order", () => {
+    const migrations = [
+      { createdAt: "01-01-1900_00-00-00", migrationName: "app-very-early", origin: "app" },
+      { createdAt: "01-01-2026_00-00-00", migrationName: "app-later", origin: "app" },
+      { migrationName: "package-undated", origin: "package" },
+      { createdAt: "02-01-2026_00-00-00", migrationName: "package-later", origin: "package" },
+    ];
+
+    expect(
+      [...migrations].sort(sortMigrations).map((migration) => migration.migrationName),
+    ).toEqual(["package-later", "package-undated", "app-very-early", "app-later"]);
+  });
 });
 
 describe("sortMigrationsForRollback — rollback order", () => {
@@ -72,10 +82,7 @@ describe("sortMigrationsForRollback — rollback order", () => {
   });
 
   it("falls back to reverse-alphabetical when timestamps cannot decide", () => {
-    const undated = [
-      { migrationName: "a-first" },
-      { migrationName: "b-second" },
-    ];
+    const undated = [{ migrationName: "a-first" }, { migrationName: "b-second" }];
 
     expect(order(undated as never, sortMigrationsForRollback)).toEqual(["b-second", "a-first"]);
   });
