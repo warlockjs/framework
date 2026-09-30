@@ -5,7 +5,9 @@ import { Application } from "../application";
 import { connectorsManager } from "../connectors/connectors-manager";
 import { ConnectorLifecyclePhase } from "../connectors/types";
 import { warlockConfigManager } from "../warlock-config";
+import { registerDevelopmentOpenApiProvider } from "../openapi/development-openapi-provider";
 import { BootPreconditionError } from "./boot-precondition-error";
+import { buildDevelopmentOpenApiDocument } from "./build-development-openapi-document";
 import { devLogInfo, devLogSection, devLogWarn, devServeLog } from "./dev-logger";
 import { filesOrchestrator } from "./files-orchestrator";
 import { MANIFEST_PATH } from "./flags";
@@ -51,6 +53,9 @@ export class DevelopmentServer {
     try {
       this.connectorsStarted = true;
       const startedAt = performance.now();
+
+      // Devtools reads this through the root barrel, which must not reach dev-server code.
+      registerDevelopmentOpenApiProvider(buildDevelopmentOpenApiDocument);
 
       // --fresh deletes the manifest so reconciliation re-parses every file
       // from disk. Transpile caching is owned by the loader hook (in-memory).
