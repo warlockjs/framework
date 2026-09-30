@@ -185,6 +185,33 @@ createProductController.validation = {
 };
 ```
 
+### Validating route params
+
+Add `params` next to `schema` to validate the route's path segments. Route params arrive as strings, so number and boolean validators convert them for you:
+
+```ts title="src/app/posts/controllers/get-post.controller.ts"
+import { v } from "@warlock.js/seal";
+import { type RequestHandler } from "@warlock.js/core";
+
+// router.get("/posts/:id", getPost)
+export const getPost: RequestHandler = async ({ request, response }) => {
+  const id = request.input("id"); // 42, not "42"
+
+  return response.success({ post: await getPostService(id) });
+};
+
+getPost.validation = {
+  params: v.object({ id: v.int().min(1) }),
+};
+```
+
+- Route params are validated against the `params` schema on every request.
+- `v.int()`, `v.number()` and `v.boolean()` convert the string segments automatically. Your schema object is never changed; core converts a copy of it.
+- The parsed values replace `request.params`, so `request.input("id")` returns a number.
+- They also merge into `request.validated()`. When a param and a body field share a name, the param wins.
+- A failure answers exactly like a `schema` failure (the same 422 `errors` response by default), and the handler never runs.
+- Routes without `params` still receive raw string params.
+
 ## A real example end-to-end
 
 Here's the actual `login` controller from the reference codebase. Three input sources, one use-case, two response paths:

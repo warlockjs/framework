@@ -60,7 +60,7 @@ type RequestHandler = (context: HttpContext<Request>) => ReturnedResponse | void
 It can have static properties for validation and OpenAPI metadata:
 
 ```ts
-handler.validation = { schema, validate, validating };
+handler.validation = { schema, params, validate, validating };
 handler.description = "Lists all products";
 handler.responseSchema = { 200: { body: { products: [ProductResource] } } };
 ```
