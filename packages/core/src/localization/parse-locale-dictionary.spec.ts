@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import config from "@mongez/config";
+import { getTranslationsList } from "@mongez/localization";
 import { LocaleDictionaryError, parseLocaleDictionary } from "./parse-locale-dictionary";
+import { registerLocaleDictionary } from "./register-locale-dictionary";
 
 const sourceFile = "app/locales.json";
 const localeCodes = ["en", "ar"] as const;
@@ -83,5 +86,38 @@ describe("parseLocaleDictionary", () => {
     expect(() => parse(source)).toThrow(LocaleDictionaryError);
     expect(() => parse(source)).toThrow(message);
     expect(() => parse(source)).toThrow(sourceFile);
+  });
+});
+
+describe("registerLocaleDictionary", () => {
+  it("registers flattened module dictionaries globally and removes stale entries on cleanup", () => {
+    config.set("app.localeCodes", ["en", "ar"]);
+    const cleanup = registerLocaleDictionary({
+      sourceFile: "src/app/posts/utils/locales.json",
+      source: JSON.stringify({ card: { title: { en: "Posts", ar: "مقالات" } } }),
+      defaultNamespace: "posts",
+    });
+
+    expect((getTranslationsList() as any).en.posts.card.title).toBe("Posts");
+    expect((getTranslationsList() as any).ar.posts.card.title).toBe("مقالات");
+    cleanup();
+    expect((getTranslationsList() as any).en.posts?.card?.title).toBeUndefined();
+  });
+
+  it("fails when two JSON dictionaries own the same key", () => {
+    const first = registerLocaleDictionary({
+      sourceFile: "src/app/first/utils/locales.json",
+      source: JSON.stringify({ $group: "shared", title: { en: "First", ar: "الأول" } }),
+      defaultNamespace: "first",
+    });
+
+    expect(() =>
+      registerLocaleDictionary({
+        sourceFile: "src/app/second/utils/locales.json",
+        source: JSON.stringify({ $group: "shared", title: { en: "Second", ar: "الثاني" } }),
+        defaultNamespace: "second",
+      }),
+    ).toThrow("src/app/first/utils/locales.json");
+    first();
   });
 });

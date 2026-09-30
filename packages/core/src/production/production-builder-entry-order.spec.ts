@@ -13,7 +13,7 @@ vi.mock("esbuild", () => ({
     build: vi.fn(async (options: { entryPoints: string[] }) => {
       const dir = path.dirname(options.entryPoints[0]!);
 
-      for (const file of ["app.ts", "bootstrap.ts", "config-loader.ts"]) {
+      for (const file of ["app.ts", "bootstrap.ts", "config-loader.ts", "locales.ts"]) {
         generated[file] = await fs.readFile(path.join(dir, file), "utf8");
       }
     }),
@@ -55,6 +55,11 @@ describe("ProductionBuilder generated entry order", () => {
     await fs.writeFile(path.join(tempRoot, "src/app/bootstrap.ts"), "export {};\n");
     await fs.writeFile(path.join(tempRoot, "src/app/prestart.ts"), "export {};\n");
     await fs.writeFile(path.join(tempRoot, "src/config/app.ts"), "export default {};\n");
+    await fs.mkdir(path.join(tempRoot, "src/app/posts/utils"), { recursive: true });
+    await fs.writeFile(
+      path.join(tempRoot, "src/app/posts/utils/locales.json"),
+      JSON.stringify({ title: { en: "Posts" } }),
+    );
     await fs.writeFile(
       path.join(tempRoot, "package.json"),
       JSON.stringify({ name: "fixture-app", dependencies: { "@warlock.js/core": "*" } }),
@@ -77,7 +82,7 @@ describe("ProductionBuilder generated entry order", () => {
     await new ProductionBuilder().build();
 
     const firstImport = (source: string) =>
-      source.split("\n").find(line => line.trimStart().startsWith("import "));
+      source.split("\n").find((line) => line.trimStart().startsWith("import "));
 
     // The entry's very first import is ./bootstrap, ahead of config and connectors...
     const entry = generated["app.ts"]!;
@@ -91,5 +96,15 @@ describe("ProductionBuilder generated entry order", () => {
     // The config loader starts with the app's prestart, ahead of every config import.
     const configLoader = generated["config-loader.ts"]!;
     expect(firstImport(configLoader)).toBe("import './../../src/app/prestart';");
+  }, 60_000);
+
+  it("embeds locale JSON through the generated locale loader", async () => {
+    await new ProductionBuilder().build();
+
+    expect(generated["locales.ts"]).toContain(
+      'import dictionary0 from "../../src/app/posts/utils/locales.json";',
+    );
+    expect(generated["locales.ts"]).toContain("registerLocaleDictionary");
+    expect(generated["locales.ts"]).toContain('defaultNamespace: "posts"');
   }, 60_000);
 });

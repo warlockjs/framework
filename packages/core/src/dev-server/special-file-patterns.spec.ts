@@ -32,6 +32,7 @@ describe("special file patterns", () => {
     [isEventFile, "src/app/blog/events/on-post.ts", true],
     [isEventFile, "src/app/modules/blog/events/on-post.ts", false],
     [isLocaleFile, "src/app/blog/utils/locales.ts", true],
+    [isLocaleFile, "src/app/blog/utils/locales.json", true],
     [isLocaleFile, "src/app/modules/blog/utils/locales.ts", false],
     [isConfigFile, "src/config/rate-limit.ts", true],
     [isConfigFile, "src/config/mail/smtp.ts", true],

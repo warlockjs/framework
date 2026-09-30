@@ -19,9 +19,9 @@ export const isWorkerFile = (path: string) =>
 export const isEventFile = (path: string) =>
   /^src\/app\/[^/]+\/events\/[^/]+\.(ts|tsx)$/.test(normalize(path));
 
-/** `src/app/<module>/utils/locales.ts` */
+/** `src/app/<module>/utils/locales.ts` or `locales.json` */
 export const isLocaleFile = (path: string) =>
-  /^src\/app\/[^/]+\/utils\/locales\.(ts|tsx)$/.test(normalize(path));
+  /^src\/app\/[^/]+\/utils\/locales\.(ts|tsx|json)$/.test(normalize(path));
 
 /** Source files the dev server can hot-reload; anything else is data (`.sql`, `.json`, …) */
 export const isCodeFile = (path: string) =>

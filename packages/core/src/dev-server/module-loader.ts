@@ -1,7 +1,10 @@
 import { pathToFileURL } from "node:url";
+import ts from "typescript";
 import { importAppModule } from "../loader/app-module-importer";
+import { registerGroupedTranslationKeys, registerLocaleDictionary } from "../localization";
 import { router } from "../router/router";
 import { devLogError, formatModuleNotFoundError } from "./dev-logger";
+import { extractTranslationKeys } from "./extract-translation-keys";
 import type { CleanupFunction, FileManager } from "./file-manager";
 import { getDevelopmentModelModuleRegistry } from "./model-module-registry";
 import type { SpecialFileType, SpecialFilesCollector } from "./special-files-collector";
@@ -101,6 +104,25 @@ export class ModuleLoader {
    */
   public async loadModule<T = unknown>(file: FileManager, type: string): Promise<T | undefined> {
     if (file.relativePath.endsWith(".env")) return undefined;
+
+    if (type === "locale" && file.relativePath.endsWith(".json")) {
+      const cleanup = registerLocaleDictionary({
+        sourceFile: file.relativePath,
+        source: file.source,
+        defaultNamespace: file.relativePath.split("/")[2]!,
+      });
+      file.addCleanup(cleanup);
+      return undefined;
+    }
+
+    if (type === "locale") {
+      registerGroupedTranslationKeys(
+        file.relativePath,
+        extractTranslationKeys(
+          ts.createSourceFile(file.relativePath, file.source, ts.ScriptTarget.Latest),
+        ),
+      );
+    }
 
     globalThis.__currentModuleFile = file;
 

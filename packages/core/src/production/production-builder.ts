@@ -447,7 +447,7 @@ bootstrap();
    * Returns relative paths from .warlock/production/ to src/app/
    */
   private async globModule(matches: (relativePath: string) => boolean): Promise<string[]> {
-    const files = await glob("**/*.{ts,tsx}", {
+    const files = await glob("**/*.{ts,tsx,json}", {
       cwd: appPath(),
       absolute: false,
     });
@@ -529,7 +529,18 @@ bootstrap();
   private async generateLocales(): Promise<boolean> {
     const files = await this.globModule(isLocaleFile);
     if (files.length === 0) return false;
-    await this.generateImportsFile(files, "locales.ts");
+    const content = files
+      .map((file, index) => {
+        if (!file.endsWith(".json")) return `import "${file}";`;
+        const moduleFolder = file.split("/").at(-3)!;
+        return [
+          `import dictionary${index} from "${file}";`,
+          'import { registerLocaleDictionary } from "@warlock.js/core";',
+          `registerLocaleDictionary({ sourceFile: ${JSON.stringify(file)}, source: JSON.stringify(dictionary${index}), defaultNamespace: ${JSON.stringify(moduleFolder)} });`,
+        ].join("\n");
+      })
+      .join("\n");
+    await putFileAsync(path.join(this.productionDir, "locales.ts"), content + "\n");
     return true;
   }
 
