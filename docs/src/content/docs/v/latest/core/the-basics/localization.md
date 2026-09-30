@@ -104,7 +104,23 @@ Both fields are declared on the `AppConfigurations` type as `localeCode?` and `l
 
 ### Registering translations
 
-Register grouped translations once, typically per module in `utils/locales.ts` (auto-loaded by the framework):
+Prefer a strict JSON dictionary per module in `utils/locales.json` (auto-loaded by the framework):
+
+```json title="src/app/products/utils/locales.json"
+{
+  "notFound": { "en": "Product not found", "ar": "المنتج غير موجود" },
+  "errors": { "invalidPrice": { "en": "Invalid price", "ar": "سعر غير صالح" } }
+}
+```
+
+The module folder is the default group, so these keys are
+`products.notFound` and `products.errors.invalidPrice`. A root `$group` string
+replaces that group. Nested keys are flattened, every dictionary is strictly
+validated, and one key cannot be owned by two dictionaries (or by a dictionary
+and a static registration). Do not import the file; Warlock loads it.
+
+`utils/locales.ts` remains supported but is deprecated and will be removed in
+v6. Run `warlock doctor --fix` to migrate it. The legacy registration form is:
 
 ```ts title="src/app/products/utils/locales.ts"
 import { groupedTranslations } from "@mongez/localization";
@@ -124,7 +140,7 @@ groupedTranslations("products", {
 The group name becomes the namespace: `t("products.notFound")` resolves `products → notFound → <currentLocale>`. Nested groups dot-access naturally (`t("products.errors.invalidPrice")`).
 
 :::note[Typed keys in `@warlock.js/web` — new in 5.13]
-`warlock dev` scans every `utils/locales.*` file for `groupedTranslations(group, dictionary)` calls and writes the flattened keys (`"products.notFound"`, `"products.outOfStock"`, …) to `.warlock/typings/translations.d.ts`, augmenting web's `TranslationKeyRegistry`. If your app also uses `@warlock.js/web`'s `useTrans()` in page components, its keys are then checked against this registry instead of accepting any `string` — see [Localization](/v/latest/web/essentials/localization/#typed-keys--new-in-513). `t()` / `trans()` here in core are untyped either way.
+`warlock dev` scans module `utils/locales.json` dictionaries and literal `groupedTranslations(group, dictionary)` calls, then writes flattened keys (`"products.notFound"`, `"products.outOfStock"`, …) to `.warlock/typings/translations.d.ts`, augmenting web's `TranslationKeyRegistry`. If your app also uses `@warlock.js/web`'s `useTrans()` in page components, its keys are then checked against this registry instead of accepting any `string` — see [Localization](/v/latest/web/essentials/localization/#typed-keys--new-in-513). `t()` / `trans()` here in core are untyped either way.
 :::
 
 ### Reading translations: `t()` vs `trans()`
