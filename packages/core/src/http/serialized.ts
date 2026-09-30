@@ -190,7 +190,11 @@ export type Serialized<
           : W extends "devalue"
             ? T extends DevalueNative
               ? T
-              : SerializedStructure<T, W, D>
+              : // Page data awaits promises nested in plain objects and arrays, then
+                // serializes the settled value, so the page receives that value.
+                T extends PromiseLike<infer V>
+                ? Serialized<V, W, D>
+                : SerializedStructure<T, W, D>
             : T extends Map<infer K, infer V>
               ? Record<Extract<K, PropertyKey>, Serialized<V, W, D>>
               : SerializedStructure<T, W, D>;

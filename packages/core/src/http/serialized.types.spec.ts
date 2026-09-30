@@ -136,6 +136,12 @@ describe("Serialized, devalue wire", () => {
     expectTypeOf<Serialized<URL, "devalue">>().toEqualTypeOf<URL>();
   });
 
+  it("types a nested promise as its serialized settled value", () => {
+    expectTypeOf<
+      Serialized<{ at: Promise<Date>; item: Promise<{ toJSON(): { id: number } }> }, "devalue">
+    >().toEqualTypeOf<{ at: Date; item: { id: number } }>();
+  });
+
   it("keeps Date inside objects and arrays", () => {
     expectTypeOf<Serialized<{ a: Date; f: () => void }, "devalue">>().toEqualTypeOf<{ a: Date }>();
     expectTypeOf<Serialized<Date[], "devalue">>().toEqualTypeOf<Date[]>();
