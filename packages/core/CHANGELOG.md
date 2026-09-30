@@ -30,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `warlock generate.typings` honours `build.routeRegistrationTimeoutMs` / `WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS`, like `warlock build`. It always used 30 seconds, so `generate.typings && tsc && warlock build` could fail on a loaded machine even with a longer timeout configured.
 - `request.t()`, `request.trans()` and `t()` are typed as returning `string` (they were `any`), so `title: request.t("...")` type-checks without a `String(...)` wrapper.
 - `warlock migrate` runs package migrations (such as @warlock.js/auth's token tables) before your app's migrations, whatever their dates. On a fresh database, an app migration that alters a package table used to run before the table existed. The order inside each group is unchanged.
 - `startHttpTestServer({ web: false })` now starts an API-only test server: it skips the optional web connector before its lazy lifecycle delegate constructs `WebConnector` or creates Vite. Omitting the option preserves the existing full-stack startup.

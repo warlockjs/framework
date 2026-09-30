@@ -33,10 +33,21 @@ export const typingsGeneratorCommand = command({
     await typeGenerator.generateAll();
 
     await runConnectorTypings({
-      connectors: warlockConfigManager.isLoaded ? (warlockConfigManager.get("connectors") ?? []) : [],
+      connectors: warlockConfigManager.isLoaded
+        ? (warlockConfigManager.get("connectors") ?? [])
+        : [],
       appRoot: rootPath(),
       options: resolveBuildConfig,
-      collectRoutes: async () => (await collectRouteRegistrationSnapshot({ cwd: rootPath() })).routes,
+      // Same timeout as `warlock build` (build.routeRegistrationTimeoutMs or
+      // WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS): `generate.typings` runs first in
+      // the usual build script, so a slower default here fails the whole build.
+      collectRoutes: async () =>
+        (
+          await collectRouteRegistrationSnapshot({
+            cwd: rootPath(),
+            timeoutMs: resolveBuildConfig().routeRegistrationTimeoutMs,
+          })
+        ).routes,
     });
   },
   preload: {
