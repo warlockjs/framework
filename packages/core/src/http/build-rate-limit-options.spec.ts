@@ -31,6 +31,12 @@ describe("buildRateLimitOptions", () => {
     expect(options?.global).toBe(false);
   });
 
+  it("passes ipv6Subnet through to the plugin", () => {
+    const options = buildRateLimitOptions({ ipv6Subnet: 56 } as any);
+
+    expect(options?.ipv6Subnet).toBe(56);
+  });
+
   it("returns null when disabled", () => {
     expect(buildRateLimitOptions({ enabled: false })).toBeNull();
   });

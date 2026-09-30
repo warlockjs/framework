@@ -7,6 +7,7 @@ const passthroughKeys = [
   "redis",
   "nameSpace",
   "keyGenerator",
+  "ipv6Subnet",
   "skipOnError",
   "allowList",
   "continueExceeding",
@@ -22,7 +23,16 @@ const passthroughKeys = [
 /**
  * Shape of the `http.rateLimit` config.
  */
-export type HttpRateLimitConfig = Pick<RateLimitPluginOptions, (typeof passthroughKeys)[number]> & {
+export type HttpRateLimitConfig = Omit<
+  Pick<RateLimitPluginOptions, (typeof passthroughKeys)[number]>,
+  "ipv6Subnet"
+> & {
+  /**
+   * IPv6 subnet size used to group client addresses.
+   *
+   * @default 64
+   */
+  ipv6Subnet?: RateLimitPluginOptions["ipv6Subnet"];
   /**
    * Set `false` to skip registering the global rate limiter.
    *

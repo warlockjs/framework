@@ -1,3 +1,4 @@
+import { normalizeIP } from "@fastify/rate-limit";
 import type { Middleware } from "../../router";
 import { HttpErrorCodes } from "../error-codes";
 import type { Request } from "../request";
@@ -46,6 +47,7 @@ type Bucket = {
 };
 
 const buckets = new Map<string, Bucket>();
+const defaultIpv6Subnet = 64;
 
 /**
  * Each `rateLimitMiddleware()` call is its own limiter. Page actions share one
@@ -113,7 +115,9 @@ export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
       }
     }
 
-    const groupKey = options.keyGenerator?.(request) || userKey || request.detectIp() || "unknown";
+    const ip = request.detectIp();
+    const ipKey = ip ? normalizeIP(ip, defaultIpv6Subnet) : "unknown";
+    const groupKey = options.keyGenerator?.(request) || userKey || ipKey;
     const cacheKey = `${limiterId}:${request.route.path}:${groupKey}`;
 
     let bucket = buckets.get(cacheKey);

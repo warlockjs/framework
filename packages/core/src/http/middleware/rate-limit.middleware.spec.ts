@@ -5,7 +5,12 @@ import { rateLimitMiddleware } from "./rate-limit.middleware";
 
 let seq = 0;
 
-function run(middleware: ReturnType<typeof rateLimitMiddleware>, path: string, userId?: string, ip = "1.1.1.1") {
+function run(
+  middleware: ReturnType<typeof rateLimitMiddleware>,
+  path: string,
+  userId?: string,
+  ip = "1.1.1.1",
+) {
   const request = {
     route: { path },
     locals: userId ? { user: { id: userId } } : {},
@@ -74,7 +79,9 @@ describe("rateLimitMiddleware key: user", () => {
     const { response } = run(mw, path, "a");
 
     expect(errorMessage).toHaveBeenCalledTimes(1);
-    expect(response.tooManyRequests).toHaveBeenCalledWith(expect.objectContaining({ error: "slow down" }));
+    expect(response.tooManyRequests).toHaveBeenCalledWith(
+      expect.objectContaining({ error: "slow down" }),
+    );
   });
 
   it("sets X-RateLimit headers", () => {
@@ -84,5 +91,27 @@ describe("rateLimitMiddleware key: user", () => {
     expect(response.header).toHaveBeenCalledWith("X-RateLimit-Limit", 5);
     expect(response.header).toHaveBeenCalledWith("X-RateLimit-Remaining", 4);
     expect(response.header).toHaveBeenCalledWith("X-RateLimit-Reset", expect.any(Number));
+  });
+});
+
+describe("rateLimitMiddleware IP keys", () => {
+  it("groups IPv6 clients by /64 and maps IPv4-mapped addresses to IPv4", () => {
+    const mw = rateLimitMiddleware({ max: 1, duration: 60_000 });
+
+    expect(
+      run(mw, `/ip${seq++}`, undefined, "2001:db8:1:2::1").response.tooManyRequests,
+    ).not.toHaveBeenCalled();
+    expect(
+      run(mw, `/ip${seq - 1}`, undefined, "2001:db8:1:2::ffff").response.tooManyRequests,
+    ).toHaveBeenCalled();
+    expect(
+      run(mw, `/ip${seq - 1}`, undefined, "2001:db8:1:3::1").response.tooManyRequests,
+    ).not.toHaveBeenCalled();
+
+    const ipv4Path = `/ip${seq++}`;
+    expect(
+      run(mw, ipv4Path, undefined, "::ffff:1.2.3.4").response.tooManyRequests,
+    ).not.toHaveBeenCalled();
+    expect(run(mw, ipv4Path, undefined, "1.2.3.4").response.tooManyRequests).toHaveBeenCalled();
   });
 });
