@@ -67,15 +67,27 @@ component subscribed.
 ## Programmatic navigation
 
 ```tsx
-import { href, navigateTo, refresh } from "@warlock.js/web";
+import { apiHref, href, navigateTo, refresh } from "@warlock.js/web";
 
-const productUrl = href("products.details", { id: "42" });
-navigateTo(productUrl);
+navigateTo({ name: "products.details", params: { id: "42" }, query: { tab: "reviews" } });
+navigateTo("/cart", { replace: true });
+
+const productUrl = href("products.details", { params: { id: "42" }, query: { tab: "reviews" } });
+const reviewsEndpoint = apiHref("products.reviews", { params: { id: "42" }, query: { page: 2 } });
+
 await refresh();
 ```
 
-`navigateTo()` accepts a path, not a route name. `href()` resolves named routes
-through the server-published route table. Generated declarations in
+`navigateTo()` accepts a path or a `{ name, params, query }` route target.
+Before the client runtime is connected (for example, a click before hydration
+finishes), it falls back to a real browser navigation, so you never need to
+write `window.location.assign` yourself. It returns `false` only on the server,
+or when the runtime declines a same-origin URL.
+
+`href()` resolves named page routes through the server-published route table.
+It takes either positional arguments (`href(name, params, query)`) or an
+object (`href(name, { params, query })`). `apiHref()` does the same for named
+API routes, which is useful for `fetch` URLs. Generated declarations in
 `.warlock/typings/web-routes.d.ts` make page names and required path parameters
 type-safe when they are available; runtime validation remains active before
 generation. `refresh()` leaves history unchanged

@@ -19,7 +19,7 @@ That single command does everything:
 - ejects `config/access.ts` (wired under the `access` key, the same way `auth` is registered),
 - ejects the **resolver** — `DatabaseAccessResolver` in `src/app/access/services/access-resolver.ts`,
 - ejects the **role tables** — the `Role` catalog and the `UserRole` assignments models under `src/app/access/models/`, each with its own migration,
-- registers the access locale (an `access` group with `errors.forbidden` in `en` + `ar`) into `src/app/shared/utils/locales.ts`, creating that file if it's missing.
+- writes the access locale (`errors.forbidden` in `en` + `ar`) to `src/app/access/utils/locales.json`; the `access` module folder makes the key `access.errors.forbidden`. An existing file gets the key merged in. If an older `src/app/shared/utils/locales.ts` already registers the `access` group, nothing is written.
 
 The ejected migrations auto-discover from `src/app/access/models/*/migrations/` — there is no `database.migrations` list to register by hand. Run your migrations once to create the tables:
 
