@@ -1,13 +1,12 @@
-import { fork, type ChildProcess } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import type { NamedApiRoute, RequestMethod } from "../router/types";
 import type { Environment, RuntimeStrategy } from "../utils/environment";
+import {
+  runRegistrationChild,
+  type RegistrationChildForker,
+  type RegistrationChildProcess,
+} from "./registration-child-runner";
 
 const PROTOCOL_VERSION = 1;
-const DEFAULT_TIMEOUT_MS = 30_000;
-const MAX_DIAGNOSTIC_BYTES = 16_384;
 
 export type RouteRegistrationSnapshot = Readonly<{
   version: typeof PROTOCOL_VERSION;
@@ -21,15 +20,7 @@ export type RouteRegistrationChildRequest = Readonly<{
   runtimeStrategy?: RuntimeStrategy;
 }>;
 
-type RouteRegistrationChildMessage =
-  | Readonly<{ type: "route-registration:snapshot"; snapshot: unknown }>
-  | Readonly<{ type: "route-registration:error"; message: string }>
-  | Readonly<{ type: "route-registration:progress"; module: string }>;
-
-export type RouteRegistrationChildProcess = Pick<
-  ChildProcess,
-  "send" | "kill" | "disconnect" | "on" | "stdout" | "stderr" | "connected"
->;
+export type RouteRegistrationChildProcess = RegistrationChildProcess;
 
 export type RouteRegistrationSnapshotOptions = Readonly<{
   cwd?: string;
@@ -37,7 +28,7 @@ export type RouteRegistrationSnapshotOptions = Readonly<{
   runtimeStrategy?: RuntimeStrategy;
   timeoutMs?: number;
   childEntry?: string;
-  forkProcess?: (entry: string, options: { cwd: string }) => RouteRegistrationChildProcess;
+  forkProcess?: RegistrationChildForker;
 }>;
 
 /**
@@ -51,175 +42,22 @@ export function collectRouteRegistrationSnapshot(
   options: RouteRegistrationSnapshotOptions = {},
 ): Promise<RouteRegistrationSnapshot> {
   const cwd = options.cwd ?? process.cwd();
-  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const startedAt = Date.now();
-  const forkProcess = options.forkProcess ?? defaultForkProcess;
-  // An injected fork is a protocol seam, not an installation check. Unit
-  // fixtures do not have a packaged ESM child and do not need to resolve one.
-  const entry =
-    options.childEntry ??
-    (options.forkProcess ? "<injected-route-registration-child>" : resolveCompiledChildEntry());
 
-  return new Promise<RouteRegistrationSnapshot>((resolve, reject) => {
-    const child = forkProcess(entry, { cwd });
-    let settled = false;
-    let receivedSnapshot: RouteRegistrationSnapshot | undefined;
-    let stdout = "";
-    let stderr = "";
-    let pendingModule: string | undefined;
-
-    const append = (current: string, chunk: Buffer) => {
-      const remaining = MAX_DIAGNOSTIC_BYTES - Buffer.byteLength(current);
-      return remaining <= 0 ? current : current + chunk.toString("utf8", 0, remaining);
-    };
-
-    const finish = (error?: Error, snapshot?: RouteRegistrationSnapshot) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-
-      if (child.connected) child.disconnect?.();
-      if (error) {
-        child.kill?.();
-        reject(error);
-      } else {
-        resolve(snapshot!);
-      }
-    };
-
-    child.stdout?.on("data", (chunk: Buffer) => {
-      stdout = append(stdout, chunk);
-    });
-    child.stderr?.on("data", (chunk: Buffer) => {
-      stderr = append(stderr, chunk);
-    });
-
-    const timeout = setTimeout(() => {
-      const elapsedMs = Date.now() - startedAt;
-      finish(
-        new Error(
-          `Route registration child timed out after ${elapsedMs}ms${pendingModule ? ` while registering ${pendingModule}` : ""}.${formatDiagnostics(stdout, stderr)}`,
-        ),
-      );
-    }, timeoutMs);
-    timeout.unref?.();
-
-    child.on("error", (error) => {
-      finish(
-        new Error(
-          `Could not start route registration child: ${error.message}${formatDiagnostics(stdout, stderr)}`,
-        ),
-      );
-    });
-
-    child.on("message", (message: unknown) => {
-      if (!isChildMessage(message)) return;
-
-      if (message.type === "route-registration:error") {
-        finish(
-          new Error(
-            `Route registration child failed: ${message.message}${formatDiagnostics(stdout, stderr)}`,
-          ),
-        );
-        return;
-      }
-
-      if (message.type === "route-registration:progress") {
-        pendingModule = message.module;
-        return;
-      }
-
-      try {
-        const snapshot = validateSnapshot(message.snapshot);
-        if (receivedSnapshot) {
-          finish(new Error("Route registration child sent more than one snapshot."));
-          return;
-        }
-
-        receivedSnapshot = snapshot;
-      } catch (error) {
-        finish(error as Error);
-      }
-    });
-
-    child.on("close", (code) => {
-      if (settled) return;
-
-      if (code === 0 && receivedSnapshot) {
-        finish(undefined, receivedSnapshot);
-        return;
-      }
-
-      finish(
-        new Error(
-          `Route registration child exited ${code ?? "by signal"} without a valid snapshot.${formatDiagnostics(stdout, stderr)}`,
-        ),
-      );
-    });
-
-    if (!child.send) {
-      finish(new Error("Route registration child did not provide an IPC send channel."));
-      return;
-    }
-
-    child.send({
+  return runRegistrationChild<RouteRegistrationSnapshot>({
+    cwd,
+    timeoutMs: options.timeoutMs,
+    childEntry: options.childEntry,
+    forkProcess: options.forkProcess,
+    request: {
       version: PROTOCOL_VERSION,
       cwd,
       environment: options.environment,
       runtimeStrategy: options.runtimeStrategy,
-    } satisfies RouteRegistrationChildRequest);
+    } satisfies RouteRegistrationChildRequest,
+    resultMessageType: "route-registration:snapshot",
+    resultNoun: "snapshot",
+    readResult: (message) => validateSnapshot(message.snapshot),
   });
-}
-
-function defaultForkProcess(
-  entry: string,
-  options: { cwd: string },
-): RouteRegistrationChildProcess {
-  const forkOptions: NonNullable<Parameters<typeof fork>[2]> & { windowsHide?: boolean } = {
-    cwd: options.cwd,
-    stdio: ["ignore", "pipe", "pipe", "ipc"],
-    windowsHide: true,
-  };
-  return fork(entry, [], forkOptions);
-}
-
-/** Resolve from Core's package root, not an assumed bundler-preserved dirname. */
-function resolveCompiledChildEntry(): string {
-  let directory = path.dirname(fileURLToPath(import.meta.url));
-
-  while (directory !== path.dirname(directory)) {
-    const packageJson = path.join(directory, "package.json");
-    if (existsSync(packageJson)) {
-      try {
-        if (JSON.parse(readFileSync(packageJson, "utf8")).name === "@warlock.js/core") {
-          const child = path.join(directory, "esm", "production", "route-registration-child.mjs");
-          if (existsSync(child)) return child;
-          throw new Error(
-            `@warlock.js/core is missing its compiled route-registration child at ${child}. Reinstall a complete package.`,
-          );
-        }
-      } catch (error) {
-        if (error instanceof Error && error.message.includes("route-registration child"))
-          throw error;
-      }
-    }
-    directory = path.dirname(directory);
-  }
-
-  throw new Error(
-    "Could not locate @warlock.js/core package root for the route-registration child.",
-  );
-}
-
-function isChildMessage(value: unknown): value is RouteRegistrationChildMessage {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "type" in value &&
-      ((value as { type?: unknown }).type === "route-registration:snapshot" ||
-      (value as { type?: unknown }).type === "route-registration:error" ||
-      (value as { type?: unknown }).type === "route-registration:progress")
-  );
 }
 
 function validateSnapshot(value: unknown): RouteRegistrationSnapshot {
@@ -282,7 +120,3 @@ function normalizeRequestMethod(value: RequestMethod | string): RequestMethod {
   return value.toLowerCase() === "all" ? "all" : (value.toUpperCase() as RequestMethod);
 }
 
-function formatDiagnostics(stdout: string, stderr: string): string {
-  if (!stdout && !stderr) return "";
-  return `\nChild stdout:\n${stdout}\nChild stderr:\n${stderr}`;
-}

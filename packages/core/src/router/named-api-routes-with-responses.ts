@@ -4,6 +4,7 @@ import {
   buildResourceMap,
   createResourceTypeResolver,
   describeResponseSchemaTypes,
+  type ResourceModuleExport,
   type ResourceModuleNamespace,
   type ResourceTypeResolver,
 } from "./response-schema-types";
@@ -64,6 +65,23 @@ async function importResourceNamespaces(
 }
 
 /**
+ * Identity map from every resource class exported by a `*.resource.ts(x)` file under
+ * `src/` to the module export it came from.
+ *
+ * The modules are imported through the same importer the routes used, so a resource class
+ * found in a `responseSchema` is the very instance exported by its module. A module that
+ * cannot be imported is reported once through `onWarn` and left out of the map.
+ */
+export async function collectResourceExportMap(
+  files: Iterable<ResourceSourceFile>,
+  onWarn?: (message: string) => void,
+): Promise<Map<unknown, ResourceModuleExport>> {
+  const namespaces = await importResourceNamespaces([...files].filter(isResourceFile), onWarn);
+
+  return buildResourceMap(namespaces);
+}
+
+/**
  * Named API route snapshots, with a `response` type map on every route whose handler
  * declares `responseSchema`.
  *
@@ -80,10 +98,8 @@ export async function collectNamedApiRoutesWithResponses(
 
     if (!declaresSchema) return router.getNamedApiRoutes();
 
-    const resourceFiles = [...options.files].filter(isResourceFile);
-    const namespaces = await importResourceNamespaces(resourceFiles, options.onWarn);
     const resolveResource: ResourceTypeResolver = createResourceTypeResolver(
-      buildResourceMap(namespaces),
+      await collectResourceExportMap(options.files, options.onWarn),
       options.appRoot,
     );
 

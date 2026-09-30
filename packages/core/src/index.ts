@@ -25,6 +25,7 @@ export * from "./image";
 export * from "./logger";
 export * from "./localization";
 export * from "./mail";
+export * from "./openapi";
 export * from "./react";
 export * from "./repositories";
 export * from "./resource";
