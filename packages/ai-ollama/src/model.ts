@@ -7,6 +7,7 @@ import {
   type ModelResponse,
   type ModelStreamChunk,
   type ModelToolCallRequest,
+  type ReasoningEffort,
   type Usage,
 } from "@warlock.js/ai";
 import { log, type Logger } from "@warlock.js/logger";
@@ -23,6 +24,19 @@ import { inferVisionCapability } from "./known-vision-models";
 import { mapDoneReason, toOllamaMessages, toOllamaTools, wrapOllamaError } from "./utils";
 
 const LOG_MODULE = "ai.ollama";
+
+/** Ollama supports only low, medium, and high named thinking levels. */
+const EFFORT_TO_THINK_LEVEL: Record<
+  Exclude<ReasoningEffort, "none">,
+  "low" | "medium" | "high"
+> = {
+  minimal: "low",
+  low: "low",
+  medium: "medium",
+  high: "high",
+  xhigh: "high",
+  max: "high",
+};
 
 /**
  * Ollama-backed implementation of `ModelContract`.
@@ -241,9 +255,9 @@ export class OllamaModel implements ModelContract {
   /**
    * Translate the neutral `reasoning` hint into Ollama's `think`
    * request flag. Ollama's `think` accepts `boolean | 'low' | 'medium'
-   * | 'high'`, so the `"low" | "medium" | "high"` effort literals pass
-   * straight through; an effort-less `reasoning` (only `maxTokens`, or
-   * an empty object) becomes `think: true` to switch the channel on.
+   * | 'high'`, so neutral effort levels are clamped to the nearest named
+   * level; an effort-less `reasoning` (only `maxTokens`, or an empty
+   * object) becomes `think: true` to switch the channel on.
    * The neutral `effort: "none"` ("run without reasoning") maps to
    * `think: false` — Ollama has no `"none"` level, and this is its
    * native reasoning-off switch.
@@ -270,7 +284,7 @@ export class OllamaModel implements ModelContract {
       return { think: false };
     }
 
-    return { think: reasoning.effort ?? true };
+    return { think: reasoning.effort ? EFFORT_TO_THINK_LEVEL[reasoning.effort] : true };
   }
 
   /**

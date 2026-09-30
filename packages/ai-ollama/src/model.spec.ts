@@ -343,13 +343,18 @@ describe("OllamaModel capabilities (cost-truth)", () => {
 });
 
 describe("OllamaModel reasoning → think mapping", () => {
-  it("maps reasoning.effort to Ollama's think literal on a reasoning model", async () => {
+  it("maps every reasoning.effort to Ollama's supported think literal on a reasoning model", async () => {
     const { client, calls } = makeFakeClient({ response: baseResponse });
     const model = new OllamaModel(client, { name: "deepseek-r1:7b" });
 
+    await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "minimal" } });
+    await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "low" } });
+    await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "medium" } });
     await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "high" } });
+    await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "xhigh" } });
+    await model.complete([{ role: "user", content: "hi" }], { reasoning: { effort: "max" } });
 
-    expect(calls[0].think).toBe("high");
+    expect(calls.map((call) => call.think)).toEqual(["low", "low", "medium", "high", "high", "high"]);
   });
 
   it("maps an effort-less reasoning hint to think: true", async () => {
