@@ -40,14 +40,14 @@
     }
   },
   "devDependencies": {
-    "@bull-board/api": "^9.10.1",
-    "@bull-board/fastify": "^9.10.1",
+    "@bull-board/api": "^9.10.2",
+    "@bull-board/fastify": "^9.10.2",
     "@types/node": "^25.6.2",
     "@warlock.js/cache": "workspace:^",
     "@warlock.js/cascade": "workspace:^",
     "@warlock.js/core": "workspace:^",
     "@warlock.js/logger": "workspace:^",
-    "fastify": "^5.6.2",
+    "fastify": "^5.12.5",
     "typescript": "^5.9.3",
     "vitest": "4.1.10"
   },
