@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let configText = "";
-let packageJson: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> } =
-  {};
+let packageJson: {
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+} = {};
 
 vi.mock("@warlock.js/fs", () => ({
   fileExistsAsync: vi.fn(async () => true),
@@ -41,8 +43,8 @@ describe("add bull-board", () => {
 
   it("declares both bull-board packages as dependencies", () => {
     expect(bullBoardFeature.dependencies).toEqual({
-      "@bull-board/api": "^9.10.1",
-      "@bull-board/fastify": "^9.10.1",
+      "@bull-board/api": "^9.10.2",
+      "@bull-board/fastify": "^9.10.2",
     });
   });
 

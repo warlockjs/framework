@@ -45,20 +45,17 @@ export type StartHttpTestServerOptions = {
 };
 
 /**
- * Start one lifecycle phase while optionally omitting the web connector.
+ * Start one lifecycle phase while omitting the web connector.
  *
  * Kept here rather than changing the manager's public API: this is a
  * test-server-only selection, and retaining the manager's boot-all / start-all
  * ordering is essential for HTTP and socket connector wiring.
  */
-async function startTestServerPhase(
-  phase: ConnectorLifecyclePhase,
-  includeWeb: boolean,
-): Promise<void> {
+async function startTestServerPhase(phase: ConnectorLifecyclePhase): Promise<void> {
   const connectors = connectorsManager
     .list()
     .filter((connector) => connector.lifecyclePhase === phase)
-    .filter((connector) => includeWeb || connector.name !== "web");
+    .filter((connector) => connector.name !== "web");
 
   for (const connector of connectors) {
     await connector.boot();
@@ -185,7 +182,11 @@ export async function startHttpTestServer(options: StartHttpTestServerOptions = 
     // side-effect can query the DB at import time, so the data source has to
     // be registered first. This mirrors the dev/prod boot order (see
     // `cli-commands.manager`, `production-builder`, and `DevelopmentServer`).
-    await startTestServerPhase(ConnectorLifecyclePhase.Early, options.web !== false);
+    if (options.web === false) {
+      await startTestServerPhase(ConnectorLifecyclePhase.Early);
+    } else {
+      await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);
+    }
 
     // Load application modules (their boot side-effects now see a live DB).
     await filesOrchestrator.moduleLoader.loadAll();
@@ -199,7 +200,11 @@ export async function startHttpTestServer(options: StartHttpTestServerOptions = 
 
     // Late-phase connectors (http, socket) bind after app code has
     // registered its routes and listeners.
-    await startTestServerPhase(ConnectorLifecyclePhase.Late, options.web !== false);
+    if (options.web === false) {
+      await startTestServerPhase(ConnectorLifecyclePhase.Late);
+    } else {
+      await connectorsManager.startPhase(ConnectorLifecyclePhase.Late);
+    }
 
     isServerRunning = true;
   } catch (error) {

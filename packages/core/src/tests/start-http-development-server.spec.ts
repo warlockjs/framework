@@ -11,7 +11,17 @@ const mocks = vi.hoisted(() => ({
   initializeAll: vi.fn(async () => undefined),
   loadAll: vi.fn(async () => undefined),
   loadConfigFiles: vi.fn(async () => undefined),
-  startPhase: vi.fn(async () => undefined),
+  startPhase: vi.fn(async (phase: string) => {
+    const connectors = mocks.connectors.filter((connector) => connector.lifecyclePhase === phase);
+
+    for (const connector of connectors) {
+      await connector.boot();
+    }
+
+    for (const connector of connectors) {
+      await connector.start();
+    }
+  }),
   webConnectorConstruction: vi.fn(async () => undefined),
   webConnectorStart: vi.fn(async () => undefined),
   connectors: [] as Array<{
