@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `http.rateLimit.ipv6Subnet` sets the IPv6 prefix length the global rate limiter groups clients by (default `64`).
+- Module `src/app/<module>/utils/locales.json` dictionaries register translations with the module folder as their default group; root `$group` overrides it. Dictionaries strictly validate their JSON and translation shape, and reject duplicate key ownership. `utils/locales.ts` still works but is deprecated and will be removed in v6 (its warning ships separately).
+- `parseLocaleDictionary()` is public for tooling that needs to validate and flatten a module locale dictionary without loading application code.
 
 ### Changed
 

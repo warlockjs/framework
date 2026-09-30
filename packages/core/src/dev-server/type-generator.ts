@@ -12,7 +12,12 @@ import { runTypingsGeneration, type TypingsGenerationPorts } from "./run-typings
 import { filesOrchestrator } from "./files-orchestrator";
 import { Path } from "../utils/normalized-path";
 import { extractTranslationKeys } from "./extract-translation-keys";
-import { isTranslationRegisteringSource } from "./translation-keys-sources";
+import {
+  isModuleLocaleDictionaryPath,
+  isTranslationRegisteringSource,
+} from "./translation-keys-sources";
+import { parseLocaleDictionary } from "../localization";
+import { getFilesFromDirectory } from "./utils";
 
 type RouteLocaleBuildModule = {
   listRouteLocaleKeys?: (options: {
@@ -202,7 +207,13 @@ export class TypeGenerator {
     // Check config files
     for (const [path, fileManager] of files) {
       if (!path.startsWith("src/config/")) continue;
-      if (path.split("/").pop()?.replace(/[.][^.]+$/, "") === "index") continue;
+      if (
+        path
+          .split("/")
+          .pop()
+          ?.replace(/[.][^.]+$/, "") === "index"
+      )
+        continue;
 
       // Extract config name (remove dir prefix and extension)
       const configName = path.replace("src/config/", "").replace(/\.[^.]+$/, "");
@@ -362,7 +373,13 @@ ${interfaceContent}
 
       for (const [path, fileManager] of files) {
         if (!path.startsWith("src/config/")) continue;
-        if (path.split("/").pop()?.replace(/[.][^.]+$/, "") === "index") continue;
+        if (
+          path
+            .split("/")
+            .pop()
+            ?.replace(/[.][^.]+$/, "") === "index"
+        )
+          continue;
 
         // Extract config name
         const configName = path.replace("src/config/", "").replace(/\.[^.]+$/, "");
@@ -407,17 +424,48 @@ ${interfaceContent}
     const sourceFiles = new Set<string>();
 
     for (const [path, fileManager] of filesOrchestrator.getFiles()) {
-      if (!isTranslationRegisteringSource(fileManager.source)) {
+      if (!isTranslationRegisteringSource(path, fileManager.source)) {
         continue;
       }
 
       sourceFiles.add(path);
+
+      if (isModuleLocaleDictionaryPath(path)) {
+        const dictionary = parseLocaleDictionary({
+          sourceFile: path,
+          source: fileManager.source,
+          defaultNamespace: path.split("/")[2]!,
+        });
+        for (const key of Object.keys(dictionary.entries)) {
+          keys.add(key);
+        }
+        continue;
+      }
 
       const sourceFile = await readConfigAst(fileManager.absolutePath);
       if (sourceFile) {
         for (const key of extractTranslationKeys(sourceFile)) {
           keys.add(key);
         }
+      }
+    }
+
+    // The dev source map intentionally tracks executable TypeScript only. Module
+    // dictionaries are JSON data, so discover them directly without loading app
+    // code; use the runtime parser to keep `$group` and flattening identical.
+    for (const absolutePath of await getFilesFromDirectory(
+      join(process.cwd(), "src", "app"),
+      "**/utils/locales.json",
+    )) {
+      const path = Path.toRelative(absolutePath);
+      sourceFiles.add(path);
+      const dictionary = parseLocaleDictionary({
+        sourceFile: path,
+        source: await readFile(absolutePath, "utf-8"),
+        defaultNamespace: path.split("/")[2]!,
+      });
+      for (const key of Object.keys(dictionary.entries)) {
+        keys.add(key);
       }
     }
 
@@ -845,10 +893,14 @@ ${keyEntries}
         const normalizedPath = Path.normalize(file);
         if (normalizedPath.includes("src/config/")) return true;
         if (isRouteLocalesJsonPath(normalizedPath)) return true;
+        if (isModuleLocaleDictionaryPath(normalizedPath)) return true;
         if (this.translationSourceFiles.has(normalizedPath)) return true;
 
         const fileManager = files.get(normalizedPath);
-        return fileManager !== undefined && isTranslationRegisteringSource(fileManager.source);
+        return (
+          fileManager !== undefined &&
+          isTranslationRegisteringSource(normalizedPath, fileManager.source)
+        );
       });
 
     if (!touchedAConfig) return;

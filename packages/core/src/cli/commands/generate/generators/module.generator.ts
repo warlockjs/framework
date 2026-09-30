@@ -98,7 +98,8 @@ import { guarded } from "app/shared/utils/router";
 `;
   await putFileAsync(path.join(modulePath, "routes.ts"), routesContent);
 
-  // Create utils/locales.ts
+  /* Legacy TypeScript locale scaffold, retained here only until its removal can
+   * be made in a dedicated cleanup. New modules use the JSON dictionary below.
   const localesContent = `import { groupedTranslations } from "@warlock.js/core";
 
 groupedTranslations("${name.camel}", {
@@ -110,7 +111,10 @@ groupedTranslations("${name.camel}", {
   // },
 });
 `;
-  await putFileAsync(path.join(modulePath, "utils", "locales.ts"), localesContent);
+  await putFileAsync(path.join(modulePath, "utils", "locales.ts"), localesContent); */
+
+  // The generator cannot infer configured locale codes for a first dictionary.
+  await putFileAsync(path.join(modulePath, "utils", "locales.json"), "{}\n");
 
   // Full CRUD scaffold (the default) unless --minimal was passed
   if (withCrud) {
@@ -230,9 +234,7 @@ groupedTranslations("${name.camel}", {
     console.log(colors.gray(`\nNext steps:`));
     const entity = singularName(moduleName);
     console.log(
-      colors.gray(
-        `  1. Update model schema in models/${entity.kebab}/${entity.kebab}.model.ts`,
-      ),
+      colors.gray(`  1. Update model schema in models/${entity.kebab}/${entity.kebab}.model.ts`),
     );
     console.log(colors.gray(`  2. Update schema rules in schema/*.schema.ts`));
   } else {

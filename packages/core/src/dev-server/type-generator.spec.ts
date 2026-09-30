@@ -52,6 +52,8 @@ describe("TypeGenerator — translation key discovery over all app source", () =
     await fs.rm(path.join(tempRoot, "src"), { recursive: true, force: true });
 
     await fs.mkdir(path.join(tempRoot, "src/utils"), { recursive: true });
+    await fs.mkdir(path.join(tempRoot, "src/app/products/utils"), { recursive: true });
+    await fs.mkdir(path.join(tempRoot, "src/app/accounts/utils"), { recursive: true });
     await fs.mkdir(path.join(tempRoot, "src/web/home"), { recursive: true });
     await fs.mkdir(path.join(tempRoot, "node_modules/@warlock.js/web"), { recursive: true });
 
@@ -91,6 +93,17 @@ describe("TypeGenerator — translation key discovery over all app source", () =
           },
         });
       `,
+    );
+
+    await fs.writeFile(
+      path.join(tempRoot, "src/app/products/utils/locales.json"),
+      JSON.stringify({ detail: { title: { en: "Title", ar: "العنوان" } } }),
+      "utf-8",
+    );
+    await fs.writeFile(
+      path.join(tempRoot, "src/app/accounts/utils/locales.json"),
+      JSON.stringify({ $group: "identity", signIn: { en: "Sign in", ar: "تسجيل الدخول" } }),
+      "utf-8",
     );
 
     await fs.writeFile(
@@ -139,10 +152,23 @@ describe("TypeGenerator — translation key discovery over all app source", () =
       "utf-8",
     );
 
+    await fs.writeFile(
+      path.join(tempRoot, "src/app/products/utils/locales.json"),
+      JSON.stringify({ detail: { title: { en: "Title", ar: "العنوان" } } }),
+      "utf-8",
+    );
+    await fs.writeFile(
+      path.join(tempRoot, "src/app/accounts/utils/locales.json"),
+      JSON.stringify({ $group: "identity", signIn: { en: "Sign in", ar: "تسجيل الدخول" } }),
+      "utf-8",
+    );
+
     expect(content).toContain('"products.notFound": true;');
     expect(content).toContain('"products.detail.title": true;');
     expect(content).toContain('"layout.footer": true;');
     expect(content).toContain('"site.home": true;');
+    expect(content).toContain('"products.detail.title": true;');
+    expect(content).toContain('"identity.signIn": true;');
     expect(content).toContain('"json.home.title": true;');
     expect(content).toContain('"json.shared.save": true;');
     expect(content).not.toContain("dynamicKey");

@@ -1,5 +1,10 @@
 const GROUPED_TRANSLATIONS_MARKER = "groupedTranslations";
 
+/** `src/app/<module>/utils/locales.json`, the data-only module dictionary. */
+export function isModuleLocaleDictionaryPath(path: string): boolean {
+  return /^src\/app\/[^/]+\/utils\/locales\.json$/.test(path.replace(/\\\\/g, "/"));
+}
+
 /**
  * Cheap pre-filter for candidate translation-registering source files.
  *
@@ -10,6 +15,6 @@ const GROUPED_TRANSLATIONS_MARKER = "groupedTranslations";
  * every file — this text check keeps that cheap by skipping the AST parse
  * for the files that plainly do not call it, without executing app code.
  */
-export function isTranslationRegisteringSource(source: string): boolean {
-  return source.includes(GROUPED_TRANSLATIONS_MARKER);
+export function isTranslationRegisteringSource(path: string, source: string): boolean {
+  return isModuleLocaleDictionaryPath(path) || source.includes(GROUPED_TRANSLATIONS_MARKER);
 }

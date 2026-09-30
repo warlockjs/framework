@@ -15,7 +15,7 @@ Both pivot on **the request's locale** — auto-detected from headers / query st
 ## The shape
 
 ```ts
-// 1. Declare keys (auto-loaded from src/app/<module>/utils/locales.ts)
+// 1. Declare keys (auto-loaded from src/app/<module>/utils/locales.json)
 import { groupedTranslations } from "@mongez/localization";
 
 groupedTranslations("products", {
@@ -37,7 +37,26 @@ const name = getLocalized(product.get("name_translations"));
 // → reads the current request's locale, returns the matching value
 ```
 
-## Declaring translations — `groupedTranslations`
+## Declaring translations — module `locales.json`
+
+Prefer a data-only dictionary in `src/app/<module>/utils/locales.json`. The
+module folder is its default group, so this example registers
+`products.notFound`; a root `$group` string replaces that group when a module
+needs a different namespace. The module loader validates the strict JSON
+shape, flattens nested keys, and rejects duplicate ownership. Do not import the
+file yourself.
+
+```json title="src/app/products/utils/locales.json"
+{
+  "notFound": { "en": "Product not found", "ar": "المنتج غير موجود" },
+  "errors": { "outOfStock": { "en": "Product out of stock", "ar": "المنتج غير متوفر" } }
+}
+```
+
+`utils/locales.ts` with `groupedTranslations` remains supported but is
+deprecated and will be removed in v6. Migrate it with `warlock doctor --fix`.
+
+### Legacy `groupedTranslations`
 
 Every module owns its translation namespace under `src/app/<module>/utils/locales.ts`. The file is auto-loaded at boot — you don't import it from anywhere; the framework picks it up via the module loader.
 
@@ -98,7 +117,7 @@ All three lookups go through `@mongez/localization`'s `trans()` under the hood, 
 
 ### Web `useTrans()` key checking
 
-When an app uses `@warlock.js/web`, `warlock dev` writes `.warlock/typings/translations.d.ts` from literal `groupedTranslations("group", { key: ... })` registrations. It augments web's `TranslationKeyRegistry`, so `useTrans()("products.notFound")` is checked against registered keys and a typo fails TypeScript. Before the generated file exists, `useTrans()` accepts `string` for a non-breaking first boot. Dynamic groups/keys and placeholders are not inferred.
+When an app uses `@warlock.js/web`, `warlock dev` writes `.warlock/typings/translations.d.ts` from module `locales.json` dictionaries and literal `groupedTranslations("group", { key: ... })` registrations. It augments web's `TranslationKeyRegistry`, so `useTrans()("products.notFound")` is checked against registered keys and a typo fails TypeScript. Before the generated file exists, `useTrans()` accepts `string` for a non-breaking first boot. Dynamic TypeScript groups/keys and placeholders are not inferred.
 
 `useTrans()` now works correctly across hydration (5.15.0): the hydration
 payload ships a `translations` key with the active locale's keywords, and
@@ -292,7 +311,7 @@ GET /products/42?locale=ar
 
 ## Gotchas
 
-- **Locales files are auto-loaded — don't import them.** `src/app/<module>/utils/locales.ts` is picked up by the module loader on boot. Importing it manually causes double-registration warnings.
+- **Locales files are auto-loaded — don't import them.** `src/app/<module>/utils/locales.json` is picked up by the module loader on boot. Importing legacy `locales.ts` manually causes double-registration warnings.
 - **Group names should match module URL slugs.** `groupedTranslations("products", ...)` for the `/products` module. Mismatch breaks the convention but doesn't throw.
 - **Every key needs every locale.** If a key is missing for the active locale, the lookup falls back to the key string itself (`"products.notFound"` literally appears in the response). Always ship all locales together when adding a key.
 - **`t()` outside a request uses the global default.** `Application.environment === "test"` or background jobs without a request context get the configured `app.localeCode`, not whatever the most recent request used.
@@ -305,8 +324,8 @@ GET /products/42?locale=ar
 
 - [`send-response/SKILL.md`](../send-response/SKILL.md) — error helpers that pair with translated messages (`response.notFound({ error: t("...") })`).
 - [`define-resource/SKILL.md`](../define-resource/SKILL.md) — using `getLocalized` inside resource output for clean per-locale responses.
-- [`create-module/SKILL.md`](../create-module/SKILL.md) — the `utils/locales.ts` file is part of the generated module scaffold.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — `utils/locales.ts` is auto-loaded; the suffix is mandatory.
+- [`create-module/SKILL.md`](../create-module/SKILL.md) — the `utils/locales.json` file is part of the generated module scaffold.
+- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — `utils/locales.json` is auto-loaded; the suffix is mandatory.
 
 ## Route-owned web translations (5.17)
 

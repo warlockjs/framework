@@ -23,8 +23,7 @@ const data = (args: string[], options: CommandActionData["options"] = {}): Comma
   options,
 });
 
-const appPathFor = (...segments: string[]) =>
-  path.join(process.cwd(), "src", "app", ...segments);
+const appPathFor = (...segments: string[]) => path.join(process.cwd(), "src", "app", ...segments);
 
 /**
  * `gen.migration` refuses to run when the target model file is missing
@@ -69,11 +68,16 @@ describe("generateModule — minimal", () => {
   it("creates the module scaffold files", async () => {
     const main = await readFile(appPathFor("products", "main.ts"), "utf-8");
     const routes = await readFile(appPathFor("products", "routes.ts"), "utf-8");
-    const locales = await readFile(appPathFor("products", "utils", "locales.ts"), "utf-8");
+    const locales = await readFile(appPathFor("products", "utils", "locales.json"), "utf-8");
 
     expect(main).toContain("custom entry point");
     expect(routes).toContain('import { router } from "@warlock.js/core"');
-    expect(locales).toContain('groupedTranslations("products"');
+    expect(locales).toBe("{}\n");
+    await expect(
+      readFile(appPathFor("products", "utils", "locales.ts"), "utf-8"),
+    ).rejects.toMatchObject({
+      code: "ENOENT",
+    });
   });
 
   it("does NOT emit CRUD controllers in minimal mode", async () => {
