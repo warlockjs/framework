@@ -18,7 +18,7 @@ import {
 } from "../config/locale-configuration";
 import type { Middleware, Route } from "../router";
 import { validateAll } from "../validation/validateAll";
-import { CookieJarUnavailableError, RequestUserMovedError } from "./errors";
+import { CookieJarUnavailableError } from "./errors";
 import { createRequestStore } from "./middleware/inject-request-context";
 import { Response } from "./response";
 import { buildTracingContext, deriveTraceId, dispatchPhase, isTracingEnabled } from "./tracing";
@@ -94,31 +94,6 @@ export class Request<RequestValidation = any> {
   public set decodedAccessToken(value: DecodedAccessToken | undefined) {
     this._decodedAccessToken = value;
     this.locals.authDerived = true;
-  }
-
-  /**
-   * REMOVED in 5.12.0 — the authenticated user now lives at
-   * `request.locals.user`, a key `@warlock.js/auth` declares via module
-   * augmentation on `RequestLocals` and writes from its middleware after a
-   * successful token resolution. `RequestUser` moved out of core to
-   * `@warlock.js/auth` alongside it.
-   *
-   * This getter is a development-time diagnostic only, kept for one release
-   * so a call site that still reads `request.user` fails loudly at runtime
-   * instead of silently reading `undefined`. It is typed `never` so it
-   * cannot reintroduce an auth-shaped type into core, and it throws
-   * unconditionally outside production so the failure is impossible to miss
-   * in local dev — see `RequestUserMovedError`.
-   *
-   * There is no setter: nothing in core or downstream packages should ever
-   * assign to `request.user` again.
-   */
-  public get user(): never {
-    if (Application.isDevelopment) {
-      throw new RequestUserMovedError();
-    }
-
-    return undefined as never;
   }
 
   /**
@@ -593,7 +568,10 @@ export class Request<RequestValidation = any> {
   protected hasUnsafeSegment(key: string): boolean {
     return key
       .split(/[[\].]+/)
-      .some(segment => segment === "__proto__" || segment === "constructor" || segment === "prototype");
+      .some(
+        (segment) =>
+          segment === "__proto__" || segment === "constructor" || segment === "prototype",
+      );
   }
 
   /**
@@ -1073,8 +1051,8 @@ export class Request<RequestValidation = any> {
     const matchesRoute = (target?: PartialMiddleware) =>
       Boolean(
         target &&
-          ((route.path && target.routes?.includes(route.path)) ||
-            (route.name && target.namedRoutes?.includes(route.name))),
+        ((route.path && target.routes?.includes(route.path)) ||
+          (route.name && target.namedRoutes?.includes(route.name))),
       );
 
     // app-wide middlewares first, then the `only` ones matching this route
@@ -1090,7 +1068,7 @@ export class Request<RequestValidation = any> {
     // global first, then route middlewares, deduplicated by reference
     return [
       ...new Set([
-        ...global.filter(middleware => !excluded.includes(middleware)),
+        ...global.filter((middleware) => !excluded.includes(middleware)),
         ...(route.middleware || []),
       ]),
     ];

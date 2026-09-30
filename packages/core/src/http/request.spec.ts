@@ -1,57 +1,19 @@
 /**
- * 5.12.0 request/locals move — see the CHANGELOG entry and
- * `RequestUserMovedError`.
+ * `request.user` was removed from core's `Request` in 5.12.0 (the
+ * authenticated user lives at `request.locals.user`, written by
+ * `@warlock.js/auth`'s middleware). Its development-time diagnostic getter
+ * was removed in 5.26.0, so `Request` has no `user` member at all.
  *
- * `request.user` was removed from core's `Request` (the authenticated user
- * now lives at `request.locals.user`, written by `@warlock.js/auth`'s
- * middleware). This suite pins the two behaviors core itself still owns:
- *
- * - a development-time diagnostic on the removed `user` getter, so a call
- *   site that still reads it fails loudly instead of silently reading
- *   `undefined`;
- * - `decodedAccessToken`'s cache-mark behavior (`locals.authDerived`), which
- *   is explicitly OUT OF SCOPE for this move and must keep working exactly
- *   as before.
+ * `decodedAccessToken`'s cache-mark behavior (`locals.authDerived`) is
+ * unrelated to that move and must keep working exactly as before.
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Application } from "../application/application";
-import type { Environment } from "../utils";
-import { RequestUserMovedError } from "./errors";
+import { describe, expect, it } from "vitest";
 import { Request } from "./request";
 
-describe("Request — request.user removal (5.12.0)", () => {
-  let originalEnvironment: Environment;
-
-  beforeEach(() => {
-    originalEnvironment = Application.environment;
-  });
-
-  afterEach(() => {
-    Application.setEnvironment(originalEnvironment);
-  });
-
-  it("throws RequestUserMovedError naming request.locals.user when read in development", () => {
-    Application.setEnvironment("development");
-
-    const request = new Request();
-
-    expect(() => request.user).toThrow(RequestUserMovedError);
-    expect(() => request.user).toThrow(/request\.locals\.user/);
-  });
-
-  it("does not throw outside development (returns undefined)", () => {
-    Application.setEnvironment("production");
-
-    const request = new Request();
-
-    expect(request.user).toBeUndefined();
-  });
-
-  it("has no setter — request.user cannot be assigned to", () => {
-    const request = new Request();
-    const descriptor = Object.getOwnPropertyDescriptor(Request.prototype, "user");
-
-    expect(descriptor?.set).toBeUndefined();
+describe("Request — no user member (removed 5.12.0, diagnostic removed 5.26.0)", () => {
+  it("declares no user accessor on the prototype", () => {
+    expect(Object.getOwnPropertyDescriptor(Request.prototype, "user")).toBeUndefined();
+    expect("user" in new Request()).toBe(false);
   });
 });
 

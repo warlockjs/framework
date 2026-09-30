@@ -34,6 +34,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `startHttpTestServer({ web: false })` now starts an API-only test server: it skips the optional web connector before its lazy lifecycle delegate constructs `WebConnector` or creates Vite. Omitting the option preserves the existing full-stack startup.
 - `response.cookie()` truncates a fractional `maxAge` to whole seconds. `@fastify/cookie` 11 rejects a non-whole `maxAge`, so a computed value such as `ttl / 1000` used to fail the response.
 
+### Removed
+
+- **BREAKING (only if something still reads `request.user`):** the `request.user` getter and `RequestUserMovedError`, the development-time diagnostic kept since the 5.12.0 move. The user lives at `request.locals.user` (set by `@warlock.js/auth`); TypeScript now reports any remaining `request.user`.
+
 ## 5.25.0 - 2026-09-28
 
 ### Added

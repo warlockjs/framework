@@ -10,9 +10,8 @@ import { Request } from "../../../src/http/request";
  * 5.12.0: `request.user` and `clearCurrentUser()` were REMOVED from `Request`
  * — the authenticated user now lives at `request.locals.user`, written by
  * `@warlock.js/auth`'s middleware, which does not mark `authDerived` when it
- * does so (see the 5.12.0 CHANGELOG). `request.user`'s development-time
- * throwing getter (`RequestUserMovedError`) and the `decodedAccessToken`
- * cache-mark behavior below are covered in `src/http/request.spec.ts`.
+ * does so (see the 5.12.0 CHANGELOG). The `decodedAccessToken` cache-mark
+ * behavior is covered in `src/http/request.spec.ts`.
  */
 describe("Request auth-derived mark", () => {
   it("is unmarked on a fresh request that never touches auth state", () => {
