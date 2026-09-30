@@ -31,7 +31,43 @@ export type StartHttpTestServerOptions = {
    * bootstraps the app itself, and that bootstrap re-reads `.env`.
    */
   port?: number;
+
+  /**
+   * Whether to boot the optional web connector.
+   *
+   * Defaults to `true` to preserve the full-stack test server. Pass `false`
+   * for API-only suites: the web connector's lazy delegate is skipped before
+   * `boot()`, so it never constructs its Vite-backed implementation.
+   *
+   * @default true
+   */
+  web?: boolean;
 };
+
+/**
+ * Start one lifecycle phase while optionally omitting the web connector.
+ *
+ * Kept here rather than changing the manager's public API: this is a
+ * test-server-only selection, and retaining the manager's boot-all / start-all
+ * ordering is essential for HTTP and socket connector wiring.
+ */
+async function startTestServerPhase(
+  phase: ConnectorLifecyclePhase,
+  includeWeb: boolean,
+): Promise<void> {
+  const connectors = connectorsManager
+    .list()
+    .filter((connector) => connector.lifecyclePhase === phase)
+    .filter((connector) => includeWeb || connector.name !== "web");
+
+  for (const connector of connectors) {
+    await connector.boot();
+  }
+
+  for (const connector of connectors) {
+    await connector.start();
+  }
+}
 
 /**
  * Apply the caller's port and preflight the bind.
@@ -149,7 +185,7 @@ export async function startHttpTestServer(options: StartHttpTestServerOptions = 
     // side-effect can query the DB at import time, so the data source has to
     // be registered first. This mirrors the dev/prod boot order (see
     // `cli-commands.manager`, `production-builder`, and `DevelopmentServer`).
-    await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);
+    await startTestServerPhase(ConnectorLifecyclePhase.Early, options.web !== false);
 
     // Load application modules (their boot side-effects now see a live DB).
     await filesOrchestrator.moduleLoader.loadAll();
@@ -163,7 +199,7 @@ export async function startHttpTestServer(options: StartHttpTestServerOptions = 
 
     // Late-phase connectors (http, socket) bind after app code has
     // registered its routes and listeners.
-    await connectorsManager.startPhase(ConnectorLifecyclePhase.Late);
+    await startTestServerPhase(ConnectorLifecyclePhase.Late, options.web !== false);
 
     isServerRunning = true;
   } catch (error) {

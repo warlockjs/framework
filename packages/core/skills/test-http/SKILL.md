@@ -50,7 +50,7 @@ import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core/tests"
 - Loads `warlock.config.ts` + bootstrap + `filesOrchestrator` (without file watching).
 - Loads `src/config/*.ts`.
 - Loads every module (`routes.ts`, `main.ts`, `events/*.ts`).
-- Starts **ALL** connectors, including HTTP.
+- Starts **ALL** connectors, including HTTP, by default.
 
 Unlike the dev server, it doesn't watch files, doesn't do HMR, doesn't run health checkers. Just a working HTTP endpoint listening on the configured port.
 
@@ -69,6 +69,14 @@ The explicit port wins over `http.port` — including over `HTTP_PORT` in `.env`
 **Nothing else can move the server.** `startHttpTestServer()` bootstraps the app itself, and that bootstrap re-reads `.env` (dotenv overrides by default), so any value you set before calling it is gone before the port is read. Assigning `process.env.HTTP_PORT` does not work either: `env()` reads dotenv's own store and never falls back to `process.env`. The option is applied after the bootstrap, immediately before the connector binds — that is why it is the only channel that survives.
 
 The request helpers follow with no extra wiring: the bound port is published as `WARLOCK_TEST_SERVER_PORT`, which the workers inherit, and `getTestServerUrl()` prefers it over their own `.env`-resolved `http.port`. `stopHttpTestServer()` withdraws it.
+
+### API-only suites — `startHttpTestServer({ web: false })`
+
+```ts
+await startHttpTestServer({ web: false });
+```
+
+Use this in `globalSetup` for a suite that exercises API routes only. It still boots the HTTP connector and every other configured connector, but excludes the optional `web` connector before its lifecycle begins. That means web's lazy delegate never constructs `WebConnector`, and Vite is never created. Omitting `web` keeps the default full-stack behavior.
 
 ### The port is preflighted
 

@@ -12,6 +12,14 @@ const mocks = vi.hoisted(() => ({
   loadAll: vi.fn(async () => undefined),
   loadConfigFiles: vi.fn(async () => undefined),
   startPhase: vi.fn(async () => undefined),
+  webConnectorConstruction: vi.fn(async () => undefined),
+  webConnectorStart: vi.fn(async () => undefined),
+  connectors: [] as Array<{
+    name: string;
+    lifecyclePhase: string;
+    boot: () => Promise<void>;
+    start: () => Promise<void>;
+  }>,
   shutdown: vi.fn(async () => undefined),
   runStartupValidators: vi.fn(async () => undefined),
   setRuntimeStrategy: vi.fn(),
@@ -28,7 +36,11 @@ vi.mock("../application", () => ({
 vi.mock("../bootstrap", () => ({ bootstrap: mocks.bootstrap }));
 vi.mock("../config/load-config-files", () => ({ loadConfigFiles: mocks.loadConfigFiles }));
 vi.mock("../connectors/connectors-manager", () => ({
-  connectorsManager: { startPhase: mocks.startPhase, shutdown: mocks.shutdown },
+  connectorsManager: {
+    list: () => mocks.connectors,
+    startPhase: mocks.startPhase,
+    shutdown: mocks.shutdown,
+  },
 }));
 vi.mock("../dev-server/files-orchestrator", () => ({
   filesOrchestrator: {
@@ -42,7 +54,7 @@ vi.mock("../warlock-config/warlock-config.manager", () => ({
 }));
 
 import { resetLoadedEnvironment } from "../utils/load-environment";
-import { startHttpTestServer } from "./start-http-development-server";
+import { startHttpTestServer, stopHttpTestServer } from "./start-http-development-server";
 
 const fixtureKey = "WARLOCK_TEST_SERVER_ENV_FIXTURE";
 let originalDirectory: string;
@@ -59,9 +71,20 @@ beforeEach(async () => {
   resetEnv();
   resetLoadedEnvironment();
   vi.clearAllMocks();
+  mocks.connectors = [
+    {
+      // Web's lazy delegate constructs WebConnector (and can create Vite) on
+      // its first boot call. This is the construction seam the API must skip.
+      name: "web",
+      lifecyclePhase: "late",
+      boot: mocks.webConnectorConstruction,
+      start: mocks.webConnectorStart,
+    },
+  ];
 });
 
 afterEach(async () => {
+  await stopHttpTestServer();
   process.chdir(originalDirectory);
   delete process.env.NODE_ENV;
   delete process.env[fixtureKey];
@@ -77,5 +100,17 @@ describe("startHttpTestServer", () => {
     expect(process.env.NODE_ENV).toBe("test");
     expect(env(fixtureKey)).toBe("test");
     expect(mocks.load).toHaveBeenCalledOnce();
+  });
+
+  it("does not construct the web connector when web is false", async () => {
+    await startHttpTestServer({ web: false });
+
+    expect(mocks.webConnectorConstruction).not.toHaveBeenCalled();
+  });
+
+  it("constructs the web connector by default", async () => {
+    await startHttpTestServer();
+
+    expect(mocks.webConnectorConstruction).toHaveBeenCalledOnce();
   });
 });
