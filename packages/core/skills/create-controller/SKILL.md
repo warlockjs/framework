@@ -1,6 +1,6 @@
 ---
 name: create-controller
-description: 'Author HTTP controllers in @warlock.js/core — RequestHandler signature, validated input via seal schemas, response helpers, attaching metadata. Controllers are thin functions; business logic moves to services or use-cases. Triggers: `RequestHandler`, `Request<TSchema>`, `GuardedRequestHandler`, `request.validated`, `request.input`, `controller.validation`, `response.success`, `response.successCreate`; "write a controller", "attach a schema to a handler", "thin controller pattern", "guarded request type"; typical import `import { type RequestHandler } from "@warlock.js/core"`. Skip: response helper menu — `@warlock.js/core/send-response/SKILL.md`; schema authoring — `@warlock.js/core/validate-input/SKILL.md`; URL wiring — `@warlock.js/core/register-route/SKILL.md`; competing patterns: `express` middleware functions, `@nestjs/common` `@Controller`/`@Get` decorators.'
+description: 'Author HTTP controllers in @warlock.js/core — RequestHandler signature, validated input via seal schemas, response helpers, attaching metadata. Controllers are thin functions; business logic moves to services or use-cases. Triggers: `RequestHandler`, `Request<TSchema>`, `GuardedRequestHandler`, `request.validated`, `request.input`, `controller.validation`, `controller.responseSchema`, `response.success`, `response.successCreate`; "write a controller", "attach a schema to a handler", "thin controller pattern", "guarded request type", "type the API response"; typical import `import { type RequestHandler } from "@warlock.js/core"`. Skip: response helper menu — `@warlock.js/core/send-response/SKILL.md`; schema authoring — `@warlock.js/core/validate-input/SKILL.md`; URL wiring — `@warlock.js/core/register-route/SKILL.md`; competing patterns: `express` middleware functions, `@nestjs/common` `@Controller`/`@Get` decorators.'
 ---
 
 # Warlock — create a controller
@@ -134,7 +134,44 @@ Use `RequestHandler<Request<TSchema>>` for public routes, `GuardedRequestHandler
 createProductController.description = "Create a new product (admin only)";
 ```
 
-Used by OpenAPI/Swagger generation (planned per `domains/core/backlog.md`) and surfaces in dev-server logs.
+`description` feeds the OpenAPI document (`warlock generate.openapi`, see [`generate-openapi`](../generate-openapi/SKILL.md)) and surfaces in dev-server logs.
+
+## Declaring response types with `responseSchema`
+
+Set `responseSchema` on the handler, next to `validation`, to declare the body per status code. The same declaration types the client (web's `ApiRouteRegistry`, `useSubmitForm`) and fills the `responses` of the OpenAPI document.
+
+```ts title="src/app/auth/controllers/login.controller.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import { loginUseCase } from "app/auth/use-cases/login.use-case";
+import { UserResource } from "app/users/resources/user.resource";
+
+export const loginController: RequestHandler = async ({ request, response }) => {
+  const { user, token } = await loginUseCase(request.all());
+
+  return response.success({ user, token });
+};
+
+loginController.responseSchema = {
+  200: { body: { user: UserResource, token: "string" } },
+  400: { body: { error: "string" } },
+};
+```
+
+A body is an object whose values are one of:
+
+| Value                                           | Meaning                                     |
+| ----------------------------------------------- | ------------------------------------------- |
+| a cast string, with the resource suffixes       | `"string"`, `"number?"`, `"string[]"`, `"date[]?"` (`?` is `T \| null`, key always present) |
+| a resource                                      | one `ResourceOutput` object                 |
+| `[Resource]`                                    | an array of that resource                   |
+| a nested plain object of any of the above       | recursed                                    |
+
+The output types follow the same rules as `defineResource` (`ResponseBodyOutput<B>` and `ResponseSchemaOutput<S>` are exported if you need the type of a body or of the whole schema).
+
+- Types are generated, not annotated: `warlock generate.typings` and `warlock dev` load the routes, read each `responseSchema` and hand the response types of every named route to the web route-types generator. A route without `responseSchema` gets no `response` entry.
+- A resource is mapped back to its `*.resource.ts(x)` export by identity. A resource defined inline or outside such a file is typed `unknown`, and a warning names the route and field. Export each resource from its own `*.resource.ts` file.
+- `responseSchema` is kept when a route is bound from an array handler (`[controller, "action"]`) or a restful resource method.
+- Nothing checks the response against the schema at runtime: it is documentation and types.
 
 ## What belongs in a controller (and what doesn't)
 

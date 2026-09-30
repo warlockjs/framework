@@ -6,7 +6,7 @@ Each folder holds one `SKILL.md` (an agent-facing how-to for a single task). The
 
 - [register-route](register-route/SKILL.md) — register single routes, prefix groups, middleware-guarded blocks, and RESTful resource chains.
 - [build-restful](build-restful/SKILL.md) — generate standard CRUD endpoints via the `router.route(...)` chain or the `Restful` base class.
-- [create-controller](create-controller/SKILL.md) — author HTTP controllers: `RequestHandler` signature, validated input, response helpers, middleware.
+- [create-controller](create-controller/SKILL.md) — author HTTP controllers: `RequestHandler` signature, validated input, response helpers, middleware, `responseSchema` response types.
 - [send-response](send-response/SKILL.md) — `Response` helpers: success/error variants, status helpers, redirects, files, streams, SSE.
 - [validate-input](validate-input/SKILL.md) — author seal schemas, attach them to controllers, infer types, layer DTOs.
 - [use-middleware](use-middleware/SKILL.md) — attach built-in HTTP middleware (rateLimit, concurrencyLimit, maxBodySize, …) via the `middleware` namespace.
@@ -19,7 +19,7 @@ Each folder holds one `SKILL.md` (an agent-facing how-to for a single task). The
 
 - [use-repository](use-repository/SKILL.md) — subclass `RepositoryManager`: `source`/`filterBy`/`defaultOptions`, list/find/CRUD, cached/cursor variants, and the `filterBy`-aware aggregates (`sum`/`avg`/`min`/`max`/`groupBy`/`aggregate`).
 - [use-model-transformers](use-model-transformers/SKILL.md) — schema-side helpers: `useHashedPassword()`, `useComputedSlug()`, and friends.
-- [define-resource](define-resource/SKILL.md) — map model fields to wire-shape via `defineResource()` / `Resource` subclasses (output-only).
+- [define-resource](define-resource/SKILL.md) — map model fields to wire-shape via `defineResource()` / `Resource` subclasses (output-only); typed output with `ResourceOutput`, `Serialized<T, W>` and `ModelResourceRegistry`.
 - [write-seeder](write-seeder/SKILL.md) — author a seed file with `seeder()` — `name`/`dependsOn`/`once`/`order`/`batchSize`, `run({ track, now, batchSize })`, `warlock seed --drop`.
 
 ## Files, media, mail
@@ -46,6 +46,7 @@ Each folder holds one `SKILL.md` (an agent-facing how-to for a single task). The
 - [warlock-doctor](warlock-doctor/SKILL.md) — `warlock doctor`: read-only diagnostics (routes/config/connectors/optional-peers/health/release-hygiene) with a pass/warn/fail report and non-zero exit on failure.
 - [warlock-routes](warlock-routes/SKILL.md) — `warlock routes`: list the registered HTTP routes as a verb-colored table (method/path/name/action/middleware/source); filter by method/path/name or emit JSON. Read-only, no connectors.
 - [write-cli-command](write-cli-command/SKILL.md) — author a custom `warlock <cmd>` via the `command()` factory, or inspect built-in `warlock add` feature scaffolding such as the Web starter.
+- [generate-openapi](generate-openapi/SKILL.md) — `warlock generate.openapi`: an OpenAPI 3.1 document from the routes (validation, `responseSchema`, auth), plus the dev-only API docs page.
 - [run-app](run-app/SKILL.md) — `warlock dev` / `warlock build` / `warlock start` operational commands.
 - [update-packages](update-packages/SKILL.md) — bump every `@warlock.js/*` dependency with `warlock update`.
 

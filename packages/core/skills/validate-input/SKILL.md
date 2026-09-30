@@ -185,10 +185,10 @@ const updateAvatarSchema = v.object({
 
 ## What the framework sends on failure
 
-The framework calls `response.failedSchema(result)` which sends `400` with the shape configured under `validation.response` (defaults shown):
+The framework calls `response.failedSchema(result)` which sends `422` by default (set `validation.response.status` to change it) with the shape configured under `validation.response` (defaults shown):
 
 ```jsonc
-// 400 Bad Request
+// 422 Unprocessable Entity
 {
   "errors": [
     { "input": "email", "error": "The email must be a valid email" },
