@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Migrations now reject colliding unnamed index definitions before sending DDL to MongoDB or PostgreSQL, with guidance to provide an explicit index name. Declarative alter migrations with a custom `up()` but no `down()` now emit one rollback warning.
 - `trustedFilter: true` now works on `atomic()`, `findOneAndUpdate()` and `findAndUpdate()` with an operator filter such as `{ id: { $in: ids } }`. The scoped-write lookup re-ran the filter through `where()`, which rejected the operator, so these calls threw `UnsafeFilterError` even when the filter was trusted. Global scopes (tenant, soft delete) still apply to the write. `findAndUpdate()` now accepts `trustedFilter`.
 
 ## 5.25.0 - 2026-09-28

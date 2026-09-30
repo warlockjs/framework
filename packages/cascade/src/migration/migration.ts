@@ -8,6 +8,7 @@ import type {
   TableIndexInformation,
   VectorIndexOptions,
 } from "../contracts/migration-driver.contract";
+import { log } from "@warlock.js/logger";
 import type { DataSource } from "../data-source/data-source";
 import type { ChildModel, Model } from "../model/model";
 import type { DeleteStrategy, MigrationDefaults } from "../types";
@@ -986,6 +987,8 @@ export abstract class Migration implements MigrationContract {
    * @internal
    */
   public async execute(): Promise<void> {
+    this.assertNoGeneratedIndexNameCollisions();
+
     for (const op of this.pendingOperations) {
       await this.executeOperation(op);
     }
@@ -1031,6 +1034,8 @@ export abstract class Migration implements MigrationContract {
    * @internal
    */
   public toSteps(): MigrationStep[] {
+    this.assertNoGeneratedIndexNameCollisions();
+
     const serializer = this.driver.driver.getSQLSerializer();
     const steps: MigrationStep[] = [];
     let schemaRun: PendingOperation[] = [];
@@ -1251,6 +1256,56 @@ export abstract class Migration implements MigrationContract {
         await this.driver.removeSchemaValidation(this.table);
         break;
     }
+  }
+
+  /**
+   * Reject two unnamed indexes that a driver would give the same name before
+   * either DDL command is sent. MongoDB's default names include directions;
+   * PostgreSQL's include the table and columns.
+   */
+  private assertNoGeneratedIndexNameCollisions(): void {
+    const engine = this.databaseEngine;
+    if (engine !== "mongodb" && engine !== "postgres") return;
+
+    const unnamedIndexes = this.pendingOperations.flatMap((operation) => {
+      if (operation.type === "createIndex") {
+        const index = operation.payload as IndexDefinition;
+        return index.name ? [] : [index];
+      }
+
+      if (operation.type === "createUniqueIndex") {
+        const { columns, name } = operation.payload as { columns: string[]; name?: string };
+        return name ? [] : [{ columns, unique: true }];
+      }
+
+      return [];
+    });
+
+    const seen = new Map<string, IndexDefinition>();
+    for (const index of unnamedIndexes) {
+      const generatedName =
+        engine === "mongodb"
+          ? index.columns
+              .map((column, i) => `${column}_${index.directions?.[i] === "desc" ? -1 : 1}`)
+              .join("_")
+          : `idx_${this.table}_${index.columns.join("_")}`;
+      const first = seen.get(generatedName);
+
+      if (first) {
+        throw new Error(
+          `Migration queued two ${engine} indexes with the generated name "${generatedName}": ` +
+            `${this.describeIndex(first)} and ${this.describeIndex(index)}. ` +
+            `Give one index an explicit name, for example { name: "..." }.`,
+        );
+      }
+
+      seen.set(generatedName, index);
+    }
+  }
+
+  private describeIndex(index: IndexDefinition): string {
+    const partial = index.where ? JSON.stringify(index.where) : "none";
+    return `columns [${index.columns.join(", ")}] (unique: ${!!index.unique}, partial: ${partial})`;
   }
 
   // ============================================================================
@@ -3686,8 +3741,9 @@ Migration.alter = function alterMigration(
   options: MigrationAlterOptions = {},
 ): MigrationConstructor {
   const { order = 0, createdAt, transactional } = options;
+  let missingDownWarningEmitted = false;
 
-  return class AlterMigration extends Migration {
+  class AlterMigration extends Migration {
     public static readonly order = order;
     public static readonly createdAt = createdAt;
     public static readonly transactional = transactional;
@@ -3695,6 +3751,15 @@ Migration.alter = function alterMigration(
     public readonly dataSource = model.dataSource;
 
     public async up(): Promise<void> {
+      if (options.up && !options.down && !missingDownWarningEmitted) {
+        missingDownWarningEmitted = true;
+        log.warn(
+          "database",
+          "migration",
+          `Migration "${AlterMigration.migrationName ?? this.table}" defines a custom up() without a down() rollback.`,
+        );
+      }
+
       // ── Column Operations ─────────────────────────────────────────────────
       if (schema.add) {
         wireColumns(this, schema.add);
@@ -3873,7 +3938,9 @@ Migration.alter = function alterMigration(
         await options.down.call(this as unknown as Migration);
       }
     }
-  } as unknown as MigrationConstructor;
+  }
+
+  return AlterMigration as unknown as MigrationConstructor;
 };
 
 // The no-op re-assignments below silence the TS "used before assigned" check;
