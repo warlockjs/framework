@@ -65,6 +65,8 @@ handler.description = "Lists all products";
 handler.responseSchema = { 200: { body: { products: [ProductResource] } } };
 ```
 
+`description` and `responseSchema` feed the OpenAPI document ([`warlock generate.openapi`](../cli/openapi.md)), and `responseSchema` also types the client's API responses; see [Declare response types](./03-controllers.md#declare-response-types-with-responseschema).
+
 The router doesn't care if you write the handler as `function`, `const = async`, or `({ request, response }) => ...` — anything callable works. Most projects use named `const` exports for the controller-per-file convention.
 
 ### Route options

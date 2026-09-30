@@ -475,17 +475,58 @@ export const ProductResource = defineResource({
     if (data.price > 100) {
       data.tier = "premium";
     }
+
+    return data;
   },
 });
 ```
 
 :::caution[`transform` must mutate `data` — its return value is ignored]
-The framework runs `transform.call(this, this.data, this)` and discards whatever you return. Mutate the `data` object directly (as above). Returning a fresh object — `return { ...data, tier }` — silently drops your changes.
+The framework runs `transform.call(this, this.data, this)` and discards whatever you return (the option's type still asks for a return, so `return data;`). Mutate the `data` object directly (as above). Returning a fresh object — `return { ...data, tier }` — silently drops your changes.
 :::
 
 Inside the hooks you can read the input via `this.get(key)` / `resource.get(key)`, and write to the output via `this.set(key, value)` / `resource.set(key, value)`.
 
 **The output-only rule still applies inside hooks.** No DB queries, no service calls. Hooks exist to reshape data, not to fetch more of it.
+
+## Serialized output on the wire
+
+`ResourceOutput` is the type of `toJSON()`. `Serialized<T, W>` (exported from `@warlock.js/core`) is the type of what a client receives after Warlock serializes a whole value: a model, a list, a response body. `W` is the wire: `"json"` (the default) for API responses, `"devalue"` for web page loader data.
+
+```ts
+import type { Serialized } from "@warlock.js/core";
+
+type Payload = Serialized<{ createdAt: Date; note?: string }>;
+// { createdAt: string; note?: string }
+```
+
+The rules mirror the serializer, in the same order:
+
+1. Primitives, `Buffer` and `Uint8Array` pass through. `any` and `unknown` stay as they are.
+2. On `"devalue"`, `Date`, `RegExp`, `URL`, `Map` and `Set` stay native. On `"json"`, a `Map` becomes a record and a `Set` an array.
+3. A cascade model becomes the output of its registered resource (below); with no registry entry it becomes its serialized `data` type.
+4. Anything with `toJSON()` becomes the awaited, serialized result. This is how a `Date` becomes a `string` on `"json"`.
+5. Arrays map item by item. Functions are dropped from objects.
+6. On `"json"`, a key whose value can be `undefined` becomes optional, because `JSON.stringify` leaves it out.
+7. A class with private or protected members and no `toJSON()` maps to its public data on `"json"` and to `never` on `"devalue"`, where devalue throws at render. `Error` is `{}` on `"json"`.
+8. Nesting is walked to a fixed depth (8); below that the type is `unknown`.
+
+### Mapping a model to its resource
+
+A model type cannot reveal its resource on its own (`Model.resource` is loosely typed), so you register the pair by augmenting `ModelResourceRegistry`, once per model, in a file that imports both:
+
+```ts title="src/app/users/user-resource.type.ts"
+import type { User } from "app/users/models/user";
+import type { UserResource } from "app/users/resources/user.resource";
+
+declare module "@warlock.js/core" {
+  interface ModelResourceRegistry {
+    User: { model: User; resource: typeof UserResource };
+  }
+}
+```
+
+`Serialized<User>` then resolves to `ResourceOutput<typeof UserResource>`; the entry matches a model type that is mutually assignable with `model`. There is no generator, so write the entry yourself. `@warlock.js/web` uses the same registry to type the `data` a page receives from its loader; see [Loaders and metadata](/v/latest/web/essentials/loaders-and-metadata/).
 
 ## Wiring the resource to the model
 

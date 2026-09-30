@@ -182,6 +182,72 @@ defineResource({
 
 The framework recurses using the same resource class, with built-in cycle detection (max depth of 10, plus identity tracking via `id` / `_id`) so a circular `parent → child → parent` pair can't lock the renderer.
 
+## Typed output
+
+`defineResource()` reads the literal cast strings in `schema` and types `toJSON()` with them. Nothing is annotated by hand:
+
+```ts title="src/app/users/resources/user.resource.ts"
+import { defineResource, type ResourceOutput } from "@warlock.js/core";
+
+export const UserResource = defineResource({
+  schema: {
+    id: "number",
+    name: "string?",
+    tags: "string[]",
+    createdAt: "date",
+  },
+});
+
+export type UserJson = ResourceOutput<typeof UserResource>;
+// {
+//   id: number;
+//   name: string | null;
+//   tags: string[];
+//   createdAt: { iso: string; format: string; timestamp: number; humanTime: string };
+// }
+
+const json = new UserResource(user).toJSON(); // typed as UserJson
+```
+
+`ResourceOutput<R>` accepts the resource class or an instance (`InstanceType<typeof UserResource>`). How each schema entry is typed:
+
+| Schema entry                                                          | Output type                                                                 |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `"string"`, `"localized"`, `"url"`, `"uploadsUrl"`, `"storageUrl"`    | `string`                                                                    |
+| `"number"`, `"float"`, `"int"`                                        | `number`                                                                    |
+| `"boolean"`                                                           | `boolean`                                                                   |
+| `"date"`                                                              | `{ iso: string; format: string; timestamp: number; humanTime: string }`     |
+| `"object"`, `"array"`                                                 | `Record<string, unknown>`, `unknown[]`                                      |
+| `"x[]"`                                                               | an array of the base type                                                   |
+| `"x?"`                                                                | the base type or `null`. The key is always present, never optional.         |
+| a nested resource, `lazy(() => R)`                                    | that resource's output, as one object (even if the model holds an array)    |
+| `"self"`, `"self[]"`                                                  | this resource's own output, or an array of it                               |
+| `["inputKey", "cast"]`                                                | the cast's type                                                             |
+| a resolver function                                                   | its return type (an `any` return becomes `unknown`)                         |
+| a field builder (`this.date()...`, `new ResourceFieldBuilder(...)`)   | `unknown`                                                                   |
+
+The type reflects the schema, not the data. Mark a field `?` when the model might not have a value.
+
+When `transform`, `boot`, `extend` or a builder changes the real shape, say so with a type argument. It replaces the inferred type:
+
+```ts title="src/app/products/resources/product.resource.ts"
+import { defineResource } from "@warlock.js/core";
+
+type ProductJson = { id: number; title: string; priceLabel: string };
+
+export const ProductResource = defineResource<ProductJson>({
+  schema: { id: "number", title: "string", price: "number" },
+  transform: (data) => {
+    data.priceLabel = `$${data.price}`;
+    delete data.price;
+
+    return data;
+  },
+});
+```
+
+The same types power typed API responses ([`responseSchema`](./03-controllers.md#declare-response-types-with-responseschema)) and what a web page receives from its loader. To type the value a client gets after Warlock serializes a model, see `Serialized<T, W>` and `ModelResourceRegistry` in the [deep dive](./resources-deep.md#serialized-output-on-the-wire).
+
 ## Wiring the resource to the model
 
 A model declares its resource via a static property:

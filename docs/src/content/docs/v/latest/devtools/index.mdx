@@ -1,6 +1,6 @@
 ---
 title: Devtools
-description: A loopback-only development dashboard for request timing, database queries, N+1 warnings, mail, logs, cache activity, and routes.
+description: A loopback-only development dashboard for request timing, database queries, N+1 warnings, mail, logs, cache activity, routes, and API docs.
 ---
 
 `@warlock.js/devtools` is an in-app dashboard for understanding what a request
@@ -35,9 +35,25 @@ The default dashboard retains the latest 200 requests at `/__warlock`.
 | Logs     | Request-associated log entries, filterable by level and module.                                                                                                                                                                                                           |
 | Cache    | Hit, miss, set, removed, and tag-invalidation activity.                                                                                                                                                                                                                   |
 | Routes   | Registered HTTP routes with their method, path, name, and middleware.                                                                                                                                                                                                     |
+| API      | The app's API reference, rendered from its OpenAPI 3.1 document. See [API docs](#api-docs). |
 
 Work that is not part of a request, such as boot work or a scheduler tick,
 appears separately so it does not distort a request timeline.
+
+## API docs
+
+The dashboard has an **API** tab, and the same page is served on its own at `/__warlock/docs`. It renders the app's OpenAPI 3.1 document with [Scalar](https://github.com/scalar/scalar): every API route with its parameters, request body, responses and security.
+
+```text
+http://localhost:<port>/__warlock/docs
+```
+
+The document is built in-process, on every request to `GET /__warlock/api/openapi.json`, from the routes the running dev server has already registered. It is the same generator as [`warlock generate.openapi`](/v/latest/core/cli/openapi/), so what you see here is what that command writes (minus page routes), and it follows your edits without a CLI run. What it documents, and how to declare it (`validation`, `description`, `responseSchema`, `authMiddleware()`), is in the [generate.openapi guide](/v/latest/core/cli/openapi/).
+
+- If the host provides no document generator, `/__warlock/api/openapi.json` answers `503`.
+- Scalar's prebuilt browser bundle is vendored in the package, so apps install nothing extra. The page fetches nothing from a CDN, and Scalar's web fonts, telemetry, AI agent and MCP are turned off, so it makes no outside request.
+- Warnings about routes that cannot be fully described are logged once per process.
+- To get a file for Postman or Insomnia, run `warlock generate.openapi`; it writes `storage/openapi/openapi.json` by default.
 
 ## Safe by construction
 

@@ -101,6 +101,56 @@ export const config = { route: "/login", middleware: [requireGuest({ to: "/accou
 
 A signed-in user is sent to the `redirect` query when it is a same-origin relative path, else to `to` (default `/`). `safeRedirectTarget(value)` is exported to apply the same rule in your own login flow: it rejects `//host`, `/\host`, absolute URLs, `javascript:` and control characters.
 
+### Type a guarded page as signed-in
+
+A page guarded by `requireUser()` can never be reached by a guest, so since 5.27 its types say so. The route-types generator reads the guard statically and writes `guard: "user"` on that page's `PageRouteRegistry` entry; `GuardedPageRouteName`, exported from `@warlock.js/web`, is the union of those names.
+
+```tsx title="src/web/account/account.page.tsx"
+import { useUser } from "@warlock.js/web";
+import type { PageConfig, PageLoaderContext, PageProps } from "@warlock.js/web";
+import { requireUser } from "@warlock.js/web/session";
+
+export const config = {
+  route: { path: "/account", name: "account.show" },
+  middleware: [requireUser({ loginPath: "/login" })],
+} satisfies PageConfig;
+
+export async function loader({ session }: PageLoaderContext<undefined, undefined, "account.show">) {
+  // session is { user, model } here, neither null, and request.locals.user is non-null
+  return { user: session.user };
+}
+
+export default function AccountPage({ data }: PageProps<typeof loader>) {
+  const user = useUser("account.show"); // SessionUser, never null
+
+  return <h1>{user.name}</h1>; // assumes your SessionRegistry user has a name
+}
+```
+
+- **Loader context.** For a guarded page, `PageLoaderContext<Validation, typeof route>` (and `PageLoader`) type `session` as a non-optional `{ user, model }` with neither field null, and `request.locals.user` as non-null. The route name is passed as the third type argument as above, or read from `typeof config.route` when `route` keeps a literal name: declare `config` `as const satisfies PageConfig`, because plain `satisfies` widens `name` to `string` and the loader then types `session` as optional. Unguarded pages, layout and app loaders, and page actions are unchanged: there `session` stays optional and `user` may be `null`.
+- **`useUser(routeName)`** returns a non-null `SessionUser`. Any name that is not a guarded page fails to compile. Passing the name also keeps the last signed-in user while that component stays mounted, so a sign-out that flips the store to a guest a frame before the navigation completes does not hand `null` to a component that reads `user.name`. Plain `useUser()` is unchanged and still returns `null` for a guest.
+
+#### What counts as a guard
+
+The generator types a page as guarded only when it can prove the guard from source. The page, any layout on its chain, or the root (`root.tsx`) must export a literal `config` whose `middleware` is an array literal with a **direct element** that is a call to `requireUser(...)`, where `requireUser` is a value import from `"@warlock.js/web/session"`. The arguments do not matter. An aliased import (`import { requireUser as ru }`) counts, and `as`, `satisfies` or parentheses around the array or the call are looked through. A page's `config` may live in its `.setup.ts` companion, in one of the two files.
+
+These do **not** count, and the page stays unguarded in the types (no `guard` is emitted):
+
+| Not a guard                                                   | Example                                                     |
+| ------------------------------------------------------------- | ----------------------------------------------------------- |
+| a spread into the array                                       | `middleware: [...guards]`                                   |
+| `middleware` that is not an array literal                     | `middleware: guards`                                        |
+| an identifier in the array                                    | `middleware: [guard]`                                       |
+| a conditional                                                 | `middleware: [isPrivate ? requireUser() : audit]`           |
+| a wrapper call around it                                      | `middleware: [withAudit(requireUser())]`                    |
+| `requireGuest()`                                              | `middleware: [requireGuest()]`                              |
+| `config.action.middleware`                                    | only the page's action is guarded                           |
+| a type-only import, or an import from any other module        | `import type { requireUser } from "@warlock.js/web/session"` |
+| a namespace or member call                                    | `session.requireUser()`                                     |
+| the loader form inside a loader                               | `requireUser(ctx)` guards at runtime but is not seen by the generator |
+
+The not-found page is never guarded. A guard the generator cannot prove still runs at runtime; only the types stay loose, so `useUser()` keeps returning `null` for a guest. In development a file the generator cannot parse reads as unguarded rather than breaking boot.
+
 ## Guests and the page cache
 
 A guest render carries `session: { user: null }` and stays cacheable. A signed-in request is never served from or stored in the page cache: it carries a cookie, resolving the user marks the response auth-derived (`private, no-store`), and a renewal sets a cookie.

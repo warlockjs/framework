@@ -265,13 +265,40 @@ createProductController.validation = { schema: createProductSchema };
 createProductController.description = "Create a new product (admin only)";
 createProductController.responseSchema = {
   201: { body: { product: ProductResource } },
-  400: { body: { errors: "array" } },
+  400: { body: { error: "string" } },
 };
 ```
 
 - **`validation`** — what's covered above.
-- **`description`** — surfaces in dev-server logs and feeds OpenAPI / Swagger generation (planned per `domains/core/backlog.md`).
-- **`responseSchema`** — declares the response shape per status code, also for docs generation.
+- **`description`** — surfaces in dev-server logs and in the generated OpenAPI document.
+- **`responseSchema`** — declares the response body per status code. It feeds the OpenAPI document and the typed client, see below.
+
+## Declare response types with `responseSchema`
+
+`responseSchema` is keyed by HTTP status code; each entry has a `body` object. The values of a body are one of:
+
+| Value                                     | Meaning                                                                                   |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------- |
+| a cast string, with the resource suffixes | `"string"`, `"number?"`, `"string[]"`, `"date[]?"`. `?` means the key is always present and the value may be `null`. |
+| a resource                                | One object shaped like the resource's output.                                            |
+| `[Resource]`                              | An array of that resource.                                                                |
+| a nested plain object                     | Recursed, with any of the values above.                                                   |
+
+```ts title="src/app/auth/controllers/login.controller.ts"
+import { UserResource } from "app/users/resources/user.resource";
+
+login.responseSchema = {
+  200: { body: { user: UserResource, token: "string" } },
+  400: { body: { error: "string" } },
+};
+```
+
+The declared types follow the same rules as a [resource's typed output](./06-resources.md#typed-output): `ResponseBodyOutput<B>` gives the type of one body and `ResponseSchemaOutput<S>` the body per status code for a whole schema. You rarely need either, because the types are generated:
+
+- `warlock dev` and `warlock generate.typings` load your routes, read each `responseSchema` and hand every named route's response types to the web route-types generator. A route's generated entry in web's `ApiRouteRegistry` then carries a `response` map, which types `useSubmitForm({ route })` and the `ApiResponse` helpers on the client. See [Typed API responses](/v/latest/web/essentials/14-form-submission/#typed-api-responses).
+- A resource is mapped back to its `*.resource.ts(x)` export by identity. A resource defined inline, or outside such a file, is typed `unknown` and a warning names the route and field.
+- `responseSchema` is kept when a route is bound from an array handler (`[controller, "action"]`) or a restful resource method.
+- The same declaration fills the `responses` of [`warlock generate.openapi`](../cli/openapi.md). Nothing checks a response against the schema at runtime: it is for types and documentation.
 
 ## What belongs in a controller (and what doesn't)
 

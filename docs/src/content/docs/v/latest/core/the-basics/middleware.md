@@ -361,7 +361,7 @@ Notice the shape: it's a **factory** that takes config (`allowedUserType`) and r
 
 ## Validation as built-in middleware
 
-Validation isn't separate machinery — it's just the framework's last middleware step before the controller runs. When you attach `controller.validation = { schema }`, the framework runs the schema against `request.allExceptParams()` (or the segments you specify), sets `request.validatedData`, and only then calls the controller. If validation fails, it short-circuits with a 400 and an `errors` payload before the controller is ever invoked. See [Validation](./validation.md) for the full pattern.
+Validation isn't separate machinery — it's just the framework's last middleware step before the controller runs. When you attach `controller.validation = { schema }`, the framework runs the schema against `request.allExceptParams()` (or the segments you specify), sets `request.validatedData`, and only then calls the controller. If validation fails, it short-circuits with a 422 and an `errors` payload before the controller is ever invoked. See [Validation](./validation.md) for the full pattern.
 
 ## Ordering
 

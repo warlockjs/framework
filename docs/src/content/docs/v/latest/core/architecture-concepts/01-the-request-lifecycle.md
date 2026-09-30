@@ -19,7 +19,7 @@ flowchart TD
     listening["server listening<br/><i>process awaits requests</i>"]
     match["router matches<br/><i>method + path → route + middleware</i>"]
     middleware["middleware chain<br/><i>auth · rate limit · custom</i>"]
-    validation["schema validation<br/><i>seal — fail returns 400</i>"]
+    validation["schema validation<br/><i>seal — fail returns 422</i>"]
     controller["controller<br/><i>thin: read input, call work</i>"]
     usecase["use-case pipeline<br/><i>guards → before → handler → after</i>"]
     repository["repository<br/><i>list · find · create · update</i>"]

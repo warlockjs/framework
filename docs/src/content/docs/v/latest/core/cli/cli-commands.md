@@ -149,6 +149,27 @@ The dev server runs this automatically on every boot (unless `--skip-typings`). 
 
 **New in 5.13.** `.warlock/typings/translations.d.ts` is generated alongside the config types: `warlock dev` scans your app's `groupedTranslations(group, dictionary)` calls and writes the flattened keys as an augmentation of `@warlock.js/web`'s `TranslationKeyRegistry`, so `useTrans()` in page components checks its key argument against your actual dictionary. See [Localization](../the-basics/localization.md#registering-translations).
 
+**New in 5.27.** When a route handler declares `responseSchema`, the same run hands that route's response types to the web route-types generator, so its `ApiRouteRegistry` entry carries a `response` map. See [Declare response types](../the-basics/03-controllers.md#declare-response-types-with-responseschema).
+
+### `generate.openapi`
+
+Write an OpenAPI 3.1 document derived from the registered routes: paths, parameters, request bodies from Seal validation, responses from `handler.responseSchema`, `401`/`422`, and bearer/cookie security from `authMiddleware()`.
+
+```bash
+warlock generate.openapi
+warlock generate.openapi --out docs/openapi.json --title "Shop API" --server https://api.shop.test
+warlock generate.openapi --include-pages
+```
+
+| Flag              | Type    | Description                                                                                          |
+| ----------------- | ------- | ---------------------------------------------------------------------------------------------------- |
+| `--out, -o`       | string  | Output file, relative to the project root. Default `storage/openapi/openapi.json`.                   |
+| `--title`         | string  | `info.title`. Default: the `name` in `package.json`.                                                 |
+| `--server`        | string  | `servers[0].url`. Default: built from the `http` config.                                             |
+| `--include-pages` | boolean | Also document page (SSR) routes.                                                                     |
+
+Routes are read in the same isolated child process `warlock build` uses, so no connector starts. Per-route gaps are printed as warnings; the command fails only when the app cannot be loaded. What is documented, the security schemes, and the live API docs page in devtools are in the [`warlock generate.openapi` guide](./openapi.md).
+
 ---
 
 ## Production

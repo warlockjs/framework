@@ -6,7 +6,7 @@ sidebar:
   label: "Validation"
 ---
 
-Validation in Warlock is **seal schemas attached to handlers, plus the framework's bridge for HTTP, file, and database-aware rules**. You author a schema once with `v.*`, attach it as a property on the controller, and the framework runs it before the handler is ever called. Failures short-circuit with a 400 carrying an `errors` payload. Successes get parked on the request, ready for `request.validated()`.
+Validation in Warlock is **seal schemas attached to handlers, plus the framework's bridge for HTTP, file, and database-aware rules**. You author a schema once with `v.*`, attach it as a property on the controller, and the framework runs it before the handler is ever called. Failures short-circuit with a 422 carrying an `errors` payload. Successes get parked on the request, ready for `request.validated()`.
 
 This page covers the schema surface, how to wire it to a controller, the request-type alias trick, database-aware rules (`unique`, `exists`), file rules, and how to run a schema ad-hoc when you need to validate outside the request lifecycle.
 
@@ -16,7 +16,7 @@ A schema is a runtime object that knows how to validate a value. seal's `v.*` fa
 
 1. Picks the data segments to validate (body + query by default).
 2. Runs the schema. If it succeeds, the **transformed** data lands on `request` and the controller runs.
-3. If it fails, the framework returns 400 with `{ errors: [...] }` and the controller never runs.
+3. If it fails, the framework returns 422 with `{ errors: [...] }` and the controller never runs.
 
 You read the typed result via `request.validated()` — the schema's `Infer` type drives the return type.
 
@@ -230,7 +230,7 @@ When validation fails, the framework calls `response.failedSchema(result)` which
 }
 ```
 
-Status code defaults to 400. Both the payload shape and status are configurable via `config.get("validation.response")`:
+Status code defaults to 422. Both the payload shape and status are configurable via `config.get("validation.response")`:
 
 ```ts title="src/config/validation.ts"
 const validationConfig = {
@@ -238,7 +238,7 @@ const validationConfig = {
     errors: "errors", // key holding the array
     inputKey: "input", // key for the field name
     inputError: "error", // key for the message
-    status: 400,
+    status: 422,
   },
 };
 
@@ -247,7 +247,7 @@ export default validationConfig;
 
 For most apps the defaults are right. Override only if you need to match an external API contract.
 
-> **Two status keys, two code paths.** Schema failures (`response.failedSchema(result)`) read the status from `validation.response.status` — the `status` key inside the block above. The custom `validate` path (a controller's `validation.validate(request, response)` hook that returns an error) instead reads a separate top-level `validation.responseStatus` key, defaulting to `400`. They both default to `400`, but if you change one expecting it to cover both, the other keeps its default. Set `validation.responseStatus` too if your custom-validate handlers should return a non-400 status.
+> **Two status keys, two code paths.** Schema failures (`response.failedSchema(result)`) read the status from `validation.response.status` — the `status` key inside the block above. The custom `validate` path (a controller's `validation.validate(request, response)` hook that returns an error) instead reads a separate top-level `validation.responseStatus` key, defaulting to `400`. Schema failures default to `422` and custom-validate failures to `400`; changing one does not change the other. Set `validation.responseStatus` too if your custom-validate handlers should return something other than 400.
 
 ### Locale-aware error messages
 
@@ -402,7 +402,7 @@ result.errors;
 
 The HTTP layer's `response.failedSchema(result)` reshapes this into `{ [errors]: [{ [inputKey], [inputError] }] }` using the keys from `config.get("validation.response")` — so the wire payload drops `type` by default. When you validate ad-hoc, you get the richer object straight from seal.
 
-If you want the framework's HTTP-layer behaviour (set validated data on a request, return a 400 on failure), call `validateAll`:
+If you want the framework's HTTP-layer behaviour (set validated data on a request, return a 422 on failure), call `validateAll`:
 
 ```ts
 import { validateAll } from "@warlock.js/core";
@@ -515,7 +515,7 @@ The framework reads the `type` field and validates against the matching branch.
 - **By default, schemas validate body + query, not params.** Route params are already validated by the route matcher. If you need to validate them too (e.g. coerce `:id` to a number), add `"params"` to `validating`.
 - **`unique` / `exists` need the model registered.** Pass the imported model class (`User`), not its name as a string — string forms work only for models registered via `@RegisterModel()`.
 - **`uniqueExceptCurrentUser` / etc. only work inside an HTTP request.** They read `request.locals.user` from the context store. For background jobs, use the base `unique` with an explicit `query` callback.
-- **Validation failures are 400 by default, but they short-circuit before the handler runs.** Branching on "did the schema pass?" inside the controller is impossible — the controller only runs if validation succeeded.
+- **Validation failures are 422 by default, but they short-circuit before the handler runs.** Branching on "did the schema pass?" inside the controller is impossible — the controller only runs if validation succeeded.
 - **`Infer<>` follows `.optional()` / `.nullable()`.** `v.string().optional()` infers as `string | undefined`. If a field is `.optional().default("x")`, `Infer` keeps it `string | undefined` at the type level even though the runtime value is always a string. Use `.required().default("x")` if you want the type to drop the `undefined`.
 
 ## See also

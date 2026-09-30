@@ -319,6 +319,53 @@ stricter gate: scalars, arrays, plain objects, or values with a `toJSON()` —
 `Date`, `Map`, `Set`, functions, and arbitrary class instances are rejected
 there regardless.
 
+### What the page's `data` type says
+
+Since 5.27, `data` in `PageProps`, `LayoutProps`, `AppProps` and in
+`metadata` callbacks is typed as what actually reaches the page:
+`Serialized<LoaderReturn, "devalue">` from `@warlock.js/core`, not the loader's
+raw return. The loader's own declared return type is untouched, and plain
+JSON-like data reads exactly as before.
+
+```tsx title="src/web/products/product.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import { getProduct } from "app/products/services/get-product.service";
+
+export async function loader() {
+  const product = await getProduct(); // a Product model
+
+  return { product, publishedAt: new Date() };
+}
+
+export default function ProductPage({ data }: PageProps<typeof loader>) {
+  // data.product      is the output of the model's resource
+  // data.publishedAt  is a Date: devalue keeps it native
+  return <h1>{data.product.title}</h1>;
+}
+```
+
+| The loader returns                                          | The page reads                                                               |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| a model registered in `ModelResourceRegistry`               | that resource's output, `ResourceOutput<typeof ProductResource>`             |
+| a model with no registry entry                              | its serialized `data` type                                                   |
+| a value with `toJSON()`                                     | the awaited result of `toJSON()`                                             |
+| `Date`, `Map`, `Set`, `RegExp`, `URL`                       | the same native type                                                         |
+| a class instance with private members and no `toJSON()`     | `never`, because devalue would throw at render                               |
+| a function-valued key                                       | dropped from the type; devalue still refuses a function at render, so do not return one |
+| a `defer()` key holding a promise                           | a `Promise` of the serialized settled value, for `use()`                     |
+
+A model reads as its resource once you register the pair in
+`ModelResourceRegistry`, which core does not generate. See
+[Serialized output on the wire](/v/latest/core/the-basics/resources-deep/#serialized-output-on-the-wire)
+for the registration and the full rules.
+
+A promise nested in plain loader data (not a top-level `defer()` key) is
+awaited, and its settled value is serialized too. A model or resource resolved
+from a promise therefore reaches the page as its `toJSON()` output instead of
+making devalue throw, and the type reads the serialized settled value. This is
+not streaming; only a top-level `defer()` key streams, and inside `defer()` a
+promise nested under a key is still refused.
+
 ## Page tracing phases
 
 When request tracing is enabled (`http.tracing`, off by default — see
