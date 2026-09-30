@@ -291,20 +291,17 @@ Rules, in the order the runtime applies them:
 
 ### `ModelResourceRegistry` — map a model to its resource
 
-`Model.resource` is typed loosely, so a model type cannot reveal its resource by itself. Augment `ModelResourceRegistry` once per model, in a file that imports the model and the resource:
+`Model.resource` is typed loosely, so a model type cannot reveal its resource by itself. You don't write the mapping: `warlock generate.typings` and `warlock dev` generate `.warlock/typings/model-resources.d.ts` from every model that declares `static resource = SomeResource`:
 
-```ts title="src/app/users/user-resource.type.ts"
-import type { User } from "app/users/models/user";
-import type { UserResource } from "app/users/resources/user.resource";
-
+```ts title=".warlock/typings/model-resources.d.ts (generated)"
 declare module "@warlock.js/core" {
   interface ModelResourceRegistry {
-    User: { model: User; resource: typeof UserResource };
+    "User": { model: import("../../src/app/users/models/user.model").User; resource: typeof import("../../src/app/users/resources/user.resource").UserResource };
   }
 }
 ```
 
-`Serialized<User>` then resolves to `ResourceOutput<typeof UserResource>`. The entry is matched when the model type is mutually assignable with `model`. There is no generator: write the entry yourself. `@warlock.js/web` uses the same registry to type page loader data.
+`Serialized<User>` then resolves to `ResourceOutput<typeof UserResource>` instead of the raw model data (so hidden columns such as a password never appear in the type). The generator reads the model file statically and resolves the identifier through its imports (named, aliased or default, or a resource declared in the same file). It skips anything it cannot resolve statically (a computed value, `lazy(...)`, a namespace import): that model keeps its raw data type. Your `tsconfig.json` must include `.warlock/typings/*.d.ts` (new apps do). `@warlock.js/web` uses the same registry to type page loader data.
 
 ## Attaching to a model
 
