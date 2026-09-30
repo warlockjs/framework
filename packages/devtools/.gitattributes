@@ -1,0 +1,2 @@
+# Vendored third-party bundles are stored and checked out byte-for-byte.
+ui/vendor/** -text
