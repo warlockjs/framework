@@ -1,4 +1,15 @@
 {
+  "5.27.0": {
+    "publishedAt": "2026-10-01T02:56:24.504Z",
+    "matrix": "none",
+    "summary": "**Typed API responses, typed page data, OpenAPI, and reasoning with tools on GPT-6.** Controllers declare `responseSchema` and the generated route types carry it: `ApiResponse<\"auth.login\">` and `useSubmitForm({ route })` know the response body, and undeclared routes stay `unknown`. `defineResource()` infers its output type, `Serialized<T>` describes what the client receives, and page loader data is typed as what actually reaches the page (models map to their resource automatically). Pages guarded by `requireUser()` get a non-null user in their loader and in `useUser(\"route.name\")`. `warlock generate.openapi` writes an OpenAPI 3.1 file for Postman and Insomnia, and `warlock dev` adds interactive API docs at `/__warlock/docs`. `@warlock.js/ai-openai` adds the opt-in Responses API (`api: \"responses\"`) so reasoning models can use tools with reasoning on, including streaming and reasoning carried across tool turns. **Fixed:** a promise nested in page loader data is now serialized after it settles (a model inside one made devalue throw). **Behaviour changes:** page `data` types are the serialized shape; `@mongez/supportive-is` 3.0 checkers are type predicates. Lockstep release across all 31 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.27.0 tarballs passed install, typecheck, a fresh migrate and seed, devtools in dev, a production build with browser smoke, and the `--role=worker` and `--role=api` starts; after publishing, the same check passed against npm.",
+    "featured": [
+      "@warlock.js/core",
+      "@warlock.js/web",
+      "@warlock.js/ai-openai",
+      "@warlock.js/devtools"
+    ]
+  },
   "5.26.0": {
     "publishedAt": "2026-09-30T17:41:20.771Z",
     "matrix": "none",

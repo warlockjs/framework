@@ -128,6 +128,621 @@
   ],
   "releases": [
     {
+      "version": "5.27.0",
+      "id": "v5-27-0",
+      "date": "October 1, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Typed API responses, typed page data, OpenAPI, and reasoning with tools on GPT-6.</strong> Controllers declare <code>responseSchema</code> and the generated route types carry it: <code>ApiResponse&lt;\"auth.login\"&gt;</code> and <code>useSubmitForm({ route })</code> know the response body, and undeclared routes stay <code>unknown</code>. <code>defineResource()</code> infers its output type, <code>Serialized&lt;T&gt;</code> describes what the client receives, and page loader data is typed as what actually reaches the page (models map to their resource automatically). Pages guarded by <code>requireUser()</code> get a non-null user in their loader and in <code>useUser(\"route.name\")</code>. <code>warlock generate.openapi</code> writes an OpenAPI 3.1 file for Postman and Insomnia, and <code>warlock dev</code> adds interactive API docs at <code>/__warlock/docs</code>. <code>@warlock.js/ai-openai</code> adds the opt-in Responses API (<code>api: \"responses\"</code>) so reasoning models can use tools with reasoning on, including streaming and reasoning carried across tool turns. <strong>Fixed:</strong> a promise nested in page loader data is now serialized after it settles (a model inside one made devalue throw). <strong>Behaviour changes:</strong> page <code>data</code> types are the serialized shape; <code>@mongez/supportive-is</code> 3.0 checkers are type predicates. Lockstep release across all 31 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.27.0 tarballs passed install, typecheck, a fresh migrate and seed, devtools in dev, a production build with browser smoke, and the <code>--role=worker</code> and <code>--role=api</code> starts; after publishing, the same check passed against npm.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 11,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 10
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>Typed resource output.</strong> <code>defineResource()</code> infers the <code>toJSON()</code> output type from the schema's cast strings (<code>\"string?\"</code> is <code>string | null</code>, <code>\"date\"</code> is the default <code>{ iso; format; timestamp; humanTime }</code> object, nested and <code>\"self\"</code> resources resolve to their own output). Read it with <code>ResourceOutput&lt;typeof UserResource&gt;</code>. When <code>transform</code>/<code>boot</code>/builders change the shape, state it: <code>defineResource&lt;ProductJson&gt;({ ... })</code>. Builder fields are <code>unknown</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>Serialized&lt;T, W&gt;</code></strong>: the type of what the client receives after Warlock serializes <code>T</code>, for API responses (<code>\"json\"</code>, default) and page loader data (<code>\"devalue\"</code>). Dates become strings on JSON, <code>toJSON()</code> results are used, functions are dropped, and models map to their resource through the augmentable <code>ModelResourceRegistry</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Typed API responses from <code>handler.responseSchema</code>.</strong> A response schema body now accepts cast strings with the resource suffixes (<code>\"number?\"</code>, <code>\"string[]\"</code>, <code>\"date[]?\"</code>), a resource, <code>[resource]</code> for an array, and nested plain objects. <code>ResponseBodyOutput&lt;B&gt;</code> and <code>ResponseSchemaOutput&lt;S&gt;</code> give the body type per status code with the same rules as <code>ResourceOutput</code>. <code>warlock generate.typings</code> and <code>warlock dev</code> read the declared schema at runtime and hand each route's response types to the web route-types generator, so nothing is annotated by hand."
+            },
+            {
+              "type": "Added",
+              "html": "<code>NamedApiRoute</code> has an optional <code>response</code> map (status code to a TypeScript type expression), present only on routes that declare <code>responseSchema</code>; <code>router.getNamedApiRoutes()</code> accepts a <code>resolveResponse</code> option to attach it and still returns the plain <code>{ name, path, method }</code> records otherwise. Resources are mapped back to their <code>*.resource.ts(x)</code> export by identity; a resource defined inline or outside such a file is typed <code>unknown</code> with a warning naming the route and field. The typings child and the dev server share one serializer, so both emit identical strings."
+            },
+            {
+              "type": "Added",
+              "html": "<code>responseSchema</code> is now kept when a route is bound from an array handler (<code>[controller, \"action\"]</code>) or a restful resource method; the bound function used to lose it."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>warlock generate.openapi</code></strong> writes an OpenAPI 3.1 document (<code>storage/openapi/openapi.json</code>, or <code>--out</code>) derived from the registered routes. Options: <code>--title</code>, <code>--server</code>, <code>--include-pages</code>. Paths use <code>{param}</code> templates and <code>all</code> routes expand to every verb; <code>validation.schema</code> becomes the request body (POST/PUT/PATCH) or query parameters (GET/HEAD/DELETE) according to <code>validating</code>, and <code>validation.params</code> becomes typed path parameters. Responses come from <code>handler.responseSchema</code> (casts, <code>\"?\"</code> as <code>type: [T, \"null\"]</code>, resources as <code>components.schemas</code> <code>$ref</code>s named after their export, <code>[Resource]</code> as an array); a route with no schema documents only a <code>200</code> description. A <code>422</code> (shaped by <code>validation.response</code>) is added when a route has <code>validation.schema</code>, and a <code>401</code> when it is guarded. Fields that cannot be described statically (field builders, resolver functions) are documented as <code>{}</code> and listed as warnings; the command exits non-zero only when the app cannot be loaded."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Security schemes from <code>authMiddleware</code>.</strong> Core reads the <code>Symbol.for(\"warlock.auth\")</code> descriptor (<code>{ sources: (\"header\" | { cookie: string })[], userTypes: string[] }</code>) that <code>authMiddleware()</code> attaches and emits <code>bearerAuth</code> / <code>cookieAuth</code> schemes only for the ones a route uses (header plus cookie is an OR). Middleware without a descriptor is ordinary middleware and produces no security entry."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>buildOpenApiDocument(routes, context)</code></strong> is exported: a pure function from <code>router.list()</code> routes to a plain-JSON OpenAPI document plus a <code>warnings</code> list, so a dev tool can build the same document in-process. The CLI builds it inside the route-registration child process, so Seal instances never cross IPC; that child's fork, IPC and timeout handling is now a shared helper with no change to <code>warlock build</code> (<code>WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS</code> applies to both)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>getDevelopmentOpenApiDocument()</code></strong> returns the same document for the routes registered in the running dev process (<code>warlock dev</code> registers the builder at startup; outside it the call throws), reusing the CLI child's builder (resource export map, <code>package.json</code> info, <code>http</code> server, <code>validation.response</code>). <code>@warlock.js/devtools</code> calls it to serve its API docs page at <code>/__warlock/docs</code>; warnings are logged once per process."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Models resolve to their resource in <code>Serialized</code>.</strong> <code>warlock generate.typings</code> and <code>warlock dev</code> now write <code>.warlock/typings/model-resources.d.ts</code>, a <code>ModelResourceRegistry</code> augmentation with one entry per model class that declares <code>static resource = &lt;Identifier&gt;</code>, so <code>Serialized&lt;User&gt;</code> is the resource output instead of the raw model data. The identifier is followed through the model file's own imports (named, aliased, default, tsconfig aliases) or its own declarations, by reading the source only; a computed expression, <code>lazy(...)</code>, a generic or unexported model is left out and keeps the raw-data type. Duplicate class names get <code>_2</code>, <code>_3</code> keys, output is sorted, and the file is rewritten only when it changes. The app's <code>tsconfig.json</code> must include <code>.warlock/typings/*.d.ts</code> (the scaffold already does)."
+            },
+            {
+              "type": "Changed",
+              "html": "Dependency: @mongez/supportive-is 3.0 (type-predicate checkers)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Typed API responses. Each generated <code>ApiRouteRegistry</code> entry now carries <code>response: { 200: ...; 400: ... }</code> when the route's handler declares <code>responseSchema</code> (the generator accepts an optional <code>response</code> on the route snapshot and emits it verbatim). New public types <code>ApiResponse&lt;Name, Status = 200&gt;</code> (the declared body, or <code>unknown</code> when the route or status is undeclared, never <code>any</code>), <code>ApiResponses&lt;Name&gt;</code> (the whole status map) and <code>ApiSuccessResponse&lt;Name&gt;</code> (the union of declared 2xx bodies). <code>useSubmitForm({ route: \"auth.login\" })</code> now types <code>data</code>, <code>response</code> and <code>onSuccess</code> from the route's declared 2xx body; path targets and explicit <code>useSubmitForm&lt;Schema, Data&gt;</code> calls are unchanged, and apps with no <code>responseSchema</code> generate a byte-identical file."
+            },
+            {
+              "type": "Added",
+              "html": "Page, layout, app and metadata <code>data</code> is now typed as what actually reaches the page: <code>Serialized&lt;LoaderReturn, \"devalue\"&gt;</code> from <code>@warlock.js/core</code>, not the loader's raw return. A cascade model registered in <code>ModelResourceRegistry</code> reads as its resource output, <code>Date</code>/<code>Map</code>/<code>Set</code>/<code>RegExp</code>/<code>URL</code> stay native, function keys are dropped, and a class instance without <code>toJSON</code> reads as <code>never</code> (devalue would throw at render). Deferred <code>defer()</code> keys stay promises whose settled value is serialized. Plain JSON-ish data is unchanged; the loader's own declared return type is untouched."
+            },
+            {
+              "type": "Added",
+              "html": "Guarded pages are typed as signed-in. The generator now reads whether a page is guarded by <code>requireUser()</code> (imported from <code>\"@warlock.js/web/session\"</code>, aliased imports included) as a direct element of a literal <code>config.middleware</code> array on the page, any layout on its chain, or the root, and emits <code>guard: \"user\"</code> on that <code>PageRouteRegistry</code> entry (nothing is emitted for an unguarded page, so existing generated files are byte-identical; spreads, identifiers, conditionals, wrapper calls, <code>requireGuest()</code> and <code>config.action.middleware</code> do not count, and the not-found page is never guarded). A new <code>GuardedPageRouteName</code> type lists those names. For a guarded page, <code>PageLoaderContext&lt;Validation, typeof route&gt;</code> (and <code>PageLoader</code>) now type <code>session</code> as non-optional <code>{ user, model }</code> with neither field null and <code>request.locals.user</code> as non-null; the route name is read from <code>typeof route</code> or passed as a third type argument (<code>PageLoaderContext&lt;undefined, undefined, \"account.show\"&gt;</code>). Unguarded pages, layout and app loaders, and page actions are unchanged. The dev route-type writer now keeps <code>guard</code> and <code>actions</code> instead of dropping them on a rewrite."
+            },
+            {
+              "type": "Added",
+              "html": "<code>useUser(\"account.show\")</code>: pass a guarded page's route name to get a non-null <code>SessionUser</code> (any other name fails to compile). The name also opts the component in to keeping the last signed-in user while it stays mounted, so a sign-out that flips the store to a guest a frame before navigation completes no longer hands <code>null</code> to a component that reads <code>user.name</code>. Plain <code>useUser()</code> is unchanged and still returns <code>null</code> for a guest."
+            },
+            {
+              "type": "Fixed",
+              "html": "Page data: a promise nested in a loader's data (not a <code>defer()</code> key) is awaited and its settled value is now serialized too, so a model or resource resolved from a promise reaches the page as its <code>toJSON()</code> output instead of making devalue throw."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>Responses API (opt-in).</strong> <code>sdk.model({ name, api: \"responses\" })</code> routes an OpenAI model through <code>/v1/responses</code>, so a reasoning model (gpt-5 family, o-series, gpt-6) can use function tools with reasoning on. Chat Completions stays the default and is unchanged. Under <code>api: \"responses\"</code> reasoning uses the provider default even when tools are attached (more reasoning tokens and latency than the Chat path, which forces reasoning off with tools); the system prompt is sent as <code>instructions</code>; requests use <code>store: false</code>; <code>pdf</code>/<code>audio</code> inputs are off. Only the <code>openai</code> provider accepts it: the DeepSeek, Groq, xAI and Mistral adapters reject <code>api: \"responses\"</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Responses streaming.</strong> <code>stream()</code> works under <code>api: \"responses\"</code> and yields the same chunks as the Chat path: text deltas (refusal text included), then the tool calls, then one <code>done</code> with the finish reason and usage. A <code>response.failed</code> or <code>error</code> event mid-stream throws the same typed error as a failed request."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Reasoning replay across tool turns.</strong> Every Responses request asks for <code>include: [\"reasoning.encrypted_content\"]</code>. The reasoning items of a tool-calling turn are saved on the first tool call (<code>providerMetadata.openaiResponses = { model, reasoningItems }</code>) and sent back before that turn's function calls on the next request, so the model keeps its own reasoning while it works through tools, with nothing stored on OpenAI's side. Replay is skipped when the model changed, and turns without a tool call are not replayed. <strong>The encrypted reasoning items are stored with the conversation history</strong> (memory or session store), so expect larger stored messages; there is no size cap. The Chat path and the other adapters ignore the key."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>API docs page.</strong> <code>/__warlock/docs</code> renders the app's OpenAPI 3.1 document with Scalar, and the dashboard has a new <strong>API</strong> tab that shows it. The document comes from <code>GET /__warlock/api/openapi.json</code>, built in-process by core's <code>buildDevelopmentOpenApiDocument()</code> from the routes already registered (the same generator as <code>warlock generate.openapi</code>); it answers 503 when the host provides none. Everything stays behind the existing dev-only, loopback-only guard."
+            },
+            {
+              "type": "Added",
+              "html": "The API docs page uses <a href=\"https://github.com/scalar/scalar\">Scalar</a> (MIT). Its prebuilt browser bundle (1.72.2) is vendored in <code>ui/vendor/scalar/</code> and served as <code>assets/scalar.js</code>, so apps install no extra dependencies. Nothing is fetched from a CDN, and the page turns off Scalar's web fonts, telemetry, AI agent and MCP so it makes no outside request."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>authMiddleware()</code> now tags the middleware it returns with a non-enumerable, frozen, JSON-safe descriptor under <code>Symbol.for(\"warlock.auth\")</code> (<code>{ sources, userTypes }</code>), exported as <code>AUTH_MIDDLEWARE_DESCRIPTOR</code> / <code>AuthMiddlewareDescriptor</code>, so other tooling can read a route's resolved credential sources and allowed user types without changing runtime behavior."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Dependency: @mongez/supportive-is 3.0 (type-predicate checkers)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Dependency: @mongez/supportive-is 3.0 (type-predicate checkers)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/sitemap",
+          "slug": "sitemap",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Generated apps depend on <code>@mongez/supportive-is</code> ^3.0.0 (type-predicate checkers). Lockstep release; package APIs are otherwise unchanged."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.26.0",
       "id": "v5-26-0",
       "date": "September 30, 2026",
