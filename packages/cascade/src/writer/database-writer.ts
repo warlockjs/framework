@@ -554,10 +554,30 @@ export class DatabaseWriter implements WriterContract {
     // Changing a primary key is a deliberate operation: use the atomic/raw APIs.
     const identityColumns = new Set([this.primaryKey, "id", "_id"]);
 
+    // Top-level fields assigned/unset as a whole (`set("nested", obj)`,
+    // `unset("nested")`) are written as ONE value. Per-leaf operations can only
+    // report the leaves that changed or vanished, so a nested object replaced with
+    // one that has fewer keys would keep its removed keys' empty parents in the
+    // stored document. Dotted-path sets (`set("nested.a", v)`) and merges are
+    // partial by intent and keep going through the per-leaf path below.
+    const replacedColumns = this.model.dirtyTracker
+      .getReplacedColumns()
+      .filter(column => !identityColumns.has(column) && !this.unvalidatedColumns.has(column));
+
+    // A leaf under a whole-written field must not be sent too: MongoDB rejects
+    // an update touching both `nested` and `nested.a`.
+    const isUnderReplaced = (column: string): boolean =>
+      replacedColumns.some(root => column === root || column.startsWith(`${root}.`));
+
     // Get dirty columns (modified fields)
     const dirtyColumns = this.model
       .getDirtyColumns()
-      .filter(column => !identityColumns.has(column) && !this.unvalidatedColumns.has(column));
+      .filter(
+        column =>
+          !identityColumns.has(column) &&
+          !this.unvalidatedColumns.has(column) &&
+          !isUnderReplaced(column),
+      );
 
     if (dirtyColumns.length > 0) {
       operations.$set = {};
@@ -569,16 +589,30 @@ export class DatabaseWriter implements WriterContract {
       }
     }
 
-    // Get removed columns
-    const removedColumns = this.model
-      .getRemovedColumns()
-      .filter(column => !identityColumns.has(column));
+    // Get removed columns, collapsed to the highest path that is actually gone so
+    // a parent emptied by an unset is removed too instead of left behind as `{}`.
+    const removedColumns = this.model.dirtyTracker
+      .getRemovedPaths()
+      .filter(column => !identityColumns.has(column) && !isUnderReplaced(column));
 
     if (removedColumns.length > 0) {
       operations.$unset = {};
       for (const column of removedColumns) {
         operations.$unset[column] = 1;
       }
+    }
+
+    for (const column of replacedColumns) {
+      const value = this.model.get(column);
+
+      if (value === undefined) {
+        operations.$unset ??= {};
+        operations.$unset[column] = 1;
+        continue;
+      }
+
+      operations.$set ??= {};
+      operations.$set[column] = value;
     }
 
     return operations;

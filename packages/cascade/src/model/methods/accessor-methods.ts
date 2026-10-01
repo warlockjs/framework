@@ -1,4 +1,5 @@
 import { get, merge, only, set, unset } from "@mongez/reinforcements";
+import { pruneEmptyParents } from "../../utils/prune-empty-parents";
 import type { Model } from "../model";
 
 /**
@@ -36,8 +37,23 @@ export function decrementField(model: Model, field: string, amount?: number): Mo
   return setFieldValue(model, field, decrementedValue);
 }
 
+/**
+ * Remove fields from the model data.
+ *
+ * Unsetting the last key of a nested object also removes the parents that this
+ * unset left empty (`unset("a.b")` on `{ a: { b: 1 } }` leaves `{}`, not
+ * `{ a: {} }`). A parent is pruned only when this unset emptied it: an object
+ * the user stored as `{}` is never touched, and arrays are never pruned.
+ */
 export function unsetFields(model: Model, ...fields: string[]): Model {
+  const existing = fields.filter(field => hasField(model, field));
+
   model.data = unset(model.data, fields);
+
+  for (const field of existing) {
+    pruneEmptyParents(model.data, field);
+  }
+
   model.dirtyTracker.unset(fields);
 
   return model;

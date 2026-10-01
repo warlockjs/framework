@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.28.0
+
+### Fixed
+
+- Replacing a nested object on MongoDB (`model.set("nested", obj).save()`) now writes the whole new object with one `$set`, instead of diffing per leaf. Removing keys no longer leaves their parents behind as empty `{}` objects in the stored document. Dotted-path sets (`set("nested.a", v)`) and `merge()` stay partial per-leaf updates, so concurrent writes to other keys still survive. SQL drivers already replace the whole JSON column and are unchanged.
+- `unset("nested.x")` now removes the parents it empties (`unset("a.b.c")` on `{ a: { b: { c: 1 } } }` stores no `a`), and the update `$unset`s that parent rather than leaving `{}`. A parent is pruned only when that unset emptied it: an object stored or set as `{}` is left alone, and arrays are never pruned. `unset("nested")` removes the whole object.
+
 ## 5.27.0 - 2026-10-01
 
 ### Changed

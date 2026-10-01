@@ -1,5 +1,6 @@
 import { areEqual, clone } from "@mongez/reinforcements";
 import { isPlainObject } from "@mongez/supportive-is";
+import { pruneEmptyParents } from "./utils/prune-empty-parents";
 
 function canBeFlatten(object: unknown): boolean {
   return isPlainObject(object);
@@ -101,6 +102,14 @@ export class DatabaseDirtyTracker {
    */
   protected readonly removedColumns = new Set<string>();
 
+  /**
+   * Top-level fields that were assigned or unset as a whole (`set("nested", obj)`,
+   * `unset("nested")`) since the last reset. Dotted-path writes
+   * (`set("nested.a", v)`) and `mergeChanges` are partial by intent and never
+   * land here. See {@link getReplacedColumns}.
+   */
+  protected readonly replacedRoots = new Set<string>();
+
   public constructor(data: Record<string, unknown>) {
     this.initialRaw = this.cloneData(data);
     this.currentRaw = this.cloneData(data);
@@ -126,6 +135,85 @@ export class DatabaseDirtyTracker {
    */
   public getDirtyColumns(): string[] {
     return Array.from(this.dirtyColumns);
+  }
+
+  /**
+   * Removed columns collapsed to the highest path that no longer exists.
+   *
+   * `getRemovedColumns()` reports leaves (`"a.b.c"`). Unsetting just that leaf
+   * would keep `a` and `a.b` in the stored document as empty objects whenever
+   * the unset emptied them (and `unset()` prunes those parents). This returns
+   * the path to actually `$unset`: the shortest prefix that is gone from the
+   * current data, which is the leaf itself when its parents still hold other
+   * keys.
+   *
+   * @returns Distinct paths to remove
+   */
+  public getRemovedPaths(): string[] {
+    const paths = new Set<string>();
+
+    for (const column of this.removedColumns) {
+      const segments = column.split(".");
+      let container: unknown = this.currentRaw;
+      let path = column;
+
+      for (let index = 0; index < segments.length; index += 1) {
+        const segment = segments[index] as string;
+
+        if (
+          container === null ||
+          typeof container !== "object" ||
+          !(segment in (container as Record<string, unknown>))
+        ) {
+          path = segments.slice(0, index + 1).join(".");
+          break;
+        }
+
+        container = (container as Record<string, unknown>)[segment];
+      }
+
+      paths.add(path);
+    }
+
+    return Array.from(paths);
+  }
+
+  /**
+   * Top-level fields whose nested object must be written as a WHOLE value.
+   *
+   * Per-leaf diffing cannot express "this object is now exactly this": it only
+   * reports the leaves that changed or vanished, so a key removed from a nested
+   * object leaves its (now empty) parents behind in the stored document. A field
+   * that was assigned or unset as a whole therefore reports here, and the writer
+   * sends one `$set` (or `$unset`) for it instead of per-leaf operations.
+   *
+   * A field is reported only when it was replaced via `set("field", value)` /
+   * `unset("field")`, either its old or new value is a plain object, and the
+   * value actually differs from the baseline. Dotted-path writes
+   * (`set("field.a", v)`) and `mergeChanges` stay per-leaf, so partial updates
+   * keep working. Scalars and arrays are already whole-value leaves in the diff.
+   *
+   * @returns Top-level column names to write as a whole
+   */
+  public getReplacedColumns(): string[] {
+    const columns: string[] = [];
+
+    for (const root of this.replacedRoots) {
+      const initial = this.initialRaw[root];
+      const current = this.currentRaw[root];
+
+      if (!isPlainObject(initial) && !isPlainObject(current)) {
+        continue;
+      }
+
+      if (areEqual(initial, current)) {
+        continue;
+      }
+
+      columns.push(root);
+    }
+
+    return columns;
   }
 
   /**
@@ -258,6 +346,10 @@ export class DatabaseDirtyTracker {
     const segments = path.split(".");
     let container = this.currentRaw as Record<string, unknown>;
 
+    if (segments.length === 1) {
+      this.replacedRoots.add(path);
+    }
+
     for (let index = 0; index < segments.length - 1; index += 1) {
       const segment = segments[index] as string;
 
@@ -292,6 +384,10 @@ export class DatabaseDirtyTracker {
     const targets = Array.isArray(columns) ? columns : [columns];
 
     for (const path of targets) {
+      if (!path.includes(".")) {
+        this.replacedRoots.add(path);
+      }
+
       this.deleteFromRaw(path);
     }
 
@@ -329,6 +425,7 @@ export class DatabaseDirtyTracker {
 
     this.dirtyColumns.clear();
     this.removedColumns.clear();
+    this.replacedRoots.clear();
   }
 
   /**
@@ -447,7 +544,15 @@ export class DatabaseDirtyTracker {
     }
 
     if (typeof container === "object") {
+      const existed = lastSegment in (container as Record<string, unknown>);
+
       delete (container as Record<string, unknown>)[lastSegment];
+
+      // Drop parents this unset just emptied; a parent that was already `{}` is
+      // left alone because nothing was removed from it.
+      if (existed) {
+        pruneEmptyParents(this.currentRaw, path);
+      }
     }
   }
 
