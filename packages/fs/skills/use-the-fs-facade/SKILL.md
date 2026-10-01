@@ -85,14 +85,14 @@ const moved = await fs.file("a.txt").moveTo(fs.dir("archive"));  // new File han
 
 ## Facade vs primitives — when to use which
 - **Facade (`fs.*`)** — async app/runtime code; read-modify-write; JSON patching; recursive listing/walking; you want an OO handle. One import, ergonomic verbs.
-- **Bare primitives (`getFile`/`putFile`/…)** — synchronous CLI tools / codegen / one-shot scripts (no `Async`), or when you want the smallest possible call. See [`read-and-write-files`](@warlock.js/fs/read-and-write-files/SKILL.md) / [`manage-directories`](@warlock.js/fs/manage-directories/SKILL.md).
+- **Bare primitives (`getFile`/`putFile`/…)** — synchronous CLI tools / codegen / one-shot scripts (no `Async`), or when you want the smallest possible call. See the `read-and-write-files` topic / the `manage-directories` topic.
 
 ## Gotchas
 - **Async-only facade.** There is no `fs.filesSync`; for sync use the bare primitives.
 - **`edit`/`mergeJson` are sugar, not a lock.** Concurrent edits race (last-write-wins); `atomic` only makes the *write* atomic, not the read+write pair. No file locking.
 - **`get()` reads the whole file.** For large text use `readLines`; for large-file digests `hash` already streams.
-- **Still no glob / watch / chmod** — see the [overview](@warlock.js/fs/overview/SKILL.md). Use `walk` + filter instead of glob.
+- **Still no glob / watch / chmod** — see the `overview` topic. Use `walk` + filter instead of glob.
 
 ## See also
-- [`overview/SKILL.md`](@warlock.js/fs/overview/SKILL.md) — the package front door + the `*Async`/bare convention.
-- [`write-atomically/SKILL.md`](@warlock.js/fs/write-atomically/SKILL.md) — `put({ atomic })` delegates to this.
+- The `overview` topic — the package front door + the `*Async`/bare convention.
+- The `write-atomically` topic — `put({ atomic })` delegates to this.

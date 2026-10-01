@@ -1,6 +1,6 @@
 ---
 name: write-atomically
-description: 'Atomic file writes via atomicWriteAsync(path, content) — writes to a uniquely-named sibling temp + rename onto target so readers see old or complete new content, never half-written; the rename retries transient Windows locks with backoff and throws a named AtomicWriteError on exhaustion. Triggers: `atomicWriteAsync`, `atomicWriteJsonAsync`, `AtomicWriteError`; "atomic file write", "write config file safely with concurrent readers", "manifest written by build step", "state file across runs", "avoid half-written files", "EPERM/EBUSY on rename", "atomic write fails intermittently on Windows"; typical import `import { atomicWriteAsync, atomicWriteJsonAsync, AtomicWriteError } from "@warlock.js/fs"`. Skip: plain writes — `@warlock.js/fs/read-and-write-files/SKILL.md`; read-modify-write locking — `@warlock.js/cache/use-cache-lock/SKILL.md`; competing libs `write-file-atomic`, `steno`, `fs-extra` `outputFile`.'
+description: 'Atomic file writes via atomicWriteAsync(path, content) — writes to a uniquely-named sibling temp + rename onto target so readers see old or complete new content, never half-written; the rename retries transient Windows locks with backoff and throws a named AtomicWriteError on exhaustion. Triggers: `atomicWriteAsync`, `atomicWriteJsonAsync`, `AtomicWriteError`; "atomic file write", "write config file safely with concurrent readers", "manifest written by build step", "state file across runs", "avoid half-written files", "EPERM/EBUSY on rename", "atomic write fails intermittently on Windows"; typical import `import { atomicWriteAsync, atomicWriteJsonAsync, AtomicWriteError } from "@warlock.js/fs"`. Skip: plain writes — the `read-and-write-files` topic; read-modify-write locking — the `use-cache-lock` topic of the `warlock-js-cache` skill; competing libs `write-file-atomic`, `steno`, `fs-extra` `outputFile`.'
 ---
 
 # Atomic file writes
@@ -50,7 +50,7 @@ The random 6-byte suffix prevents two concurrent writers from racing on the same
 
 Two `atomicWriteAsync` calls to the same target serialize at the rename. Whichever rename completes last wins. **No locking** — last-writer-wins is the contract.
 
-If you need read-modify-write atomicity (each writer sees the previous writer's result), wrap the calls in a distributed lock — e.g. [`@warlock.js/cache/use-cache-lock/SKILL.md`](@warlock.js/cache/use-cache-lock/SKILL.md).
+If you need read-modify-write atomicity (each writer sees the previous writer's result), wrap the calls in a distributed lock — e.g. the `use-cache-lock` topic of the `warlock-js-cache` skill.
 
 ## Common shapes
 
@@ -113,8 +113,8 @@ try {
 
 ## See also
 
-- [`@warlock.js/fs/read-and-write-files/SKILL.md`](@warlock.js/fs/read-and-write-files/SKILL.md) — `putFileAsync` for non-atomic writes
-- [`@warlock.js/cache/use-cache-lock/SKILL.md`](@warlock.js/cache/use-cache-lock/SKILL.md) — distributed lock for read-modify-write protection
+- The `read-and-write-files` topic — `putFileAsync` for non-atomic writes
+- The `use-cache-lock` topic of the `warlock-js-cache` skill — distributed lock for read-modify-write protection
 
 ## Things NOT to do
 

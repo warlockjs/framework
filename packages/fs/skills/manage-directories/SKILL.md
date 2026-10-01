@@ -1,6 +1,6 @@
 ---
 name: manage-directories
-description: 'Manage directories + files — ensureDirectory (mkdir -p), list / listFiles / listDirectories, copyFile / copyDirectory, renameFile, unlink (ENOENT-safe), removeDirectory (recursive force). Triggers: `ensureDirectoryAsync`, `listAsync`, `listFilesAsync`, `listDirectoriesAsync`, `copyFileAsync`, `copyDirectoryAsync`, `renameFileAsync`, `unlinkAsync`, `removeDirectoryAsync`; "create directory recursively", "list files in folder", "delete directory recursively", "copy or rename folder", "walk a tree"; typical import `import { ensureDirectoryAsync, listFilesAsync, removeDirectoryAsync } from "@warlock.js/fs"`. Skip: file IO — `@warlock.js/fs/read-and-write-files/SKILL.md`; atomic writes — `@warlock.js/fs/write-atomically/SKILL.md`; competing libs `fs-extra`, `mkdirp`, `rimraf`, `recursive-readdir`, `glob`; native `node:fs/promises`.'
+description: 'Manage directories + files — ensureDirectory (mkdir -p), list / listFiles / listDirectories, copyFile / copyDirectory, renameFile, unlink (ENOENT-safe), removeDirectory (recursive force). Triggers: `ensureDirectoryAsync`, `listAsync`, `listFilesAsync`, `listDirectoriesAsync`, `copyFileAsync`, `copyDirectoryAsync`, `renameFileAsync`, `unlinkAsync`, `removeDirectoryAsync`; "create directory recursively", "list files in folder", "delete directory recursively", "copy or rename folder", "walk a tree"; typical import `import { ensureDirectoryAsync, listFilesAsync, removeDirectoryAsync } from "@warlock.js/fs"`. Skip: file IO — the `read-and-write-files` topic; atomic writes — the `write-atomically` topic; competing libs `fs-extra`, `mkdirp`, `rimraf`, `recursive-readdir`, `glob`; native `node:fs/promises`.'
 ---
 
 # Manage directories and files on disk
@@ -128,9 +128,9 @@ const tsFiles = await walk("./src");
 
 ## See also
 
-- [`@warlock.js/fs/read-and-write-files/SKILL.md`](@warlock.js/fs/read-and-write-files/SKILL.md) — text / JSON file IO and existence checks
-- [`@warlock.js/fs/write-atomically/SKILL.md`](@warlock.js/fs/write-atomically/SKILL.md) — atomic writes when concurrent readers might see the file mid-write
-- [`@warlock.js/fs/hash-files/SKILL.md`](@warlock.js/fs/hash-files/SKILL.md) — fingerprinting
+- The `read-and-write-files` topic — text / JSON file IO and existence checks
+- The `write-atomically` topic — atomic writes when concurrent readers might see the file mid-write
+- The `hash-files` topic — fingerprinting
 
 ## Things NOT to do
 

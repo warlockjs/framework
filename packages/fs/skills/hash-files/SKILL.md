@@ -1,6 +1,6 @@
 ---
 name: hash-files
-description: 'Compute hex digests — hashFile / hashFileAsync (streaming for large files), hashFileSmallAsync, hashString, hashBuffer. Defaults to SHA-256; supports sha1 / md5 / sha512. Triggers: `hashFile`, `hashFileAsync`, `hashFileSmallAsync`, `hashString`, `hashBuffer`, `HashAlgorithm`; "fingerprint a file for cache invalidation", "compute SHA-256 checksum", "compare two files for equality", "cache key from request input"; typical import `import { hashFileAsync, hashString } from "@warlock.js/fs"`. Skip: file IO — `@warlock.js/fs/read-and-write-files/SKILL.md`; competing libs `hasha`, `md5-file`, `crypto-hash`; native `node:crypto` `createHash`.'
+description: 'Compute hex digests — hashFile / hashFileAsync (streaming for large files), hashFileSmallAsync, hashString, hashBuffer. Defaults to SHA-256; supports sha1 / md5 / sha512. Triggers: `hashFile`, `hashFileAsync`, `hashFileSmallAsync`, `hashString`, `hashBuffer`, `HashAlgorithm`; "fingerprint a file for cache invalidation", "compute SHA-256 checksum", "compare two files for equality", "cache key from request input"; typical import `import { hashFileAsync, hashString } from "@warlock.js/fs"`. Skip: file IO — the `read-and-write-files` topic; competing libs `hasha`, `md5-file`, `crypto-hash`; native `node:crypto` `createHash`.'
 ---
 
 # Compute file and content hashes
@@ -119,8 +119,8 @@ Cheaper than `cmp`-byte-comparing two large files when the result is "yes/no dif
 
 ## See also
 
-- [`@warlock.js/fs/read-and-write-files/SKILL.md`](@warlock.js/fs/read-and-write-files/SKILL.md) — reading files before hashing in-memory content
-- [`@warlock.js/cache/use-cached-hof/SKILL.md`](@warlock.js/cache/use-cached-hof/SKILL.md) — building cache keys from hashes
+- The `read-and-write-files` topic — reading files before hashing in-memory content
+- The `use-cached-hof` topic of the `warlock-js-cache` skill — building cache keys from hashes
 
 ## Things NOT to do
 

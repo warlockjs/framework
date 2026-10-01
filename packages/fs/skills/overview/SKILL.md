@@ -31,7 +31,7 @@ Skip if your code path is one-off and bare `node:fs/promises` is already importe
 
 Four task skills cover the surface. Load the one that matches what you're trying to do — don't load all four unless you're touring the package.
 
-### [`read-and-write-files/SKILL.md`](@warlock.js/fs/read-and-write-files/SKILL.md)
+### `read-and-write-files`
 
 Read and write text or JSON files; check existence and metadata. Covers
 `getFile` / `getFileAsync` / `getJsonFile` / `getJsonFileAsync`,
@@ -41,7 +41,7 @@ Read and write text or JSON files; check existence and metadata. Covers
 
 Load when reading or writing text or JSON, or gating creation on existence.
 
-### [`manage-directories/SKILL.md`](@warlock.js/fs/manage-directories/SKILL.md)
+### `manage-directories`
 
 Create, list, copy, move, and delete directories and files. Covers
 `ensureDirectory(Async)`, `list(Async)` / `listFiles(Async)` / `listDirectories(Async)`,
@@ -50,7 +50,7 @@ Create, list, copy, move, and delete directories and files. Covers
 
 Load when scaffolding, walking trees, snapshotting, cleaning, or moving files around.
 
-### [`write-atomically/SKILL.md`](@warlock.js/fs/write-atomically/SKILL.md)
+### `write-atomically`
 
 Write files so concurrent readers never see a half-written state. Covers
 `atomicWriteAsync(path, content)` and `atomicWriteJsonAsync(path, value)`.
@@ -58,7 +58,7 @@ Sibling temp file + atomic rename — last-writer-wins on contention, no locking
 
 Load when writing a file that other processes / file watchers / build steps consume in parallel (config, manifest, state, lockfile).
 
-### [`hash-files/SKILL.md`](@warlock.js/fs/hash-files/SKILL.md)
+### `hash-files`
 
 Compute hex digests for files (streaming) or in-memory content. Covers
 `hashFile(Async)` (streaming — constant memory),
@@ -68,7 +68,7 @@ Defaults to SHA-256; supports SHA-1 / MD5 / SHA-512.
 
 Load when fingerprinting for cache invalidation, content-addressable storage, change detection, or file-equality comparison. Never for security (password hashing, signing).
 
-### [`use-the-fs-facade/SKILL.md`](@warlock.js/fs/use-the-fs-facade/SKILL.md)
+### `use-the-fs-facade`
 
 The ergonomic, **async** shorthand over all the primitives: `fs.files.*` (file ops), `fs.dirs.*` (directory ops), lazy `fs.file(path)` / `fs.dir(path)` handles (`File` / `Directory`), and `fs.exists`. Adds what the flat primitives lack — `append`/`appendLine`/`appendJsonLine`, `size`/`isEmpty`/`count`, `ensure`(ensureFile)/`touch`/`empty`(emptyDir), EXDEV-safe `move`, `walk` + recursive `list*`, `readLines`, `edit`/`editJson`/`mergeJson`/`ensureJson`, schema-validated `getJson`, directory `hash`.
 
@@ -83,5 +83,5 @@ Load when you want the grouped/OO surface, a read-modify-write (patch a file or 
 
 ## See also
 
-- [`@warlock.js/core/warlock-conventions/SKILL.md`](@warlock.js/core/warlock-conventions/SKILL.md) — the parent framework's conventions; `fs` is one of its foundation packages.
-- `mongez-agent-kit-authoring-skills` (load via agent-kit sync) — how this `overview/SKILL.md` becomes the front-door skill in `.claude/skills/warlock-js-fs-overview/`.
+- The `warlock-conventions` topic of the `warlock-js-core` skill — the parent framework's conventions; `fs` is one of its foundation packages.
+- `mongez-agent-kit-authoring-skills` (load via agent-kit sync) — how this `overview` topic becomes the front-door skill in `.claude/skills/warlock-js-fs-overview/`.

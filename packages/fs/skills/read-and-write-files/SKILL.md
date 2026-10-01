@@ -1,6 +1,6 @@
 ---
 name: read-and-write-files
-description: 'Read and write files — getFile / getFileAsync / getJsonFile / putFile (auto-creates parent dirs), plus pathExists / fileExists / directoryExists / lastModified / stats. Triggers: `getFileAsync`, `getJsonFileAsync`, `putFileAsync`, `putJsonFileAsync`, `pathExists`, `fileExists`, `lastModifiedAsync`, `statsAsync`; "read a text file", "write a JSON file", "check if file exists"; typical import `import { getFileAsync, putJsonFileAsync, fileExists } from "@warlock.js/fs"`. Skip: atomic writes — `@warlock.js/fs/write-atomically/SKILL.md`; dirs + copy + delete — `@warlock.js/fs/manage-directories/SKILL.md`; hashing — `@warlock.js/fs/hash-files/SKILL.md`; competing libs `fs-extra`, `jsonfile`, `graceful-fs`; native `node:fs/promises`.'
+description: 'Read and write files — getFile / getFileAsync / getJsonFile / putFile (auto-creates parent dirs), plus pathExists / fileExists / directoryExists / lastModified / stats. Triggers: `getFileAsync`, `getJsonFileAsync`, `putFileAsync`, `putJsonFileAsync`, `pathExists`, `fileExists`, `lastModifiedAsync`, `statsAsync`; "read a text file", "write a JSON file", "check if file exists"; typical import `import { getFileAsync, putJsonFileAsync, fileExists } from "@warlock.js/fs"`. Skip: atomic writes — the `write-atomically` topic; dirs + copy + delete — the `manage-directories` topic; hashing — the `hash-files` topic; competing libs `fs-extra`, `jsonfile`, `graceful-fs`; native `node:fs/promises`.'
 ---
 
 # Read and write files
@@ -43,7 +43,7 @@ await putJsonFileAsync("./dist/manifest.json", { version: "1.0.0" });
 Behavior:
 - Parent directories are created recursively — no need to `ensureDirectory` first.
 - JSON variants pretty-print at 2-space indent. For minified output, stringify yourself and use the plain `putFile`.
-- Overwrites existing files. For atomic write semantics (readers never see a half-written file), use [`write-atomically`](@warlock.js/fs/write-atomically/SKILL.md).
+- Overwrites existing files. For atomic write semantics (readers never see a half-written file), use the `write-atomically` topic.
 
 ## Existence checks
 
@@ -96,12 +96,12 @@ const all = await statsAsync("./bundle.js");                // fs.Stats
 
 ## See also
 
-- [`@warlock.js/fs/manage-directories/SKILL.md`](@warlock.js/fs/manage-directories/SKILL.md) — directory listing, copying, removing, renaming
-- [`@warlock.js/fs/write-atomically/SKILL.md`](@warlock.js/fs/write-atomically/SKILL.md) — safe writes for files that other readers depend on
-- [`@warlock.js/fs/hash-files/SKILL.md`](@warlock.js/fs/hash-files/SKILL.md) — fingerprinting files
+- The `manage-directories` topic — directory listing, copying, removing, renaming
+- The `write-atomically` topic — safe writes for files that other readers depend on
+- The `hash-files` topic — fingerprinting files
 
 ## Things NOT to do
 
-- Don't call `putFileAsync` on a file that other processes / readers consume in parallel — use `atomicWriteAsync` from [`write-atomically`](@warlock.js/fs/write-atomically/SKILL.md) instead.
+- Don't call `putFileAsync` on a file that other processes / readers consume in parallel — use `atomicWriteAsync` from the `write-atomically` topic instead.
 - Don't rely on `try { getFileAsync(...) } catch` for existence checks — `fileExists` is faster and reads better.
 - Don't pass binary content to `putFile` / `putFileAsync` as a `Buffer` directly — these are text-only (UTF-8). For binaries, use `node:fs/promises`'s `writeFile` directly, or use `atomicWriteAsync` (which accepts `string | Buffer`).
