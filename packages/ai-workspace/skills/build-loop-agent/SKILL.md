@@ -1,6 +1,6 @@
 ---
 name: build-loop-agent
-description: 'Wire a @warlock.js/ai-workspace into a coding agent that closes the read → edit → run-tests loop on its own. Triggers: `ws.tools.all()`, `ai.agent({ tools: ws.tools.all() })`, `maxTrips`, `run_tests`, `run_shell`, ''agent that fixes a failing test'', ''make the suite green'', ''coding agent that edits a repo'', ''build-loop agent'', ''self-correcting agent'', ''read-only code reviewer'', ''scaffold then hand off to an agent'', ''share one workspace across a supervisor'', ''least-privilege agent tools'', ''errors as tool data''; typical wiring `const ws = ai.workspace({ cwd, shell }); ai.agent({ model, tools: ws.tools.all(), maxTrips })`. Skip: constructing the workspace / its policy / direct methods / readonly / scope — `@warlock.js/ai-workspace/use-a-workspace/SKILL.md`; the agent loop / maxTrips / events themselves — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
+description: 'Wire a @warlock.js/ai-workspace into a coding agent that closes the read → edit → run-tests loop on its own. Triggers: `ws.tools.all()`, `ai.agent({ tools: ws.tools.all() })`, `maxTrips`, `run_tests`, `run_shell`, ''agent that fixes a failing test'', ''make the suite green'', ''coding agent that edits a repo'', ''build-loop agent'', ''self-correcting agent'', ''read-only code reviewer'', ''scaffold then hand off to an agent'', ''share one workspace across a supervisor'', ''least-privilege agent tools'', ''errors as tool data''; typical wiring `const ws = ai.workspace({ cwd, shell }); ai.agent({ model, tools: ws.tools.all(), maxTrips })`. Skip: constructing the workspace / its policy / direct methods / readonly / scope — the `use-a-workspace` topic; the agent loop / maxTrips / events themselves — the `run-ai-agent` topic of the `warlock-js-ai` skill.'
 ---
 
 # Build a build-loop agent — read → edit → run tests, until green
@@ -95,6 +95,6 @@ ai.supervisor({
 
 ## See also
 
-- [`@warlock.js/ai-workspace/use-a-workspace/SKILL.md`](@warlock.js/ai-workspace/use-a-workspace/SKILL.md) — building the workspace, the policy surface, the direct methods, `readonly` / `scope`, and the typed errors.
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — the agent loop, `maxTrips`, and the run report.
-- [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md) — coordinating the members that share one workspace.
+- The `use-a-workspace` topic — building the workspace, the policy surface, the direct methods, `readonly` / `scope`, and the typed errors.
+- The `run-ai-agent` topic of the `warlock-js-ai` skill — the agent loop, `maxTrips`, and the run report.
+- The `run-supervisor` topic of the `warlock-js-ai` skill — coordinating the members that share one workspace.

@@ -1,6 +1,6 @@
 ---
 name: use-a-workspace
-description: 'Build and operate a policy-jailed filesystem + shell workspace with @warlock.js/ai-workspace. Triggers: `ai.workspace`, `workspace(`, `WorkspacePolicy`, `WorkspaceShellPolicy`, `WorkspaceToolName`, `ws.tools.all`, `ws.tools.pick`, `ws.readFile`, `ws.writeFile`, `ws.editFile`, `ws.exec`, `ws.grep`, `ws.glob`, `ws.readonly`, `ws.scope`, `WorkspacePolicyError`, `WorkspaceEditError`, `denyPaths`, `inheritEnv`, `expectHash`, `tokenizeCommand`, `read_file`/`edit_file`/`write_file`/`run_shell`/`run_tests`/`grep`; ''give an agent file tools'', ''jail an agent to a directory'', ''let an agent read/write/grep a repo'', ''read-only workspace for a reviewer'', ''scope an agent to a subdirectory'', ''run a shell command under policy'', ''edit a file with a stale-hash guard'', ''command injection guard for an agent shell tool'', ''ReDoS-safe grep for an agent''; typical import `import "@warlock.js/ai-workspace"; import { ai } from "@warlock.js/ai"`. Skip: building the agent loop that consumes the tools — `@warlock.js/ai-workspace/build-loop-agent/SKILL.md`; defining a non-filesystem custom tool — `@warlock.js/ai/define-ai-tool/SKILL.md`.'
+description: 'Build and operate a policy-jailed filesystem + shell workspace with @warlock.js/ai-workspace. Triggers: `ai.workspace`, `workspace(`, `WorkspacePolicy`, `WorkspaceShellPolicy`, `WorkspaceToolName`, `ws.tools.all`, `ws.tools.pick`, `ws.readFile`, `ws.writeFile`, `ws.editFile`, `ws.exec`, `ws.grep`, `ws.glob`, `ws.readonly`, `ws.scope`, `WorkspacePolicyError`, `WorkspaceEditError`, `denyPaths`, `inheritEnv`, `expectHash`, `tokenizeCommand`, `read_file`/`edit_file`/`write_file`/`run_shell`/`run_tests`/`grep`; ''give an agent file tools'', ''jail an agent to a directory'', ''let an agent read/write/grep a repo'', ''read-only workspace for a reviewer'', ''scope an agent to a subdirectory'', ''run a shell command under policy'', ''edit a file with a stale-hash guard'', ''command injection guard for an agent shell tool'', ''ReDoS-safe grep for an agent''; typical import `import "@warlock.js/ai-workspace"; import { ai } from "@warlock.js/ai"`. Skip: building the agent loop that consumes the tools — the `build-loop-agent` topic; defining a non-filesystem custom tool — the `define-ai-tool` topic of the `warlock-js-ai` skill.'
 ---
 
 # Use a workspace — a policy jail for an agent's filesystem + shell
@@ -131,6 +131,6 @@ const ws = ai.workspace({ cwd: "/srv/app", backend: "mock", shell: { allow: ["np
 
 ## See also
 
-- [`@warlock.js/ai-workspace/build-loop-agent/SKILL.md`](@warlock.js/ai-workspace/build-loop-agent/SKILL.md) — wiring these tools into a read → edit → test agent loop.
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent that consumes `ws.tools.all()`.
-- [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) — the `tool()` / `ToolContract` seam every workspace tool is built on.
+- The `build-loop-agent` topic — wiring these tools into a read → edit → test agent loop.
+- The `run-ai-agent` topic of the `warlock-js-ai` skill — running the agent that consumes `ws.tools.all()`.
+- The `define-ai-tool` topic of the `warlock-js-ai` skill — the `tool()` / `ToolContract` seam every workspace tool is built on.
