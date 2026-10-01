@@ -1,6 +1,7 @@
 import { lazy } from "@mongez/reinforcements";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { defineResource } from "./define-resource";
+import { nullable } from "./nullable-resource";
 import type { ResourceConstructor } from "./resource";
 import { ResourceFieldBuilder } from "./resource-field-builder";
 import type { ResourceOutput } from "./types";
@@ -111,6 +112,48 @@ describe("defineResource output types", () => {
     // A runtime [] input is what the field emits for an empty list.
     const json: Record<string, unknown> = new PostResource({ id: 1, tags: [] }).toJSON();
     expect(json.tags).toEqual([]);
+  });
+
+  it("types nullable(Resource) as the resource output or null, never an optional key", () => {
+    const AuthorResource = defineResource({ schema: { id: "number", name: "string" } });
+    const PostResource = defineResource({
+      schema: {
+        id: "number",
+        author: nullable(AuthorResource),
+        editor: nullable(lazy(() => AuthorResource)),
+      },
+    });
+
+    type PostJson = ResourceOutput<typeof PostResource>;
+
+    expectTypeOf<PostJson>().toEqualTypeOf<{
+      id: number;
+      author: { id: number; name: string } | null;
+      editor: { id: number; name: string } | null;
+    }>();
+  });
+
+  it("types [Resource] as an array of the resource output", () => {
+    const TagResource = defineResource({ schema: { label: "string" } });
+    const PostResource = defineResource({ schema: { id: "number", tags: [TagResource] } });
+
+    type PostJson = ResourceOutput<typeof PostResource>;
+
+    expectTypeOf<PostJson>().toEqualTypeOf<{ id: number; tags: { label: string }[] }>();
+    expectTypeOf<PostJson["tags"]>().not.toBeNullable();
+  });
+
+  it("types nullable and list fields nested in another resource", () => {
+    const TagResource = defineResource({ schema: { label: "string" } });
+    const PostResource = defineResource({ schema: { tags: [TagResource] } });
+    const FeedResource = defineResource({
+      schema: { latest: nullable(PostResource), posts: [PostResource] },
+    });
+
+    expectTypeOf<ResourceOutput<typeof FeedResource>>().toEqualTypeOf<{
+      latest: { tags: { label: string }[] } | null;
+      posts: { tags: { label: string }[] }[];
+    }>();
   });
 
   it("ResourceOutput agrees for a class and an instance", () => {

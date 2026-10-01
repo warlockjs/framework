@@ -1,5 +1,6 @@
 import { type Lazy } from "@mongez/reinforcements";
 import { ResponseStatus } from "../http";
+import { type NullableResource } from "./nullable-resource";
 import { type ResourceConstructor, type ResourceContract } from "./resource";
 import { type ResourceFieldBuilder } from "./resource-field-builder";
 
@@ -49,6 +50,8 @@ export type ResourceFieldConfig =
   | ResourceConstructor
   | ResourceSelfReference
   | Lazy<ResourceConstructor>
+  | NullableResource
+  | [ResourceConstructor]
   | [string, ResourceCastType]
   | ResourceFieldBuilder
   | ResourceArraySchema
@@ -99,12 +102,14 @@ export type ResourceFieldBuilderDateOutputOptions =
  *   (e.g. "string", "number?", "string[]", "date[]?")
  * - ResourceConstructor for a single nested resource object
  * - [ResourceConstructor] (tuple) for an array of a nested resource
+ * - nullable(ResourceConstructor) for a nested resource that is `null` when the value is missing
  * - A nested plain object of any of the above
  */
 export type ResponseBodyValue =
   | ResourceCastType
   | ResourceConstructor
   | [ResourceConstructor]
+  | NullableResource<ResourceConstructor<any>>
   | { [key: string]: ResponseBodyValue };
 
 /**
@@ -178,19 +183,23 @@ export type FieldOutput<F, Root extends ResourceSchema = ResourceSchema> = F ext
     ? ResourceOutputOf<Root, Root>[]
     : F extends string
       ? CastOutput<F>
-      : F extends readonly [string, infer C extends string]
-        ? CastOutput<C>
-        : F extends ResourceFieldBuilder
-          ? unknown
-          : F extends Lazy<infer R>
-            ? FieldOutput<R, Root>
-            : F extends { readonly __type: "arrayOf"; readonly schema: infer Item extends ResourceSchema }
-              ? ResourceOutputOf<Item, Root>[]
-              : F extends new (...args: any[]) => { toJSON(): infer O }
-                ? AnyToUnknown<O>
-                : F extends (...args: any[]) => infer R
-                  ? AnyToUnknown<R>
-                  : unknown;
+      : F extends NullableResource<infer R>
+        ? FieldOutput<R, Root> | null
+        : F extends readonly [new (...args: any[]) => { toJSON(): infer O }]
+          ? AnyToUnknown<O>[]
+          : F extends readonly [string, infer C extends string]
+            ? CastOutput<C>
+            : F extends ResourceFieldBuilder
+              ? unknown
+              : F extends Lazy<infer R>
+                ? FieldOutput<R, Root>
+                : F extends { readonly __type: "arrayOf"; readonly schema: infer Item extends ResourceSchema }
+                  ? ResourceOutputOf<Item, Root>[]
+                  : F extends new (...args: any[]) => { toJSON(): infer O }
+                    ? AnyToUnknown<O>
+                    : F extends (...args: any[]) => infer R
+                      ? AnyToUnknown<R>
+                      : unknown;
 
 /**
  * JSON output type inferred from a resource schema.
@@ -219,7 +228,8 @@ export type ResourceOutput<R> = R extends new (...args: any[]) => { toJSON(): in
 /**
  * Output type of one response schema body value, with the same rules as a resource schema:
  * a cast string resolves through `CastOutput`, a resource through `ResourceOutput`,
- * `[Resource]` to an array of it, and a nested object recurses.
+ * `[Resource]` to an array of it, `nullable(Resource)` to its output or `null`, and a nested
+ * object recurses.
  *
  * @example
  * type Out = ResponseBodyOutput<{ user: typeof UserResource; token: "string"; tags: "string[]?" }>;
@@ -230,9 +240,11 @@ export type ResponseBodyOutput<B> = B extends string
     ? ResourceOutput<R>[]
     : B extends new (...args: any[]) => unknown
       ? ResourceOutput<B>
-      : B extends object
-        ? { -readonly [K in keyof B]: ResponseBodyOutput<B[K]> }
-        : never;
+      : B extends NullableResource<infer R>
+        ? ResourceOutput<R> | null
+        : B extends object
+          ? { -readonly [K in keyof B]: ResponseBodyOutput<B[K]> }
+          : never;
 
 /**
  * Output type of a whole response schema: the body output per declared status code.

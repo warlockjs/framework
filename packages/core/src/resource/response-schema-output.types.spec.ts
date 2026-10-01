@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { ResponseStatus } from "../http";
 import { defineResource } from "./define-resource";
+import { nullable } from "./nullable-resource";
 import type {
   ResponseBodyOutput,
   ResponseBodyValue,
@@ -24,9 +25,10 @@ describe("ResponseBodyValue", () => {
       user: UserResource,
       posts: [PostResource],
       meta: { count: "number", owner: { user: UserResource } },
+      maybe: nullable(UserResource),
     } satisfies Record<string, ResponseBodyValue>;
 
-    expect(Object.keys(body)).toHaveLength(7);
+    expect(Object.keys(body)).toHaveLength(8);
   });
 
   it("stays assignable for the original flat schema", () => {
@@ -62,6 +64,29 @@ describe("ResponseBodyOutput", () => {
       meta: { count: number };
       posts: PostJson[];
     }>();
+  });
+
+  it("maps nullable(Resource) to the resource output or null, also nested", () => {
+    type Output = ResponseBodyOutput<{
+      user: ReturnType<typeof nullable<typeof UserResource>>;
+      meta: { owner: ReturnType<typeof nullable<typeof PostResource>>; count: "number" };
+    }>;
+
+    expectTypeOf<Output>().toEqualTypeOf<{
+      user: UserJson | null;
+      meta: { owner: PostJson | null; count: number };
+    }>();
+  });
+
+  it("infers nullable(Resource) from a satisfies-checked body", () => {
+    const schema = {
+      200: { body: { user: nullable(UserResource), posts: [PostResource] } },
+    } satisfies ResponseSchema;
+
+    type Output = ResponseSchemaOutput<typeof schema>;
+
+    expectTypeOf<Output[200]>().toEqualTypeOf<{ user: UserJson | null; posts: PostJson[] }>();
+    expect(schema[200].body.user.resource).toBe(UserResource);
   });
 
   it("is readonly-agnostic so an `as const` body resolves the same way", () => {

@@ -1,4 +1,5 @@
 import { isLazy } from "@mongez/reinforcements";
+import { isNullableResource } from "../resource/nullable-resource";
 import { castToJsonSchema } from "./cast-schema";
 import type { OpenApiSchema, WarningSink } from "./types";
 
@@ -153,8 +154,16 @@ export class SchemaRegistry {
       return this.cast(config, context.path);
     }
 
+    if (isNullableResource(config)) {
+      return { oneOf: [this.fieldSchema(config.resource, context), { type: "null" }] };
+    }
+
     if (isLazy(config)) {
       return this.lazyFieldSchema(config, context);
+    }
+
+    if (Array.isArray(config) && config.length === 1) {
+      return { type: "array", items: this.fieldSchema(config[0], context) };
     }
 
     if (Array.isArray(config) && config.length === 2 && typeof config[1] === "string") {

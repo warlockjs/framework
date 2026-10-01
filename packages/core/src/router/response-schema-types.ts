@@ -1,4 +1,5 @@
 import { posix, relative, sep } from "node:path";
+import { isNullableResource } from "../resource/nullable-resource";
 
 /**
  * Where a resource class lives: the module it is exported from and the export name.
@@ -122,6 +123,10 @@ function describeBodyValue(
 ): string {
   if (typeof value === "string") {
     return describeCast(value);
+  }
+
+  if (isNullableResource(value)) {
+    return `(${describeBodyValue(value.resource, path, resolveResource, onUnmapped)}) | null`;
   }
 
   if (typeof value === "function") {

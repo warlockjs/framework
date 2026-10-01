@@ -6,6 +6,8 @@ import {
   describeResponseSchemaTypes,
   type ResourceTypeResolver,
 } from "./response-schema-types";
+import { nullable } from "../resource/nullable-resource";
+import type { ResourceConstructor } from "../resource/resource";
 
 const appRoot = resolve("/work/app");
 const userFile = resolve(appRoot, "src/app/users/resources/user.resource.ts");
@@ -60,6 +62,40 @@ describe("describeResponseSchemaTypes", () => {
     expect(described?.["200"]).toBe(
       `{ "x-total": ${cast("int")}; "we\\"ird": ${cast("string")} }`,
     );
+  });
+
+  it("serializes nullable(Resource) as the resource type or null, also nested and in arrays", () => {
+    const asResource = (value: unknown) => value as ResourceConstructor;
+
+    const described = describeResponseSchemaTypes(
+      {
+        200: {
+          body: {
+            user: nullable(asResource(UserResource)),
+            meta: { owner: nullable(asResource(PostResource)) },
+            posts: [PostResource],
+            unmapped: nullable(asResource(class {})),
+          },
+        },
+      },
+      resolver(),
+    );
+
+    expect(described?.["200"]).toBe(
+      `{ "user": (${USER}) | null; "meta": { "owner": (${POST}) | null }; "posts": (${POST})[]; "unmapped": (unknown) | null }`,
+    );
+  });
+
+  it("reports the path of an unmapped nullable resource", () => {
+    const onUnmapped = vi.fn();
+
+    describeResponseSchemaTypes(
+      { 200: { body: { owner: nullable(class {} as unknown as ResourceConstructor) } } },
+      resolver(),
+      onUnmapped,
+    );
+
+    expect(onUnmapped).toHaveBeenCalledWith("200.body.owner");
   });
 
   it("types an unmapped resource as unknown and reports its path", () => {

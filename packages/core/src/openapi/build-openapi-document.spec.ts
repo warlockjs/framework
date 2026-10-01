@@ -1,6 +1,8 @@
 import { lazy } from "@mongez/reinforcements";
 import { v } from "@warlock.js/seal";
 import { describe, expect, it } from "vitest";
+import { nullable } from "../resource/nullable-resource";
+import type { ResourceConstructor } from "../resource/resource";
 import { buildOpenApiDocument } from "./build-openapi-document";
 import type {
   OpenApiContext,
@@ -579,6 +581,84 @@ describe("buildOpenApiDocument — responses from responseSchema", () => {
       },
       required: ["id", "name", "email", "createdAt", "avatar", "tags", "parent", "friends"],
     });
+  });
+
+  it("documents nullable(Resource) in a response body as oneOf the resource or null", () => {
+    const asResource = (value: unknown) => value as ResourceConstructor;
+    const { document, warnings } = build(
+      [
+        route("GET", "/me", {
+          responseSchema: {
+            200: {
+              body: {
+                user: nullable(asResource(UserResource)),
+                meta: { owner: nullable(asResource(UserResource)) },
+              },
+            },
+          },
+        }),
+      ],
+      { resolveResourceName: (resource) => (resource === UserResource ? "UserResource" : undefined) },
+    );
+    const nullableUser = {
+      oneOf: [{ $ref: "#/components/schemas/UserResource" }, { type: "null" }],
+    };
+
+    expect(jsonSchemaOf(responseOf(opAt(document, "/me", "get"), "200").content)).toEqual({
+      type: "object",
+      properties: {
+        user: nullableUser,
+        meta: { type: "object", properties: { owner: nullableUser }, required: ["owner"] },
+      },
+      required: ["user", "meta"],
+    });
+    expect(Object.keys(document.components?.schemas ?? {})).toEqual(["UserResource"]);
+    expect(warnings).toEqual([]);
+  });
+
+  it("documents nullable(Resource) and [Resource] fields inside a resource", () => {
+    const asResource = (value: unknown) => value as ResourceConstructor;
+
+    class TagResource {
+      public static schema = { label: "string" };
+    }
+
+    class PostResource {
+      public static schema = {
+        tags: [TagResource],
+        author: nullable(asResource(UserResource)),
+        editor: nullable(lazy(() => asResource(TagResource))),
+      };
+    }
+
+    const { document, warnings } = build(
+      [route("GET", "/p", { responseSchema: { 200: { body: { post: PostResource } } } })],
+      {
+        resolveResourceName: (resource) =>
+          resource === PostResource
+            ? "PostResource"
+            : resource === TagResource
+              ? "TagResource"
+              : resource === UserResource
+                ? "UserResource"
+                : undefined,
+      },
+    );
+
+    expect(document.components?.schemas?.PostResource).toEqual({
+      type: "object",
+      properties: {
+        tags: { type: "array", items: { $ref: "#/components/schemas/TagResource" } },
+        author: {
+          oneOf: [{ $ref: "#/components/schemas/UserResource" }, { type: "null" }],
+        },
+        editor: {
+          oneOf: [{ $ref: "#/components/schemas/TagResource" }, { type: "null" }],
+        },
+      },
+      required: ["tags", "author", "editor"],
+    });
+    expect(warnings).toEqual([]);
   });
 
   it("recurses through nested and lazy resources without looping", () => {

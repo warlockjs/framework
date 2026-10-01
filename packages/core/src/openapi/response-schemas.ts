@@ -1,3 +1,4 @@
+import { isNullableResource } from "../resource/nullable-resource";
 import type { SchemaRegistry } from "./schema-registry";
 import type { OpenApiResponse, OpenApiSchema, WarningSink } from "./types";
 
@@ -35,12 +36,16 @@ export function describeStatus(status: string): string {
 
 /**
  * JSON Schema of one response body value: a cast string, a resource class, `[Resource]`
- * (array of it) or a nested plain object of those. Anything else (a resolver function, a
+ * (array of it), `nullable(Resource)` (the resource or null) or a nested plain object of those. Anything else (a resolver function, a
  * builder) is `{}` plus a warning.
  */
 function bodyValueSchema(value: unknown, path: string, registry: SchemaRegistry, warn: WarningSink): OpenApiSchema {
   if (typeof value === "string") {
     return registry.cast(value, path, warn);
+  }
+
+  if (isNullableResource(value)) {
+    return { oneOf: [bodyValueSchema(value.resource, path, registry, warn), { type: "null" }] };
   }
 
   if (typeof value === "function") {

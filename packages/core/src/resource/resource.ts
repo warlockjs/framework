@@ -1,6 +1,7 @@
 import { get, isLazy, set, type GenericObject } from "@mongez/reinforcements";
 import { Model } from "@warlock.js/cascade";
 import { useRequestStore } from "../http/context/request-context";
+import { isNullableResource } from "./nullable-resource";
 import { ResourceFieldBuilder } from "./resource-field-builder";
 import {
   type ResourceArraySchema,
@@ -280,6 +281,22 @@ export class Resource implements ResourceContract {
       return this.transformValue(value, outputSettings.resolve(), locale);
     }
 
+    if (isNullableResource(outputSettings)) {
+      // nullable(Resource) — always present: null for a missing input, the resource output otherwise
+      if (value === null || value === undefined) return null;
+
+      return this.transformValue(value, outputSettings.resource, locale) ?? null;
+    }
+
+    if (Array.isArray(outputSettings) && outputSettings.length === 1) {
+      // [Resource] — a list field. [] stays [], a missing/null input omits the field.
+      if (!Array.isArray(value)) return;
+
+      return value
+        .map((item) => this.transformValue(item, outputSettings[0], locale))
+        .filter((v) => v !== undefined);
+    }
+
     if (outputSettings === "self" || outputSettings === "self[]") {
       // Self-reference — resolve using the same resource class with cycle detection
       outputValue = this.transformSelfReference(value, outputSettings === "self[]");
@@ -385,9 +402,9 @@ export class Resource implements ResourceContract {
       let fieldKey = outputKey;
       let valueTransformType = outputSettings as ResourceFieldConfig;
 
-      if (Array.isArray(outputSettings)) {
-        fieldKey = outputSettings[0];
-        valueTransformType = outputSettings[1];
+      if (Array.isArray(outputSettings) && outputSettings.length === 2) {
+        fieldKey = outputSettings[0] as string;
+        valueTransformType = outputSettings[1] as ResourceFieldConfig;
       }
 
       const inputKey = valueTransformType instanceof ResourceFieldBuilder
