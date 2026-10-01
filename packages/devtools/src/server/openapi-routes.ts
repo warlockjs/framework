@@ -7,8 +7,10 @@ import { sendFile } from "./ui-assets";
 /**
  * Registers the API docs: `GET /api/openapi.json` returns the document core
  * builds from the registered routes (`deps.getOpenApiDocument`), and
- * `GET /docs` serves the page that renders it with Scalar. The page uses
- * relative URLs, so it works under whatever base path the dashboard is
+ * `GET /docs` serves the page that renders it with Scalar and
+ * `GET /docs/swagger` the same document in Swagger UI;
+ * `GET /api/postman.json` returns the Postman collection core builds
+ * (`deps.getPostmanCollection`). The pages use relative URLs, so it works under whatever base path the dashboard is
  * mounted on.
  */
 export function registerOpenApiRoutes(
@@ -27,7 +29,23 @@ export function registerOpenApiRoutes(
     return deps.getOpenApiDocument();
   });
 
+  server.get("/api/postman.json", async (_request, reply) => {
+    if (!deps.getPostmanCollection) {
+      return reply.code(503).header("Cache-Control", "no-store").send({
+        error: "The Postman collection is not available: the host did not provide a generator.",
+      });
+    }
+
+    reply.header("Cache-Control", "no-store");
+
+    return deps.getPostmanCollection();
+  });
+
   server.get("/docs", (_request, reply) => {
     sendFile(reply, path.join(resolveUiRoot(), "docs.html"), "text/html; charset=utf-8");
+  });
+
+  server.get("/docs/swagger", (_request, reply) => {
+    sendFile(reply, path.join(resolveUiRoot(), "docs-swagger.html"), "text/html; charset=utf-8");
   });
 }

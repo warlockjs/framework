@@ -330,10 +330,16 @@ details summary {
 .log-success {
   color: var(--good);
 }
+.toolbar-link {
+  margin-left: 6px;
+}
+.toolbar-link:first-of-type {
+  margin-left: auto;
+}
 .docs-frame {
   display: block;
   width: 100%;
-  height: calc(100vh - 110px);
+  height: calc(100vh - 165px);
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--surface);

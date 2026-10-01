@@ -467,8 +467,72 @@ async function routesView() {
   return section;
 }
 
+const DOCS_VIEWERS = [
+  { id: "scalar", label: "Scalar", src: "docs" },
+  { id: "swagger", label: "Swagger UI", src: "docs/swagger" },
+];
+const DOCS_VIEWER_KEY = "warlock-devtools-docs-viewer";
+
+function savedDocsViewer() {
+  try {
+    const id = localStorage.getItem(DOCS_VIEWER_KEY);
+    return DOCS_VIEWERS.find((viewer) => viewer.id === id) || DOCS_VIEWERS[0];
+  } catch {
+    return DOCS_VIEWERS[0];
+  }
+}
+
+function saveDocsViewer(viewer) {
+  try {
+    localStorage.setItem(DOCS_VIEWER_KEY, viewer.id);
+  } catch {
+    // Storage can be blocked; the choice then lasts until the tab changes.
+  }
+}
+
 function apiView() {
-  return el("iframe", { class: "docs-frame", src: "docs", title: "API reference" });
+  const section = el("section");
+  const frame = el("iframe", { class: "docs-frame", title: "API reference" });
+  const buttons = DOCS_VIEWERS.map((viewer) =>
+    el("button", {
+      class: "toggle",
+      type: "button",
+      text: viewer.label,
+    }),
+  );
+  const show = (viewer) => {
+    frame.src = viewer.src;
+    buttons.forEach((button, index) =>
+      button.classList.toggle("is-active", DOCS_VIEWERS[index] === viewer),
+    );
+  };
+  const pick = (viewer) => {
+    saveDocsViewer(viewer);
+    show(viewer);
+  };
+  buttons.forEach((button, index) =>
+    button.addEventListener("click", () => pick(DOCS_VIEWERS[index])),
+  );
+  section.append(
+    el("div", { class: "toolbar" }, [
+      ...buttons,
+      el("a", {
+        class: "toolbar-link",
+        href: "api/openapi.json",
+        download: "openapi.json",
+        text: "OpenAPI JSON",
+      }),
+      el("a", {
+        class: "toolbar-link",
+        href: "api/postman.json",
+        download: "postman.json",
+        text: "Postman collection",
+      }),
+    ]),
+    frame,
+  );
+  show(savedDocsViewer());
+  return section;
 }
 
 async function render() {

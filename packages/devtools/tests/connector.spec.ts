@@ -104,3 +104,53 @@ describe("devtoolsConnector OpenAPI hook", () => {
     await connector.shutdown();
   });
 });
+
+describe("devtoolsConnector Postman hook", () => {
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it("injects a getPostmanCollection that returns the collection core builds", async () => {
+    const core = await import("@warlock.js/core");
+    (core.Application as { runtimeStrategy: string }).runtimeStrategy = "development";
+    const collection = { info: { name: "app" }, item: [] };
+    (core as Record<string, unknown>).getDevelopmentPostmanCollection = vi.fn(
+      async () => collection,
+    );
+    mountDevtoolsRoutes.mockClear();
+
+    const { devtoolsConnector } = await import("../src/devtools-connector");
+    const connector = devtoolsConnector();
+
+    await connector.boot();
+
+    const deps = mountDevtoolsRoutes.mock.calls[0][1] as {
+      getPostmanCollection: () => Promise<object>;
+    };
+
+    await expect(deps.getPostmanCollection()).resolves.toBe(collection);
+
+    await connector.shutdown();
+    delete (core as Record<string, unknown>).getDevelopmentPostmanCollection;
+  });
+
+  it("leaves getPostmanCollection undefined when core cannot build one", async () => {
+    const core = await import("@warlock.js/core");
+    (core.Application as { runtimeStrategy: string }).runtimeStrategy = "development";
+    delete (core as Record<string, unknown>).getDevelopmentPostmanCollection;
+    mountDevtoolsRoutes.mockClear();
+
+    const { devtoolsConnector } = await import("../src/devtools-connector");
+    const connector = devtoolsConnector();
+
+    await connector.boot();
+
+    const deps = mountDevtoolsRoutes.mock.calls[0][1] as {
+      getPostmanCollection?: () => Promise<object>;
+    };
+
+    expect(deps.getPostmanCollection).toBeUndefined();
+
+    await connector.shutdown();
+  });
+});

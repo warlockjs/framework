@@ -24,6 +24,18 @@ const UI_ASSETS: Record<string, UiAsset> = {
     contentType: "text/javascript; charset=utf-8",
     file: uiFile("vendor/scalar/standalone.js"),
   },
+  "swagger-ui-bundle.js": {
+    contentType: "text/javascript; charset=utf-8",
+    file: uiFile("vendor/swagger-ui/swagger-ui-bundle.js"),
+  },
+  "swagger-ui.css": {
+    contentType: "text/css; charset=utf-8",
+    file: uiFile("vendor/swagger-ui/swagger-ui.css"),
+  },
+  "docs-swagger.js": {
+    contentType: "text/javascript; charset=utf-8",
+    file: uiFile("docs-swagger.js"),
+  },
 };
 
 /** Sends `file` with `contentType` and no caching. */
@@ -36,8 +48,8 @@ export function sendFile(reply: FastifyReply, file: string, contentType: string)
 
 /**
  * Serves the static dashboard: `index.html` at the dashboard root and the
- * whitelisted assets (`app.js`, `app.css`, and the vendored Scalar bundle
- * as `scalar.js`). The asset name is matched against a fixed whitelist — never
+ * whitelisted assets (`app.js`, `app.css`, the vendored Scalar bundle as
+ * `scalar.js`, and the vendored Swagger UI files plus their init script). The asset name is matched against a fixed whitelist — never
  * joined into a filesystem path — so no request can traverse outside it.
  */
 export function registerUiAssets(server: FastifyInstance): void {

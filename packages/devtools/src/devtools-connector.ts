@@ -78,6 +78,7 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
       await attachSource(log, "log", () => attachLogSource(collector));
 
       const { mountDevtoolsRoutes } = await import("./server");
+      const postmanBuilder = await findPostmanBuilder();
 
       mountDevtoolsRoutes(getHttpServer(), {
         collector,
@@ -86,6 +87,9 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
         explain: (query) => explainQuery(query),
         listRoutes: () => listRoutes(),
         getOpenApiDocument: () => getOpenApiDocument(),
+        getPostmanCollection: postmanBuilder
+          ? async () => unwrapCollection(await postmanBuilder())
+          : undefined,
       });
 
       // An N+1 is worth a terminal line, not just a badge the developer has
@@ -174,4 +178,35 @@ async function getOpenApiDocument(): Promise<object> {
   const { document } = await getDevelopmentOpenApiDocument();
 
   return document;
+}
+
+type PostmanBuilder = () => Promise<unknown>;
+
+/**
+ * Looks up core's Postman collection builder, `getDevelopmentPostmanCollection`.
+ * Older cores do not export it; the route then answers 503. The lookup is
+ * guarded because a namespace without the export may throw on access. Core is
+ * imported lazily, like the OpenAPI document above.
+ */
+async function findPostmanBuilder(): Promise<PostmanBuilder | undefined> {
+  try {
+    const core: Record<string, unknown> = await import("@warlock.js/core");
+    const build = core.getDevelopmentPostmanCollection;
+
+    return typeof build === "function" ? (build as PostmanBuilder) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Core may return the collection itself or wrap it in `{ collection, warnings }`,
+ * like the OpenAPI generator's `{ document, warnings }`.
+ */
+function unwrapCollection(result: unknown): object {
+  if (result && typeof result === "object" && "collection" in result) {
+    return (result as { collection: object }).collection;
+  }
+
+  return result as object;
 }
