@@ -1,6 +1,6 @@
 ---
 name: pick-log-channel
-description: 'Pick one of the four built-in channels — ConsoleLog (terminal), FileLog (plain text on disk), JSONFileLog (structured JSON for aggregators like Loki / Datadog / Elastic), SentryLog (forwards errors + breadcrumbs to Sentry). Triggers: `ConsoleLog`, `FileLog`, `JSONFileLog`, `SentryLog`, `chunk`, `rotate`, `groupBy`, `maxFileSize`, `showContext`, `log.channel`; "log to a file", "rotate log files", "daily log chunks", "json logs for datadog / loki / elastic", "send logs to Sentry"; typical import `import { ConsoleLog, FileLog, JSONFileLog, SentryLog } from "@warlock.js/logger"`. Skip: Sentry-specific setup — `@warlock.js/logger/ship-logs-to-sentry/SKILL.md`; custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; registration — `@warlock.js/logger/configure-logger/SKILL.md`; competing libs `winston-daily-rotate-file`, `pino-pretty`.'
+description: 'Pick one of the four built-in channels — ConsoleLog (terminal), FileLog (plain text on disk), JSONFileLog (structured JSON for aggregators like Loki / Datadog / Elastic), SentryLog (forwards errors + breadcrumbs to Sentry). Triggers: `ConsoleLog`, `FileLog`, `JSONFileLog`, `SentryLog`, `chunk`, `rotate`, `groupBy`, `maxFileSize`, `showContext`, `log.channel`; "log to a file", "rotate log files", "daily log chunks", "json logs for datadog / loki / elastic", "send logs to Sentry"; typical import `import { ConsoleLog, FileLog, JSONFileLog, SentryLog } from "@warlock.js/logger"`. Skip: Sentry-specific setup — the `ship-logs-to-sentry` topic; custom sinks — the `write-custom-log-channel` topic; registration — the `configure-logger` topic; competing libs `winston-daily-rotate-file`, `pino-pretty`.'
 ---
 
 # Channels — which one to pick and how to configure it
@@ -119,7 +119,7 @@ import { SentryLog } from "@warlock.js/logger";
 new SentryLog({ client: Sentry, eventLevels: ["error", "warn"] });
 ```
 
-Full guide — level mapping, init modes, shutdown draining: [`ship-logs-to-sentry`](@warlock.js/logger/ship-logs-to-sentry/SKILL.md).
+Full guide — level mapping, init modes, shutdown draining: the `ship-logs-to-sentry` topic.
 
 ## Shared config — `BasicLogConfigurations`
 
@@ -149,7 +149,7 @@ If two channels share a `name`, only one is reachable this way — the search re
 
 ## See also
 
-- [`@warlock.js/logger/configure-logger/SKILL.md`](@warlock.js/logger/configure-logger/SKILL.md) — registering channels at startup
-- [`@warlock.js/logger/filter-log-entries/SKILL.md`](@warlock.js/logger/filter-log-entries/SKILL.md) — `levels` and `filter` config in detail
-- [`@warlock.js/logger/ship-logs-to-sentry/SKILL.md`](@warlock.js/logger/ship-logs-to-sentry/SKILL.md) — the `SentryLog` channel in depth
-- [`@warlock.js/logger/write-custom-log-channel/SKILL.md`](@warlock.js/logger/write-custom-log-channel/SKILL.md) — extending `LogChannel` for custom sinks
+- The `configure-logger` topic — registering channels at startup
+- The `filter-log-entries` topic — `levels` and `filter` config in detail
+- The `ship-logs-to-sentry` topic — the `SentryLog` channel in depth
+- The `write-custom-log-channel` topic — extending `LogChannel` for custom sinks

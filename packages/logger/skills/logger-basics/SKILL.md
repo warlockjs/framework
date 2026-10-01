@@ -23,13 +23,13 @@ The 11 things that are true in every logger use:
 2. **The singleton starts with zero channels.** Nothing is written until at least one channel is registered via `addChannel`, `setChannels`, or `configure`.
 3. **Custom instances:** `new Logger()` gives an isolated logger with the identical API. Almost always you want the singleton — reach for the class only when you need an isolated channel set (libraries, test sandboxes).
 4. **Six levels, closed union:** `"debug" | "info" | "warn" | "error" | "success" | "fatal"`. `fatal` ranks strictly above `error` — use it for unrecoverable failures where the app is going down (failed bootstrap, `uncaughtException`). There are no custom levels.
-5. **Channels can be filtered two ways:** a `levels` array (whitelist) and a `filter` predicate (custom logic). Both run on every entry. See [`@warlock.js/logger/filter-log-entries/SKILL.md`](@warlock.js/logger/filter-log-entries/SKILL.md).
+5. **Channels can be filtered two ways:** a `levels` array (whitelist) and a `filter` predicate (custom logic). Both run on every entry. See the `filter-log-entries` topic.
 6. **Logger-wide minimum severity** is available via `log.setMinLevel("info")` (or `configure({ minLevel })`). Entries below the rank are dropped before fan-out — cheaper than per-channel filters.
-7. **Redaction** is two-layer additive: `configure({ redact })` sets the logger floor; `new XxxChannel({ redact: { paths: [...] } })` adds more paths on top. Channels can never remove paths from the logger floor. See [`@warlock.js/logger/redact-sensitive-log-fields/SKILL.md`](@warlock.js/logger/redact-sensitive-log-fields/SKILL.md).
-8. **`FileLog` and `JSONFileLog` buffer in memory.** They flush when `maxMessagesToWrite` (default `100`) is hit, when 5 seconds have elapsed since the last write, or when `flushSync()` is called. See [`@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`](@warlock.js/logger/flush-logs-on-shutdown/SKILL.md).
+7. **Redaction** is two-layer additive: `configure({ redact })` sets the logger floor; `new XxxChannel({ redact: { paths: [...] } })` adds more paths on top. Channels can never remove paths from the logger floor. See the `redact-sensitive-log-fields` topic.
+8. **`FileLog` and `JSONFileLog` buffer in memory.** They flush when `maxMessagesToWrite` (default `100`) is hit, when 5 seconds have elapsed since the last write, or when `flushSync()` is called. See the `flush-logs-on-shutdown` topic.
 9. **Non-terminal channels receive ANSI-stripped messages.** `Logger.log` shallow-clones the entry per non-terminal channel before stripping, so later terminal channels still get the colored original.
 10. **`JSONFileLog.extension` is always `"json"`.** The option is ignored for this channel.
-11. **`captureAnyUnhandledRejection()` registers process listeners.** Call it once at startup, after channels are registered. Calling it twice installs duplicate listeners. See [`@warlock.js/logger/capture-unhandled-errors/SKILL.md`](@warlock.js/logger/capture-unhandled-errors/SKILL.md).
+11. **`captureAnyUnhandledRejection()` registers process listeners.** Call it once at startup, after channels are registered. Calling it twice installs duplicate listeners. See the `capture-unhandled-errors` topic.
 
 ## Minimal startup example
 
@@ -59,7 +59,7 @@ log.success("module", "action", "operation done");    // explicit success
 log.fatal("module", "action", error);                 // unrecoverable, app is going down
 ```
 
-`fatal` is purely informational — it does NOT auto-flush or exit. The caller decides whether to `await log.flush()` and `process.exit(...)`. See [`@warlock.js/logger/capture-unhandled-errors/SKILL.md`](@warlock.js/logger/capture-unhandled-errors/SKILL.md) for the `uncaughtException` → `fatal` routing.
+`fatal` is purely informational — it does NOT auto-flush or exit. The caller decides whether to `await log.flush()` and `process.exit(...)`. See the `capture-unhandled-errors` topic for the `uncaughtException` → `fatal` routing.
 
 Every call signature is the same — `module`, `action`, `message`, optional `context`. `message` can be a string, object, or `Error` instance (file channels capture the stack).
 
@@ -67,15 +67,15 @@ Every call signature is the same — `module`, `action`, `message`, optional `co
 
 | If the task is about… | Load |
 | --- | --- |
-| Picking a channel — what each built-in does, when to use which | [`@warlock.js/logger/pick-log-channel/SKILL.md`](@warlock.js/logger/pick-log-channel/SKILL.md) |
-| Startup — registering channels, environment-based setup, the `configure` method | [`@warlock.js/logger/configure-logger/SKILL.md`](@warlock.js/logger/configure-logger/SKILL.md) |
-| Filtering log output (`levels`, `filter`, per-channel routing, `minLevel`) | [`@warlock.js/logger/filter-log-entries/SKILL.md`](@warlock.js/logger/filter-log-entries/SKILL.md) |
-| Graceful shutdown — `flushSync`, `autoFlushOn`, signal behavior | [`@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`](@warlock.js/logger/flush-logs-on-shutdown/SKILL.md) |
-| Extending `LogChannel` to build a custom sink (Slack, database, HTTP) | [`@warlock.js/logger/write-custom-log-channel/SKILL.md`](@warlock.js/logger/write-custom-log-channel/SKILL.md) |
-| Routing Node's `unhandledRejection` / `uncaughtException` through the logger | [`@warlock.js/logger/capture-unhandled-errors/SKILL.md`](@warlock.js/logger/capture-unhandled-errors/SKILL.md) |
-| `log.assert(...)` and `log.timer(...)` shorthand helpers | [`@warlock.js/logger/use-log-helpers/SKILL.md`](@warlock.js/logger/use-log-helpers/SKILL.md) |
-| Redacting secrets — logger floor + additive channel paths | [`@warlock.js/logger/redact-sensitive-log-fields/SKILL.md`](@warlock.js/logger/redact-sensitive-log-fields/SKILL.md) |
-| Tests that assert on log output, or code under test that logs | [`@warlock.js/logger/test-logging-code/SKILL.md`](@warlock.js/logger/test-logging-code/SKILL.md) |
+| Picking a channel — what each built-in does, when to use which | the `pick-log-channel` topic |
+| Startup — registering channels, environment-based setup, the `configure` method | the `configure-logger` topic |
+| Filtering log output (`levels`, `filter`, per-channel routing, `minLevel`) | the `filter-log-entries` topic |
+| Graceful shutdown — `flushSync`, `autoFlushOn`, signal behavior | the `flush-logs-on-shutdown` topic |
+| Extending `LogChannel` to build a custom sink (Slack, database, HTTP) | the `write-custom-log-channel` topic |
+| Routing Node's `unhandledRejection` / `uncaughtException` through the logger | the `capture-unhandled-errors` topic |
+| `log.assert(...)` and `log.timer(...)` shorthand helpers | the `use-log-helpers` topic |
+| Redacting secrets — logger floor + additive channel paths | the `redact-sensitive-log-fields` topic |
+| Tests that assert on log output, or code under test that logs | the `test-logging-code` topic |
 
 ## Things NOT to do
 

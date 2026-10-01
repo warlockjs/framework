@@ -1,6 +1,6 @@
 ---
 name: test-logging-code
-description: 'Test code that touches the logger — silence globally via log.setChannels([]) in setupFiles, assert specific log lines via a capturing LogChannel subclass (prefer it over vi.spyOn — it asserts on delivered entries, not just method calls, and isolates the shared singleton cleanly). Triggers: `log.setChannels`, `LogChannel`, `LoggingData`, `Logger`, `log.channels`; "silence logger in vitest", "assert a log line was emitted", "capture log output in tests", "test code that logs"; typical import `import { log, Logger, LogChannel, type LoggingData } from "@warlock.js/logger"`. Skip: custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; competing `vi.spyOn(console)`, `jest.spyOn`.'
+description: 'Test code that touches the logger — silence globally via log.setChannels([]) in setupFiles, assert specific log lines via a capturing LogChannel subclass (prefer it over vi.spyOn — it asserts on delivered entries, not just method calls, and isolates the shared singleton cleanly). Triggers: `log.setChannels`, `LogChannel`, `LoggingData`, `Logger`, `log.channels`; "silence logger in vitest", "assert a log line was emitted", "capture log output in tests", "test code that logs"; typical import `import { log, Logger, LogChannel, type LoggingData } from "@warlock.js/logger"`. Skip: custom sinks — the `write-custom-log-channel` topic; filtering — the `filter-log-entries` topic; competing `vi.spyOn(console)`, `jest.spyOn`.'
 ---
 
 # Testing — code that logs, and asserting on log output
@@ -174,4 +174,4 @@ captureAnyUnhandledRejection();
 process.emit("uncaughtException", new Error("test"), "uncaughtException");
 ```
 
-See [`@warlock.js/logger/capture-unhandled-errors/SKILL.md`](@warlock.js/logger/capture-unhandled-errors/SKILL.md) for a full example.
+See the `capture-unhandled-errors` topic for a full example.

@@ -1,6 +1,6 @@
 ---
 name: configure-logger
-description: 'Register channels via log.addChannel / log.setChannels / log.configure({channels, autoFlushOn, redact, minLevel}) at boot. Triggers: `log.configure`, `log.addChannel`, `log.setChannels`, `Logger`, `autoFlushOn`, `disableAutoFlush`; "wire channels at startup", "branch logger by NODE_ENV", "isolate a library''s logger", "replace channel list"; typical import `import { log, Logger, ConsoleLog, FileLog } from "@warlock.js/logger"`. Skip: channel picks — `@warlock.js/logger/pick-log-channel/SKILL.md`; flushing — `@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`; redaction — `@warlock.js/logger/redact-sensitive-log-fields/SKILL.md`; competing libs `winston.createLogger`, `pino`.'
+description: 'Register channels via log.addChannel / log.setChannels / log.configure({channels, autoFlushOn, redact, minLevel}) at boot. Triggers: `log.configure`, `log.addChannel`, `log.setChannels`, `Logger`, `autoFlushOn`, `disableAutoFlush`; "wire channels at startup", "branch logger by NODE_ENV", "isolate a library''s logger", "replace channel list"; typical import `import { log, Logger, ConsoleLog, FileLog } from "@warlock.js/logger"`. Skip: channel picks — the `pick-log-channel` topic; flushing — the `flush-logs-on-shutdown` topic; redaction — the `redact-sensitive-log-fields` topic; competing libs `winston.createLogger`, `pino`.'
 ---
 
 # Setup — registering channels at startup
@@ -48,7 +48,7 @@ log.info("app", "start", "Server listening on :3000");
 
 ## What `configure({ autoFlushOn })` does
 
-Registers one process-level handler per event that calls `log.flushSync()` before Node exits. See [`@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`](@warlock.js/logger/flush-logs-on-shutdown/SKILL.md) for the full behavior table.
+Registers one process-level handler per event that calls `log.flushSync()` before Node exits. See the `flush-logs-on-shutdown` topic for the full behavior table.
 
 ```ts
 log.configure({
@@ -97,9 +97,9 @@ log.configure({
 });
 ```
 
-See [`@warlock.js/logger/redact-sensitive-log-fields/SKILL.md`](@warlock.js/logger/redact-sensitive-log-fields/SKILL.md) for the redact contract and [`@warlock.js/logger/filter-log-entries/SKILL.md`](@warlock.js/logger/filter-log-entries/SKILL.md) for `minLevel`.
+See the `redact-sensitive-log-fields` topic for the redact contract and the `filter-log-entries` topic for `minLevel`.
 
 ## See also
 
-- [`@warlock.js/logger/pick-log-channel/SKILL.md`](@warlock.js/logger/pick-log-channel/SKILL.md) — what each built-in channel does
-- [`@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`](@warlock.js/logger/flush-logs-on-shutdown/SKILL.md) — `autoFlushOn` event behavior
+- The `pick-log-channel` topic — what each built-in channel does
+- The `flush-logs-on-shutdown` topic — `autoFlushOn` event behavior

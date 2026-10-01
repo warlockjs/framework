@@ -1,6 +1,6 @@
 ---
 name: filter-log-entries
-description: 'Drop log entries — per-channel levels whitelist, per-channel filter predicate, logger-wide setMinLevel(level) fast path. Triggers: `levels`, `filter`, `minLevel`, `log.setMinLevel`, `shouldBeLogged`, `LoggingData`, `LogLevel`; "silence a noisy module", "route errors to a dedicated file", "raise global severity floor", "drop debug logs in prod"; typical import `import { log } from "@warlock.js/logger"`. Skip: custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; channel picks — `@warlock.js/logger/pick-log-channel/SKILL.md`; competing libs `pino.levels`, `winston.format.filter`, `debug` env var.'
+description: 'Drop log entries — per-channel levels whitelist, per-channel filter predicate, logger-wide setMinLevel(level) fast path. Triggers: `levels`, `filter`, `minLevel`, `log.setMinLevel`, `shouldBeLogged`, `LoggingData`, `LogLevel`; "silence a noisy module", "route errors to a dedicated file", "raise global severity floor", "drop debug logs in prod"; typical import `import { log } from "@warlock.js/logger"`. Skip: custom sinks — the `write-custom-log-channel` topic; channel picks — the `pick-log-channel` topic; competing libs `pino.levels`, `winston.format.filter`, `debug` env var.'
 ---
 
 # Filtering — `levels` + `filter` predicate + `minLevel`
@@ -107,7 +107,7 @@ if (filter) return filter(data);
 return true;
 ```
 
-If you extend `LogChannel` to write a custom channel, call `this.shouldBeLogged(data)` first thing inside your `log(data)` method — you inherit both mechanisms for free. See [`@warlock.js/logger/write-custom-log-channel/SKILL.md`](@warlock.js/logger/write-custom-log-channel/SKILL.md).
+If you extend `LogChannel` to write a custom channel, call `this.shouldBeLogged(data)` first thing inside your `log(data)` method — you inherit both mechanisms for free. See the `write-custom-log-channel` topic.
 
 ## Logger-wide custom filtering — not a thing
 

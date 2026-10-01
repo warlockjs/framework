@@ -1,6 +1,6 @@
 ---
 name: use-log-helpers
-description: 'Two DX shortcuts on every Logger — log.assert(condition, module, action, message, context?) logs an error when condition is falsy (free on the happy path), log.timer(module, action) returns an end-function emitting an info entry with measured duration. Triggers: `log.assert`, `log.timer`, `durationMs`; "assert an invariant via logger", "measure how long an operation took", "time a request", "log operation duration"; typical import `import { log } from "@warlock.js/logger"`. Skip: basics — `@warlock.js/logger/logger-basics/SKILL.md`; filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; competing `console.assert`, `console.time`, `console.timeEnd`, `perf_hooks.performance.now`.'
+description: 'Two DX shortcuts on every Logger — log.assert(condition, module, action, message, context?) logs an error when condition is falsy (free on the happy path), log.timer(module, action) returns an end-function emitting an info entry with measured duration. Triggers: `log.assert`, `log.timer`, `durationMs`; "assert an invariant via logger", "measure how long an operation took", "time a request", "log operation duration"; typical import `import { log } from "@warlock.js/logger"`. Skip: basics — the `logger-basics` topic; filtering — the `filter-log-entries` topic; competing `console.assert`, `console.time`, `console.timeEnd`, `perf_hooks.performance.now`.'
 ---
 
 # Helpers — `assert`, `timer`
@@ -24,7 +24,7 @@ The level is implicitly `error` — assertions express failures, not warnings. I
 
 ### Why not `console.assert`?
 
-`console.assert` writes to stderr only and bypasses your file/JSON channels. `log.assert` runs through the logger pipeline, so a failed assertion is captured by every persistent channel you've configured. See [`@warlock.js/logger/pick-log-channel/SKILL.md`](@warlock.js/logger/pick-log-channel/SKILL.md).
+`console.assert` writes to stderr only and bypasses your file/JSON channels. `log.assert` runs through the logger pipeline, so a failed assertion is captured by every persistent channel you've configured. See the `pick-log-channel` topic.
 
 ## `log.timer(module, action)`
 
@@ -63,4 +63,4 @@ end({ rowsProcessed: report.rowCount });
 
 - The duration is `Date.now()` based — millisecond resolution. For sub-millisecond profiling, reach for `performance.now()` directly.
 - The end-function captures `this` at construction; calling it after the logger is reconfigured still routes through the same `Logger` instance.
-- `log.timer` shorthand binds to the singleton — see [`@warlock.js/logger/test-logging-code/SKILL.md`](@warlock.js/logger/test-logging-code/SKILL.md) for how to swap channels per test.
+- `log.timer` shorthand binds to the singleton — see the `test-logging-code` topic for how to swap channels per test.
