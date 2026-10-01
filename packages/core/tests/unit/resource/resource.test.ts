@@ -1,3 +1,4 @@
+import { lazy } from "@mongez/reinforcements";
 import { beforeEach, describe, expect, it } from "vitest";
 import { defineResource } from "../../../src/resource/define-resource";
 import { Resource } from "../../../src/resource/resource";
@@ -116,6 +117,49 @@ describe("nested resources", () => {
       id: 1,
       tags: [{ label: "news" }, { label: "tech" }],
     });
+  });
+
+  it("outputs an empty array for a nested-resource list given []", () => {
+    const TagResource = defineResource({ schema: { label: "string" } });
+    const PostResource = defineResource({ schema: { id: "int", tags: TagResource } });
+
+    const json = new PostResource({ id: 1, tags: [] }).toJSON();
+
+    expect(json).toEqual({ id: 1, tags: [] });
+    expect(Array.isArray(json.tags)).toBe(true);
+  });
+
+  it("outputs [] for an empty nested-resource list inside a lazy-resolved field", () => {
+    const TagResource = defineResource({ schema: { label: "string" } });
+    const PostResource = defineResource({
+      schema: { id: "int", tags: lazy(() => TagResource) },
+    });
+
+    expect(new PostResource({ id: 1, tags: [] }).toJSON()).toEqual({ id: 1, tags: [] });
+    expect(new PostResource({ id: 1, tags: [{ label: "a", extra: 1 }] }).toJSON()).toEqual({
+      id: 1,
+      tags: [{ label: "a" }],
+    });
+  });
+
+  it("still maps each item of a non-empty nested-resource list", () => {
+    const TagResource = defineResource({ schema: { label: "string" } });
+    const PostResource = defineResource({ schema: { id: "int", tags: TagResource } });
+
+    const json = new PostResource({
+      id: 1,
+      tags: [{ label: "a", secret: "x" }, { label: "b" }],
+    }).toJSON();
+
+    expect(json).toEqual({ id: 1, tags: [{ label: "a" }, { label: "b" }] });
+  });
+
+  it("keeps omitting a nested-resource field when the input is null or undefined", () => {
+    const TagResource = defineResource({ schema: { label: "string" } });
+    const PostResource = defineResource({ schema: { id: "int", tags: TagResource } });
+
+    expect(new PostResource({ id: 1, tags: null }).toJSON()).toEqual({ id: 1 });
+    expect(new PostResource({ id: 1 }).toJSON()).toEqual({ id: 1 });
   });
 
   it("omits a nested resource when the value is missing", () => {

@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **`warlock generate.postman`** writes a Postman Collection v2.1.0 (`storage/postman/collection.json`, or `--out`) derived from the same OpenAPI document as `generate.openapi` (options: `--title`, `--server`, `--include-pages`), so the two can never disagree. Each tag is a folder, each operation a request with an example body generated from its schema (JSON as raw, multipart as form-data), saved responses for every declared status, `{{baseUrl}}` and `{{token}}` collection variables, collection-level bearer auth for `authMiddleware()` routes and `noauth` on public ones. `openApiToPostmanCollection(document, options?)` is exported (pure, deterministic `_postman_id`), and `getDevelopmentPostmanCollection()` returns the collection for the running dev process.
 
+### Fixed
+
+- Expected client errors no longer fill logs with stack traces: a thrown error that resolves to a 4xx (an `HttpError` such as `ConflictError` or `ResourceNotFoundError`, or a `DatabaseWriterValidationError` configured below 500 via `http.modelValidationErrorStatus`) is logged once at `warn` as `Name: message (status)`, without the stack. 5xx and unknown errors are logged at `error` with the stack, as before.
+- A nested-resource field whose input is an empty list now outputs `[]`; it used to drop the key. `null`/`undefined` still omit it.
 ## 5.27.0 - 2026-10-01
 
 ### Added

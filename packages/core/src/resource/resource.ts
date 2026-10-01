@@ -290,7 +290,8 @@ export class Resource implements ResourceContract {
       if (!value) return;
       // Nested resource — handle both single and array values
       if (Array.isArray(value)) {
-        if (value.length === 0) return;
+        // An empty list stays an empty list ([] is the honest output); only a
+        // missing/null input omits the field.
         outputValue = value
           .map((item) => new (outputSettings as typeof Resource)(item).toJSON())
           .filter((v) => v !== undefined);

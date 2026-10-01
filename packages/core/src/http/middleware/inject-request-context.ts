@@ -114,10 +114,48 @@ export function createRequestStore(
 
       return output as ReturnedResponse;
     } catch (error) {
-      request.log(error, "error");
+      logRequestError(error, request);
       return handleRequestError(error, response, request);
     }
   });
+}
+
+/**
+ * The HTTP status an error will be answered with, or `undefined` when it is not
+ * one of the known HTTP-answerable shapes (those fall through to the opaque 500).
+ *
+ * Single source for `handleRequestError` and the request logger, so the rule
+ * that decides the response status is the same rule that decides the log level.
+ * @internal
+ */
+function resolveRequestErrorStatus(error: unknown): number | undefined {
+  if (error instanceof HttpError) {
+    return error.status;
+  }
+
+  if (error instanceof DatabaseWriterValidationError) {
+    return config.get("http.modelValidationErrorStatus", 500);
+  }
+
+  return undefined;
+}
+
+/**
+ * Log a request error at the right severity. An error answered with a 4xx is an
+ * expected client error (a thrown 404/409/422): one `warn` line, no stack.
+ * Everything else (5xx, unknown errors) keeps the error-level entry with its stack.
+ * @internal
+ */
+function logRequestError(error: unknown, request: Request<any>) {
+  const status = resolveRequestErrorStatus(error);
+
+  if (status !== undefined && status < 500 && error instanceof Error) {
+    request.log(`${error.name}: ${error.message} (${status})`, "warn");
+
+    return;
+  }
+
+  request.log(error, "error");
 }
 
 /**
@@ -183,12 +221,16 @@ function handleRequestError(
   }
 
   if (error instanceof DatabaseWriterValidationError) {
-    log.error("http", "model-write-validation-error", error, {
-      requestId: request.id,
-      errors: error.errors,
-    });
+    const status = resolveRequestErrorStatus(error) as number;
 
-    const status = config.get("http.modelValidationErrorStatus", 500);
+    // A 4xx is an expected client error, already logged as a one-line warn by
+    // `logRequestError`; only a 5xx gets the error-level entry with its stack.
+    if (status >= 500) {
+      log.error("http", "model-write-validation-error", error, {
+        requestId: request.id,
+        errors: error.errors,
+      });
+    }
 
     // A 4xx status means the app treats this as the client's fault, so the
     // field errors are useful to it; a 5xx stays opaque.

@@ -99,6 +99,20 @@ describe("defineResource output types", () => {
     }>();
   });
 
+  it("keeps a nested-resource field required and non-nullable (an empty list is [], not undefined)", () => {
+    const TagResource = defineResource({ schema: { label: "string" } });
+    const PostResource = defineResource({ schema: { id: "number", tags: TagResource } });
+
+    type PostJson = ResourceOutput<typeof PostResource>;
+
+    expectTypeOf<PostJson>().toHaveProperty("tags");
+    expectTypeOf<PostJson["tags"]>().not.toBeNullable();
+
+    // A runtime [] input is what the field emits for an empty list.
+    const json: Record<string, unknown> = new PostResource({ id: 1, tags: [] }).toJSON();
+    expect(json.tags).toEqual([]);
+  });
+
   it("ResourceOutput agrees for a class and an instance", () => {
     const UserResource = defineResource({ schema: { id: "number", name: "string" } });
 
