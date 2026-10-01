@@ -8,7 +8,7 @@
 
 ---
 name: hash-files
-description: 'Compute hex digests — hashFile / hashFileAsync (streaming for large files), hashFileSmallAsync, hashString, hashBuffer. Defaults to SHA-256; supports sha1 / md5 / sha512. Triggers: `hashFile`, `hashFileAsync`, `hashFileSmallAsync`, `hashString`, `hashBuffer`, `HashAlgorithm`; "fingerprint a file for cache invalidation", "compute SHA-256 checksum", "compare two files for equality", "cache key from request input"; typical import `import { hashFileAsync, hashString } from "@warlock.js/fs"`. Skip: file IO — `@warlock.js/fs/read-and-write-files/SKILL.md`; competing libs `hasha`, `md5-file`, `crypto-hash`; native `node:crypto` `createHash`.'
+description: 'Compute hex digests — hashFile / hashFileAsync (streaming for large files), hashFileSmallAsync, hashString, hashBuffer. Defaults to SHA-256; supports sha1 / md5 / sha512. Triggers: `hashFile`, `hashFileAsync`, `hashFileSmallAsync`, `hashString`, `hashBuffer`, `HashAlgorithm`; "fingerprint a file for cache invalidation", "compute SHA-256 checksum", "compare two files for equality", "cache key from request input"; typical import `import { hashFileAsync, hashString } from "@warlock.js/fs"`. Skip: file IO — the `read-and-write-files` topic; competing libs `hasha`, `md5-file`, `crypto-hash`; native `node:crypto` `createHash`.'
 ---
 
 # Compute file and content hashes
@@ -127,8 +127,8 @@ Cheaper than `cmp`-byte-comparing two large files when the result is "yes/no dif
 
 ## See also
 
-- [`@warlock.js/fs/read-and-write-files/SKILL.md`](@warlock.js/fs/read-and-write-files/SKILL.md) — reading files before hashing in-memory content
-- [`@warlock.js/cache/use-cached-hof/SKILL.md`](@warlock.js/cache/use-cached-hof/SKILL.md) — building cache keys from hashes
+- The `read-and-write-files` topic — reading files before hashing in-memory content
+- The `use-cached-hof` topic of the `warlock-js-cache` skill — building cache keys from hashes
 
 ## Things NOT to do
 
@@ -142,7 +142,7 @@ Cheaper than `cmp`-byte-comparing two large files when the result is "yes/no dif
 
 ---
 name: manage-directories
-description: 'Manage directories + files — ensureDirectory (mkdir -p), list / listFiles / listDirectories, copyFile / copyDirectory, renameFile, unlink (ENOENT-safe), removeDirectory (recursive force). Triggers: `ensureDirectoryAsync`, `listAsync`, `listFilesAsync`, `listDirectoriesAsync`, `copyFileAsync`, `copyDirectoryAsync`, `renameFileAsync`, `unlinkAsync`, `removeDirectoryAsync`; "create directory recursively", "list files in folder", "delete directory recursively", "copy or rename folder", "walk a tree"; typical import `import { ensureDirectoryAsync, listFilesAsync, removeDirectoryAsync } from "@warlock.js/fs"`. Skip: file IO — `@warlock.js/fs/read-and-write-files/SKILL.md`; atomic writes — `@warlock.js/fs/write-atomically/SKILL.md`; competing libs `fs-extra`, `mkdirp`, `rimraf`, `recursive-readdir`, `glob`; native `node:fs/promises`.'
+description: 'Manage directories + files — ensureDirectory (mkdir -p), list / listFiles / listDirectories, copyFile / copyDirectory, renameFile, unlink (ENOENT-safe), removeDirectory (recursive force). Triggers: `ensureDirectoryAsync`, `listAsync`, `listFilesAsync`, `listDirectoriesAsync`, `copyFileAsync`, `copyDirectoryAsync`, `renameFileAsync`, `unlinkAsync`, `removeDirectoryAsync`; "create directory recursively", "list files in folder", "delete directory recursively", "copy or rename folder", "walk a tree"; typical import `import { ensureDirectoryAsync, listFilesAsync, removeDirectoryAsync } from "@warlock.js/fs"`. Skip: file IO — the `read-and-write-files` topic; atomic writes — the `write-atomically` topic; competing libs `fs-extra`, `mkdirp`, `rimraf`, `recursive-readdir`, `glob`; native `node:fs/promises`.'
 ---
 
 # Manage directories and files on disk
@@ -270,9 +270,9 @@ const tsFiles = await walk("./src");
 
 ## See also
 
-- [`@warlock.js/fs/read-and-write-files/SKILL.md`](@warlock.js/fs/read-and-write-files/SKILL.md) — text / JSON file IO and existence checks
-- [`@warlock.js/fs/write-atomically/SKILL.md`](@warlock.js/fs/write-atomically/SKILL.md) — atomic writes when concurrent readers might see the file mid-write
-- [`@warlock.js/fs/hash-files/SKILL.md`](@warlock.js/fs/hash-files/SKILL.md) — fingerprinting
+- The `read-and-write-files` topic — text / JSON file IO and existence checks
+- The `write-atomically` topic — atomic writes when concurrent readers might see the file mid-write
+- The `hash-files` topic — fingerprinting
 
 ## Things NOT to do
 
@@ -317,7 +317,7 @@ Skip if your code path is one-off and bare `node:fs/promises` is already importe
 
 Four task skills cover the surface. Load the one that matches what you're trying to do — don't load all four unless you're touring the package.
 
-### [`read-and-write-files/SKILL.md`](@warlock.js/fs/read-and-write-files/SKILL.md)
+### `read-and-write-files`
 
 Read and write text or JSON files; check existence and metadata. Covers
 `getFile` / `getFileAsync` / `getJsonFile` / `getJsonFileAsync`,
@@ -327,7 +327,7 @@ Read and write text or JSON files; check existence and metadata. Covers
 
 Load when reading or writing text or JSON, or gating creation on existence.
 
-### [`manage-directories/SKILL.md`](@warlock.js/fs/manage-directories/SKILL.md)
+### `manage-directories`
 
 Create, list, copy, move, and delete directories and files. Covers
 `ensureDirectory(Async)`, `list(Async)` / `listFiles(Async)` / `listDirectories(Async)`,
@@ -336,7 +336,7 @@ Create, list, copy, move, and delete directories and files. Covers
 
 Load when scaffolding, walking trees, snapshotting, cleaning, or moving files around.
 
-### [`write-atomically/SKILL.md`](@warlock.js/fs/write-atomically/SKILL.md)
+### `write-atomically`
 
 Write files so concurrent readers never see a half-written state. Covers
 `atomicWriteAsync(path, content)` and `atomicWriteJsonAsync(path, value)`.
@@ -344,7 +344,7 @@ Sibling temp file + atomic rename — last-writer-wins on contention, no locking
 
 Load when writing a file that other processes / file watchers / build steps consume in parallel (config, manifest, state, lockfile).
 
-### [`hash-files/SKILL.md`](@warlock.js/fs/hash-files/SKILL.md)
+### `hash-files`
 
 Compute hex digests for files (streaming) or in-memory content. Covers
 `hashFile(Async)` (streaming — constant memory),
@@ -354,7 +354,7 @@ Defaults to SHA-256; supports SHA-1 / MD5 / SHA-512.
 
 Load when fingerprinting for cache invalidation, content-addressable storage, change detection, or file-equality comparison. Never for security (password hashing, signing).
 
-### [`use-the-fs-facade/SKILL.md`](@warlock.js/fs/use-the-fs-facade/SKILL.md)
+### `use-the-fs-facade`
 
 The ergonomic, **async** shorthand over all the primitives: `fs.files.*` (file ops), `fs.dirs.*` (directory ops), lazy `fs.file(path)` / `fs.dir(path)` handles (`File` / `Directory`), and `fs.exists`. Adds what the flat primitives lack — `append`/`appendLine`/`appendJsonLine`, `size`/`isEmpty`/`count`, `ensure`(ensureFile)/`touch`/`empty`(emptyDir), EXDEV-safe `move`, `walk` + recursive `list*`, `readLines`, `edit`/`editJson`/`mergeJson`/`ensureJson`, schema-validated `getJson`, directory `hash`.
 
@@ -369,15 +369,15 @@ Load when you want the grouped/OO surface, a read-modify-write (patch a file or 
 
 ## See also
 
-- [`@warlock.js/core/warlock-conventions/SKILL.md`](@warlock.js/core/warlock-conventions/SKILL.md) — the parent framework's conventions; `fs` is one of its foundation packages.
-- `mongez-agent-kit-authoring-skills` (load via agent-kit sync) — how this `overview/SKILL.md` becomes the front-door skill in `.claude/skills/warlock-js-fs-overview/`.
+- The `warlock-conventions` topic of the `warlock-js-core` skill — the parent framework's conventions; `fs` is one of its foundation packages.
+- `mongez-agent-kit-authoring-skills` (load via agent-kit sync) — how this `overview` topic becomes the front-door skill in `.claude/skills/warlock-js-fs-overview/`.
 
 
 ## read-and-write-files  `@warlock.js/fs/read-and-write-files/SKILL.md`
 
 ---
 name: read-and-write-files
-description: 'Read and write files — getFile / getFileAsync / getJsonFile / putFile (auto-creates parent dirs), plus pathExists / fileExists / directoryExists / lastModified / stats. Triggers: `getFileAsync`, `getJsonFileAsync`, `putFileAsync`, `putJsonFileAsync`, `pathExists`, `fileExists`, `lastModifiedAsync`, `statsAsync`; "read a text file", "write a JSON file", "check if file exists"; typical import `import { getFileAsync, putJsonFileAsync, fileExists } from "@warlock.js/fs"`. Skip: atomic writes — `@warlock.js/fs/write-atomically/SKILL.md`; dirs + copy + delete — `@warlock.js/fs/manage-directories/SKILL.md`; hashing — `@warlock.js/fs/hash-files/SKILL.md`; competing libs `fs-extra`, `jsonfile`, `graceful-fs`; native `node:fs/promises`.'
+description: 'Read and write files — getFile / getFileAsync / getJsonFile / putFile (auto-creates parent dirs), plus pathExists / fileExists / directoryExists / lastModified / stats. Triggers: `getFileAsync`, `getJsonFileAsync`, `putFileAsync`, `putJsonFileAsync`, `pathExists`, `fileExists`, `lastModifiedAsync`, `statsAsync`; "read a text file", "write a JSON file", "check if file exists"; typical import `import { getFileAsync, putJsonFileAsync, fileExists } from "@warlock.js/fs"`. Skip: atomic writes — the `write-atomically` topic; dirs + copy + delete — the `manage-directories` topic; hashing — the `hash-files` topic; competing libs `fs-extra`, `jsonfile`, `graceful-fs`; native `node:fs/promises`.'
 ---
 
 # Read and write files
@@ -420,7 +420,7 @@ await putJsonFileAsync("./dist/manifest.json", { version: "1.0.0" });
 Behavior:
 - Parent directories are created recursively — no need to `ensureDirectory` first.
 - JSON variants pretty-print at 2-space indent. For minified output, stringify yourself and use the plain `putFile`.
-- Overwrites existing files. For atomic write semantics (readers never see a half-written file), use [`write-atomically`](@warlock.js/fs/write-atomically/SKILL.md).
+- Overwrites existing files. For atomic write semantics (readers never see a half-written file), use the `write-atomically` topic.
 
 ## Existence checks
 
@@ -473,13 +473,13 @@ const all = await statsAsync("./bundle.js");                // fs.Stats
 
 ## See also
 
-- [`@warlock.js/fs/manage-directories/SKILL.md`](@warlock.js/fs/manage-directories/SKILL.md) — directory listing, copying, removing, renaming
-- [`@warlock.js/fs/write-atomically/SKILL.md`](@warlock.js/fs/write-atomically/SKILL.md) — safe writes for files that other readers depend on
-- [`@warlock.js/fs/hash-files/SKILL.md`](@warlock.js/fs/hash-files/SKILL.md) — fingerprinting files
+- The `manage-directories` topic — directory listing, copying, removing, renaming
+- The `write-atomically` topic — safe writes for files that other readers depend on
+- The `hash-files` topic — fingerprinting files
 
 ## Things NOT to do
 
-- Don't call `putFileAsync` on a file that other processes / readers consume in parallel — use `atomicWriteAsync` from [`write-atomically`](@warlock.js/fs/write-atomically/SKILL.md) instead.
+- Don't call `putFileAsync` on a file that other processes / readers consume in parallel — use `atomicWriteAsync` from the `write-atomically` topic instead.
 - Don't rely on `try { getFileAsync(...) } catch` for existence checks — `fileExists` is faster and reads better.
 - Don't pass binary content to `putFile` / `putFileAsync` as a `Buffer` directly — these are text-only (UTF-8). For binaries, use `node:fs/promises`'s `writeFile` directly, or use `atomicWriteAsync` (which accepts `string | Buffer`).
 
@@ -573,24 +573,24 @@ const moved = await fs.file("a.txt").moveTo(fs.dir("archive"));  // new File han
 
 ## Facade vs primitives — when to use which
 - **Facade (`fs.*`)** — async app/runtime code; read-modify-write; JSON patching; recursive listing/walking; you want an OO handle. One import, ergonomic verbs.
-- **Bare primitives (`getFile`/`putFile`/…)** — synchronous CLI tools / codegen / one-shot scripts (no `Async`), or when you want the smallest possible call. See [`read-and-write-files`](@warlock.js/fs/read-and-write-files/SKILL.md) / [`manage-directories`](@warlock.js/fs/manage-directories/SKILL.md).
+- **Bare primitives (`getFile`/`putFile`/…)** — synchronous CLI tools / codegen / one-shot scripts (no `Async`), or when you want the smallest possible call. See the `read-and-write-files` topic / the `manage-directories` topic.
 
 ## Gotchas
 - **Async-only facade.** There is no `fs.filesSync`; for sync use the bare primitives.
 - **`edit`/`mergeJson` are sugar, not a lock.** Concurrent edits race (last-write-wins); `atomic` only makes the *write* atomic, not the read+write pair. No file locking.
 - **`get()` reads the whole file.** For large text use `readLines`; for large-file digests `hash` already streams.
-- **Still no glob / watch / chmod** — see the [overview](@warlock.js/fs/overview/SKILL.md). Use `walk` + filter instead of glob.
+- **Still no glob / watch / chmod** — see the `overview` topic. Use `walk` + filter instead of glob.
 
 ## See also
-- [`overview/SKILL.md`](@warlock.js/fs/overview/SKILL.md) — the package front door + the `*Async`/bare convention.
-- [`write-atomically/SKILL.md`](@warlock.js/fs/write-atomically/SKILL.md) — `put({ atomic })` delegates to this.
+- The `overview` topic — the package front door + the `*Async`/bare convention.
+- The `write-atomically` topic — `put({ atomic })` delegates to this.
 
 
 ## write-atomically  `@warlock.js/fs/write-atomically/SKILL.md`
 
 ---
 name: write-atomically
-description: 'Atomic file writes via atomicWriteAsync(path, content) — writes to a uniquely-named sibling temp + rename onto target so readers see old or complete new content, never half-written; the rename retries transient Windows locks with backoff and throws a named AtomicWriteError on exhaustion. Triggers: `atomicWriteAsync`, `atomicWriteJsonAsync`, `AtomicWriteError`; "atomic file write", "write config file safely with concurrent readers", "manifest written by build step", "state file across runs", "avoid half-written files", "EPERM/EBUSY on rename", "atomic write fails intermittently on Windows"; typical import `import { atomicWriteAsync, atomicWriteJsonAsync, AtomicWriteError } from "@warlock.js/fs"`. Skip: plain writes — `@warlock.js/fs/read-and-write-files/SKILL.md`; read-modify-write locking — `@warlock.js/cache/use-cache-lock/SKILL.md`; competing libs `write-file-atomic`, `steno`, `fs-extra` `outputFile`.'
+description: 'Atomic file writes via atomicWriteAsync(path, content) — writes to a uniquely-named sibling temp + rename onto target so readers see old or complete new content, never half-written; the rename retries transient Windows locks with backoff and throws a named AtomicWriteError on exhaustion. Triggers: `atomicWriteAsync`, `atomicWriteJsonAsync`, `AtomicWriteError`; "atomic file write", "write config file safely with concurrent readers", "manifest written by build step", "state file across runs", "avoid half-written files", "EPERM/EBUSY on rename", "atomic write fails intermittently on Windows"; typical import `import { atomicWriteAsync, atomicWriteJsonAsync, AtomicWriteError } from "@warlock.js/fs"`. Skip: plain writes — the `read-and-write-files` topic; read-modify-write locking — the `use-cache-lock` topic of the `warlock-js-cache` skill; competing libs `write-file-atomic`, `steno`, `fs-extra` `outputFile`.'
 ---
 
 # Atomic file writes
@@ -640,7 +640,7 @@ The random 6-byte suffix prevents two concurrent writers from racing on the same
 
 Two `atomicWriteAsync` calls to the same target serialize at the rename. Whichever rename completes last wins. **No locking** — last-writer-wins is the contract.
 
-If you need read-modify-write atomicity (each writer sees the previous writer's result), wrap the calls in a distributed lock — e.g. [`@warlock.js/cache/use-cache-lock/SKILL.md`](@warlock.js/cache/use-cache-lock/SKILL.md).
+If you need read-modify-write atomicity (each writer sees the previous writer's result), wrap the calls in a distributed lock — e.g. the `use-cache-lock` topic of the `warlock-js-cache` skill.
 
 ## Common shapes
 
@@ -703,8 +703,8 @@ try {
 
 ## See also
 
-- [`@warlock.js/fs/read-and-write-files/SKILL.md`](@warlock.js/fs/read-and-write-files/SKILL.md) — `putFileAsync` for non-atomic writes
-- [`@warlock.js/cache/use-cache-lock/SKILL.md`](@warlock.js/cache/use-cache-lock/SKILL.md) — distributed lock for read-modify-write protection
+- The `read-and-write-files` topic — `putFileAsync` for non-atomic writes
+- The `use-cache-lock` topic of the `warlock-js-cache` skill — distributed lock for read-modify-write protection
 
 ## Things NOT to do
 

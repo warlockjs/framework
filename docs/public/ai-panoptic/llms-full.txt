@@ -8,12 +8,12 @@
 
 ---
 name: evaluate-system-prompt
-description: 'Grade a single trace''s LAST captured system prompt from the dashboard drawer — the dashboard''s only write-capable feature, config-gated via `DashboardOptions.evaluate` (`ai.config({ panoptic: { dashboard: { evaluate: { model, instructions } } } })`). Triggers: `evaluate`, `EvaluateConfig`, `EvaluateVerdict`, `evaluateSystemPrompt`, `extractLastSystemPrompt`, `findSpanById`, "Evaluate system prompt" button, `POST .../spans/:spanId/evaluate`, grading a prompt from a real trace, judging a captured system prompt, per-run instructions override, judge model factory; ''evaluate this trace''s prompt'', ''grade the system prompt from the dashboard'', ''judge a captured run'', ''score a live system prompt''. Skip: grading raw prompt TEXT you already have in code (no trace involved) — `@warlock.js/ai`''s `ai.prompts().validate({ criteria })`, the same judge machinery this wraps; a DATASET of test cases run through an agent — `@warlock.js/ai`''s `ai.dataset` + `agent.eval`; viewing/filtering/grouping traces without grading them — `@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`; capturing the content this feature reads — `@warlock.js/ai-panoptic/export-traces/SKILL.md` (`captureContent`).'
+description: 'Grade a single trace''s LAST captured system prompt from the dashboard drawer — the dashboard''s only write-capable feature, config-gated via `DashboardOptions.evaluate` (`ai.config({ panoptic: { dashboard: { evaluate: { model, instructions } } } })`). Triggers: `evaluate`, `EvaluateConfig`, `EvaluateVerdict`, `evaluateSystemPrompt`, `extractLastSystemPrompt`, `findSpanById`, "Evaluate system prompt" button, `POST .../spans/:spanId/evaluate`, grading a prompt from a real trace, judging a captured system prompt, per-run instructions override, judge model factory; ''evaluate this trace''s prompt'', ''grade the system prompt from the dashboard'', ''judge a captured run'', ''score a live system prompt''. Skip: grading raw prompt TEXT you already have in code (no trace involved) — `@warlock.js/ai`''s `ai.prompts().validate({ criteria })`, the same judge machinery this wraps; a DATASET of test cases run through an agent — `@warlock.js/ai`''s `ai.dataset` + `agent.eval`; viewing/filtering/grouping traces without grading them — the `use-local-dashboard` topic; capturing the content this feature reads — the `export-traces` topic (`captureContent`).'
 ---
 
 # Evaluate a trace's system prompt from the dashboard
 
-A drawer button that grades the LAST `{role: "system"}` message captured on the selected span — not the whole conversation, not the tool code, just the system prompt that was actually in effect for that run. It's the dashboard's only write-capable feature: every other route is `GET`-only and read-only by design (see `use-local-dashboard/SKILL.md`'s security note); this one POSTs, and it's off unless you explicitly opt in.
+A drawer button that grades the LAST `{role: "system"}` message captured on the selected span — not the whole conversation, not the tool code, just the system prompt that was actually in effect for that run. It's the dashboard's only write-capable feature: every other route is `GET`-only and read-only by design (see the `use-local-dashboard` topic's security note); this one POSTs, and it's off unless you explicitly opt in.
 
 ## Enable it
 
@@ -89,8 +89,8 @@ curl -X POST 'http://127.0.0.1:4319/api/traces/tr_1/spans/sp_1/evaluate' \
 
 ## See also
 
-- [`@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`](@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md) — the dashboard this feature is a drawer action of; its security note now says "every route is GET-only and read-only EXCEPT the one opt-in write route `evaluate` enables."
-- [`@warlock.js/ai-panoptic/export-traces/SKILL.md`](@warlock.js/ai-panoptic/export-traces/SKILL.md) — `captureContent` (and `fullHistory`), the prerequisite for `span.input` to carry anything gradable.
+- The `use-local-dashboard` topic — the dashboard this feature is a drawer action of; its security note now says "every route is GET-only and read-only EXCEPT the one opt-in write route `evaluate` enables."
+- The `export-traces` topic — `captureContent` (and `fullHistory`), the prerequisite for `span.input` to carry anything gradable.
 - `ai.prompts().validate({ criteria })` in `@warlock.js/ai` — the sibling capability this reuses: grading raw prompt TEXT you already have in code, no trace or dashboard involved.
 
 
@@ -98,7 +98,7 @@ curl -X POST 'http://127.0.0.1:4319/api/traces/tr_1/spans/sp_1/evaluate' \
 
 ---
 name: export-traces
-description: 'Send @warlock.js/ai-panoptic traces to an observability backend via pluggable exporters, including capturing prompt/response content onto spans. Triggers: `consoleExporter`, `fileExporter`, `otelExporter`, `langfuseExporter`, `ExporterContract`, `ContentCaptureOptions`, `captureContent`, `redactContent`, `fullHistory`, `ContentRedactor`, `toGenAiAttributes`, `walkSpans`, `totalCostUsd`, `GEN_AI_ATTRIBUTES`, `WARLOCK_ATTRIBUTES`, `reportToTrace`, `reportToSpan`, `extractSpanAttributes`, `normalizeError`, `formatSpanLine`, `createPanopticMiddleware`; ''export AI traces to OpenTelemetry'', ''send traces to Langfuse'', ''log traces to console / a file'', ''capture the full prompt/conversation onto a span'', ''gen_ai semantic conventions'', ''write a custom exporter''; typical import `import { otelExporter, langfuseExporter, consoleExporter, fileExporter } from "@warlock.js/ai-panoptic"`. Skip: wiring the subscriber/collector into a run — `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`; the core report shape — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
+description: 'Send @warlock.js/ai-panoptic traces to an observability backend via pluggable exporters, including capturing prompt/response content onto spans. Triggers: `consoleExporter`, `fileExporter`, `otelExporter`, `langfuseExporter`, `ExporterContract`, `ContentCaptureOptions`, `captureContent`, `redactContent`, `fullHistory`, `ContentRedactor`, `toGenAiAttributes`, `walkSpans`, `totalCostUsd`, `GEN_AI_ATTRIBUTES`, `WARLOCK_ATTRIBUTES`, `reportToTrace`, `reportToSpan`, `extractSpanAttributes`, `normalizeError`, `formatSpanLine`, `createPanopticMiddleware`; ''export AI traces to OpenTelemetry'', ''send traces to Langfuse'', ''log traces to console / a file'', ''capture the full prompt/conversation onto a span'', ''gen_ai semantic conventions'', ''write a custom exporter''; typical import `import { otelExporter, langfuseExporter, consoleExporter, fileExporter } from "@warlock.js/ai-panoptic"`. Skip: wiring the subscriber/collector into a run — the `observe-with-panoptic` topic; the core report shape — the `run-ai-agent` topic of the `warlock-js-ai` skill.'
 ---
 
 # Export traces — the sink end of Panoptic
@@ -277,16 +277,16 @@ Reach for `reportToTrace` when you already hold a finished `result.report` and w
 
 ## See also
 
-- [`@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md) — the source end: wiring the `panoptic(...)` subscriber into a run (`attach` / `middleware` / `collect`). The `collector` these exporters register on comes from there.
-- [`@warlock.js/ai-panoptic/query-traces/SKILL.md`](@warlock.js/ai-panoptic/query-traces/SKILL.md) — the in-memory trace store: a sibling sink that *retains* traces (instead of shipping them out) so you can `query` / `aggregate` them after the fact.
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent and the `BaseReport` shape Panoptic projects into a `Trace`.
+- The `observe-with-panoptic` topic — the source end: wiring the `panoptic(...)` subscriber into a run (`attach` / `middleware` / `collect`). The `collector` these exporters register on comes from there.
+- The `query-traces` topic — the in-memory trace store: a sibling sink that *retains* traces (instead of shipping them out) so you can `query` / `aggregate` them after the fact.
+- The `run-ai-agent` topic of the `warlock-js-ai` skill — running the agent and the `BaseReport` shape Panoptic projects into a `Trace`.
 
 
 ## observe-with-panoptic  `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`
 
 ---
 name: observe-with-panoptic
-description: 'Wire @warlock.js/ai-panoptic into an agent/workflow/supervisor/orchestrator — declaratively via `ai.config({ panoptic })` (registers panoptic on core''s Observer seam) or with the one-call `panoptic({ exporters })` subscriber. Triggers: `panoptic`, `Panoptic`, `PanopticOptions`, `PanopticConfig`, `ai.config({ panoptic })`, `observeAll`, per-flow `observe`, `FlowObserveOption`, `registerObserver`, `Observer`, `.attach`, `.middleware`, `.collect`, `.toTrace`, `observe.attach(agent)`, `panoptic().middleware()`, `completedEvents`, `middlewareName`; ''observe a warlock agent'', ''trace an agent run'', ''attach observability to a workflow/supervisor'', ''observe every flow by default'', ''add a tracing middleware'', ''collect an orchestrator turn report'', ''wire OTel/Langfuse into my agent''; typical import `import { ai } from "@warlock.js/ai"` + `import "@warlock.js/ai-panoptic"` (or `import { panoptic } from "@warlock.js/ai-panoptic"`). Skip: the zero-setup local dashboard — `@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`; writing/choosing an exporter (the sink end) — `@warlock.js/ai-panoptic/export-traces/SKILL.md`; the core report shape / running the agent itself — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
+description: 'Wire @warlock.js/ai-panoptic into an agent/workflow/supervisor/orchestrator — declaratively via `ai.config({ panoptic })` (registers panoptic on core''s Observer seam) or with the one-call `panoptic({ exporters })` subscriber. Triggers: `panoptic`, `Panoptic`, `PanopticOptions`, `PanopticConfig`, `ai.config({ panoptic })`, `observeAll`, per-flow `observe`, `FlowObserveOption`, `registerObserver`, `Observer`, `.attach`, `.middleware`, `.collect`, `.toTrace`, `observe.attach(agent)`, `panoptic().middleware()`, `completedEvents`, `middlewareName`; ''observe a warlock agent'', ''trace an agent run'', ''attach observability to a workflow/supervisor'', ''observe every flow by default'', ''add a tracing middleware'', ''collect an orchestrator turn report'', ''wire OTel/Langfuse into my agent''; typical import `import { ai } from "@warlock.js/ai"` + `import "@warlock.js/ai-panoptic"` (or `import { panoptic } from "@warlock.js/ai-panoptic"`). Skip: the zero-setup local dashboard — the `use-local-dashboard` topic; writing/choosing an exporter (the sink end) — the `export-traces` topic; the core report shape / running the agent itself — the `run-ai-agent` topic of the `warlock-js-ai` skill.'
 ---
 
 # Observe a run with Panoptic — the one-call subscriber
@@ -451,21 +451,21 @@ const observe = panoptic({ collector, exporters: [consoleExporter()] });
 
 Add exporters after construction with `observe.use(exporter)` (chainable, deduped by `ExporterContract.name`). `observe.toTrace(report)` projects a report into a `Trace` **without** dispatching — handy for inspection or tests.
 
-> The store's full query / aggregate / capacity surface is its own skill — see [`query-traces/SKILL.md`](@warlock.js/ai-panoptic/query-traces/SKILL.md).
+> The store's full query / aggregate / capacity surface is its own skill — see the `query-traces` topic.
 
 ## See also
 
-- [`@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`](@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md) — the zero-setup local viewer the `ai.config({ panoptic: { dashboard } })` switch starts over the collector's store.
-- [`@warlock.js/ai-panoptic/export-traces/SKILL.md`](@warlock.js/ai-panoptic/export-traces/SKILL.md) — the sink end: choosing/writing an exporter, the `gen_ai.*` / `warlock.*` attribute mapping.
-- [`@warlock.js/ai-panoptic/query-traces/SKILL.md`](@warlock.js/ai-panoptic/query-traces/SKILL.md) — retaining traces in the queryable in-memory store and slicing them (`query` / `aggregate` / `capacity`).
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent and the `BaseReport` shape Panoptic consumes.
+- The `use-local-dashboard` topic — the zero-setup local viewer the `ai.config({ panoptic: { dashboard } })` switch starts over the collector's store.
+- The `export-traces` topic — the sink end: choosing/writing an exporter, the `gen_ai.*` / `warlock.*` attribute mapping.
+- The `query-traces` topic — retaining traces in the queryable in-memory store and slicing them (`query` / `aggregate` / `capacity`).
+- The `run-ai-agent` topic of the `warlock-js-ai` skill — running the agent and the `BaseReport` shape Panoptic consumes.
 
 
 ## query-traces  `@warlock.js/ai-panoptic/query-traces/SKILL.md`
 
 ---
 name: query-traces
-description: 'Retain @warlock.js/ai-panoptic traces in a queryable store — in-memory, or cache-backed so they survive a process restart — and slice them after the fact: get one run by id, list a session, filter failed runs in a window, roll up usage + cost. Triggers: `createInMemoryTraceStore`, `createCacheTraceStore`, `CacheTraceStoreHandle`, `CacheTraceStoreOptions`, `CacheDriverInput`, `store.ready`, `TraceStoreContract`, `TraceQuery`, `TraceAggregate`, `InMemoryTraceStoreOptions`, `store.query`, `store.aggregate`, `store.get`, `store.add`, `store.clear`, `store.size`, `capacity`, `prefix`, `onError`, `sumUsage`, `emptyUsage`, `matchTrace`; ''query collected traces'', ''aggregate AI cost per session'', ''how much did this session spend'', ''list failed runs'', ''retain traces in memory'', ''persist traces across a restart'', ''cache-backed trace store'', ''Redis trace store'', ''roll up token usage''; typical import `import { createInMemoryTraceStore, createCacheTraceStore } from "@warlock.js/ai-panoptic"`. Skip: sending traces to an external backend (OTel/Langfuse/console/file) — `@warlock.js/ai-panoptic/export-traces/SKILL.md`; wiring the subscriber into a run — `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`.'
+description: 'Retain @warlock.js/ai-panoptic traces in a queryable store — in-memory, or cache-backed so they survive a process restart — and slice them after the fact: get one run by id, list a session, filter failed runs in a window, roll up usage + cost. Triggers: `createInMemoryTraceStore`, `createCacheTraceStore`, `CacheTraceStoreHandle`, `CacheTraceStoreOptions`, `CacheDriverInput`, `store.ready`, `TraceStoreContract`, `TraceQuery`, `TraceAggregate`, `InMemoryTraceStoreOptions`, `store.query`, `store.aggregate`, `store.get`, `store.add`, `store.clear`, `store.size`, `capacity`, `prefix`, `onError`, `sumUsage`, `emptyUsage`, `matchTrace`; ''query collected traces'', ''aggregate AI cost per session'', ''how much did this session spend'', ''list failed runs'', ''retain traces in memory'', ''persist traces across a restart'', ''cache-backed trace store'', ''Redis trace store'', ''roll up token usage''; typical import `import { createInMemoryTraceStore, createCacheTraceStore } from "@warlock.js/ai-panoptic"`. Skip: sending traces to an external backend (OTel/Langfuse/console/file) — the `export-traces` topic; wiring the subscriber into a run — the `observe-with-panoptic` topic.'
 ---
 
 # Query traces — the in-memory queryable store
@@ -492,7 +492,7 @@ const failed = store.query({ status: "failed" });
 const spend = store.aggregate({ sessionId: "session-42" });
 ```
 
-> The store is also a valid `collector.use(...)` target directly — `panoptic({ collector: createCollector().use(store) })` — see [`observe-with-panoptic/SKILL.md`](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md) for bring-your-own-collector wiring.
+> The store is also a valid `collector.use(...)` target directly — `panoptic({ collector: createCollector().use(store) })` — see the `observe-with-panoptic` topic for bring-your-own-collector wiring.
 
 ## The store contract
 
@@ -593,7 +593,7 @@ const store = createInMemoryTraceStore({ capacity: 1000 });
 
 Overwriting an existing `traceId` refreshes its insertion position, so a re-collected run is treated as newest for eviction — eviction stays honest under overwrite.
 
-> The in-memory store has no secondary indexes: `get` / `add` are O(1), `query` / `aggregate` are O(n) scans. That is the right trade-off for dev/test and modest-volume runtime use. For high-volume or durable retention, write a custom `TraceStoreContract` (or export to a backend with [`export-traces`](@warlock.js/ai-panoptic/export-traces/SKILL.md)) backed by a real datastore.
+> The in-memory store has no secondary indexes: `get` / `add` are O(1), `query` / `aggregate` are O(n) scans. That is the right trade-off for dev/test and modest-volume runtime use. For high-volume or durable retention, write a custom `TraceStoreContract` (or export to a backend with the `export-traces` topic) backed by a real datastore.
 
 ## Persisting across a restart — `createCacheTraceStore`
 
@@ -644,7 +644,7 @@ type CacheTraceStoreHandle = TraceStoreContract & ExporterContract & {
 
 Ordering uses an **internal monotonic counter**, not `Date.now()`, so the persisted index stays a stable total order even when many traces land in the same millisecond — FIFO eviction stays honest across a restart.
 
-> The usual path is declarative: `ai.config({ panoptic: { cache, dashboard: true } })` constructs this store, awaits `ready()`, and wires it under the dashboard for you — see [`use-local-dashboard/SKILL.md`](@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md). Reach for `createCacheTraceStore` directly only when you manage the store / collector yourself.
+> The usual path is declarative: `ai.config({ panoptic: { cache, dashboard: true } })` constructs this store, awaits `ready()`, and wires it under the dashboard for you — see the `use-local-dashboard` topic. Reach for `createCacheTraceStore` directly only when you manage the store / collector yourself.
 
 ## Summing usage yourself
 
@@ -663,16 +663,16 @@ for (const trace of store.query({ sessionId })) {
 
 ## See also
 
-- [`@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md) — wiring the `panoptic(...)` subscriber and bring-your-own-collector so the store fills as runs complete.
-- [`@warlock.js/ai-panoptic/export-traces/SKILL.md`](@warlock.js/ai-panoptic/export-traces/SKILL.md) — sending traces to an external backend instead of (or alongside) retaining them in memory; writing a custom sink.
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — the `BaseReport` the collector projects into the `Trace` this store retains.
+- The `observe-with-panoptic` topic — wiring the `panoptic(...)` subscriber and bring-your-own-collector so the store fills as runs complete.
+- The `export-traces` topic — sending traces to an external backend instead of (or alongside) retaining them in memory; writing a custom sink.
+- The `run-ai-agent` topic of the `warlock-js-ai` skill — the `BaseReport` the collector projects into the `Trace` this store retains.
 
 
 ## use-local-dashboard  `@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`
 
 ---
 name: use-local-dashboard
-description: 'Run the zero-setup local Panoptic dashboard — a loopback `node:http` server over a trace store served from `ai.config({ panoptic: { dashboard } })`, with a two-pane call-tree + metadata UI (light/dark/system theme, search/filter, session + prompt-version grouping, cost heatmap, Gantt timeline, errors filter, hash deep-links) and an optional cache-backed persistent store. Triggers: `dashboard`, `DashboardOptions`, `DashboardHandle`, `ai.config({ panoptic })`, `panoptic.dashboard`, `panoptic.cache`, `port: 4319`, `basePath`, `open`, `authToken`, `allowedHosts`, `/api/traces`, `/api/aggregate`, `/api/traces/:id`, `createRequestHandler`, `dashboardHtml`, `sanitizeHref`, `ServeConfig`, `TraceStoreContract`, `createCacheTraceStore`, theme, dark mode, call tree, metadata panel, cost heatmap, timeline / Gantt, errors only, deep-link, group by session, prompt version, group by type, type stats panel, started / ended timestamps, team type; ''open a local AI trace dashboard'', ''view agent traces in the browser'', ''self-hosted panoptic UI'', ''inspect traces without Langfuse'', ''spin up a dev observability server'', ''dark mode dashboard'', ''persist traces across restart'', ''group traces by session / prompt version / type'', ''cost heatmap'', ''timeline / waterfall view'', ''filter failed runs in the dashboard'', ''per-type stats panel'', ''is the dashboard bearer token safe'', ''markdown links XSS in trace content''; typical import `import { ai } from "@warlock.js/ai"` + `import "@warlock.js/ai-panoptic"`. Skip: shipping traces to a backend (OTel / Langfuse / file) — `@warlock.js/ai-panoptic/export-traces/SKILL.md`; the queryable store API the dashboard reads — `@warlock.js/ai-panoptic/query-traces/SKILL.md`; wiring the subscriber by hand — `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`.'
+description: 'Run the zero-setup local Panoptic dashboard — a loopback `node:http` server over a trace store served from `ai.config({ panoptic: { dashboard } })`, with a two-pane call-tree + metadata UI (light/dark/system theme, search/filter, session + prompt-version grouping, cost heatmap, Gantt timeline, errors filter, hash deep-links) and an optional cache-backed persistent store. Triggers: `dashboard`, `DashboardOptions`, `DashboardHandle`, `ai.config({ panoptic })`, `panoptic.dashboard`, `panoptic.cache`, `port: 4319`, `basePath`, `open`, `authToken`, `allowedHosts`, `/api/traces`, `/api/aggregate`, `/api/traces/:id`, `createRequestHandler`, `dashboardHtml`, `sanitizeHref`, `ServeConfig`, `TraceStoreContract`, `createCacheTraceStore`, theme, dark mode, call tree, metadata panel, cost heatmap, timeline / Gantt, errors only, deep-link, group by session, prompt version, group by type, type stats panel, started / ended timestamps, team type; ''open a local AI trace dashboard'', ''view agent traces in the browser'', ''self-hosted panoptic UI'', ''inspect traces without Langfuse'', ''spin up a dev observability server'', ''dark mode dashboard'', ''persist traces across restart'', ''group traces by session / prompt version / type'', ''cost heatmap'', ''timeline / waterfall view'', ''filter failed runs in the dashboard'', ''per-type stats panel'', ''is the dashboard bearer token safe'', ''markdown links XSS in trace content''; typical import `import { ai } from "@warlock.js/ai"` + `import "@warlock.js/ai-panoptic"`. Skip: shipping traces to a backend (OTel / Langfuse / file) — the `export-traces` topic; the queryable store API the dashboard reads — the `query-traces` topic; wiring the subscriber by hand — the `observe-with-panoptic` topic.'
 ---
 
 # The local Panoptic dashboard — zero-setup trace viewing
@@ -791,7 +791,7 @@ ai.config({
 });
 ```
 
-Panoptic awaits the store's `ready()` hydration **before** the server starts serving, so a restart surfaces previously-persisted traces immediately. Reads stay synchronous (served from an in-memory mirror); writes go through to the cache fire-and-forget, so a flaky cache never throws into the collector's hot path. A store-shaped exporter you pass via `exporters` still wins over `cache`. The store building block (`createCacheTraceStore`) and its durability contract live in [`query-traces/SKILL.md`](@warlock.js/ai-panoptic/query-traces/SKILL.md).
+Panoptic awaits the store's `ready()` hydration **before** the server starts serving, so a restart surfaces previously-persisted traces immediately. Reads stay synchronous (served from an in-memory mirror); writes go through to the cache fire-and-forget, so a flaky cache never throws into the collector's hot path. A store-shaped exporter you pass via `exporters` still wins over `cache`. The store building block (`createCacheTraceStore`) and its durability contract live in the `query-traces` topic.
 
 ## The low-level building block — `dashboard(store, options)`
 
@@ -838,7 +838,7 @@ type DashboardHandle = {
 
 ## The JSON API
 
-Every route is **`GET`-only and read-only** (non-`GET` → `405`), mounted under `basePath` — EXCEPT the one opt-in `POST .../spans/:spanId/evaluate` route `DashboardOptions.evaluate` enables (see [`evaluate-system-prompt/SKILL.md`](@warlock.js/ai-panoptic/evaluate-system-prompt/SKILL.md)); absent that config, it 405s like everything else. The page polls the `GET` routes; you can curl them too. Store shapes are already JSON-safe, so responses are a plain `JSON.stringify`.
+Every route is **`GET`-only and read-only** (non-`GET` → `405`), mounted under `basePath` — EXCEPT the one opt-in `POST .../spans/:spanId/evaluate` route `DashboardOptions.evaluate` enables (see the `evaluate-system-prompt` topic); absent that config, it 405s like everything else. The page polls the `GET` routes; you can curl them too. Store shapes are already JSON-safe, so responses are a plain `JSON.stringify`.
 
 | Route | Returns |
 |---|---|
@@ -855,7 +855,7 @@ curl 'http://127.0.0.1:4319/api/traces?status=failed'
 curl 'http://127.0.0.1:4319/api/aggregate?sessionId=sess_42'
 ```
 
-(The exact filter keys and the aggregate shape live in [`query-traces/SKILL.md`](@warlock.js/ai-panoptic/query-traces/SKILL.md).)
+(The exact filter keys and the aggregate shape live in the `query-traces` topic.)
 
 ## Advanced — build the handler yourself
 
@@ -887,7 +887,7 @@ These three findings (link sanitization + the two token-handling items above) ca
 
 ## See also
 
-- [`@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md) — the `ai.config({ panoptic })` wiring and the underlying `panoptic(...)` subscriber that fills the store.
-- [`@warlock.js/ai-panoptic/query-traces/SKILL.md`](@warlock.js/ai-panoptic/query-traces/SKILL.md) — the `TraceStoreContract` (`query` / `get` / `aggregate`) the dashboard reads, the `TraceQuery` filter, and capacity eviction.
-- [`@warlock.js/ai-panoptic/export-traces/SKILL.md`](@warlock.js/ai-panoptic/export-traces/SKILL.md) — shipping traces to OTel / Langfuse / a file instead of (or alongside) the local dashboard.
-- [`@warlock.js/ai-panoptic/evaluate-system-prompt/SKILL.md`](@warlock.js/ai-panoptic/evaluate-system-prompt/SKILL.md) — the drawer's "Evaluate system prompt" action, the dashboard's one write route.
+- The `observe-with-panoptic` topic — the `ai.config({ panoptic })` wiring and the underlying `panoptic(...)` subscriber that fills the store.
+- The `query-traces` topic — the `TraceStoreContract` (`query` / `get` / `aggregate`) the dashboard reads, the `TraceQuery` filter, and capacity eviction.
+- The `export-traces` topic — shipping traces to OTel / Langfuse / a file instead of (or alongside) the local dashboard.
+- The `evaluate-system-prompt` topic — the drawer's "Evaluate system prompt" action, the dashboard's one write route.

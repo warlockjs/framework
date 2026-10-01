@@ -8,7 +8,7 @@
 
 ---
 name: setup-groq
-description: 'Wire @warlock.js/ai-groq — new GroqSDK({apiKey, baseURL?, provider?, pricing?}) for Groq-hosted open models on LPU hardware (llama-3.3-70b-versatile, llama-3.1-8b-instant, openai/gpt-oss-120b/20b, deepseek-r1-distill-llama-70b). Thin wrapper over @warlock.js/ai-openai — uses the OpenAI-compatible endpoint https://api.groq.com/openai/v1, delegating transport/streaming/structured-output/errors to OpenAISDK while injecting Groqs OWN vision/reasoning inference + default pricing. .model({name, vision?, reasoning?, structuredOutput?}) for ModelContract. Triggers: `GroqSDK`, `groq.model`, `groq.count`, `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `gpt-oss`, `deepseek-r1-distill`, `groq vision`, `groq reasoning`, `reasoning_effort`, `https://api.groq.com/openai/v1`, OpenAI-compatible Groq, LPU, fast inference; "wire groq into a warlock agent", "use llama 3.3 on groq", "run gpt-oss / deepseek reasoning on groq", "point warlock at the groq endpoint"; import `import { GroqSDK } from "@warlock.js/ai-groq"`. Skip: agent wiring — `@warlock.js/ai/run-ai-agent/SKILL.md`; adapter comparison — `@warlock.js/ai/pick-ai-provider/SKILL.md`; the wrapped adapter `@warlock.js/ai-openai` (`setup-openai`); embeddings (Groq has none — use openai/google); siblings `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `groq-sdk` / `openai` SDK.'
+description: 'Wire @warlock.js/ai-groq — new GroqSDK({apiKey, baseURL?, provider?, pricing?}) for Groq-hosted open models on LPU hardware (llama-3.3-70b-versatile, llama-3.1-8b-instant, openai/gpt-oss-120b/20b, deepseek-r1-distill-llama-70b). Thin wrapper over @warlock.js/ai-openai — uses the OpenAI-compatible endpoint https://api.groq.com/openai/v1, delegating transport/streaming/structured-output/errors to OpenAISDK while injecting Groqs OWN vision/reasoning inference + default pricing. .model({name, vision?, reasoning?, structuredOutput?}) for ModelContract. Triggers: `GroqSDK`, `groq.model`, `groq.count`, `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `gpt-oss`, `deepseek-r1-distill`, `groq vision`, `groq reasoning`, `reasoning_effort`, `https://api.groq.com/openai/v1`, OpenAI-compatible Groq, LPU, fast inference; "wire groq into a warlock agent", "use llama 3.3 on groq", "run gpt-oss / deepseek reasoning on groq", "point warlock at the groq endpoint"; import `import { GroqSDK } from "@warlock.js/ai-groq"`. Skip: agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; the wrapped adapter `@warlock.js/ai-openai` (`setup-openai`); embeddings (Groq has none — use openai/google); siblings `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `groq-sdk` / `openai` SDK.'
 ---
 
 # `@warlock.js/ai-groq`
@@ -72,7 +72,7 @@ await model.complete(messages, { reasoning: { effort: "high" } });   // → reas
 
 ## Structured output & streaming
 
-Inherited unchanged from `@warlock.js/ai-openai`: a `responseSchema` maps to `response_format: json_schema` (strict) when the schema is a proper root object, else loose `json_object`; `model.stream()` drains the streaming Chat Completions response and yields `delta` / `tool-call` / `done` chunks with `include_usage` on. See [`setup-openai`](@warlock.js/ai-openai/skills/setup-openai/SKILL.md) for the full wire behavior.
+Inherited unchanged from `@warlock.js/ai-openai`: a `responseSchema` maps to `response_format: json_schema` (strict) when the schema is a proper root object, else loose `json_object`; `model.stream()` drains the streaming Chat Completions response and yields `delta` / `tool-call` / `done` chunks with `include_usage` on. See the `setup-openai` topic of the `warlock-js-ai-openai` skill for the full wire behavior.
 
 ## Embeddings — not available on Groq
 
@@ -105,7 +105,7 @@ Good for budgeting; not for billing.
 
 ## Errors
 
-Raw errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by the inner OpenAI adapter's error wrapper (dispatch keys on `status + code`). See [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md). Note Groq's documented OpenAI-compat gaps — `n` must be `1`, and `logprobs` / `logit_bias` / `top_logprobs` / `messages[].name` are unsupported.
+Raw errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by the inner OpenAI adapter's error wrapper (dispatch keys on `status + code`). See the `handle-ai-errors` topic of the `warlock-js-ai` skill. Note Groq's documented OpenAI-compat gaps — `n` must be `1`, and `logprobs` / `logit_bias` / `top_logprobs` / `messages[].name` are unsupported.
 
 ## When NOT to use this skill
 
@@ -115,6 +115,6 @@ Raw errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by th
 
 ## See also
 
-- [`@warlock.js/ai-openai/skills/setup-openai/SKILL.md`](@warlock.js/ai-openai/skills/setup-openai/SKILL.md) — the wrapped adapter; full wire / streaming / structured-output detail
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — passing the model into `ai.agent({...})`
-- [`@warlock.js/ai/pick-ai-provider/SKILL.md`](@warlock.js/ai/pick-ai-provider/SKILL.md) — adapter comparison
+- The `setup-openai` topic of the `warlock-js-ai-openai` skill — the wrapped adapter; full wire / streaming / structured-output detail
+- The `run-ai-agent` topic of the `warlock-js-ai` skill — passing the model into `ai.agent({...})`
+- The `pick-ai-provider` topic of the `warlock-js-ai` skill — adapter comparison

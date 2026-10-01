@@ -8,7 +8,7 @@
 
 ---
 name: connect-mcp-server
-description: 'Connect a @warlock.js/ai agent to an external Model Context Protocol (MCP) server and adapt its tools as native agent tools (Direction A) with `ai.mcp(server)`. Triggers: `ai.mcp(`, `ai.mcp.serve` (the other direction), `mcp(`, `McpClient`, `McpClientOptions`, `McpTransport`, `client.tools()`, `client.close()`, `namePrefix`, `filter`, `McpTransportError`, `{ type: "stdio" }`, `{ type: "http" }`, `tools/list`, `tools/call`, `jsonSchemaToStandard`, `@modelcontextprotocol/sdk`, `ajv`; ''consume an MCP server'', ''use an external MCP server''s tools in my agent'', ''connect to the GitHub/Slack/Filesystem MCP server'', ''adapt MCP tools as agent tools'', ''bridge my agent to the MCP ecosystem'', ''run an MCP server over stdio/http''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: exposing YOUR agent/tools AS an MCP server (the reverse direction) — `@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`; the built-in web/HTTP/calc/date tools — `@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`.'
+description: 'Connect a @warlock.js/ai agent to an external Model Context Protocol (MCP) server and adapt its tools as native agent tools (Direction A) with `ai.mcp(server)`. Triggers: `ai.mcp(`, `ai.mcp.serve` (the other direction), `mcp(`, `McpClient`, `McpClientOptions`, `McpTransport`, `client.tools()`, `client.close()`, `namePrefix`, `filter`, `McpTransportError`, `{ type: "stdio" }`, `{ type: "http" }`, `tools/list`, `tools/call`, `jsonSchemaToStandard`, `@modelcontextprotocol/sdk`, `ajv`; ''consume an MCP server'', ''use an external MCP server''s tools in my agent'', ''connect to the GitHub/Slack/Filesystem MCP server'', ''adapt MCP tools as agent tools'', ''bridge my agent to the MCP ecosystem'', ''run an MCP server over stdio/http''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: exposing YOUR agent/tools AS an MCP server (the reverse direction) — the `expose-as-mcp-server` topic; the built-in web/HTTP/calc/date tools — the `use-web-and-http-tools` topic.'
 ---
 
 # Connect to an external MCP server (Direction A)
@@ -101,16 +101,16 @@ The MCP client lazily imports `@modelcontextprotocol/sdk` (the protocol SDK) and
 
 ## See also
 
-- [`@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`](@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md) — the reverse direction: publish a local primitive AS an MCP server.
-- [`@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`](@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md) — the built-in web / HTTP / calculator / date-time belt.
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent that consumes the adapted tools.
+- The `expose-as-mcp-server` topic — the reverse direction: publish a local primitive AS an MCP server.
+- The `use-web-and-http-tools` topic — the built-in web / HTTP / calculator / date-time belt.
+- The `run-ai-agent` topic of the `warlock-js-ai` skill — running the agent that consumes the adapted tools.
 
 
 ## expose-as-mcp-server  `@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`
 
 ---
 name: expose-as-mcp-server
-description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a raw ToolContract[]) AS a Model Context Protocol (MCP) server other clients consume (Direction B) with `ai.mcp.serve(source, options)`. Triggers: `ai.mcp.serve(`, `serve(`, `createServeHandler`, `McpServer`, `McpServeOptions`, `McpServeSource`, `McpServeTransport`, `server.start()`, `server.stop()`, `schemaTarget`, `draft-2020-12`, `extractJsonSchema`, `tools/list`, `tools/call`, `{ type: "stdio" }`, `{ type: "http"; port }`; ''expose my agent as an MCP server'', ''publish my tools to Cursor/Claude Desktop'', ''make my warlock workspace an MCP server'', ''serve my ToolContract[] over MCP'', ''let other MCP clients call my agent''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: CONSUMING an external MCP server (the reverse direction) — `@warlock.js/ai-tools/connect-mcp-server/SKILL.md`; the built-in web/HTTP/calc/date tools — `@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`.'
+description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a raw ToolContract[]) AS a Model Context Protocol (MCP) server other clients consume (Direction B) with `ai.mcp.serve(source, options)`. Triggers: `ai.mcp.serve(`, `serve(`, `createServeHandler`, `McpServer`, `McpServeOptions`, `McpServeSource`, `McpServeTransport`, `server.start()`, `server.stop()`, `schemaTarget`, `draft-2020-12`, `extractJsonSchema`, `tools/list`, `tools/call`, `{ type: "stdio" }`, `{ type: "http"; port }`; ''expose my agent as an MCP server'', ''publish my tools to Cursor/Claude Desktop'', ''make my warlock workspace an MCP server'', ''serve my ToolContract[] over MCP'', ''let other MCP clients call my agent''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: CONSUMING an external MCP server (the reverse direction) — the `connect-mcp-server` topic; the built-in web/HTTP/calc/date tools — the `use-web-and-http-tools` topic.'
 ---
 
 # Expose tools AS an MCP server (Direction B)
@@ -190,16 +190,16 @@ const response = await handler.handle(jsonRpcRequest); // request → response, 
 
 ## See also
 
-- [`@warlock.js/ai-tools/connect-mcp-server/SKILL.md`](@warlock.js/ai-tools/connect-mcp-server/SKILL.md) — the reverse direction: consume an external MCP server's tools.
-- [`@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`](@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md) — the built-in tools you might expose.
-- [`@warlock.js/ai-workspace/use-a-workspace/SKILL.md`](@warlock.js/ai-workspace/use-a-workspace/SKILL.md) — a workspace whose `tools.all()` is a natural `serve` source.
+- The `connect-mcp-server` topic — the reverse direction: consume an external MCP server's tools.
+- The `use-web-and-http-tools` topic — the built-in tools you might expose.
+- The `use-a-workspace` topic of the `warlock-js-ai-workspace` skill — a workspace whose `tools.all()` is a natural `serve` source.
 
 
 ## use-web-and-http-tools  `@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`
 
 ---
 name: use-web-and-http-tools
-description: 'Wire the @warlock.js/ai-tools belt — web search, fetch/scrape, HTTP/REST, calculator, date-time — into an agent under their guardrails. Triggers: `ai.tools.webSearch`, `ai.tools.fetchUrl`, `ai.tools.http`, `ai.tools.calculator`, `ai.tools.dateTime`, `webSearchTool`, `fetchUrlTool`, `httpRequestTool`, `calculatorTool`, `dateTimeTool`, `web_search`, `fetch_url`, `http_request`, `calculator`, `date_time`, `WebToolError`, `HttpPolicyError`, `CalculatorError`, `DateTimeError`, `allowHosts`, `allowMethods`, `allowPrivateNetwork`, `baseUrl`, `maxBytes`, `guardedFetch`, `SearchProvider`, `TAVILY_API_KEY`; ''give an agent web search'', ''let an agent fetch/scrape a page'', ''let an agent call a REST API'', ''restrict which hosts/methods an agent can hit'', ''add a calculator/date tool to an agent'', ''SSRF guardrail for an agent tool'', ''let a tool reach an internal/dev service''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: connecting to an external MCP server — `@warlock.js/ai-tools/connect-mcp-server/SKILL.md`; exposing tools AS an MCP server — `@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`; filesystem/shell tools — `@warlock.js/ai-workspace/use-a-workspace/SKILL.md`; defining your own custom tool — `@warlock.js/ai/define-ai-tool/SKILL.md`.'
+description: 'Wire the @warlock.js/ai-tools belt — web search, fetch/scrape, HTTP/REST, calculator, date-time — into an agent under their guardrails. Triggers: `ai.tools.webSearch`, `ai.tools.fetchUrl`, `ai.tools.http`, `ai.tools.calculator`, `ai.tools.dateTime`, `webSearchTool`, `fetchUrlTool`, `httpRequestTool`, `calculatorTool`, `dateTimeTool`, `web_search`, `fetch_url`, `http_request`, `calculator`, `date_time`, `WebToolError`, `HttpPolicyError`, `CalculatorError`, `DateTimeError`, `allowHosts`, `allowMethods`, `allowPrivateNetwork`, `baseUrl`, `maxBytes`, `guardedFetch`, `SearchProvider`, `TAVILY_API_KEY`; ''give an agent web search'', ''let an agent fetch/scrape a page'', ''let an agent call a REST API'', ''restrict which hosts/methods an agent can hit'', ''add a calculator/date tool to an agent'', ''SSRF guardrail for an agent tool'', ''let a tool reach an internal/dev service''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: connecting to an external MCP server — the `connect-mcp-server` topic; exposing tools AS an MCP server — the `expose-as-mcp-server` topic; filesystem/shell tools — the `use-a-workspace` topic of the `warlock-js-ai-workspace` skill; defining your own custom tool — the `define-ai-tool` topic of the `warlock-js-ai` skill.'
 ---
 
 # Use the web + HTTP tool belt
@@ -321,8 +321,8 @@ if (error instanceof WebToolError && error.type === "denied-host") {
 
 ## See also
 
-- [`@warlock.js/ai-tools/connect-mcp-server/SKILL.md`](@warlock.js/ai-tools/connect-mcp-server/SKILL.md) — adapt an external MCP server's tools as agent tools.
-- [`@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`](@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md) — publish these tools AS an MCP server.
-- [`@warlock.js/ai-workspace/use-a-workspace/SKILL.md`](@warlock.js/ai-workspace/use-a-workspace/SKILL.md) — the filesystem + shell tool belt (jailed `read_file` / `edit_file` / `run_shell` / …).
-- [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) — the `tool()` / `ToolContract` seam every tool here is built on.
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent that consumes these tools.
+- The `connect-mcp-server` topic — adapt an external MCP server's tools as agent tools.
+- The `expose-as-mcp-server` topic — publish these tools AS an MCP server.
+- The `use-a-workspace` topic of the `warlock-js-ai-workspace` skill — the filesystem + shell tool belt (jailed `read_file` / `edit_file` / `run_shell` / …).
+- The `define-ai-tool` topic of the `warlock-js-ai` skill — the `tool()` / `ToolContract` seam every tool here is built on.
+- The `run-ai-agent` topic of the `warlock-js-ai` skill — running the agent that consumes these tools.

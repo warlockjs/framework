@@ -8,7 +8,7 @@
 
 ---
 name: configure-notifications
-description: 'Wire `@warlock.js/notifications` via a declarative `src/config/notifications.ts` that exports a `NotificationConfig` default — the notifications connector registers it at boot, so app code never calls `setNotificationConfig`. `channels`: registry mapping name → factory result (`mailChannel`, `inApp.configure`, custom `defineChannel`); `queue`: optional `QueueDispatcher` (`.queue()` throws without it); `preferences`: optional `PreferenceProvider` (drops channels the recipient muted); `rateLimit`: optional `RateLimiter` (drops channels exceeding per-recipient budgets). Triggers: `config/notifications.ts`, `NotificationConfig`, `setNotificationConfig`, `getNotificationConfig`, `mailChannel`, `inApp.configure`, "configure notifications", "wire notifications at boot", "set preferences provider", "set rate limit"; typical import `import { type NotificationConfig, mailChannel, inApp } from "@warlock.js/notifications"`. Skip: building a reusable notification — `@warlock.js/notifications/define-notification/SKILL.md`; the in-app read API — `@warlock.js/notifications/use-in-app/SKILL.md`; adding a custom channel — `@warlock.js/notifications/define-channel/SKILL.md`.'
+description: 'Wire `@warlock.js/notifications` via a declarative `src/config/notifications.ts` that exports a `NotificationConfig` default — the notifications connector registers it at boot, so app code never calls `setNotificationConfig`. `channels`: registry mapping name → factory result (`mailChannel`, `inApp.configure`, custom `defineChannel`); `queue`: optional `QueueDispatcher` (`.queue()` throws without it); `preferences`: optional `PreferenceProvider` (drops channels the recipient muted); `rateLimit`: optional `RateLimiter` (drops channels exceeding per-recipient budgets). Triggers: `config/notifications.ts`, `NotificationConfig`, `setNotificationConfig`, `getNotificationConfig`, `mailChannel`, `inApp.configure`, "configure notifications", "wire notifications at boot", "set preferences provider", "set rate limit"; typical import `import { type NotificationConfig, mailChannel, inApp } from "@warlock.js/notifications"`. Skip: building a reusable notification — the `define-notification` topic; the in-app read API — the `use-in-app` topic; adding a custom channel — the `define-channel` topic.'
 ---
 
 # Configure notifications
@@ -140,17 +140,17 @@ afterEach(() => resetNotificationConfig());
 
 ## See also
 
-- [`notifications-basics/SKILL.md`](../notifications-basics/SKILL.md) — package front door.
-- [`define-notification/SKILL.md`](../define-notification/SKILL.md) — reusable multi-channel definitions.
-- [`use-in-app/SKILL.md`](../use-in-app/SKILL.md) — in-app read API.
-- [`define-channel/SKILL.md`](../define-channel/SKILL.md) — custom channels.
+- The `notifications-basics` topic — package front door.
+- The `define-notification` topic — reusable multi-channel definitions.
+- The `use-in-app` topic — in-app read API.
+- The `define-channel` topic — custom channels.
 
 
 ## define-channel  `@warlock.js/notifications/define-channel/SKILL.md`
 
 ---
 name: define-channel
-description: 'Add a custom notification channel — `defineChannel<P>({ name, route?, send })` returns a `Channel<P>` you register in the `channels` map of `setNotificationConfig`. `name` matches the key in `NotificationChannels` (extend via `declare module` for typing); `route(notifiable)` resolves the recipient''s address (defaults to `{ id }` when omitted); `send({ payload, route, notifiable, options })` does the actual transport. Use for Slack/Discord/internal-webhook/anything else — `fetch`-based with NO SDK is the simplest variant. Channels that load a heavy SDK should follow the lazy-import pattern from the develop-feature playbook. Triggers: `defineChannel`, `Channel<P>`, "custom notification channel", "add discord channel", "slack channel", "webhook channel", "new channel type", `declare module "@warlock.js/notifications"`; typical import `import { defineChannel } from "@warlock.js/notifications"`. Skip: lazy-loading an optional SDK behind the channel — `D:/xampp/htdocs/mongez/node/.claude/skills/develop-warlock.js-feature/SKILL.md`; using built-in channels — `@warlock.js/notifications/configure-notifications/SKILL.md`.'
+description: 'Add a custom notification channel — `defineChannel<P>({ name, route?, send })` returns a `Channel<P>` you register in the `channels` map of `setNotificationConfig`. `name` matches the key in `NotificationChannels` (extend via `declare module` for typing); `route(notifiable)` resolves the recipient''s address (defaults to `{ id }` when omitted); `send({ payload, route, notifiable, options })` does the actual transport. Use for Slack/Discord/internal-webhook/anything else — `fetch`-based with NO SDK is the simplest variant. Channels that load a heavy SDK should follow the lazy-import pattern from the develop-feature playbook. Triggers: `defineChannel`, `Channel<P>`, "custom notification channel", "add discord channel", "slack channel", "webhook channel", "new channel type", `declare module "@warlock.js/notifications"`; typical import `import { defineChannel } from "@warlock.js/notifications"`. Skip: lazy-loading an optional SDK behind the channel — the `develop-warlock.js-feature` workspace skill; using built-in channels — the `configure-notifications` topic.'
 ---
 
 # `defineChannel` — custom channels
@@ -224,7 +224,7 @@ Throw to fail the send. The dispatcher catches per channel, fires a `failed` eve
 
 ## SDK-backed channels — lazy-import the SDK
 
-Channels that wrap a heavy SDK (Twilio, Slack SDK, FCM SDK) should follow the lazy-import pattern so apps that don't use them don't pay the install/load cost. The recipe + race-safe template lives in [`develop-warlock.js-feature`](../../../../.claude/skills/develop-warlock.js-feature/SKILL.md) — copy from there; do not invent a variant.
+Channels that wrap a heavy SDK (Twilio, Slack SDK, FCM SDK) should follow the lazy-import pattern so apps that don't use them don't pay the install/load cost. The recipe + race-safe template lives in the `develop-warlock.js-feature` workspace skill — copy from there; do not invent a variant.
 
 Sketch:
 
@@ -251,17 +251,17 @@ export const slackChannel = (config: { token: string }) =>
 
 ## See also
 
-- [`configure-notifications/SKILL.md`](../configure-notifications/SKILL.md) — register channels in the config.
-- [`send-ad-hoc/SKILL.md`](../send-ad-hoc/SKILL.md) — `notify.<custom-channel>` works after registration.
-- [`define-notification/SKILL.md`](../define-notification/SKILL.md) — multi-channel renderers with the custom channel key.
-- `D:/xampp/htdocs/mongez/node/.claude/skills/develop-warlock.js-feature/SKILL.md` — lazy-import pattern for SDK-backed channels.
+- The `configure-notifications` topic — register channels in the config.
+- The `send-ad-hoc` topic — `notify.<custom-channel>` works after registration.
+- The `define-notification` topic — multi-channel renderers with the custom channel key.
+- The `develop-warlock.js-feature` workspace skill — lazy-import pattern for SDK-backed channels.
 
 
 ## define-notification  `@warlock.js/notifications/define-notification/SKILL.md`
 
 ---
 name: define-notification
-description: 'Build a reusable multi-channel notification with `defineNotification<Data>({ type, via, ...renderers })`. `type` is the stable identifier preference/rate-limit gates use AND defaults the database channel''s `type`. `via` is `ChannelName[]` OR `(data, to) => ChannelName[]` for per-recipient channel selection. Renderers are `(data, to, ctx) => NotificationChannels[C]`; `ctx` carries `locale` + `meta` from `SendOptions`. The returned object exposes `.send(to|to[], data, options?)`, `.queue(to|to[], data, options?)`, and `.only(...channels)`. Per-recipient + per-channel `Promise.allSettled` isolates failures; the database channel''s `type` is auto-defaulted from `def.type`; `SendOptions.idempotencyKey` is injected into the database payload. Triggers: `defineNotification`, `via`, "reusable notification", "multi-channel notification", "send through several channels at once", "render per channel", `RenderContext`, `def.type`; "force on a notification", "queue with delay"; typical import `import { defineNotification } from "@warlock.js/notifications"`. Skip: single-channel ad-hoc sends — `@warlock.js/notifications/send-ad-hoc/SKILL.md`; adding a brand-new channel — `@warlock.js/notifications/define-channel/SKILL.md`; observing dispatch outcomes — `@warlock.js/notifications/observe-notifications/SKILL.md`.'
+description: 'Build a reusable multi-channel notification with `defineNotification<Data>({ type, via, ...renderers })`. `type` is the stable identifier preference/rate-limit gates use AND defaults the database channel''s `type`. `via` is `ChannelName[]` OR `(data, to) => ChannelName[]` for per-recipient channel selection. Renderers are `(data, to, ctx) => NotificationChannels[C]`; `ctx` carries `locale` + `meta` from `SendOptions`. The returned object exposes `.send(to|to[], data, options?)`, `.queue(to|to[], data, options?)`, and `.only(...channels)`. Per-recipient + per-channel `Promise.allSettled` isolates failures; the database channel''s `type` is auto-defaulted from `def.type`; `SendOptions.idempotencyKey` is injected into the database payload. Triggers: `defineNotification`, `via`, "reusable notification", "multi-channel notification", "send through several channels at once", "render per channel", `RenderContext`, `def.type`; "force on a notification", "queue with delay"; typical import `import { defineNotification } from "@warlock.js/notifications"`. Skip: single-channel ad-hoc sends — the `send-ad-hoc` topic; adding a brand-new channel — the `define-channel` topic; observing dispatch outcomes — the `observe-notifications` topic.'
 ---
 
 # `defineNotification` — reusable multi-channel notification
@@ -388,10 +388,10 @@ Per-recipient: each recipient gets an independent `Promise.allSettled`. Per-chan
 
 ## See also
 
-- [`notifications-basics/SKILL.md`](../notifications-basics/SKILL.md) — package front door.
-- [`send-ad-hoc/SKILL.md`](../send-ad-hoc/SKILL.md) — `notify.<channel>` per-channel shorthand.
-- [`configure-notifications/SKILL.md`](../configure-notifications/SKILL.md) — wire channels + preferences + rate-limit + queue.
-- [`observe-notifications/SKILL.md`](../observe-notifications/SKILL.md) — `notifications.on("sending" | "sent" | "failed" | "skipped", …)`.
+- The `notifications-basics` topic — package front door.
+- The `send-ad-hoc` topic — `notify.<channel>` per-channel shorthand.
+- The `configure-notifications` topic — wire channels + preferences + rate-limit + queue.
+- The `observe-notifications` topic — `notifications.on("sending" | "sent" | "failed" | "skipped", …)`.
 
 
 ## notifications-basics  `@warlock.js/notifications/notifications-basics/SKILL.md`
@@ -487,20 +487,20 @@ await inApp.markAsRead(user, "ntf_123");
 
 ## See also
 
-- [`configure-notifications/SKILL.md`](../configure-notifications/SKILL.md) — wire `config/notifications.ts`.
-- [`define-notification/SKILL.md`](../define-notification/SKILL.md) — reusable multi-channel definitions.
-- [`send-ad-hoc/SKILL.md`](../send-ad-hoc/SKILL.md) — `notify.<channel>` shorthand.
-- [`use-in-app/SKILL.md`](../use-in-app/SKILL.md) — `inApp` read API.
-- [`define-channel/SKILL.md`](../define-channel/SKILL.md) — custom channels.
-- [`write-notification-migration/SKILL.md`](../write-notification-migration/SKILL.md) — columnMap-driven columns.
-- [`observe-notifications/SKILL.md`](../observe-notifications/SKILL.md) — events + metrics.
+- The `configure-notifications` topic — wire `config/notifications.ts`.
+- The `define-notification` topic — reusable multi-channel definitions.
+- The `send-ad-hoc` topic — `notify.<channel>` shorthand.
+- The `use-in-app` topic — `inApp` read API.
+- The `define-channel` topic — custom channels.
+- The `write-notification-migration` topic — columnMap-driven columns.
+- The `observe-notifications` topic — events + metrics.
 
 
 ## observe-notifications  `@warlock.js/notifications/observe-notifications/SKILL.md`
 
 ---
 name: observe-notifications
-description: 'Wire metrics, logging, tracing, and audits via `notifications.on(event, handler)` — four events fire per (channel, recipient): `sending` (gates passed, about to hit the transport), `sent` (succeeded), `failed` (channel threw — carries the Error), `skipped` (a pre-send gate dropped it — carries `reason: "preference" | "rate-limit"`). Every event carries the recipient as `notifiable?` (undefined only for raw-target ad-hoc sends) and a `dispatchId` — `sending` and its terminal `sent`/`failed` share it, so observers can pair them (spans, latency, hung-send detection). `sent`/`failed` also carry `durationMs`. Handler exceptions are logged-and-swallowed so one bad listener can not break the dispatcher. `on(...)` returns an unsubscribe function; `off(event, handler)` exists for symmetry. Triggers: `notifications.on`, `notifications.off`, `"sending"` event, `"sent"` event, `"failed"` event, `"skipped"` event, `dispatchId`, `durationMs`, `NotificationEvents`, "notification metrics", "notification latency", "trace notifications", "notification audit log", "track notification drops"; typical import `import { notifications } from "@warlock.js/notifications"`. Skip: building notifications — `@warlock.js/notifications/define-notification/SKILL.md`; configuring the preference/rate-limit gates that produce `skipped` — `@warlock.js/notifications/configure-notifications/SKILL.md`.'
+description: 'Wire metrics, logging, tracing, and audits via `notifications.on(event, handler)` — four events fire per (channel, recipient): `sending` (gates passed, about to hit the transport), `sent` (succeeded), `failed` (channel threw — carries the Error), `skipped` (a pre-send gate dropped it — carries `reason: "preference" | "rate-limit"`). Every event carries the recipient as `notifiable?` (undefined only for raw-target ad-hoc sends) and a `dispatchId` — `sending` and its terminal `sent`/`failed` share it, so observers can pair them (spans, latency, hung-send detection). `sent`/`failed` also carry `durationMs`. Handler exceptions are logged-and-swallowed so one bad listener can not break the dispatcher. `on(...)` returns an unsubscribe function; `off(event, handler)` exists for symmetry. Triggers: `notifications.on`, `notifications.off`, `"sending"` event, `"sent"` event, `"failed"` event, `"skipped"` event, `dispatchId`, `durationMs`, `NotificationEvents`, "notification metrics", "notification latency", "trace notifications", "notification audit log", "track notification drops"; typical import `import { notifications } from "@warlock.js/notifications"`. Skip: building notifications — the `define-notification` topic; configuring the preference/rate-limit gates that produce `skipped` — the `configure-notifications` topic.'
 ---
 
 # Observe notifications
@@ -561,16 +561,16 @@ A handler that throws is logged and swallowed — the other handlers for the sam
 
 ## See also
 
-- [`notifications-basics/SKILL.md`](../notifications-basics/SKILL.md) — front door + mental model.
-- [`configure-notifications/SKILL.md`](../configure-notifications/SKILL.md) — `preferences` / `rateLimit` slots that emit `skipped`.
-- [`send-ad-hoc/SKILL.md`](../send-ad-hoc/SKILL.md) — when `notifiable` is undefined in events.
+- The `notifications-basics` topic — front door + mental model.
+- The `configure-notifications` topic — `preferences` / `rateLimit` slots that emit `skipped`.
+- The `send-ad-hoc` topic — when `notifiable` is undefined in events.
 
 
 ## queue-notifications  `@warlock.js/notifications/queue-notifications/SKILL.md`
 
 ---
 name: queue-notifications
-description: "Send notifications asynchronously through the herald backend or the BullMQ driver. Configure a QueueDispatcher in config/notifications.ts, then use notif.queue(to, data, options?) to enqueue rendered jobs. Herald uses heraldQueue() and startNotificationsWorker(); bullmqQueue({ attempts, backoff }) from @warlock.js/notifications uses BullMQ (lazy-loading the optional @warlock.js/queue peer), supports retries, and honours SendOptions.delay. Without a queue configured, .queue() rejects NoQueueDispatcherError. Triggers: heraldQueue, bullmqQueue, startNotificationsWorker, QueueDispatcher, .queue(, async notifications, queue notifications, notification worker, background notifications, notifications.dispatch. Skip: synchronous sends - @warlock.js/notifications/define-notification/SKILL.md; herald itself - @warlock.js/herald/*."
+description: "Send notifications asynchronously through the herald backend or the BullMQ driver. Configure a QueueDispatcher in config/notifications.ts, then use notif.queue(to, data, options?) to enqueue rendered jobs. Herald uses heraldQueue() and startNotificationsWorker(); bullmqQueue({ attempts, backoff }) from @warlock.js/notifications uses BullMQ (lazy-loading the optional @warlock.js/queue peer), supports retries, and honours SendOptions.delay. Without a queue configured, .queue() rejects NoQueueDispatcherError. Triggers: heraldQueue, bullmqQueue, startNotificationsWorker, QueueDispatcher, .queue(, async notifications, queue notifications, notification worker, background notifications, notifications.dispatch. Skip: synchronous sends - the `define-notification` topic; herald itself - @warlock.js/herald/*."
 ---
 
 # Queue notifications (async)
@@ -675,16 +675,16 @@ await orderShipped.queue(user, { order }, { idempotencyKey: `ship:${order.id}` }
 
 ## See also
 
-- [`define-notification/SKILL.md`](../define-notification/SKILL.md) - `.queue()` on a defined notification.
-- [`configure-notifications/SKILL.md`](../configure-notifications/SKILL.md) - the `queue` config slot.
-- [`@warlock.js/herald/herald-basics/SKILL.md`](../../../herald/skills/herald-basics/SKILL.md) - connecting the broker.
+- The `define-notification` topic - `.queue()` on a defined notification.
+- The `configure-notifications` topic - the `queue` config slot.
+- The `herald-basics` topic of the `warlock-js-herald` skill - connecting the broker.
 
 
 ## send-ad-hoc  `@warlock.js/notifications/send-ad-hoc/SKILL.md`
 
 ---
 name: send-ad-hoc
-description: 'Ad-hoc per-channel send via the `notify.<channel>(to, payload, options?)` Proxy facade. Works for any channel registered in `NotificationChannels` (built-in or custom). `to` accepts a `Notifiable` model OR a raw route string (`"x@y.com"`); `payload` is typed per channel via the registry; `options` is the standard `SendOptions`. `notify.channel(name).send(...)` is the runtime escape when the channel name is not a compile-time literal. Type-based preference gating applies when a type is known — explicit via `options.type` OR auto-detected from a database payload''s `type` field. For multi-channel sends use `defineNotification` instead — there is no inline `notify(to, { via, ... })` form on purpose. Triggers: `notify.<channel>`, `notify.channel(name)`, `notify.mail`, `notify.database`, "send a one-off notification", "ad-hoc notification", "send an email without defining a notification", "raw email target", "dynamic channel name"; typical import `import { notify } from "@warlock.js/notifications"`. Skip: reusable multi-channel notifications — `@warlock.js/notifications/define-notification/SKILL.md`; configuring channels — `@warlock.js/notifications/configure-notifications/SKILL.md`.'
+description: 'Ad-hoc per-channel send via the `notify.<channel>(to, payload, options?)` Proxy facade. Works for any channel registered in `NotificationChannels` (built-in or custom). `to` accepts a `Notifiable` model OR a raw route string (`"x@y.com"`); `payload` is typed per channel via the registry; `options` is the standard `SendOptions`. `notify.channel(name).send(...)` is the runtime escape when the channel name is not a compile-time literal. Type-based preference gating applies when a type is known — explicit via `options.type` OR auto-detected from a database payload''s `type` field. For multi-channel sends use `defineNotification` instead — there is no inline `notify(to, { via, ... })` form on purpose. Triggers: `notify.<channel>`, `notify.channel(name)`, `notify.mail`, `notify.database`, "send a one-off notification", "ad-hoc notification", "send an email without defining a notification", "raw email target", "dynamic channel name"; typical import `import { notify } from "@warlock.js/notifications"`. Skip: reusable multi-channel notifications — the `define-notification` topic; configuring channels — the `configure-notifications` topic.'
 ---
 
 # `notify.<channel>` — ad-hoc, per-channel sends
@@ -698,7 +698,7 @@ await notify.mail(user, { subject: "Welcome", html: "<p>Hi!</p>" });
 await notify.database(user, { type: "welcome", title: "Welcome!" });
 ```
 
-For **multi-channel** sends, use [`defineNotification`](../define-notification/SKILL.md) — that's the reusable pattern and the only mental model for "send through several channels at once" (no inline multi-channel overload).
+For **multi-channel** sends, use `defineNotification` (the `define-notification` topic) — that's the reusable pattern and the only mental model for "send through several channels at once" (no inline multi-channel overload).
 
 ## Shape
 
@@ -730,7 +730,7 @@ const channelName = await chooseChannelForUser(user);
 await notify.channel(channelName).send(user, payload);
 ```
 
-This is the only path with `unknown`-typed payloads — prefer the literal `notify.<channel>` when you can. `to` is still what decides the recipient: even for the `database` channel, a `recipientId`-shaped key on `payload` (or the model's physical recipient column name) is stripped before the row is built, so an untyped payload assembled from request JSON can't redirect the write to another recipient — see [`use-in-app/SKILL.md`](../use-in-app/SKILL.md#createfor-write-side--no-idor-either-since-4150).
+This is the only path with `unknown`-typed payloads — prefer the literal `notify.<channel>` when you can. `to` is still what decides the recipient: even for the `database` channel, a `recipientId`-shaped key on `payload` (or the model's physical recipient column name) is stripped before the row is built, so an untyped payload assembled from request JSON can't redirect the write to another recipient — see the `createFor` write-side section of the `use-in-app` topic.
 
 ## Opt into preference/rate-limit gating
 
@@ -749,7 +749,7 @@ await notify.database(user, { type: "welcome", title: "Welcome!" });
 
 ## Custom channels
 
-After registering a custom channel (see [`define-channel`](../define-channel/SKILL.md)), it's first-class:
+After registering a custom channel (see the `define-channel` topic), it's first-class:
 
 ```ts
 await notify.discord(user, { content: "Build finished 🎉" });
@@ -773,17 +773,17 @@ await notify.slack(staff, { text: "Deploy starting" });
 
 ## See also
 
-- [`notifications-basics/SKILL.md`](../notifications-basics/SKILL.md) — front door + mental model.
-- [`define-notification/SKILL.md`](../define-notification/SKILL.md) — reusable multi-channel.
-- [`define-channel/SKILL.md`](../define-channel/SKILL.md) — register a custom channel.
-- [`observe-notifications/SKILL.md`](../observe-notifications/SKILL.md) — `sending` / `sent` / `failed` / `skipped` events.
+- The `notifications-basics` topic — front door + mental model.
+- The `define-notification` topic — reusable multi-channel.
+- The `define-channel` topic — register a custom channel.
+- The `observe-notifications` topic — `sending` / `sent` / `failed` / `skipped` events.
 
 
 ## use-in-app  `@warlock.js/notifications/use-in-app/SKILL.md`
 
 ---
 name: use-in-app
-description: 'Use the `inApp` facade for the in-app/database channel''s READ side: `inApp.configure({ model: Notification })` or `{ repository: myRepo }` binds the store AND returns the channel; `inApp.list / listUnread / countUnread / markAsRead / markAsUnread` are RECIPIENT-SCOPED by construction (no IDOR — `markAsRead(user, id)` cannot flip another user''s row even with a foreign id). `countUnread` uses `RepositoryManager.countCached` for the badge fast-path. Triggers: `inApp.configure`, `inApp.list`, `inApp.listUnread`, `inApp.countUnread`, `inApp.markAsRead`, `inApp.markAsUnread`, `BaseNotificationsRepository`, `DatabaseNotification`, `NotificationsFilter`, "in-app notifications", "mark notification as read", "unread count", "notification badge", "IDOR-safe markAsRead"; typical import `import { inApp } from "@warlock.js/notifications"`. Skip: writing notifications (use `defineNotification` or `notify.database`) — `@warlock.js/notifications/define-notification/SKILL.md`; the migration columns — `@warlock.js/notifications/write-notification-migration/SKILL.md`; wiring it into config — `@warlock.js/notifications/configure-notifications/SKILL.md`.'
+description: 'Use the `inApp` facade for the in-app/database channel''s READ side: `inApp.configure({ model: Notification })` or `{ repository: myRepo }` binds the store AND returns the channel; `inApp.list / listUnread / countUnread / markAsRead / markAsUnread` are RECIPIENT-SCOPED by construction (no IDOR — `markAsRead(user, id)` cannot flip another user''s row even with a foreign id). `countUnread` uses `RepositoryManager.countCached` for the badge fast-path. Triggers: `inApp.configure`, `inApp.list`, `inApp.listUnread`, `inApp.countUnread`, `inApp.markAsRead`, `inApp.markAsUnread`, `BaseNotificationsRepository`, `DatabaseNotification`, `NotificationsFilter`, "in-app notifications", "mark notification as read", "unread count", "notification badge", "IDOR-safe markAsRead"; typical import `import { inApp } from "@warlock.js/notifications"`. Skip: writing notifications (use `defineNotification` or `notify.database`) — the `define-notification` topic; the migration columns — the `write-notification-migration` topic; wiring it into config — the `configure-notifications` topic.'
 ---
 
 # `inApp` — in-app notification read API
@@ -949,17 +949,17 @@ database: inApp.configure({ repository: notificationsRepository }),
 
 ## See also
 
-- [`notifications-basics/SKILL.md`](../notifications-basics/SKILL.md) — package front door.
-- [`configure-notifications/SKILL.md`](../configure-notifications/SKILL.md) — wire `inApp.configure` into the config.
-- [`write-notification-migration/SKILL.md`](../write-notification-migration/SKILL.md) — `notificationColumns(Notification)`, named from `columnMap`.
-- [`define-notification/SKILL.md`](../define-notification/SKILL.md) — create rows via the database channel.
+- The `notifications-basics` topic — package front door.
+- The `configure-notifications` topic — wire `inApp.configure` into the config.
+- The `write-notification-migration` topic — `notificationColumns(Notification)`, named from `columnMap`.
+- The `define-notification` topic — create rows via the database channel.
 
 
 ## write-notification-migration  `@warlock.js/notifications/write-notification-migration/SKILL.md`
 
 ---
 name: write-notification-migration
-description: 'Create the notifications table with the `notificationColumns(Notification)` factory + cascade `Migration.create`. Column NAMES come from the model''s `columnMap` (recipient / tenant / readAt / isRead); the fixed columns are `type` / `title` / `body` / `payload` / `idempotency_key`. Set `{ idType: "bigint" }` for integer-key apps; UUID remains the default. Read-state follows columnMap presence: `readAt` → nullable timestamp, `isRead` → indexed boolean, both → both. Defaults to `user_id` + `read_at` when no columnMap. Spread + extend for extras (FK references, composite indexes). Triggers: `notificationColumns`, `Migration.create` for notifications, "create the notifications table", "notification migration", "add organization_id to notifications", `is_read` column, `read_at` column, `idempotency_key` column; typical import `import { Migration } from "@warlock.js/cascade"; import { notificationColumns } from "@warlock.js/notifications"`. Skip: generic cascade migration writing — `@warlock.js/cascade/write-migration/SKILL.md`; the model itself — `@warlock.js/notifications/use-in-app/SKILL.md`.'
+description: 'Create the notifications table with the `notificationColumns(Notification)` factory + cascade `Migration.create`. Column NAMES come from the model''s `columnMap` (recipient / tenant / readAt / isRead); the fixed columns are `type` / `title` / `body` / `payload` / `idempotency_key`. Set `{ idType: "bigint" }` for integer-key apps; UUID remains the default. Read-state follows columnMap presence: `readAt` → nullable timestamp, `isRead` → indexed boolean, both → both. Defaults to `user_id` + `read_at` when no columnMap. Spread + extend for extras (FK references, composite indexes). Triggers: `notificationColumns`, `Migration.create` for notifications, "create the notifications table", "notification migration", "add organization_id to notifications", `is_read` column, `read_at` column, `idempotency_key` column; typical import `import { Migration } from "@warlock.js/cascade"; import { notificationColumns } from "@warlock.js/notifications"`. Skip: generic cascade migration writing — the `write-migration` topic of the `warlock-js-cascade` skill; the model itself — the `use-in-app` topic.'
 ---
 
 # Write the notifications migration
@@ -1017,7 +1017,7 @@ export default Migration.create(Notification, {
 });
 ```
 
-Mirror any extra column in the model `schema`. To make it filterable, add a method to a custom repository (see `use-in-app/SKILL.md`).
+Mirror any extra column in the model `schema`. To make it filterable, add a method to a custom repository (see the `use-in-app` topic).
 
 ## Column naming follows `columnMap`
 
@@ -1030,10 +1030,10 @@ class Notification extends DatabaseNotification {
 // → notificationColumns(Notification) emits `userId` + `readAt`
 ```
 
-Without a model passed, defaults to `user_id` + `read_at` (read_at-only). See [`use-in-app/SKILL.md`](../use-in-app/SKILL.md) for the full `columnMap` shape.
+Without a model passed, defaults to `user_id` + `read_at` (read_at-only). See the `use-in-app` topic for the full `columnMap` shape.
 
 ## See also
 
-- [`use-in-app/SKILL.md`](../use-in-app/SKILL.md) — the model + repository the migration backs.
-- [`@warlock.js/cascade/write-migration/SKILL.md`](../../../cascade/skills/write-migration/SKILL.md) — generic Cascade migration form, `Migration.alter`, etc.
-- [`@warlock.js/cascade/manage-data-sources/SKILL.md`](../../../cascade/skills/manage-data-sources/SKILL.md) — multi-data-source setup.
+- The `use-in-app` topic — the model + repository the migration backs.
+- The `write-migration` topic of the `warlock-js-cascade` skill — generic Cascade migration form, `Migration.alter`, etc.
+- The `manage-data-sources` topic of the `warlock-js-cascade` skill — multi-data-source setup.

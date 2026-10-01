@@ -1,4 +1,13 @@
 {
+  "5.29.0": {
+    "publishedAt": "2026-10-01T12:14:49.473Z",
+    "matrix": "none",
+    "summary": "**Fixes from FORMAI's 5.27 upgrade, typed nullable and list resources, and one module graph in dev.** `locales.json` files under `$sites/<site>/…` (and other `$` folders) work again: the folder only names the group when `$group` is missing (a 5.27 regression). In `warlock dev`, the dev server has its own Vite cache so a vitest run no longer breaks it, multi-site roots get their site's translations, the original error of a broken page is logged first instead of a follow-on `useLocale()` error, and `src/app` modules imported by pages share the instance the API side uses. New in `@warlock.js/core`: `nullable(Resource)` for resources that may be `null` (resources, `responseSchema`, OpenAPI, route types) and `[Resource]` list fields in `defineResource`; cast strings inside `arrayOf` item schemas are no longer dropped. `useTrans()` returns `string` instead of `any`. Every package's skills now refer to other topics by name, so the links work after they are copied into an app. Lockstep release across all 31 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.29.0 tarballs passed install, typecheck, a fresh migrate and seed, devtools in dev with the API docs, a production build with browser smoke, and the `--role=worker` and `--role=api` starts; after publishing, the same check passed against npm.",
+    "featured": [
+      "@warlock.js/web",
+      "@warlock.js/core"
+    ]
+  },
   "5.28.0": {
     "publishedAt": "2026-10-01T06:43:27.430Z",
     "matrix": "none",

@@ -8,12 +8,12 @@
 
 ---
 name: setup-xai
-description: 'Wire @warlock.js/ai-xai — new XaiSDK({apiKey, baseURL?, provider?, pricing?}) for xAI Grok, .model({name, vision?, reasoning?, structuredOutput?}) for a ModelContract, .embedder({name, dimensions?}) and .image({name, pricing?}) delegated to the OpenAI-compatible adapter. Thin wrapper over OpenAISDK: uses the xAI OpenAI-compatible endpoint (https://api.x.ai/v1) and injects xAI''s own vision/reasoning inference so Grok names resolve to the right capabilities. Triggers: `XaiSDK`, `grok`, `grok-4`, `grok-3`, `grok-3-mini`, `grok-2-vision`, `.model`, `x.ai`, `api.x.ai`, `XAI_API_KEY`, `reasoning_effort` on Grok, "wire xai/grok into a warlock agent", "configure grok-4", "use grok reasoning effort", "send an image to grok-4 / grok-2-vision"; typical import `import { XaiSDK } from "@warlock.js/ai-xai"`. Skip: agent wiring — `@warlock.js/ai/run-ai-agent/SKILL.md`; the underlying OpenAI-compatible adapter and its full capability/streaming/error surface — `@warlock.js/ai-openai/skills/setup-openai/SKILL.md`; adapter comparison — `@warlock.js/ai/pick-ai-provider/SKILL.md`; competing adapters `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `openai` SDK pointed at x.ai by hand.'
+description: 'Wire @warlock.js/ai-xai — new XaiSDK({apiKey, baseURL?, provider?, pricing?}) for xAI Grok, .model({name, vision?, reasoning?, structuredOutput?}) for a ModelContract, .embedder({name, dimensions?}) and .image({name, pricing?}) delegated to the OpenAI-compatible adapter. Thin wrapper over OpenAISDK: uses the xAI OpenAI-compatible endpoint (https://api.x.ai/v1) and injects xAI''s own vision/reasoning inference so Grok names resolve to the right capabilities. Triggers: `XaiSDK`, `grok`, `grok-4`, `grok-3`, `grok-3-mini`, `grok-2-vision`, `.model`, `x.ai`, `api.x.ai`, `XAI_API_KEY`, `reasoning_effort` on Grok, "wire xai/grok into a warlock agent", "configure grok-4", "use grok reasoning effort", "send an image to grok-4 / grok-2-vision"; typical import `import { XaiSDK } from "@warlock.js/ai-xai"`. Skip: agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; the underlying OpenAI-compatible adapter and its full capability/streaming/error surface — the `setup-openai` topic of the `warlock-js-ai-openai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; competing adapters `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `openai` SDK pointed at x.ai by hand.'
 ---
 
 # `@warlock.js/ai-xai`
 
-Provider adapter for xAI's **Grok** models. xAI speaks the OpenAI Chat Completions protocol, so `XaiSDK` is a **thin wrapper** over [`OpenAISDK`](../../../ai-openai/skills/setup-openai/SKILL.md) — it does not reimplement the wire layer. It constructs one internal `OpenAISDK` pointed at xAI's `baseURL` and labeled `provider: "xai"`, then delegates `model()` / `embedder()` / `image()` / `count()`, injecting xAI's own capability inference so Grok model names resolve correctly. Pair with `@warlock.js/ai` for the agent / tool / system-prompt surface.
+Provider adapter for xAI's **Grok** models. xAI speaks the OpenAI Chat Completions protocol, so `XaiSDK` is a **thin wrapper** over `OpenAISDK` (the `setup-openai` topic of the `warlock-js-ai-openai` skill) — it does not reimplement the wire layer. It constructs one internal `OpenAISDK` pointed at xAI's `baseURL` and labeled `provider: "xai"`, then delegates `model()` / `embedder()` / `image()` / `count()`, injecting xAI's own capability inference so Grok model names resolve correctly. Pair with `@warlock.js/ai` for the agent / tool / system-prompt surface.
 
 ## Construction
 
@@ -55,7 +55,7 @@ This adapter ships xAI's OWN name lists (Grok ids don't match OpenAI's `gpt-*` /
 
 - `vision` — inferred `true` for the `grok-4` and `grok-2-vision` prefixes; `false` otherwise.
 - `reasoning` — inferred `true` for `grok-4` and `grok-3-mini`; drives whether `reasoning.effort` is forwarded as `reasoning_effort` on the wire.
-- `structuredOutput` / `promptCaching` and the image/PDF/audio wire mapping all come from the wrapped OpenAI adapter unchanged — see [`setup-openai`](../../../ai-openai/skills/setup-openai/SKILL.md).
+- `structuredOutput` / `promptCaching` and the image/PDF/audio wire mapping all come from the wrapped OpenAI adapter unchanged — see the `setup-openai` topic of the `warlock-js-ai-openai` skill.
 
 **Override `vision`, `reasoning`, or `structuredOutput` explicitly** via `.model({ name, vision?, reasoning?, structuredOutput? })`.
 
@@ -72,11 +72,11 @@ await model.complete(messages, { reasoning: { effort: "high" } });  // → reaso
 
 ## Multipart messages (image input)
 
-Image attachments reach the wire only on a vision-capable model (`grok-4`, `grok-2-vision`); the agent's modality gate throws otherwise. Mapping to OpenAI `image_url` parts is identical to the OpenAI adapter — see [`setup-openai`](../../../ai-openai/skills/setup-openai/SKILL.md).
+Image attachments reach the wire only on a vision-capable model (`grok-4`, `grok-2-vision`); the agent's modality gate throws otherwise. Mapping to OpenAI `image_url` parts is identical to the OpenAI adapter — see the `setup-openai` topic of the `warlock-js-ai-openai` skill.
 
 ## Uses the OpenAI-compatible endpoint
 
-All wire work — request/response mapping, streaming, tool-call accumulation, structured output, usage extraction — is the wrapped `OpenAISDK`'s, unchanged. The wrapper only: (1) sets the xAI `baseURL` + `provider` defaults, and (2) injects xAI's vision/reasoning inference per model. For streaming, structured output, and the full multipart surface, read [`@warlock.js/ai-openai/skills/setup-openai/SKILL.md`](../../../ai-openai/skills/setup-openai/SKILL.md).
+All wire work — request/response mapping, streaming, tool-call accumulation, structured output, usage extraction — is the wrapped `OpenAISDK`'s, unchanged. The wrapper only: (1) sets the xAI `baseURL` + `provider` defaults, and (2) injects xAI's vision/reasoning inference per model. For streaming, structured output, and the full multipart surface, read the `setup-openai` topic of the `warlock-js-ai-openai` skill.
 
 ## Embeddings — not available on xAI
 
@@ -111,7 +111,7 @@ usage.cost; // per-channel USD breakdown of THIS run, or undefined when unpriced
 
 ## Errors
 
-Raw xAI / OpenAI-SDK errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by the wrapped adapter's error wrapper (dispatch keys on `APIError.status + code`). See [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md).
+Raw xAI / OpenAI-SDK errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by the wrapped adapter's error wrapper (dispatch keys on `APIError.status + code`). See the `handle-ai-errors` topic of the `warlock-js-ai` skill.
 
 ## When NOT to use this skill
 
@@ -120,7 +120,7 @@ Raw xAI / OpenAI-SDK errors are wrapped into the typed `@warlock.js/ai` `AIError
 
 ## See also
 
-- [`@warlock.js/ai-openai/skills/setup-openai/SKILL.md`](../../../ai-openai/skills/setup-openai/SKILL.md) — the wrapped adapter; full wire / streaming / structured-output / multipart surface
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — passing the model into `ai.agent({...})`
-- [`@warlock.js/ai/pick-ai-provider/SKILL.md`](@warlock.js/ai/pick-ai-provider/SKILL.md) — adapter comparison
+- The `setup-openai` topic of the `warlock-js-ai-openai` skill — the wrapped adapter; full wire / streaming / structured-output / multipart surface
+- The `run-ai-agent` topic of the `warlock-js-ai` skill — passing the model into `ai.agent({...})`
+- The `pick-ai-provider` topic of the `warlock-js-ai` skill — adapter comparison
 ```

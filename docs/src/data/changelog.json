@@ -128,6 +128,585 @@
   ],
   "releases": [
     {
+      "version": "5.29.0",
+      "id": "v5-29-0",
+      "date": "October 1, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Fixes from FORMAI's 5.27 upgrade, typed nullable and list resources, and one module graph in dev.</strong> <code>locales.json</code> files under <code>$sites/&lt;site&gt;/…</code> (and other <code>$</code> folders) work again: the folder only names the group when <code>$group</code> is missing (a 5.27 regression). In <code>warlock dev</code>, the dev server has its own Vite cache so a vitest run no longer breaks it, multi-site roots get their site's translations, the original error of a broken page is logged first instead of a follow-on <code>useLocale()</code> error, and <code>src/app</code> modules imported by pages share the instance the API side uses. New in <code>@warlock.js/core</code>: <code>nullable(Resource)</code> for resources that may be <code>null</code> (resources, <code>responseSchema</code>, OpenAPI, route types) and <code>[Resource]</code> list fields in <code>defineResource</code>; cast strings inside <code>arrayOf</code> item schemas are no longer dropped. <code>useTrans()</code> returns <code>string</code> instead of <code>any</code>. Every package's skills now refer to other topics by name, so the links work after they are copied into an app. Lockstep release across all 31 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.29.0 tarballs passed install, typecheck, a fresh migrate and seed, devtools in dev with the API docs, a production build with browser smoke, and the <code>--role=worker</code> and <code>--role=api</code> starts; after publishing, the same check passed against npm.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 6
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>warlock dev</code> uses its own Vite cache (<code>node_modules/.vite/warlock-dev</code>), so a vitest run that re-optimizes dependencies no longer wipes the dev server's cache and 500s every SSR page until a restart (FORMAI)."
+            },
+            {
+              "type": "Fixed",
+              "html": "The original error is no longer hidden behind a follow-on one (FORMAI). When a client navigation cannot build the page tree (e.g. a server-only barrel imported from browser code), the original error is kept across the forced reload and logged first as the ROOT CAUSE; later errors in that document, such as \"useLocale() was called outside Warlock's LocaleProvider\", are marked as probable consequences. On the server, a page module that fails to load logs its original error at install time, and an error page that itself fails is reported as a consequence naming the root cause. <code>onClientError</code> receives the new <code>\"navigation\"</code> kind."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>useTrans()</code> returns a typed translator: it returns <code>string</code>, not <code>any</code>, and keys are still checked against <code>TranslationKeyRegistry</code>. <code>Translate</code> is one plain signature, so a lambda passed where a <code>Translate</code> is expected (<code>label((key) =&gt; t(key))</code>) keeps its parameter type. New type exports: <code>TranslateFor</code>, <code>TranslationConverter</code>, <code>InlineTranslation</code> (FORMAI)."
+            },
+            {
+              "type": "Fixed",
+              "html": "Multi-site apps in <code>warlock dev</code>: a site's <code>root.tsx</code> and its <code>locales.json</code> are keyed by the same site folder (as in production), so the root <code>LocaleProvider</code> gets the site dictionary instead of <code>{}</code>, including when the client rebuilds after an SSR failure (FORMAI)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>locales.json</code> under `﻿# Changelog"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock dev</code>: an <code>src/app</code> module imported by a page, layout or root is the same instance the API side uses (one module graph), so module state such as an <code>AsyncLocalStorage</code> set in middleware, caches and registries is shared between controllers and page loaders. Pages reach those modules through a trampoline to the native module core already loaded. Modules that (transitively) import <code>@warlock.js/web</code>, live in <code>src/web</code>, are client-bound, or need Vite (<code>import.meta.env</code>/<code>glob</code>/<code>hot</code>, CSS or asset imports) keep loading through Vite as before. Dev only; production builds are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>nullable(Resource)</code></strong>: a resource that may be <code>null</code>, accepted as a <code>defineResource</code> field and in <code>responseSchema</code> bodies. A field outputs <code>null</code> (not omitted) for null/undefined input; <code>ResourceOutput</code>/<code>ResponseBodyOutput</code> type it as <code>Output | null</code>; OpenAPI documents it as <code>oneOf [resource, null]</code>; route types emit <code>… | null</code> (FORMAI)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>[Resource]</code> list fields in <code>defineResource</code></strong>: each item is mapped through the resource, <code>[]</code> stays <code>[]</code>, and the output type is an array (the same syntax <code>responseSchema</code> already accepts). Plain <code>Resource</code> fields behave as before (FORMAI)."
+            },
+            {
+              "type": "Fixed",
+              "html": "Cast strings inside an <code>arrayOf({...})</code> item schema (<code>\"number\"</code>, <code>\"string?\"</code>, <code>\"date\"</code>, <code>\"string[]\"</code>) were silently dropped from the resource output; they are now cast like top-level fields, matching the output type."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>parseLocaleDictionary()</code> accepts <code>defaultNamespace</code> as a function, called only when the file declares no <code>$group</code>, so a folder that cannot name a namespace never fails a file with an explicit <code>$group</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock dev</code> publishes each <code>src/app</code> file it reloads (<code>{ url, generation }</code>, after the loader hook confirms the bump) through the <code>development.appModules</code> container key, so <code>@warlock.js/web</code> can load the same module instance in page loaders."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/sitemap",
+          "slug": "sitemap",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after <code>agent-kit</code> copies them into an app."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.28.0",
       "id": "v5-28-0",
       "date": "October 1, 2026",

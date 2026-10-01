@@ -8,7 +8,7 @@
 
 ---
 name: consume-message
-description: 'Subscribe to a channel via .subscribe(handler, options?) — handler receives (message, ctx). Control flow via ctx.ack / ctx.nack(requeue?) / ctx.reject / ctx.retry(delayMs). Configure prefetch, retry policy, dead-letter, consumer groups. Triggers: `subscribe`, `ctx.ack`, `ctx.nack`, `ctx.reject`, `ctx.retry`, `prefetch`, `group`, `retry`, `deadLetter`, `@Consumable`, `EventConsumer`, `defineConsumer`, `autoAck`; "consume messages from a queue", "implement a worker", "background queue processor", "set up retry and dead-letter", "class-based event consumer"; typical import `import { herald, Consumable, EventConsumer } from "@warlock.js/herald"`. Skip: setup — `@warlock.js/herald/herald-basics/SKILL.md`; producing — `@warlock.js/herald/publish-message/SKILL.md`; RPC reply — `@warlock.js/herald/request-and-respond/SKILL.md`; competing libs `amqplib`, `bullmq`, `kafkajs`; NestJS `@MessagePattern` / `@EventPattern`.'
+description: 'Subscribe to a channel via .subscribe(handler, options?) — handler receives (message, ctx). Control flow via ctx.ack / ctx.nack(requeue?) / ctx.reject / ctx.retry(delayMs). Configure prefetch, retry policy, dead-letter, consumer groups. Triggers: `subscribe`, `ctx.ack`, `ctx.nack`, `ctx.reject`, `ctx.retry`, `prefetch`, `group`, `retry`, `deadLetter`, `@Consumable`, `EventConsumer`, `defineConsumer`, `autoAck`; "consume messages from a queue", "implement a worker", "background queue processor", "set up retry and dead-letter", "class-based event consumer"; typical import `import { herald, Consumable, EventConsumer } from "@warlock.js/herald"`. Skip: setup — the `herald-basics` topic; producing — the `publish-message` topic; RPC reply — the `request-and-respond` topic; competing libs `amqplib`, `bullmq`, `kafkajs`; NestJS `@MessagePattern` / `@EventPattern`.'
 ---
 
 # Consume messages
@@ -117,7 +117,7 @@ herald().channel("user.created.failed").subscribe(async (message, ctx) => {
 
 ## Decorator-style consumers — `@Consumable` + `EventConsumer`
 
-For class-based consumers that pair with the [`EventMessage`](@warlock.js/herald/publish-message/SKILL.md) producer layer. This is a **different handler shape** from the raw `.subscribe()` above — ack/nack is automatic, and you get the unwrapped payload plus an event-metadata object (no `ctx`):
+For class-based consumers that pair with the `EventMessage` (the `publish-message` topic) producer layer. This is a **different handler shape** from the raw `.subscribe()` above — ack/nack is automatic, and you get the unwrapped payload plus an event-metadata object (no `ctx`):
 
 ```ts
 import { Consumable, EventConsumer } from "@warlock.js/herald";
@@ -223,8 +223,8 @@ await channel.delete();                   // remove the queue entirely
 
 ## See also
 
-- [`@warlock.js/herald/publish-message/SKILL.md`](@warlock.js/herald/publish-message/SKILL.md) — the producing side
-- [`@warlock.js/herald/request-and-respond/SKILL.md`](@warlock.js/herald/request-and-respond/SKILL.md) — when you need to reply to a message
+- The `publish-message` topic — the producing side
+- The `request-and-respond` topic — when you need to reply to a message
 
 
 ## herald-basics  `@warlock.js/herald/herald-basics/SKILL.md`
@@ -314,10 +314,10 @@ herald("analytics").channel("events").publish({ /* ... */ }); // → analytics
 
 | If the task is about… | Load |
 | --- | --- |
-| Publishing messages — single + batch + publish options (priority, ttl, delay, persistent, headers) | [`@warlock.js/herald/publish-message/SKILL.md`](@warlock.js/herald/publish-message/SKILL.md) |
-| Subscribing to messages — handler signature, message context (ack/nack/retry), prefetch, retry policy, dead-letter | [`@warlock.js/herald/consume-message/SKILL.md`](@warlock.js/herald/consume-message/SKILL.md) |
-| Request/response (RPC) — `channel.request(...)` + `channel.respond(...)` for synchronous-style calls over a message bus | [`@warlock.js/herald/request-and-respond/SKILL.md`](@warlock.js/herald/request-and-respond/SKILL.md) |
-| Schema-validated channels — `.channel(name, { schema })` with `@warlock.js/seal` | See [`@warlock.js/seal/seal-basics/SKILL.md`](@warlock.js/seal/seal-basics/SKILL.md) + skills below |
+| Publishing messages — single + batch + publish options (priority, ttl, delay, persistent, headers) | the `publish-message` topic |
+| Subscribing to messages — handler signature, message context (ack/nack/retry), prefetch, retry policy, dead-letter | the `consume-message` topic |
+| Request/response (RPC) — `channel.request(...)` + `channel.respond(...)` for synchronous-style calls over a message bus | the `request-and-respond` topic |
+| Schema-validated channels — `.channel(name, { schema })` with `@warlock.js/seal` | See the `seal-basics` topic of the `warlock-js-seal` skill + skills below |
 
 ## Things NOT to do
 
@@ -329,19 +329,19 @@ herald("analytics").channel("events").publish({ /* ... */ }); // → analytics
 ## See also
 
 - README at `@warlock.js/herald/README.md` for the full API surface and RabbitMQ / Kafka driver config
-- [`@warlock.js/seal/seal-basics/SKILL.md`](@warlock.js/seal/seal-basics/SKILL.md) — schema validation
+- The `seal-basics` topic of the `warlock-js-seal` skill — schema validation
 
 
 ## publish-message  `@warlock.js/herald/publish-message/SKILL.md`
 
 ---
 name: publish-message
-description: 'Publish messages to a channel — .publish(payload, options?) for single, .publishBatch([...], options?) for batch, with priority / ttl / delay / persistent / correlationId / headers options. Optional schema validation via .channel(name, {schema}). Triggers: `publish`, `publishBatch`, `channel`, `priority`, `ttl`, `delay`, `persistent`, `correlationId`, `headers`, `schema`; "publish a message", "emit an event after a domain change", "fan out a notification", "schedule delayed work", "batch publish"; typical import `import { herald } from "@warlock.js/herald"`. Skip: setup — `@warlock.js/herald/herald-basics/SKILL.md`; consuming — `@warlock.js/herald/consume-message/SKILL.md`; RPC — `@warlock.js/herald/request-and-respond/SKILL.md`; competing libs `amqplib`, `kafkajs`, `bullmq`; NestJS `ClientProxy.emit`.'
+description: 'Publish messages to a channel — .publish(payload, options?) for single, .publishBatch([...], options?) for batch, with priority / ttl / delay / persistent / correlationId / headers options. Optional schema validation via .channel(name, {schema}). Triggers: `publish`, `publishBatch`, `channel`, `priority`, `ttl`, `delay`, `persistent`, `correlationId`, `headers`, `schema`; "publish a message", "emit an event after a domain change", "fan out a notification", "schedule delayed work", "batch publish"; typical import `import { herald } from "@warlock.js/herald"`. Skip: setup — the `herald-basics` topic; consuming — the `consume-message` topic; RPC — the `request-and-respond` topic; competing libs `amqplib`, `kafkajs`, `bullmq`; NestJS `ClientProxy.emit`.'
 ---
 
 # Publish messages
 
-Push messages into a channel. The consumer side picks them up via [`@warlock.js/herald/consume-message/SKILL.md`](@warlock.js/herald/consume-message/SKILL.md).
+Push messages into a channel. The consumer side picks them up via the `consume-message` topic.
 
 ## Single publish
 
@@ -384,7 +384,7 @@ const channel = herald().channel("user.created", { schema: userSchema });
 await channel.publish({ userId: 1, email: "invalid" });   // Throws — fails .email()
 ```
 
-The schema runs `validate()` before the message hits the broker. Invalid payloads never leave the producer. See [`@warlock.js/seal/seal-basics/SKILL.md`](@warlock.js/seal/seal-basics/SKILL.md).
+The schema runs `validate()` before the message hits the broker. Invalid payloads never leave the producer. See the `seal-basics` topic of the `warlock-js-seal` skill.
 
 ## Publish options
 
@@ -471,11 +471,11 @@ export const createUserUseCase = useCase({
 });
 ```
 
-The adapter publishes the broadcast envelope's `payload` to `channel(event.event)`. It's structurally typed, so herald keeps no dependency on core. See [`@warlock.js/core/write-use-case/SKILL.md`](@warlock.js/core/write-use-case/SKILL.md) for the `broadcast` option (payload projection, custom event name, payload-safety rules).
+The adapter publishes the broadcast envelope's `payload` to `channel(event.event)`. It's structurally typed, so herald keeps no dependency on core. See the `write-use-case` topic of the `warlock-js-core` skill for the `broadcast` option (payload projection, custom event name, payload-safety rules).
 
 ## Event classes (`EventMessage`) — the typed event layer
 
-Raw `channel(name).publish(payload)` is the low-level path. For domain events that travel between modules, herald ships a higher-level pair: define the event once as a class, publish instances of it, and consume them with an [`EventConsumer`](@warlock.js/herald/consume-message/SKILL.md). The channel name comes from the event's `eventName` — no string to keep in sync across producer and consumer.
+Raw `channel(name).publish(payload)` is the low-level path. For domain events that travel between modules, herald ships a higher-level pair: define the event once as a class, publish instances of it, and consume them with an `EventConsumer` (the `consume-message` topic). The channel name comes from the event's `eventName` — no string to keep in sync across producer and consumer.
 
 ```ts
 import { defineEvent, publishEvent } from "@warlock.js/herald";
@@ -504,15 +504,15 @@ Set an optional `version` on the event (instance field) to drive the consumer's 
 
 ## See also
 
-- [`@warlock.js/herald/consume-message/SKILL.md`](@warlock.js/herald/consume-message/SKILL.md) — the receiving side
-- [`@warlock.js/herald/request-and-respond/SKILL.md`](@warlock.js/herald/request-and-respond/SKILL.md) — when you need a reply
+- The `consume-message` topic — the receiving side
+- The `request-and-respond` topic — when you need a reply
 
 
 ## request-and-respond  `@warlock.js/herald/request-and-respond/SKILL.md`
 
 ---
 name: request-and-respond
-description: 'Synchronous-style RPC over the message bus — channel.request<R>(payload, {timeout}) waits for a reply, channel.respond(handler) registers the responder, ctx.reply(response) sends the answer. Triggers: `channel.request`, `channel.respond`, `ctx.reply`, `timeout`, `correlationId`, `headers.correlationId`; "RPC over message bus", "request-response across services", "wait for a reply", "internal service-to-service call instead of HTTP"; typical import `import { herald } from "@warlock.js/herald"`. Skip: setup — `@warlock.js/herald/herald-basics/SKILL.md`; fire-and-forget — `@warlock.js/herald/publish-message/SKILL.md`; consumer ctx flow — `@warlock.js/herald/consume-message/SKILL.md`; competing libs `amqplib` RPC, `nats` request/reply; NestJS `ClientProxy.send`; gRPC; HTTP.'
+description: 'Synchronous-style RPC over the message bus — channel.request<R>(payload, {timeout}) waits for a reply, channel.respond(handler) registers the responder, ctx.reply(response) sends the answer. Triggers: `channel.request`, `channel.respond`, `ctx.reply`, `timeout`, `correlationId`, `headers.correlationId`; "RPC over message bus", "request-response across services", "wait for a reply", "internal service-to-service call instead of HTTP"; typical import `import { herald } from "@warlock.js/herald"`. Skip: setup — the `herald-basics` topic; fire-and-forget — the `publish-message` topic; consumer ctx flow — the `consume-message` topic; competing libs `amqplib` RPC, `nats` request/reply; NestJS `ClientProxy.send`; gRPC; HTTP.'
 ---
 
 # Request-response over the bus
@@ -582,5 +582,5 @@ Each `request()` generates its own correlation ID and an exclusive reply queue u
 
 ## See also
 
-- [`@warlock.js/herald/publish-message/SKILL.md`](@warlock.js/herald/publish-message/SKILL.md) — fire-and-forget pattern
-- [`@warlock.js/herald/consume-message/SKILL.md`](@warlock.js/herald/consume-message/SKILL.md) — subscribe + ctx flow control (including `ctx.reply`)
+- The `publish-message` topic — fire-and-forget pattern
+- The `consume-message` topic — subscribe + ctx flow control (including `ctx.reply`)
