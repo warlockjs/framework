@@ -1,6 +1,6 @@
 ---
 name: define-relations
-description: 'Define and query relations — `@BelongsTo` / `@HasMany` / `@BelongsToMany`, `.with("relation")` eager loading, `.whereHas(relation, cb)` filter-by-related, `setRelation` on save, `.joinWith` for SQL joins, `loadRelation`, `lazy(() => Model)`. Triggers: `@BelongsTo`, `@HasMany`, `@BelongsToMany`, `.with`, `.whereHas`, `setRelation`, `.joinWith`, `lazy`; "define a relation", "avoid N+1", "eager load posts", "filter parents by child"; typical import `import { BelongsTo, HasMany, BelongsToMany } from "@warlock.js/cascade"`. Skip: model basics — `@warlock.js/cascade/define-model/SKILL.md`; competing libs `mongoose populate`, `prisma include`, `typeorm relations`.'
+description: 'Define and query relations — `@BelongsTo` / `@HasMany` / `@BelongsToMany`, `.with("relation")` eager loading, `.whereHas(relation, cb)` filter-by-related, `setRelation` on save, `.joinWith` for SQL joins, `loadRelation`, `lazy(() => Model)`. Triggers: `@BelongsTo`, `@HasMany`, `@BelongsToMany`, `.with`, `.whereHas`, `setRelation`, `.joinWith`, `lazy`; "define a relation", "avoid N+1", "eager load posts", "filter parents by child"; typical import `import { BelongsTo, HasMany, BelongsToMany } from "@warlock.js/cascade"`. Skip: model basics — the `define-model` topic; competing libs `mongoose populate`, `prisma include`, `typeorm relations`.'
 ---
 
 # Define and query relations
@@ -167,5 +167,5 @@ For embedded/denormalized relations (cached `author_name` on posts, etc.), Casca
 
 ## See also
 
-- [`@warlock.js/cascade/query-data/SKILL.md`](@warlock.js/cascade/query-data/SKILL.md) — `.whereHas` and other filters
-- [`@warlock.js/cascade/define-model/SKILL.md`](@warlock.js/cascade/define-model/SKILL.md) — `@RegisterModel`, the registry that makes name-based lookup work
+- The `query-data` topic — `.whereHas` and other filters
+- The `define-model` topic — `@RegisterModel`, the registry that makes name-based lookup work

@@ -24,15 +24,15 @@ npm install @warlock.js/cascade @warlock.js/seal
 The 10 things that are true in every cascade use:
 
 1. **The model is the query entry point.** `User.where(...)`, `User.find(id)`, `User.paginate(...)`. No `db.users`, no separate client, no repository layer.
-2. **One schema does triple duty.** `userSchema` via `v.object({...})` is your TS type (`Infer<typeof userSchema>`), your runtime validator on save, and the shape your migration writes against. Defined via [`@warlock.js/seal/seal-basics/SKILL.md`](@warlock.js/seal/seal-basics/SKILL.md).
+2. **One schema does triple duty.** `userSchema` via `v.object({...})` is your TS type (`Infer<typeof userSchema>`), your runtime validator on save, and the shape your migration writes against. Defined via the `seal-basics` topic of the `warlock-js-seal` skill.
 3. **`@RegisterModel()` puts the model in the global registry.** Other models look it up by name for relations (`@BelongsTo("User")` or `@BelongsTo(lazy(() => User))`).
 4. **Two drivers ship in-box: MongoDB and Postgres.** Same query API across both. Switch via config; the call sites stay identical.
-5. **Migrations are required.** `cascade migrate` runs schema changes; the model class doesn't auto-create tables. See [`@warlock.js/cascade/write-migration/SKILL.md`](@warlock.js/cascade/write-migration/SKILL.md).
-6. **`.create()` validates against the schema before persisting.** Defaults (`v.string().default(...)`) fire here. Validation errors throw — see [`@warlock.js/seal/handle-seal-errors/SKILL.md`](@warlock.js/seal/handle-seal-errors/SKILL.md).
-7. **Three update idioms — pick by shape.** `.set(k, v).save()` for 1–2 fields, `.merge(data).save()` for object payloads, `.save()` after spread mutations. See [`@warlock.js/cascade/define-model/SKILL.md`](@warlock.js/cascade/define-model/SKILL.md).
-8. **`.destroy()` runs the configured delete strategy** (`permanent` / `soft` / `trash`). See [`@warlock.js/cascade/configure-delete-strategy/SKILL.md`](@warlock.js/cascade/configure-delete-strategy/SKILL.md).
-9. **Lifecycle events fire on every meaningful moment** — `saving` / `saved`, `creating` / `created`, `deleting` / `deleted`. Hook on the model class. See [`@warlock.js/cascade/subscribe-to-model-events/SKILL.md`](@warlock.js/cascade/subscribe-to-model-events/SKILL.md).
-10. **Transactions are first-class.** `transaction(async () => { ... })` wraps a unit; rollback on throw, commit on resolve. See [`@warlock.js/cascade/manage-transactions/SKILL.md`](@warlock.js/cascade/manage-transactions/SKILL.md).
+5. **Migrations are required.** `cascade migrate` runs schema changes; the model class doesn't auto-create tables. See the `write-migration` topic.
+6. **`.create()` validates against the schema before persisting.** Defaults (`v.string().default(...)`) fire here. Validation errors throw — see the `handle-seal-errors` topic of the `warlock-js-seal` skill.
+7. **Three update idioms — pick by shape.** `.set(k, v).save()` for 1–2 fields, `.merge(data).save()` for object payloads, `.save()` after spread mutations. See the `define-model` topic.
+8. **`.destroy()` runs the configured delete strategy** (`permanent` / `soft` / `trash`). See the `configure-delete-strategy` topic.
+9. **Lifecycle events fire on every meaningful moment** — `saving` / `saved`, `creating` / `created`, `deleting` / `deleted`. Hook on the model class. See the `subscribe-to-model-events` topic.
+10. **Transactions are first-class.** `transaction(async () => { ... })` wraps a unit; rollback on throw, commit on resolve. See the `manage-transactions` topic.
 
 ## Minimal example — model, write, read
 
@@ -72,20 +72,20 @@ const page = await User.paginate({ page: 1, limit: 20 });
 
 | If the task is about… | Load |
 | --- | --- |
-| Defining a model class — schema, decorators, `Model<TSchema>`, accessors | [`@warlock.js/cascade/define-model/SKILL.md`](@warlock.js/cascade/define-model/SKILL.md) |
-| Querying — `.where`, `.find`, `.first`, `.all`, `.count`, `.exists`, ordering | [`@warlock.js/cascade/query-data/SKILL.md`](@warlock.js/cascade/query-data/SKILL.md) |
-| Pagination — `.paginate`, `cursorPaginate`, `chunk` | [`@warlock.js/cascade/paginate-results/SKILL.md`](@warlock.js/cascade/paginate-results/SKILL.md) |
-| Relations — `belongsTo` / `hasMany` / `belongsToMany`, eager loading | [`@warlock.js/cascade/define-relations/SKILL.md`](@warlock.js/cascade/define-relations/SKILL.md) |
-| Migrations — `migration` definition, `up`/`down`, CLI | [`@warlock.js/cascade/write-migration/SKILL.md`](@warlock.js/cascade/write-migration/SKILL.md) |
-| Transactions — `transaction(fn)`, rollback, isolation | [`@warlock.js/cascade/manage-transactions/SKILL.md`](@warlock.js/cascade/manage-transactions/SKILL.md) |
-| Dirty tracking — `hasChanges`, `isDirty`, `getDirtyColumns`, `getDirtyColumnsWithValues` | [`@warlock.js/cascade/track-changes/SKILL.md`](@warlock.js/cascade/track-changes/SKILL.md) |
-| Lifecycle hooks — `saving`, `saved`, `deleting`, `deleted` | [`@warlock.js/cascade/subscribe-to-model-events/SKILL.md`](@warlock.js/cascade/subscribe-to-model-events/SKILL.md) |
-| Soft / hard / trash deletes + restore | [`@warlock.js/cascade/configure-delete-strategy/SKILL.md`](@warlock.js/cascade/configure-delete-strategy/SKILL.md) |
-| Atomic ops — `Model.increase`, `decrease`, `atomic`, `Model.delete(filter)` | [`@warlock.js/cascade/perform-atomic-ops/SKILL.md`](@warlock.js/cascade/perform-atomic-ops/SKILL.md) |
-| Aggregates — `.sum`, `.avg`, `.count`, `.groupBy`, `.having` | [`@warlock.js/cascade/aggregate-data/SKILL.md`](@warlock.js/cascade/aggregate-data/SKILL.md) |
-| Vector search — `similarTo`, pgvector / Atlas vector index | [`@warlock.js/cascade/search-by-vector/SKILL.md`](@warlock.js/cascade/search-by-vector/SKILL.md) |
-| Multiple databases — `connectToDatabase`, per-model `static dataSource` | [`@warlock.js/cascade/manage-data-sources/SKILL.md`](@warlock.js/cascade/manage-data-sources/SKILL.md) |
-| CLI + Operations API — `cascade migrate`, `migrate:rollback`, programmatic | [`@warlock.js/cascade/run-cascade-cli/SKILL.md`](@warlock.js/cascade/run-cascade-cli/SKILL.md) |
+| Defining a model class — schema, decorators, `Model<TSchema>`, accessors | The `define-model` topic |
+| Querying — `.where`, `.find`, `.first`, `.all`, `.count`, `.exists`, ordering | The `query-data` topic |
+| Pagination — `.paginate`, `cursorPaginate`, `chunk` | The `paginate-results` topic |
+| Relations — `belongsTo` / `hasMany` / `belongsToMany`, eager loading | The `define-relations` topic |
+| Migrations — `migration` definition, `up`/`down`, CLI | The `write-migration` topic |
+| Transactions — `transaction(fn)`, rollback, isolation | The `manage-transactions` topic |
+| Dirty tracking — `hasChanges`, `isDirty`, `getDirtyColumns`, `getDirtyColumnsWithValues` | The `track-changes` topic |
+| Lifecycle hooks — `saving`, `saved`, `deleting`, `deleted` | The `subscribe-to-model-events` topic |
+| Soft / hard / trash deletes + restore | The `configure-delete-strategy` topic |
+| Atomic ops — `Model.increase`, `decrease`, `atomic`, `Model.delete(filter)` | The `perform-atomic-ops` topic |
+| Aggregates — `.sum`, `.avg`, `.count`, `.groupBy`, `.having` | The `aggregate-data` topic |
+| Vector search — `similarTo`, pgvector / Atlas vector index | The `search-by-vector` topic |
+| Multiple databases — `connectToDatabase`, per-model `static dataSource` | The `manage-data-sources` topic |
+| CLI + Operations API — `cascade migrate`, `migrate:rollback`, programmatic | The `run-cascade-cli` topic |
 
 ## Things NOT to do
 

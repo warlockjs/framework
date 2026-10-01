@@ -1,6 +1,6 @@
 ---
 name: paginate-results
-description: 'Paginate query results — `.paginate({page, limit, filter?})` for offset (returns `data` + `pagination` total/page/limit/pages), `.cursorPaginate({limit, cursor})` for very large datasets, `.chunk(size, callback)` for streaming. Triggers: `.paginate`, `.cursorPaginate`, `.chunk`, `nextCursor`, `hasMore`, `pagination.total`; "paginate the list", "infinite scroll / load more", "stream a large table", "page 2 of users"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: filter chain — `@warlock.js/cascade/query-data/SKILL.md`; eager loading on pages — `@warlock.js/cascade/define-relations/SKILL.md`; competing libs `mongoose-paginate-v2`, `prisma` cursor, `typeorm-pagination`.'
+description: 'Paginate query results — `.paginate({page, limit, filter?})` for offset (returns `data` + `pagination` total/page/limit/pages), `.cursorPaginate({limit, cursor})` for very large datasets, `.chunk(size, callback)` for streaming. Triggers: `.paginate`, `.cursorPaginate`, `.chunk`, `nextCursor`, `hasMore`, `pagination.total`; "paginate the list", "infinite scroll / load more", "stream a large table", "page 2 of users"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: filter chain — the `query-data` topic; eager loading on pages — the `define-relations` topic; competing libs `mongoose-paginate-v2`, `prisma` cursor, `typeorm-pagination`.'
 ---
 
 # Paginate results
@@ -89,7 +89,7 @@ Eager-load relations on a paginated page:
 const page = await Post.with("author").paginate({ page: 1, limit: 20 });
 ```
 
-See [`@warlock.js/cascade/define-relations/SKILL.md`](@warlock.js/cascade/define-relations/SKILL.md).
+See the `define-relations` topic.
 
 ## Pagination shape
 
@@ -118,5 +118,5 @@ The total count requires an extra query. On very large filtered tables, this can
 
 ## See also
 
-- [`@warlock.js/cascade/query-data/SKILL.md`](@warlock.js/cascade/query-data/SKILL.md) — `.where`, `.orderBy`, filter chains
-- [`@warlock.js/cascade/define-relations/SKILL.md`](@warlock.js/cascade/define-relations/SKILL.md) — eager loading on a paginated page
+- The `query-data` topic — `.where`, `.orderBy`, filter chains
+- The `define-relations` topic — eager loading on a paginated page

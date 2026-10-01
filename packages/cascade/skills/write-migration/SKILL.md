@@ -1,6 +1,6 @@
 ---
 name: write-migration
-description: 'Write a Cascade migration — the declarative `Migration.create(Model, { columns })` / `Migration.alter(Model, { ... })` factory is the primary form (column helpers `string` / `text` / `uuid` / `integer` imported from cascade, chained with `.notNullable()` / `.unique()` / `.references()`); the `extends Migration` class form is the imperative escape hatch. Run with the `cascade migrate` CLI; pin a source via `public dataSource`. Triggers: `Migration.create`, `Migration.alter`, `string()`, `text()`, `uuid()`, `.references`, `extends Migration`, `cascade migrate`; "write a migration", "create the users table", "add a column", "rollback the last batch"; typical import `import { Migration, text, uuid } from "@warlock.js/cascade"`. Skip: running migrations programmatically — `@warlock.js/cascade/run-cascade-cli/SKILL.md`; per-source migrations — `@warlock.js/cascade/manage-data-sources/SKILL.md`; competing tools `knex migrate`, `prisma migrate`, `typeorm migration`.'
+description: 'Write a Cascade migration — the declarative `Migration.create(Model, { columns })` / `Migration.alter(Model, { ... })` factory is the primary form (column helpers `string` / `text` / `uuid` / `integer` imported from cascade, chained with `.notNullable()` / `.unique()` / `.references()`); the `extends Migration` class form is the imperative escape hatch. Run with the `cascade migrate` CLI; pin a source via `public dataSource`. Triggers: `Migration.create`, `Migration.alter`, `string()`, `text()`, `uuid()`, `.references`, `extends Migration`, `cascade migrate`; "write a migration", "create the users table", "add a column", "rollback the last batch"; typical import `import { Migration, text, uuid } from "@warlock.js/cascade"`. Skip: running migrations programmatically — the `run-cascade-cli` topic; per-source migrations — the `manage-data-sources` topic; competing tools `knex migrate`, `prisma migrate`, `typeorm migration`.'
 ---
 
 # Write a migration
@@ -47,7 +47,7 @@ export default Migration.create(User, {
 - It only fires for the `"soft"` strategy — `"permanent"` and `"trash"` add nothing. No driver defaults to `"soft"`, so this never fires unless soft delete is opted into.
 - Opt out for one table with `{ softDeletes: false }`; force it on with `{ softDeletes: true }`. A model with `deletedAtColumn = false` is never wired. An already-declared `deletedAt` in the map is not duplicated.
 
-See [`@warlock.js/cascade/configure-delete-strategy/SKILL.md`](@warlock.js/cascade/configure-delete-strategy/SKILL.md) for the strategies themselves.
+See the `configure-delete-strategy` topic for the strategies themselves.
 
 ## Running migrations
 
@@ -58,7 +58,7 @@ npx cascade migrate:list       # which migrations have been executed
 npx cascade migrate:export-sql # write .up.sql / .down.sql instead of executing
 ```
 
-`cascade migrate` discovers migration files via the `-p`/`--path` glob (default `./migrations/**`), runs them in order, and records each in the `_migrations` table / collection. See [`@warlock.js/cascade/run-cascade-cli/SKILL.md`](@warlock.js/cascade/run-cascade-cli/SKILL.md) for every flag and the programmatic Operations API.
+`cascade migrate` discovers migration files via the `-p`/`--path` glob (default `./migrations/**`), runs them in order, and records each in the `_migrations` table / collection. See the `run-cascade-cli` topic for every flag and the programmatic Operations API.
 
 ## File naming convention
 
@@ -189,7 +189,7 @@ export default Migration.create(AnalyticsEvent, {
 });
 ```
 
-For a class-form migration not bound to a model, set `public readonly dataSource = "analytics"` directly. See [`@warlock.js/cascade/manage-data-sources/SKILL.md`](@warlock.js/cascade/manage-data-sources/SKILL.md) for the registry.
+For a class-form migration not bound to a model, set `public readonly dataSource = "analytics"` directly. See the `manage-data-sources` topic for the registry.
 
 ## Things NOT to do
 
@@ -201,6 +201,6 @@ For a class-form migration not bound to a model, set `public readonly dataSource
 
 ## See also
 
-- [`@warlock.js/cascade/run-cascade-cli/SKILL.md`](@warlock.js/cascade/run-cascade-cli/SKILL.md) — CLI flags + Operations API for programmatic runs
-- [`@warlock.js/cascade/manage-data-sources/SKILL.md`](@warlock.js/cascade/manage-data-sources/SKILL.md) — multi-DB migrations
-- [`@warlock.js/cascade/configure-delete-strategy/SKILL.md`](@warlock.js/cascade/configure-delete-strategy/SKILL.md) — soft / trash / permanent deletes and the `deletedAt` column
+- The `run-cascade-cli` topic — CLI flags + Operations API for programmatic runs
+- The `manage-data-sources` topic — multi-DB migrations
+- The `configure-delete-strategy` topic — soft / trash / permanent deletes and the `deletedAt` column

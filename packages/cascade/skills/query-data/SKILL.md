@@ -1,6 +1,6 @@
 ---
 name: query-data
-description: 'Query records via the model — `.where(field, value)` / `.where(field, op, value)`, `.find(id)` / `.first` / `.all`, `.orderBy`, `.count` / `.exists`, `.lean()` plain-object reads, plus `.whereIn` / `.whereBetween` / `.whereLike` / `.pluck` / `.firstOrFail` / scopes via `addScope`. Covers filter safety: `where()` rejects `$`-prefixed keys (`UnsafeFilterError`), `whereRaw()` string form rejects `$where`/`$function`/`$accumulator` (`UnsafeRawExpressionError`), and `whereLike`/`whereStartsWith`/`whereEndsWith`/`whereSearch` match string arguments literally (pass a `RegExp` for pattern semantics). Triggers: `.where`, `.find`, `.first`, `.firstOrFail`, `.all`, `.get`, `.orderBy`, `.exists`, `.whereIn`, `.whereBetween`, `.whereLike`, `.whereRaw`, `.lean`, `UnsupportedLeanOperationError`, `addScope`, `escapeRegex`, `likePatternToRegexSource`, `UnsafeFilterError`, `UnsafeRawExpressionError`; "filter by status", "find by id", "fetch active users", "check existence", "search box query", "is where() safe from injection"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: pagination — `@warlock.js/cascade/paginate-results/SKILL.md`; aggregates — `@warlock.js/cascade/aggregate-data/SKILL.md`.'
+description: 'Query records via the model — `.where(field, value)` / `.where(field, op, value)`, `.find(id)` / `.first` / `.all`, `.orderBy`, `.count` / `.exists`, `.lean()` plain-object reads, plus `.whereIn` / `.whereBetween` / `.whereLike` / `.pluck` / `.firstOrFail` / scopes via `addScope`. Covers filter safety: `where()` rejects `$`-prefixed keys (`UnsafeFilterError`), `whereRaw()` string form rejects `$where`/`$function`/`$accumulator` (`UnsafeRawExpressionError`), and `whereLike`/`whereStartsWith`/`whereEndsWith`/`whereSearch` match string arguments literally (pass a `RegExp` for pattern semantics). Triggers: `.where`, `.find`, `.first`, `.firstOrFail`, `.all`, `.get`, `.orderBy`, `.exists`, `.whereIn`, `.whereBetween`, `.whereLike`, `.whereRaw`, `.lean`, `UnsupportedLeanOperationError`, `addScope`, `escapeRegex`, `likePatternToRegexSource`, `UnsafeFilterError`, `UnsafeRawExpressionError`; "filter by status", "find by id", "fetch active users", "check existence", "search box query", "is where() safe from injection"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: pagination — the `paginate-results` topic; aggregates — the `aggregate-data` topic.'
 ---
 
 # Query data
@@ -48,7 +48,7 @@ Equivalent to chained equalities. Useful when the filter comes from a dynamic so
 
 ### Filters are safe to build from request data — but only through this API
 
-`where(field, value)`, `where(field, "=", value)` and the object form all run the value through a `$`-prefixed-key check before it reaches the driver, so `User.first({ email: req.body.email, password: req.body.password })` throws `UnsafeFilterError` instead of compiling `{ password: { $ne: null } }` into a live MongoDB operator query (the classic NoSQL auth-bypass). This applies to every filter-accepting model static too — `first`, `findFirst`, `findAll`, `count`, `paginate`, `all`, `deleteMany`/`delete`, `deleteOne`, and the atomic/find-and-modify statics in [`perform-atomic-ops`](@warlock.js/cascade/perform-atomic-ops/SKILL.md). Explicit operator APIs (`where(field, operator, value)` for operators other than `=`, `whereIn`/`whereNull`/`whereBetween`/…, object-form `whereRaw({ ... })`) are intentionally not routed through this check — they already express an operator on purpose. Dotted paths (`"profile.name"`) and plain nested-object equality values remain valid; only literal `$`-prefixed keys are rejected. `sanitizeFilter` / `sanitizeFilterValue` are exported if you need the same check on a filter you forward to a driver-level API directly.
+`where(field, value)`, `where(field, "=", value)` and the object form all run the value through a `$`-prefixed-key check before it reaches the driver, so `User.first({ email: req.body.email, password: req.body.password })` throws `UnsafeFilterError` instead of compiling `{ password: { $ne: null } }` into a live MongoDB operator query (the classic NoSQL auth-bypass). This applies to every filter-accepting model static too — `first`, `findFirst`, `findAll`, `count`, `paginate`, `all`, `deleteMany`/`delete`, `deleteOne`, and the atomic/find-and-modify statics in the `perform-atomic-ops` topic. Explicit operator APIs (`where(field, operator, value)` for operators other than `=`, `whereIn`/`whereNull`/`whereBetween`/…, object-form `whereRaw({ ... })`) are intentionally not routed through this check — they already express an operator on purpose. Dotted paths (`"profile.name"`) and plain nested-object equality values remain valid; only literal `$`-prefixed keys are rejected. `sanitizeFilter` / `sanitizeFilterValue` are exported if you need the same check on a filter you forward to a driver-level API directly.
 
 ```ts
 await User.first({ email, password }); // throws UnsafeFilterError if password is `{ $ne: null }`
@@ -102,7 +102,7 @@ const newest = await User
 
 `.orderBy(field, "asc" | "desc")` sorts. Default direction is `"asc"`. Chain multiple `.orderBy()` for tiebreakers.
 
-For pagination see [`@warlock.js/cascade/paginate-results/SKILL.md`](@warlock.js/cascade/paginate-results/SKILL.md).
+For pagination see the `paginate-results` topic.
 
 ## Plain objects — `.lean()`
 
@@ -135,7 +135,7 @@ const activeUsers = await User.all({ status: "active" });
 
 `Model.all(filter?)` is the shortcut for "fetch all records matching a simple equality filter, or every record if no filter."
 
-**Caution.** `.all()` with no filter loads the entire table. Use [pagination](@warlock.js/cascade/paginate-results/SKILL.md) for tables larger than a few hundred rows.
+**Caution.** `.all()` with no filter loads the entire table. Use pagination (see the `paginate-results` topic) for tables larger than a few hundred rows.
 
 ## The wider query vocabulary
 
@@ -149,11 +149,11 @@ Cascade's query builder has around 60 methods. Reach for these as the need arise
 | `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter` | Date helpers |
 | `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` / `.whereSearch` | Pattern matching — see below for literal-vs-regex semantics |
 | `.whereHas(relation, callback)` | Filter by conditions on a related model |
-| `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)` | Aggregates — [`use-aggregates`](@warlock.js/cascade/aggregate-data/SKILL.md) |
+| `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)` | Aggregates — the `aggregate-data` topic |
 | `.distinct(field)` / `.pluck(field)` | Single-field reads (distinct values, flat list) |
 | `.chunk(size, callback)` | Stream a large table in batches |
-| `.cursorPaginate({ limit, cursor })` | Cursor pagination — [`paginate-results`](@warlock.js/cascade/paginate-results/SKILL.md) |
-| `.similarTo(column, embedding)` | Vector similarity — [`use-vector-search`](@warlock.js/cascade/search-by-vector/SKILL.md) |
+| `.cursorPaginate({ limit, cursor })` | Cursor pagination — the `paginate-results` topic |
+| `.similarTo(column, embedding)` | Vector similarity — the `search-by-vector` topic |
 
 Each chains off `User.where(...)` or `User.query()` and ends with the appropriate terminator. (`where`, `with`, `joinWith`, `first`, `count`, `find`, `all`, `paginate` are static shortcuts on the model; the rest live on the query builder, so reach them via `User.query()` or by chaining off a static `where`.)
 
@@ -208,6 +208,6 @@ const activeUsers = await User.query().scope("active").get();
 
 ## See also
 
-- [`@warlock.js/cascade/define-relations/SKILL.md`](@warlock.js/cascade/define-relations/SKILL.md) — `.with(...)`, `.whereHas(...)`, eager loading
-- [`@warlock.js/cascade/paginate-results/SKILL.md`](@warlock.js/cascade/paginate-results/SKILL.md) — pagination + cursor + chunk
-- [`@warlock.js/cascade/aggregate-data/SKILL.md`](@warlock.js/cascade/aggregate-data/SKILL.md) — `.sum`, `.avg`, `.groupBy`, `.having`
+- The `define-relations` topic — `.with(...)`, `.whereHas(...)`, eager loading
+- The `paginate-results` topic — pagination + cursor + chunk
+- The `aggregate-data` topic — `.sum`, `.avg`, `.groupBy`, `.having`

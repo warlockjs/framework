@@ -1,6 +1,6 @@
 ---
 name: search-by-vector
-description: 'Vector similarity search via `.similarTo(column, embedding, alias?)` — adds a similarity `score` column and orders by vector distance so the index is used; cap results with `.limit()`. Postgres uses pgvector (IVFFlat index via `this.vectorIndex`); MongoDB needs Atlas. Schema: `this.vector(column, dimensions)` + `this.vectorIndex(column, { dimensions, similarity })`. Triggers: `.similarTo`, `this.vector`, `this.vectorIndex`, `.whereFullText`, pgvector; "semantic search", "RAG retrieval", "find similar articles", "hybrid vector + full-text"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: query basics — `@warlock.js/cascade/query-data/SKILL.md`; semantic cache — `@warlock.js/cache/use-cache-similarity/SKILL.md`; competing libs `pgvector` directly, `chromadb`, `pinecone`, `weaviate`, `qdrant`.'
+description: 'Vector similarity search via `.similarTo(column, embedding, alias?)` — adds a similarity `score` column and orders by vector distance so the index is used; cap results with `.limit()`. Postgres uses pgvector (IVFFlat index via `this.vectorIndex`); MongoDB needs Atlas. Schema: `this.vector(column, dimensions)` + `this.vectorIndex(column, { dimensions, similarity })`. Triggers: `.similarTo`, `this.vector`, `this.vectorIndex`, `.whereFullText`, pgvector; "semantic search", "RAG retrieval", "find similar articles", "hybrid vector + full-text"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: query basics — the `query-data` topic; semantic cache — the `use-cache-similarity` topic of the `warlock-js-cache` skill; competing libs `pgvector` directly, `chromadb`, `pinecone`, `weaviate`, `qdrant`.'
 ---
 
 # Use vector search
@@ -123,5 +123,5 @@ For local dev with MongoDB, develop the vector path against Postgres + pgvector.
 
 ## See also
 
-- [`@warlock.js/cascade/query-data/SKILL.md`](@warlock.js/cascade/query-data/SKILL.md) — `.where`, `.whereFullText`, the broader query vocabulary
-- [`@warlock.js/cache/use-cache-similarity/SKILL.md`](@warlock.js/cache/use-cache-similarity/SKILL.md) — semantic cache of LLM output
+- The `query-data` topic — `.where`, `.whereFullText`, the broader query vocabulary
+- The `use-cache-similarity` topic of the `warlock-js-cache` skill — semantic cache of LLM output

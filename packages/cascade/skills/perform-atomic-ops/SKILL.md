@@ -1,6 +1,6 @@
 ---
 name: perform-atomic-ops
-description: 'Avoid races on concurrent writes — `Model.increase(filter, field, n)` / `Model.decrease` for atomic counters, `Model.atomic(filter, ops, options?)` for arbitrary mutations (`$set` / `$inc` / `$push` / `$pull` / `$addToSet` / `$setOnInsert`, pipeline updates, `upsert`, `returnDocument`, `arrayFilters`, `trustedFilter`), `Model.createMany` / `Model.findAndUpdate` / `Model.delete` for bulk. `atomic()` / `findAndUpdate()` / `findOneAndUpdate()` / `findAndReplace()` / `findOneAndDelete()` sanitize their `filter` argument — `$`-prefixed keys throw `UnsafeFilterError`, same check as `where()`. Triggers: `Model.increase`, `Model.decrease`, `Model.atomic`, `Model.createMany`, `createMany bulk`, `batchSize`, `Model.findAndUpdate`, `Model.findOneAndUpdate`, `Model.findAndReplace`, `Model.findOneAndDelete`, `Model.delete`, `$inc`, `$set`, `UnsafeFilterError`, `UnsupportedUpdateOperationError`, `upsert`, `returnDocument`, `$setOnInsert`; "upsert a counter", "reserve quota atomically", "increment counter under concurrency", "bulk insert without N+1", "fast bulk insert", "insert thousands of rows", "atomic update without loading", "is atomic() safe with a request body filter"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: multi-row atomicity — `@warlock.js/cascade/manage-transactions/SKILL.md`; competing patterns `mongoose findOneAndUpdate`, `pg` `UPDATE ... SET x = x + 1`.'
+description: 'Avoid races on concurrent writes — `Model.increase(filter, field, n)` / `Model.decrease` for atomic counters, `Model.atomic(filter, ops, options?)` for arbitrary mutations (`$set` / `$inc` / `$push` / `$pull` / `$addToSet` / `$setOnInsert`, pipeline updates, `upsert`, `returnDocument`, `arrayFilters`, `trustedFilter`), `Model.createMany` / `Model.findAndUpdate` / `Model.delete` for bulk. `atomic()` / `findAndUpdate()` / `findOneAndUpdate()` / `findAndReplace()` / `findOneAndDelete()` sanitize their `filter` argument — `$`-prefixed keys throw `UnsafeFilterError`, same check as `where()`. Triggers: `Model.increase`, `Model.decrease`, `Model.atomic`, `Model.createMany`, `createMany bulk`, `batchSize`, `Model.findAndUpdate`, `Model.findOneAndUpdate`, `Model.findAndReplace`, `Model.findOneAndDelete`, `Model.delete`, `$inc`, `$set`, `UnsafeFilterError`, `UnsupportedUpdateOperationError`, `upsert`, `returnDocument`, `$setOnInsert`; "upsert a counter", "reserve quota atomically", "increment counter under concurrency", "bulk insert without N+1", "fast bulk insert", "insert thousands of rows", "atomic update without loading", "is atomic() safe with a request body filter"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: multi-row atomicity — the `manage-transactions` topic; competing patterns `mongoose findOneAndUpdate`, `pg` `UPDATE ... SET x = x + 1`.'
 ---
 
 # Use atomic operations
@@ -27,7 +27,7 @@ await User.atomic({ id: userId }, {
 
 `Model.atomic(filter, operations)` → `Promise<number>`. Driver-flavored atomic mutation — MongoDB has `$set` / `$inc` / `$push` / `$pull` natively; the Postgres driver supports `$set` / `$unset` / `$inc` / `$dec` (and `$setOnInsert` on upsert) and throws `UnsupportedUpdateOperationError` for the rest. Use when you need to combine multiple field changes atomically without loading the model first.
 
-**`filter` is sanitized like `where()`.** `atomic()`, `findAndUpdate()`, `findOneAndUpdate()`, `findAndReplace()` and `findOneAndDelete()` all run their `filter` argument through the same `$`-prefixed-key check as `Model.where()` (see [`query-data`](@warlock.js/cascade/query-data/SKILL.md)) and throw `UnsafeFilterError` on a key like `$ne`. Before this, these five bypassed `where()` entirely, so a filter forwarded straight from a request body — `User.atomic(req.body.filter, { $set: { role: "admin" } })` — could still smuggle an operator like `{ role: { $ne: "admin" } }` through as a live query even though `where()` itself was already guarded. Only the FILTER is checked — the update-operator object (`$set`/`$inc`/`$unset`/…) is untouched, since that's meant to carry `$` keys. If you legitimately need operator conditions in the filter, express them through `Model.query().where(...)`, or pass `{ trustedFilter: true }` for a code-authored filter (see below).
+**`filter` is sanitized like `where()`.** `atomic()`, `findAndUpdate()`, `findOneAndUpdate()`, `findAndReplace()` and `findOneAndDelete()` all run their `filter` argument through the same `$`-prefixed-key check as `Model.where()` (see the `query-data` topic) and throw `UnsafeFilterError` on a key like `$ne`. Before this, these five bypassed `where()` entirely, so a filter forwarded straight from a request body — `User.atomic(req.body.filter, { $set: { role: "admin" } })` — could still smuggle an operator like `{ role: { $ne: "admin" } }` through as a live query even though `where()` itself was already guarded. Only the FILTER is checked — the update-operator object (`$set`/`$inc`/`$unset`/…) is untouched, since that's meant to carry `$` keys. If you legitimately need operator conditions in the filter, express them through `Model.query().where(...)`, or pass `{ trustedFilter: true }` for a code-authored filter (see below).
 
 ## Upsert, returnDocument, pipelines — the options argument
 
@@ -138,7 +138,7 @@ for (const user of targets) {
 | Update many rows with operators | `Model.findAndUpdate(filter, { $set: {...} })` |
 | Update one record by id | `Model.update(id, data)` |
 | Delete many rows (raw) | `Model.delete(filter)` |
-| Multi-row read-modify-write | Wrap in a [transaction](@warlock.js/cascade/manage-transactions/SKILL.md) |
+| Multi-row read-modify-write | Wrap in a transaction (see the `manage-transactions` topic) |
 | Need lifecycle events / delete strategy per row | `Model.where(...).get()` + iterate + `.save()` / `.destroy()` |
 
 ## Things NOT to do
@@ -152,5 +152,5 @@ for (const user of targets) {
 
 ## See also
 
-- [`@warlock.js/cascade/manage-transactions/SKILL.md`](@warlock.js/cascade/manage-transactions/SKILL.md) — multi-row atomicity
-- [`@warlock.js/cascade/paginate-results/SKILL.md`](@warlock.js/cascade/paginate-results/SKILL.md) — `.chunk` for bulk-processing iteration
+- The `manage-transactions` topic — multi-row atomicity
+- The `paginate-results` topic — `.chunk` for bulk-processing iteration

@@ -1,6 +1,6 @@
 ---
 name: run-cascade-cli
-description: 'Cascade''s standalone `cascade` binary + the Operations API it wraps — `cascade migrate` / `migrate:list` / `migrate:rollback` / `migrate:export-sql`, and `runMigrations` / `rollbackMigrations` / `freshMigrate` / `exportMigrationsSQL` / `listExecutedMigrations` / `createDatabase` / `dropAllTables` / `migrationRunner`. Triggers: `cascade migrate`, `migrate:list`, `migrate:rollback`, `migrate:export-sql`, `runMigrations`, `rollbackMigrations`, `freshMigrate`, `exportMigrationsSQL`, `listExecutedMigrations`, `migrationRunner`; "run migrations in deploy/CI", "reset DB for tests", "programmatic migration", "foreign key constraint cannot be implemented", `CASCADE_PRIMARY_KEY`; typical import `import { runMigrations, migrationRunner } from "@warlock.js/cascade"`. Skip: writing migration files — `@warlock.js/cascade/write-migration/SKILL.md`; competing tools `knex migrate:latest`, `prisma migrate deploy`, `typeorm migration:run`.'
+description: 'Cascade''s standalone `cascade` binary + the Operations API it wraps — `cascade migrate` / `migrate:list` / `migrate:rollback` / `migrate:export-sql`, and `runMigrations` / `rollbackMigrations` / `freshMigrate` / `exportMigrationsSQL` / `listExecutedMigrations` / `createDatabase` / `dropAllTables` / `migrationRunner`. Triggers: `cascade migrate`, `migrate:list`, `migrate:rollback`, `migrate:export-sql`, `runMigrations`, `rollbackMigrations`, `freshMigrate`, `exportMigrationsSQL`, `listExecutedMigrations`, `migrationRunner`; "run migrations in deploy/CI", "reset DB for tests", "programmatic migration", "foreign key constraint cannot be implemented", `CASCADE_PRIMARY_KEY`; typical import `import { runMigrations, migrationRunner } from "@warlock.js/cascade"`. Skip: writing migration files — the `write-migration` topic; competing tools `knex migrate:latest`, `prisma migrate deploy`, `typeorm migration:run`.'
 ---
 
 # Run the cascade CLI / Operations API
@@ -121,5 +121,5 @@ Reach for these when you need migrations inside test setup (`beforeAll(async () 
 
 ## See also
 
-- [`@warlock.js/cascade/write-migration/SKILL.md`](@warlock.js/cascade/write-migration/SKILL.md) — writing migration files
-- [`@warlock.js/cascade/manage-data-sources/SKILL.md`](@warlock.js/cascade/manage-data-sources/SKILL.md) — multi-database routing
+- The `write-migration` topic — writing migration files
+- The `manage-data-sources` topic — multi-database routing

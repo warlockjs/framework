@@ -1,6 +1,6 @@
 ---
 name: subscribe-to-model-events
-description: 'Hook into model lifecycle events — `saving` / `saved`, `creating` / `created`, `updating` / `updated`, `validating` / `validated`, `deleting` / `deleted`, `restoring` / `restored`, `fetching` / `fetched`. Per-model `Model.on(event, fn)` or global via `Model.globalEvents()`. Triggers: `Model.on`, `Model.off`, `saving`, `saved`, `created`, `updated`, `deleting`, `deleted`, `restored`; "audit log on save", "notify on change", "denormalize into search index"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: dirty tracking — `@warlock.js/cascade/track-changes/SKILL.md`; competing libs `mongoose` middleware, `typeorm` subscribers, `prisma` extensions.'
+description: 'Hook into model lifecycle events — `saving` / `saved`, `creating` / `created`, `updating` / `updated`, `validating` / `validated`, `deleting` / `deleted`, `restoring` / `restored`, `fetching` / `fetched`. Per-model `Model.on(event, fn)` or global via `Model.globalEvents()`. Triggers: `Model.on`, `Model.off`, `saving`, `saved`, `created`, `updated`, `deleting`, `deleted`, `restored`; "audit log on save", "notify on change", "denormalize into search index"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: dirty tracking — the `track-changes` topic; competing libs `mongoose` middleware, `typeorm` subscribers, `prisma` extensions.'
 ---
 
 # Use model events
@@ -63,7 +63,7 @@ User.on("saving", async (user) => {
 });
 ```
 
-Pair with `isDirty()` from [`@warlock.js/cascade/track-changes/SKILL.md`](@warlock.js/cascade/track-changes/SKILL.md) so the listener only runs its expensive check when the relevant field changed.
+Pair with `isDirty()` from the `track-changes` topic so the listener only runs its expensive check when the relevant field changed.
 
 ## Global listeners — across all models
 
@@ -129,7 +129,7 @@ User.on("deleted", async (user) => {
 });
 ```
 
-See [`@warlock.js/cache/use-cache-tags/SKILL.md`](@warlock.js/cache/use-cache-tags/SKILL.md).
+See the `use-cache-tags` topic of the `warlock-js-cache` skill.
 
 ### Side effects that must only fire after commit
 
@@ -144,5 +144,5 @@ For external side effects (queues, emails) that must only fire if a surrounding 
 
 ## See also
 
-- [`@warlock.js/cascade/track-changes/SKILL.md`](@warlock.js/cascade/track-changes/SKILL.md) — `isDirty` / `getDirtyColumnsWithValues` for "only run if this field changed"
-- [`@warlock.js/cascade/configure-delete-strategy/SKILL.md`](@warlock.js/cascade/configure-delete-strategy/SKILL.md) — `deleting` / `deleted` / `restored` around delete strategies
+- The `track-changes` topic — `isDirty` / `getDirtyColumnsWithValues` for "only run if this field changed"
+- The `configure-delete-strategy` topic — `deleting` / `deleted` / `restored` around delete strategies

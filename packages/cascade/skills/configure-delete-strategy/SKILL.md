@@ -1,6 +1,6 @@
 ---
 name: configure-delete-strategy
-description: 'Pick the delete behavior — `permanent` (hard delete), `soft` (set `deletedAt`, keep the row), `trash` (move to a separate table). Configure via `static deleteStrategy` or `.destroy({ strategy })`; restore via static `Model.restore(id)` / `Model.restoreAll()`. Triggers: `static deleteStrategy`, `.destroy`, `Model.restore`, `Model.restoreAll`, `deletedAtColumn`, `trashTable`; "soft delete users", "restore a deleted record", "GDPR hard delete"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: lifecycle events — `@warlock.js/cascade/subscribe-to-model-events/SKILL.md`; competing libs `mongoose-delete`, `typeorm softRemove`, `sequelize` paranoid.'
+description: 'Pick the delete behavior — `permanent` (hard delete), `soft` (set `deletedAt`, keep the row), `trash` (move to a separate table). Configure via `static deleteStrategy` or `.destroy({ strategy })`; restore via static `Model.restore(id)` / `Model.restoreAll()`. Triggers: `static deleteStrategy`, `.destroy`, `Model.restore`, `Model.restoreAll`, `deletedAtColumn`, `trashTable`; "soft delete users", "restore a deleted record", "GDPR hard delete"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: lifecycle events — the `subscribe-to-model-events` topic; competing libs `mongoose-delete`, `typeorm softRemove`, `sequelize` paranoid.'
 ---
 
 # Use delete strategies
@@ -31,7 +31,7 @@ export class User extends Model<UserSchema> {
 }
 ```
 
-When the strategy resolves to `"soft"`, `Migration.create(Model, { … })` adds the `deletedAt` column for you (using `deletedAtColumn`), so the schema matches what `destroy()` writes — no need to declare it in the migration. Opt out per table with `{ softDeletes: false }`. See [`@warlock.js/cascade/write-migration/SKILL.md`](@warlock.js/cascade/write-migration/SKILL.md).
+When the strategy resolves to `"soft"`, `Migration.create(Model, { … })` adds the `deletedAt` column for you (using `deletedAtColumn`), so the schema matches what `destroy()` writes — no need to declare it in the migration. Opt out per table with `{ softDeletes: false }`. See the `write-migration` topic.
 
 ## Override per-call
 
@@ -96,7 +96,7 @@ await User.query().withoutGlobalScope("notDeleted").get(); // active + soft-dele
 await User.query().withoutGlobalScope("notDeleted").whereNotNull("deletedAt").get(); // only deleted
 ```
 
-`withoutGlobalScope("notDeleted")` bypasses the filter for one query; `withoutGlobalScopes()` drops all of them. See [`@warlock.js/cascade/query-data/SKILL.md`](@warlock.js/cascade/query-data/SKILL.md) for scopes.
+`withoutGlobalScope("notDeleted")` bypasses the filter for one query; `withoutGlobalScopes()` drops all of them. See the `query-data` topic for scopes.
 
 ## Lifecycle hooks fire on all strategies
 
@@ -114,7 +114,7 @@ User.on("restored", async (user) => {
 });
 ```
 
-See [`@warlock.js/cascade/subscribe-to-model-events/SKILL.md`](@warlock.js/cascade/subscribe-to-model-events/SKILL.md).
+See the `subscribe-to-model-events` topic.
 
 ## Things NOT to do
 
@@ -126,5 +126,5 @@ See [`@warlock.js/cascade/subscribe-to-model-events/SKILL.md`](@warlock.js/casca
 
 ## See also
 
-- [`@warlock.js/cascade/subscribe-to-model-events/SKILL.md`](@warlock.js/cascade/subscribe-to-model-events/SKILL.md) — `deleting` / `deleted` / `restored` events
-- [`@warlock.js/cascade/query-data/SKILL.md`](@warlock.js/cascade/query-data/SKILL.md) — global scopes and `withoutGlobalScope` for surfacing deleted rows
+- The `subscribe-to-model-events` topic — `deleting` / `deleted` / `restored` events
+- The `query-data` topic — global scopes and `withoutGlobalScope` for surfacing deleted rows

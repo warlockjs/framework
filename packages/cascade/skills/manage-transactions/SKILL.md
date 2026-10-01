@@ -1,6 +1,6 @@
 ---
 name: manage-transactions
-description: 'Wrap multi-statement work in `transaction(async () => {...})` — rollback on throw, commit on resolve, optional `isolation` level (Postgres), per-`dataSource` scope. Also the home for row locking (`lockForUpdate({ skipLocked })` → `SELECT ... FOR UPDATE [SKIP LOCKED | NOWAIT]`, Postgres-only), transaction-aware raw SQL (`Model.raw` / `DataSource.raw` → `RawQueryResult`) and Postgres native-array column handling (`JSONB[]` / `TEXT[]` / `INTEGER[]` auto-detected via schema introspection on connect; `nativeArrayColumns` is an optional override). Postgres native; MongoDB requires replica set. Triggers: `transaction`, `isolation`, `SERIALIZABLE`, `READ COMMITTED`, nested transaction, flat nesting, nested savepoints, `lockForUpdate`, `skipLocked`, `FOR UPDATE`, `SKIP LOCKED`, `NOWAIT`, row lock, pessimistic lock, queue claim, `Model.raw`, `DataSource.raw`, raw SQL, `RawQueryResult`, `nativeArrayColumns`, `JSONB[]`, `TEXT[]`; "wrap two writes atomically", "transfer balance between accounts", "rollback on error", "MongoDB replica set transactions", "lock rows so workers don''t double-process", "claim jobs from a table", "run raw SQL", "native array column", "malformed array literal", "array column not saving", "nested transaction not visible", "foreign key violation on insert inside transaction", "service transaction inside seeder"; typical import `import { transaction } from "@warlock.js/cascade"`. Skip: single-row atomic ops without a transaction — `@warlock.js/cascade/perform-atomic-ops/SKILL.md`; per-source scope — `@warlock.js/cascade/manage-data-sources/SKILL.md`; competing patterns `mongoose.startSession`, `pg` `BEGIN` manually, `prisma.$transaction`, `typeorm` `QueryRunner`.'
+description: 'Wrap multi-statement work in `transaction(async () => {...})` — rollback on throw, commit on resolve, optional `isolation` level (Postgres), per-`dataSource` scope. Also the home for row locking (`lockForUpdate({ skipLocked })` → `SELECT ... FOR UPDATE [SKIP LOCKED | NOWAIT]`, Postgres-only), transaction-aware raw SQL (`Model.raw` / `DataSource.raw` → `RawQueryResult`) and Postgres native-array column handling (`JSONB[]` / `TEXT[]` / `INTEGER[]` auto-detected via schema introspection on connect; `nativeArrayColumns` is an optional override). Postgres native; MongoDB requires replica set. Triggers: `transaction`, `isolation`, `SERIALIZABLE`, `READ COMMITTED`, nested transaction, flat nesting, nested savepoints, `lockForUpdate`, `skipLocked`, `FOR UPDATE`, `SKIP LOCKED`, `NOWAIT`, row lock, pessimistic lock, queue claim, `Model.raw`, `DataSource.raw`, raw SQL, `RawQueryResult`, `nativeArrayColumns`, `JSONB[]`, `TEXT[]`; "wrap two writes atomically", "transfer balance between accounts", "rollback on error", "MongoDB replica set transactions", "lock rows so workers don''t double-process", "claim jobs from a table", "run raw SQL", "native array column", "malformed array literal", "array column not saving", "nested transaction not visible", "foreign key violation on insert inside transaction", "service transaction inside seeder"; typical import `import { transaction } from "@warlock.js/cascade"`. Skip: single-row atomic ops without a transaction — the `perform-atomic-ops` topic; per-source scope — the `manage-data-sources` topic; competing patterns `mongoose.startSession`, `pg` `BEGIN` manually, `prisma.$transaction`, `typeorm` `QueryRunner`.'
 ---
 
 # Use transactions
@@ -152,7 +152,7 @@ const claimed = await Job.atomic(
 );
 ```
 
-See `@warlock.js/cascade/perform-atomic-ops/SKILL.md` for `atomic` / `findOneAndUpdate`.
+See the `perform-atomic-ops` topic for `atomic` / `findOneAndUpdate`.
 
 ## Outside the transaction
 
@@ -229,5 +229,5 @@ Use the outbox pattern above instead when the side effect must survive a crash b
 
 ## See also
 
-- [`@warlock.js/cascade/perform-atomic-ops/SKILL.md`](@warlock.js/cascade/perform-atomic-ops/SKILL.md) — atomic single-document ops without a full transaction
-- [`@warlock.js/cascade/manage-data-sources/SKILL.md`](@warlock.js/cascade/manage-data-sources/SKILL.md) — transactions run on the default source
+- The `perform-atomic-ops` topic — atomic single-document ops without a full transaction
+- The `manage-data-sources` topic — transactions run on the default source
