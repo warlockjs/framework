@@ -128,6 +128,573 @@
   ],
   "releases": [
     {
+      "version": "5.28.0",
+      "id": "v5-28-0",
+      "date": "October 1, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Postman collections, Swagger UI, and fixes from production use.</strong> <code>warlock generate.postman</code> writes a Postman Collection v2.1.0 from the same OpenAPI document as <code>generate.openapi</code> (tag folders, example bodies, saved responses, <code>{{baseUrl}}</code>/<code>{{token}}</code>, bearer auth on guarded routes), and <code>@warlock.js/devtools</code> adds Swagger UI beside Scalar at <code>/__warlock/docs/swagger</code> with OpenAPI and Postman downloads. The web skills were audited against the code and expanded (page metadata, cookies, images, testing pages, hydration debugging), and every package's <code>llms.txt</code> now lists each skill with its description. <strong>Fixed:</strong> replacing or unsetting a nested object in Cascade no longer leaves empty parent objects; expected 4xx errors log one <code>warn</code> line instead of an error-level stack; <code>v.object()</code> output follows the declared key order; the per-site sitemap is served as <code>application/xml</code>; an empty nested-resource list outputs <code>[]</code>. <strong>Behaviour changes:</strong> <code>set(\"field\", obj)</code> writes the nested object as one value; 4xx errors log at <code>warn</code>. Lockstep release across all 31 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.28.0 tarballs passed install, typecheck, a fresh migrate and seed, devtools in dev including the API docs (OpenAPI, Postman, Scalar, Swagger UI), a production build with browser smoke, and the <code>--role=worker</code> and <code>--role=api</code> starts; after publishing, the same check passed against npm.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>warlock generate.postman</code></strong> writes a Postman Collection v2.1.0 (<code>storage/postman/collection.json</code>, or <code>--out</code>) derived from the same OpenAPI document as <code>generate.openapi</code> (options: <code>--title</code>, <code>--server</code>, <code>--include-pages</code>), so the two can never disagree. Each tag is a folder, each operation a request with an example body generated from its schema (JSON as raw, multipart as form-data), saved responses for every declared status, <code>{{baseUrl}}</code> and <code>{{token}}</code> collection variables, collection-level bearer auth for <code>authMiddleware()</code> routes and <code>noauth</code> on public ones. <code>openApiToPostmanCollection(document, options?)</code> is exported (pure, deterministic <code>_postman_id</code>), and <code>getDevelopmentPostmanCollection()</code> returns the collection for the running dev process."
+            },
+            {
+              "type": "Fixed",
+              "html": "Expected client errors no longer fill logs with stack traces: a thrown error that resolves to a 4xx (an <code>HttpError</code> such as <code>ConflictError</code> or <code>ResourceNotFoundError</code>, or a <code>DatabaseWriterValidationError</code> configured below 500 via <code>http.modelValidationErrorStatus</code>) is logged once at <code>warn</code> as <code>Name: message (status)</code>, without the stack. 5xx and unknown errors are logged at <code>error</code> with the stack, as before."
+            },
+            {
+              "type": "Fixed",
+              "html": "A nested-resource field whose input is an empty list now outputs <code>[]</code>; it used to drop the key. <code>null</code>/<code>undefined</code> still omit it."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>Swagger UI.</strong> <code>/__warlock/docs/swagger</code> renders the same OpenAPI document with <a href=\"https://github.com/swagger-api/swagger-ui\">Swagger UI</a> (Apache-2.0), and the dashboard's <strong>API</strong> tab has a <strong>Scalar | Swagger UI</strong> switch (Scalar stays the default; the choice is remembered in the browser). The prebuilt <code>swagger-ui-dist</code> 5.33.0 bundle and stylesheet are vendored in <code>ui/vendor/swagger-ui/</code> with their license and notice and served as <code>assets/swagger-ui-bundle.js</code> and <code>assets/swagger-ui.css</code>, so apps install no extra dependencies. The schema validator badge is off, so the page makes no outside request."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Downloads in the API tab.</strong> <code>OpenAPI JSON</code> (<code>/__warlock/api/openapi.json</code>) and <code>Postman collection</code> links."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>GET /__warlock/api/postman.json</code></strong> returns the Postman collection for the registered routes, built by core's <code>getDevelopmentPostmanCollection()</code>. It answers 503 when the host's core cannot build one, with the same dev-only, loopback-only guard."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Replacing a nested object on MongoDB (<code>model.set(\"nested\", obj).save()</code>) now writes the whole new object with one <code>$set</code>, instead of diffing per leaf. Removing keys no longer leaves their parents behind as empty <code>{}</code> objects in the stored document. Dotted-path sets (<code>set(\"nested.a\", v)</code>) and <code>merge()</code> stay partial per-leaf updates, so concurrent writes to other keys still survive. SQL drivers already replace the whole JSON column and are unchanged."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>unset(\"nested.x\")</code> now removes the parents it empties (<code>unset(\"a.b.c\")</code> on <code>{ a: { b: { c: 1 } } }</code> stores no <code>a</code>), and the update <code>$unset</code>s that parent rather than leaving <code>{}</code>. A parent is pruned only when that unset emptied it: an object stored or set as <code>{}</code> is left alone, and arrays are never pruned. <code>unset(\"nested\")</code> removes the whole object."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Multi-site apps: the per-site sitemap is served as <code>application/xml</code>; it was <code>text/plain</code> (the handler set the XML header, then <code>response.text()</code> overwrote it)."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "New apps: a failed AI-skills sync during install now prints a warning with the fix (the <code>skills:sync</code> script) instead of a silent <code>skills-sync-skipped</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "New apps: <code>AGENTS.md</code> describes the app as full-stack (APIs plus <code>src/web/**</code> pages) and points agents to the <code>warlock-js-web</code> skill."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>v.object()</code> now emits its validated output (and reports child errors) in declared schema order instead of the order async field validators happened to finish, so output key order is deterministic; unknown keys kept by <code>allowUnknown()</code> follow the declared keys in input order."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/sitemap",
+          "slug": "sitemap",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged. <code>llms.txt</code> now lists every skill topic with its description (frontmatter in CRLF files was skipped)."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.27.0",
       "id": "v5-27-0",
       "date": "October 1, 2026",

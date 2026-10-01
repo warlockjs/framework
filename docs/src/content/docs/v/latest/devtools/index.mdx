@@ -53,7 +53,8 @@ The document is built in-process, on every request to `GET /__warlock/api/openap
 - If the host provides no document generator, `/__warlock/api/openapi.json` answers `503`.
 - Scalar's prebuilt browser bundle is vendored in the package, so apps install nothing extra. The page fetches nothing from a CDN, and Scalar's web fonts, telemetry, AI agent and MCP are turned off, so it makes no outside request.
 - Warnings about routes that cannot be fully described are logged once per process.
-- To get a file for Postman or Insomnia, run `warlock generate.openapi`; it writes `storage/openapi/openapi.json` by default.
+- **New in 5.28:** `/__warlock/docs/swagger` shows the same document in Swagger UI (vendored swagger-ui-dist 5.33.0, no outside requests, the validator badge off). The **API** tab has a Scalar | Swagger UI switch (remembered per browser) and download links for the OpenAPI document and a Postman collection (`GET /__warlock/api/postman.json`, `503` when the host provides no generator).
+- To get files on disk, run `warlock generate.openapi` (OpenAPI, for Insomnia or SDK generators) or `warlock generate.postman` (a native Postman collection).
 
 ## Safe by construction
 

@@ -1,4 +1,15 @@
 {
+  "5.28.0": {
+    "publishedAt": "2026-10-01T06:43:27.430Z",
+    "matrix": "none",
+    "summary": "**Postman collections, Swagger UI, and fixes from production use.** `warlock generate.postman` writes a Postman Collection v2.1.0 from the same OpenAPI document as `generate.openapi` (tag folders, example bodies, saved responses, `{{baseUrl}}`/`{{token}}`, bearer auth on guarded routes), and `@warlock.js/devtools` adds Swagger UI beside Scalar at `/__warlock/docs/swagger` with OpenAPI and Postman downloads. The web skills were audited against the code and expanded (page metadata, cookies, images, testing pages, hydration debugging), and every package's `llms.txt` now lists each skill with its description. **Fixed:** replacing or unsetting a nested object in Cascade no longer leaves empty parent objects; expected 4xx errors log one `warn` line instead of an error-level stack; `v.object()` output follows the declared key order; the per-site sitemap is served as `application/xml`; an empty nested-resource list outputs `[]`. **Behaviour changes:** `set(\"field\", obj)` writes the nested object as one value; 4xx errors log at `warn`. Lockstep release across all 31 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.28.0 tarballs passed install, typecheck, a fresh migrate and seed, devtools in dev including the API docs (OpenAPI, Postman, Scalar, Swagger UI), a production build with browser smoke, and the `--role=worker` and `--role=api` starts; after publishing, the same check passed against npm.",
+    "featured": [
+      "@warlock.js/core",
+      "@warlock.js/devtools",
+      "@warlock.js/cascade",
+      "@warlock.js/web"
+    ]
+  },
   "5.27.0": {
     "publishedAt": "2026-10-01T02:56:24.504Z",
     "matrix": "none",

@@ -170,6 +170,17 @@ warlock generate.openapi --include-pages
 
 Routes are read in the same isolated child process `warlock build` uses, so no connector starts. Per-route gaps are printed as warnings; the command fails only when the app cannot be loaded. What is documented, the security schemes, and the live API docs page in devtools are in the [`warlock generate.openapi` guide](./openapi.md).
 
+### `generate.postman`
+
+**New in 5.28.** Write a Postman Collection v2.1.0 converted from the same OpenAPI document (tag folders, example bodies, saved responses, `{{baseUrl}}`/`{{token}}` variables, bearer auth on guarded routes). It takes the same flags as `generate.openapi`; the default output is `storage/postman/collection.json`.
+
+```bash
+warlock generate.postman
+warlock generate.postman --out docs/shop.postman.json --server https://api.shop.test
+```
+
+See [Use the file in a client](./openapi.md#use-the-file-in-a-client).
+
 ---
 
 ## Production

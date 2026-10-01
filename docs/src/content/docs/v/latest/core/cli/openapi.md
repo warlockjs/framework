@@ -143,7 +143,8 @@ Anything that cannot be described statically is documented as `{}` and listed af
 
 With [`@warlock.js/devtools`](/v/latest/devtools/) installed, `warlock dev` renders the same document without a CLI run:
 
-- `http://localhost:<port>/__warlock/docs` is an API reference rendered with [Scalar](https://github.com/scalar/scalar). The dashboard has an **API** tab that shows the same page.
+- `http://localhost:<port>/__warlock/docs` is an API reference rendered with [Scalar](https://github.com/scalar/scalar), and `/__warlock/docs/swagger` renders the same document with Swagger UI (**new in 5.28**). The dashboard's **API** tab switches between the two and has download links for the OpenAPI document and a Postman collection.
+- `GET /__warlock/api/postman.json` returns the Postman collection for the same routes (**new in 5.28**).
 - `GET /__warlock/api/openapi.json` returns the raw document, rebuilt from the routes registered in the running process on every request. It is built by `getDevelopmentOpenApiDocument()`, exported from `@warlock.js/core`; that function throws outside `warlock dev`.
 - Pages are not included, and each distinct warning is logged once per process instead of on every request.
 
@@ -151,7 +152,9 @@ It stays behind devtools' dev-only, loopback-only guard, and the page makes no o
 
 ## Use the file in a client
 
-The output is plain OpenAPI 3.1 JSON. Import `storage/openapi/openapi.json` into Postman or Insomnia with their Import action, or hand it to any client or SDK generator that reads OpenAPI. Support for version 3.1 is the tool's own, so update it if an older release refuses the file. Regenerate whenever routes change, or commit the file if you publish it.
+**New in 5.28.** For Postman, `warlock generate.postman` writes a native Postman Collection v2.1.0 (default `storage/postman/collection.json`; same `--out`, `--title`, `--server` and `--include-pages` options). It is converted from this same document, so the two never disagree: one folder per tag, an example body per request generated from its schema (JSON raw, multipart as form-data), a saved response for every declared status, `{{baseUrl}}` and `{{token}}` collection variables, and collection-level bearer auth for `authMiddleware()` routes (`noauth` on public ones). Import it, then set `{{token}}`. `openApiToPostmanCollection(document)` is exported from `@warlock.js/core` for your own tooling.
+
+The OpenAPI output is plain OpenAPI 3.1 JSON. Import `storage/openapi/openapi.json` into Postman or Insomnia with their Import action, or hand it to any client or SDK generator that reads OpenAPI. Support for version 3.1 is the tool's own, so update it if an older release refuses the file. Regenerate whenever routes change, or commit the file if you publish it.
 
 ## Build the document yourself
 
