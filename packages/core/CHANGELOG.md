@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Expected client errors no longer fill logs with stack traces: a thrown error that resolves to a 4xx (an `HttpError` such as `ConflictError` or `ResourceNotFoundError`, or a `DatabaseWriterValidationError` configured below 500 via `http.modelValidationErrorStatus`) is logged once at `warn` as `Name: message (status)`, without the stack. 5xx and unknown errors are logged at `error` with the stack, as before.
 - A nested-resource field whose input is an empty list now outputs `[]`; it used to drop the key. `null`/`undefined` still omit it.
+
 ## 5.27.0 - 2026-10-01
 
 ### Added
