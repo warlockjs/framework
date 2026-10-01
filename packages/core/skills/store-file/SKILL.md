@@ -1,6 +1,6 @@
 ---
 name: store-file
-description: 'Read/write/delete files via the `storage` singleton — disks, drivers (local/S3/R2/DO Spaces), `storage.use(name)`, `StorageFile` handles, presigned URLs. Triggers: `storage.put`, `storage.get`, `storage.use`, `StorageFile`, `storageConfigurations`, `getPresignedUrl`, `getPresignedUploadUrl`; "save an uploaded file", "switch between local and S3", "generate a presigned URL", "read file metadata"; typical import `import { storage } from "@warlock.js/core"`. Skip: multipart parsing + image chain — `@warlock.js/core/upload-file/SKILL.md`; image transforms — `@warlock.js/core/process-image/SKILL.md`; storage config shape — `@warlock.js/core/configure-app/SKILL.md`; competing libs `@aws-sdk/client-s3`, `multer`, `formidable`.'
+description: 'Read/write/delete files via the `storage` singleton — disks, drivers (local/S3/R2/DO Spaces), `storage.use(name)`, `StorageFile` handles, presigned URLs. Triggers: `storage.put`, `storage.get`, `storage.use`, `StorageFile`, `storageConfigurations`, `getPresignedUrl`, `getPresignedUploadUrl`; "save an uploaded file", "switch between local and S3", "generate a presigned URL", "read file metadata"; typical import `import { storage } from "@warlock.js/core"`. Skip: multipart parsing + image chain — the `upload-file` topic; image transforms — the `process-image` topic; storage config shape — the `configure-app` topic; competing libs `@aws-sdk/client-s3`, `multer`, `formidable`.'
 ---
 
 # Warlock — store a file
@@ -395,6 +395,6 @@ Client `PUT`s the bytes straight to R2 — your server never sees them.
 
 ## See also
 
-- [`configure-app/SKILL.md`](../configure-app/SKILL.md) — `src/config/storage.ts` shape and `env()` patterns.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — module layout for upload flows (`src/app/uploads/`).
-- [`send-response/SKILL.md`](../send-response/SKILL.md) — `response.sendFile(absPath)` for serving local files.
+- The `configure-app` topic — `src/config/storage.ts` shape and `env()` patterns.
+- The `warlock-conventions` topic — module layout for upload flows (`src/app/uploads/`).
+- The `send-response` topic — `response.sendFile(absPath)` for serving local files.

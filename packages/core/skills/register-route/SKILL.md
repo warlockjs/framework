@@ -1,6 +1,6 @@
 ---
 name: register-route
-description: 'Register HTTP routes via @warlock.js/core''s router — single routes, prefix groups, middleware-guarded blocks, and RESTful resource chains. Routes always live in `src/app/<module>/routes.ts`. Triggers: `router.get`, `router.post`, `router.prefix`, `router.group`, `router.route`, `guarded`; "add a route", "wire a controller to a URL", "group routes by prefix", "register a RESTful resource"; typical import `import { router } from "@warlock.js/core"`. Skip: handler shape — `@warlock.js/core/create-controller/SKILL.md`; CRUD chain details — `@warlock.js/core/build-restful/SKILL.md`; middleware authoring — `@warlock.js/core/write-middleware/SKILL.md`; competing libs `express`, `fastify`, `koa`, `@nestjs/common`.'
+description: 'Register HTTP routes via @warlock.js/core''s router — single routes, prefix groups, middleware-guarded blocks, and RESTful resource chains. Routes always live in `src/app/<module>/routes.ts`. Triggers: `router.get`, `router.post`, `router.prefix`, `router.group`, `router.route`, `guarded`; "add a route", "wire a controller to a URL", "group routes by prefix", "register a RESTful resource"; typical import `import { router } from "@warlock.js/core"`. Skip: handler shape — the `create-controller` topic; CRUD chain details — the `build-restful` topic; middleware authoring — the `write-middleware` topic; competing libs `express`, `fastify`, `koa`, `@nestjs/common`.'
 ---
 
 # Warlock — register a route
@@ -29,7 +29,7 @@ router.post("/orders/:id", createOrderController, { name: "orders.create" });
 Use a concrete HTTP verb for browser forms. `router.any()` is represented as
 `all` metadata and requires callers to choose an explicit path and method.
 
-That's the entire contract for a simple route. `router` is a singleton; method calls register routes synchronously. The handler is a plain function (controllers are typed as `RequestHandler` — see [create-controller](../create-controller/SKILL.md)).
+That's the entire contract for a simple route. `router` is a singleton; method calls register routes synchronously. The handler is a plain function (controllers are typed as `RequestHandler` — see the `create-controller` topic).
 
 ## HTTP verbs
 
@@ -98,7 +98,7 @@ router.prefix("/products", () => {
 });
 ```
 
-If `guarded` doesn't exist in your project yet, see the shared utility convention in [warlock-conventions](../warlock-conventions/SKILL.md).
+If `guarded` doesn't exist in your project yet, see the shared utility convention in the `warlock-conventions` topic.
 
 ## RESTful resource chain
 
@@ -167,6 +167,6 @@ router.get(["/health", "/healthz"], healthController);
 
 ## See also
 
-- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — the handler shape, validation, request/response surface.
-- [`send-response/SKILL.md`](../send-response/SKILL.md) — picking the right `response.<helper>()`.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — module layout, the `guarded` convention, path aliases.
+- The `create-controller` topic — the handler shape, validation, request/response surface.
+- The `send-response` topic — picking the right `response.<helper>()`.
+- The `warlock-conventions` topic — module layout, the `guarded` convention, path aliases.

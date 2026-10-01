@@ -1,6 +1,6 @@
 ---
 name: use-app-context
-description: 'Read app-wide context — the `Application` static class (env, version, uptime, runtime strategy, boot lifecycle) plus the `app` runtime accessor (live Fastify, socket.io, router, database via the DI container). Triggers: `Application.isProduction`, `Application.environment`, `Application.runtimeStrategy`, `Application.uptime`, `Application.version`, `Application.onceBooted`, `Application.whenBooted`, `Application.isBooted`, `Application.onShutdown`, `Application.isShuttingDown`, `app.http`, `app.socket`, `app.database`, `app.router`; "branch on environment", "reach the live Fastify instance", "framework version in health endpoint", "dev vs production runtime check", "run code once the app is fully booted", "after all connectors started", "app booted hook", "run cleanup before shutdown", "graceful shutdown hook"; typical import `import { Application, app } from "@warlock.js/core"`. Skip: path helpers — `@warlock.js/core/resolve-path/SKILL.md`; connector start order — `@warlock.js/core/add-connector/SKILL.md`; competing patterns: bare `process.env.NODE_ENV`, ad-hoc Fastify imports.'
+description: 'Read app-wide context — the `Application` static class (env, version, uptime, runtime strategy, boot lifecycle) plus the `app` runtime accessor (live Fastify, socket.io, router, database via the DI container). Triggers: `Application.isProduction`, `Application.environment`, `Application.runtimeStrategy`, `Application.uptime`, `Application.version`, `Application.onceBooted`, `Application.whenBooted`, `Application.isBooted`, `Application.onShutdown`, `Application.isShuttingDown`, `app.http`, `app.socket`, `app.database`, `app.router`; "branch on environment", "reach the live Fastify instance", "framework version in health endpoint", "dev vs production runtime check", "run code once the app is fully booted", "after all connectors started", "app booted hook", "run cleanup before shutdown", "graceful shutdown hook"; typical import `import { Application, app } from "@warlock.js/core"`. Skip: path helpers — the `resolve-path` topic; connector start order — the `add-connector` topic; competing patterns: bare `process.env.NODE_ENV`, ad-hoc Fastify imports.'
 ---
 
 # Warlock — use the application context
@@ -131,11 +131,11 @@ Application.onceBooted(() => {
 
 Hooks run **LIFO** (reverse of registration — last opened, first closed), each is awaited, and a throwing hook is caught + logged so it can't block the rest. `Application.isShuttingDown` flips `true` the moment shutdown begins — the built-in `/ready` endpoint reads it to report not-ready so a load balancer drains the instance first. Like `onceBooted`, registering after shutdown has begun runs the callback immediately.
 
-The framework triggers this for you (the connectors manager runs the hooks at the start of shutdown); app code only ever registers via `onShutdown`. For the HTTP-side story — `/health`, `/ready`, and graceful request draining — see `@warlock.js/core/health-checks/SKILL.md`.
+The framework triggers this for you (the connectors manager runs the hooks at the start of shutdown); app code only ever registers via `onShutdown`. For the HTTP-side story — `/health`, `/ready`, and graceful request draining — see the `health-checks` topic.
 
 ## Paths
 
-For path helpers (`appPath`, `configPath`, `uploadsPath`, …) anchored at `process.cwd()`, the `paths.*` aggregate, and the `uploads.root` config override, see [`resolve-path/SKILL.md`](../resolve-path/SKILL.md).
+For path helpers (`appPath`, `configPath`, `uploadsPath`, …) anchored at `process.cwd()`, the `paths.*` aggregate, and the `uploads.root` config override, see the `resolve-path` topic.
 
 The most-used helpers are also surfaced as no-argument getters on `Application`:
 
@@ -294,7 +294,7 @@ cors: {
 
 ## See also
 
-- [`resolve-path/SKILL.md`](../resolve-path/SKILL.md) — path helpers (`appPath`, `configPath`, `uploadsPath`, …) and the `paths.*` aggregate.
-- [`configure-app/SKILL.md`](../configure-app/SKILL.md) — `src/config/*.ts` and `warlock.config.ts`.
-- [`add-connector/SKILL.md`](../add-connector/SKILL.md) — using `Application.runtimeStrategy` inside a connector's `start()`.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — module layout, where paths point to.
+- The `resolve-path` topic — path helpers (`appPath`, `configPath`, `uploadsPath`, …) and the `paths.*` aggregate.
+- The `configure-app` topic — `src/config/*.ts` and `warlock.config.ts`.
+- The `add-connector` topic — using `Application.runtimeStrategy` inside a connector's `start()`.
+- The `warlock-conventions` topic — module layout, where paths point to.

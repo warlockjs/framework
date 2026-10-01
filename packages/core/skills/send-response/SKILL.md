@@ -1,6 +1,6 @@
 ---
 name: send-response
-description: 'Send HTTP responses via @warlock.js/core''s Response helpers — success/error variants, status helpers, redirects, files, streams, and SSE. Picking the right helper carries the HTTP semantic without manual status codes. Triggers: `response.success`, `response.successCreate`, `response.notFound`, `response.forbidden`, `response.badRequest`, `response.sendFile`, `response.stream`, `response.sse`, `response.replay`, `ResourceNotFoundError`, `ForbiddenError`, `request.cookie`, `request.hasCookie`, `CookieJarUnavailableError`; "return a 201 from a controller", "send a file", "stream Server-Sent Events", "throw HTTP-shaped errors from services"; typical import `import type { RequestHandler, Response } from "@warlock.js/core"`. Skip: controller shape — `@warlock.js/core/create-controller/SKILL.md`; route registration — `@warlock.js/core/register-route/SKILL.md`; competing patterns: hand-rolled status codes via `reply.code(404).send(...)`, raw Fastify reply.'
+description: 'Send HTTP responses via @warlock.js/core''s Response helpers — success/error variants, status helpers, redirects, files, streams, and SSE. Picking the right helper carries the HTTP semantic without manual status codes. Triggers: `response.success`, `response.successCreate`, `response.notFound`, `response.forbidden`, `response.badRequest`, `response.sendFile`, `response.stream`, `response.sse`, `response.replay`, `ResourceNotFoundError`, `ForbiddenError`, `request.cookie`, `request.hasCookie`, `CookieJarUnavailableError`; "return a 201 from a controller", "send a file", "stream Server-Sent Events", "throw HTTP-shaped errors from services"; typical import `import type { RequestHandler, Response } from "@warlock.js/core"`. Skip: controller shape — the `create-controller` topic; route registration — the `register-route` topic; competing patterns: hand-rolled status codes via `reply.code(404).send(...)`, raw Fastify reply.'
 ---
 
 # Warlock — send a response
@@ -145,7 +145,7 @@ export const getProductController: RequestHandler = async ({ request, response }
 };
 ```
 
-See [`create-controller`](../create-controller/SKILL.md) for the "throw from service, return from controller" pattern.
+See the `create-controller` topic for the "throw from service, return from controller" pattern.
 
 ## Server-Sent Events
 
@@ -225,7 +225,7 @@ These mutate the response in place; chain or call before the final `return respo
 ### `Content-Security-Policy` (5.12.0)
 
 Opt in via `http.csp.enabled` in `src/config/http.ts` (see
-[`configure-app/SKILL.md`](../configure-app/SKILL.md) for the full shape).
+the `configure-app` topic for the full shape).
 When enabled, every response through the shared request funnel
 (`http/middleware/inject-request-context.ts`, the same seam that stamps
 `X-Request-Id`) gets a `Content-Security-Policy` header — `-Report-Only`
@@ -305,6 +305,6 @@ return response.header("X-Cache", "HIT").replay({
 
 ## See also
 
-- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — what calls `response.<helper>()` from.
-- [`register-route/SKILL.md`](../register-route/SKILL.md) — wiring the controller to a URL.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — when to use HTTP error helpers vs `throw`.
+- The `create-controller` topic — what calls `response.<helper>()` from.
+- The `register-route` topic — wiring the controller to a URL.
+- The `warlock-conventions` topic — when to use HTTP error helpers vs `throw`.

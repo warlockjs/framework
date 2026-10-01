@@ -1,6 +1,6 @@
 ---
 name: warlock-conventions
-description: 'Framework-wide invariants for projects built on @warlock.js/core — module layout, canonical imports, layered flow, file naming, and the non-negotiable rules every other warlock skill assumes. Triggers: `src/app/<module>`, `routes.ts`, `main.ts`, `Request<TSchema>`, `RequestHandler`, `GuardedRequestHandler`, `app/<module>/...`; "where do files go in this project", "canonical Warlock imports", "module layout rules", "controller-service-repository layering"; typical import `import { router, type RequestHandler } from "@warlock.js/core"`. Skip: scaffold a new module — `@warlock.js/core/create-module/SKILL.md`; route shape — `@warlock.js/core/register-route/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing patterns: `express` ad-hoc layouts, `@nestjs/common` decorator-driven structure.'
+description: 'Framework-wide invariants for projects built on @warlock.js/core — module layout, canonical imports, layered flow, file naming, and the non-negotiable rules every other warlock skill assumes. Triggers: `src/app/<module>`, `routes.ts`, `main.ts`, `Request<TSchema>`, `RequestHandler`, `GuardedRequestHandler`, `app/<module>/...`; "where do files go in this project", "canonical Warlock imports", "module layout rules", "controller-service-repository layering"; typical import `import { router, type RequestHandler } from "@warlock.js/core"`. Skip: scaffold a new module — the `create-module` topic; route shape — the `register-route` topic; controller shape — the `create-controller` topic; competing patterns: `express` ad-hoc layouts, `@nestjs/common` decorator-driven structure.'
 ---
 
 # Warlock — framework-wide conventions
@@ -124,14 +124,14 @@ Within the same module, use relative paths (`./`, `../`).
 
 ## Type augmentations
 
-`src/typings.d.ts` is the project's module-augmentation file. It ships with the scaffold, is listed explicitly in `tsconfig.json`'s `include`, and is where application-wide `declare module "@warlock.js/core"` blocks live — `RequestLocals` and `RequestUser` are already there as empty interfaces. Keep its trailing `export {}` (without it the block declares an ambient module and erases the framework's real typings) and keep the augmented declarations as `interface`, the one sanctioned exception to this project's prefer-`type` rule, since declaration merging is interface-only. See [`use-request-locals`](../use-request-locals/SKILL.md).
+`src/typings.d.ts` is the project's module-augmentation file. It ships with the scaffold, is listed explicitly in `tsconfig.json`'s `include`, and is where application-wide `declare module "@warlock.js/core"` blocks live — `RequestLocals` and `RequestUser` are already there as empty interfaces. Keep its trailing `export {}` (without it the block declares an ambient module and erases the framework's real typings) and keep the augmented declarations as `interface`, the one sanctioned exception to this project's prefer-`type` rule, since declaration merging is interface-only. See the `use-request-locals` topic.
 
 ## Decorators
 
-Cascade uses `@RegisterModel()` for the model registry and `@BelongsTo` / `@HasMany` / `@MorphTo` for relations. The scaffolded `tsconfig.json` has `"experimentalDecorators": false` — these are native Stage-3 decorators, not legacy. Never set that flag to `true`; see [`lower-stage3-decorators`](../lower-stage3-decorators/SKILL.md).
+Cascade uses `@RegisterModel()` for the model registry and `@BelongsTo` / `@HasMany` / `@MorphTo` for relations. The scaffolded `tsconfig.json` has `"experimentalDecorators": false` — these are native Stage-3 decorators, not legacy. Never set that flag to `true`; see the `lower-stage3-decorators` topic.
 
 ## See also
 
-- [`register-route/SKILL.md`](../register-route/SKILL.md) — how to wire URLs to controllers.
-- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — controller signature, validation, response shape.
-- [`send-response/SKILL.md`](../send-response/SKILL.md) — the full Response helper surface.
+- The `register-route` topic — how to wire URLs to controllers.
+- The `create-controller` topic — controller signature, validation, response shape.
+- The `send-response` topic — the full Response helper surface.

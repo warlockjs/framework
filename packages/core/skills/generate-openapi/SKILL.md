@@ -1,6 +1,6 @@
 ---
 name: generate-openapi
-description: 'Generate an OpenAPI 3.1 document from the registered routes with `warlock generate.openapi` (default `storage/openapi/openapi.json`), write a Postman collection from it with `warlock generate.postman` (default `storage/postman/collection.json`), and read it live in the dev-only API docs page at `/__warlock/docs`. Documents paths, path/query parameters, request bodies from Seal validation, responses from `handler.responseSchema`, 401/422 and bearer/cookie security from `authMiddleware()`. Triggers: `generate.openapi`, `openApiGeneratorCommand`, `buildOpenApiDocument`, `getDevelopmentOpenApiDocument`, `generate.postman`, `openApiToPostmanCollection`, `getDevelopmentPostmanCollection`, `responseSchema`, `--include-pages`, `/__warlock/docs`; "OpenAPI", "Swagger", "API docs", "import my API into Postman or Insomnia", "document my routes". Skip: declaring response types on a handler — `@warlock.js/core/create-controller/SKILL.md`; the devtools dashboard — `@warlock.js/devtools/devtools-overview/SKILL.md`; listing routes — `@warlock.js/core/warlock-routes/SKILL.md`.'
+description: 'Generate an OpenAPI 3.1 document from the registered routes with `warlock generate.openapi` (default `storage/openapi/openapi.json`), write a Postman collection from it with `warlock generate.postman` (default `storage/postman/collection.json`), and read it live in the dev-only API docs page at `/__warlock/docs`. Documents paths, path/query parameters, request bodies from Seal validation, responses from `handler.responseSchema`, 401/422 and bearer/cookie security from `authMiddleware()`. Triggers: `generate.openapi`, `openApiGeneratorCommand`, `buildOpenApiDocument`, `getDevelopmentOpenApiDocument`, `generate.postman`, `openApiToPostmanCollection`, `getDevelopmentPostmanCollection`, `responseSchema`, `--include-pages`, `/__warlock/docs`; "OpenAPI", "Swagger", "API docs", "import my API into Postman or Insomnia", "document my routes". Skip: declaring response types on a handler — the `create-controller` topic; the devtools dashboard — the `devtools-overview` topic of the `warlock-js-devtools` skill; listing routes — the `warlock-routes` topic.'
 ---
 
 # Warlock — generate an OpenAPI document
@@ -44,7 +44,7 @@ npx warlock generate.openapi --out docs/openapi.json --title "Shop API" --server
 
 ### Responses from `responseSchema`
 
-The grammar is the one described in [`create-controller`](../create-controller/SKILL.md#declaring-response-types-with-responseschema): cast strings with suffixes, a resource, `[Resource]`, nested objects.
+The grammar is the one described in the `create-controller` topic ("Declaring response types with `responseSchema`" section): cast strings with suffixes, a resource, `[Resource]`, nested objects.
 
 ```ts
 loginController.responseSchema = {
@@ -143,6 +143,6 @@ const { document, warnings } = buildOpenApiDocument(router.list(), {
 
 ## See also
 
-- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — `validation`, `description` and `responseSchema` on a handler.
-- [`define-resource/SKILL.md`](../define-resource/SKILL.md) — resources, which become `components.schemas`.
-- [`warlock-routes/SKILL.md`](../warlock-routes/SKILL.md) — list the routes the document is built from.
+- The `create-controller` topic — `validation`, `description` and `responseSchema` on a handler.
+- The `define-resource` topic — resources, which become `components.schemas`.
+- The `warlock-routes` topic — list the routes the document is built from.

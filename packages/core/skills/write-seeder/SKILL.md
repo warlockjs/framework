@@ -1,6 +1,6 @@
 ---
 name: write-seeder
-description: 'Author a seed file under `src/app/<module>/seeds/<name>.ts` using the `seeder()` factory — `name`, `dependsOn`, `once`, `order`, `batchSize`, `run({ track, now, batchSize })`. Auto-discovered by `warlock seed`; tracked in a `seeds` table; per-record refs in `seed_records` so `warlock seed --drop` can undo a seed. Triggers: `seeder`, `Seeder`, `SeedResult`, `SeedContext`, `SeedClock`, `track`, `now`, `batchSize`, `SeedersManager`, `warlock seed`, `--fresh`, `--drop`, `--list`, `--path`; "seed default roles", "undo a seed", "one-time data migration", "auto-discovered seeds", "order seeds by dependency", "deterministic seed timestamps", "inject a seed clock"; typical import `import { seeder } from "@warlock.js/core"`. Skip: module folder layout — `@warlock.js/core/create-module/SKILL.md`; repository CRUD — `@warlock.js/core/use-repository/SKILL.md`; CLI flags — `@warlock.js/core/write-cli-command/SKILL.md`; competing patterns: hand-rolled `node scripts/seed.js`, `typeorm-seeding`.'
+description: 'Author a seed file under `src/app/<module>/seeds/<name>.ts` using the `seeder()` factory — `name`, `dependsOn`, `once`, `order`, `batchSize`, `run({ track, now, batchSize })`. Auto-discovered by `warlock seed`; tracked in a `seeds` table; per-record refs in `seed_records` so `warlock seed --drop` can undo a seed. Triggers: `seeder`, `Seeder`, `SeedResult`, `SeedContext`, `SeedClock`, `track`, `now`, `batchSize`, `SeedersManager`, `warlock seed`, `--fresh`, `--drop`, `--list`, `--path`; "seed default roles", "undo a seed", "one-time data migration", "auto-discovered seeds", "order seeds by dependency", "deterministic seed timestamps", "inject a seed clock"; typical import `import { seeder } from "@warlock.js/core"`. Skip: module folder layout — the `create-module` topic; repository CRUD — the `use-repository` topic; CLI flags — the `write-cli-command` topic; competing patterns: hand-rolled `node scripts/seed.js`, `typeorm-seeding`.'
 ---
 
 # Warlock — write a seeder
@@ -371,7 +371,7 @@ warlock seed --transaction    # (default true) — pass --transaction=false to s
 
 ## See also
 
-- [`create-module/SKILL.md`](../create-module/SKILL.md) — the `seeds/` folder layout in a module, `generate.module` scaffolding.
-- [`use-repository/SKILL.md`](../use-repository/SKILL.md) — the model `create` / `first` calls used inside seeds.
-- [`write-cli-command/SKILL.md`](../write-cli-command/SKILL.md) — the `warlock seed` CLI flags and full preload shape.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — `seeds/` is the canonical folder name (singular `seed/` is incorrect).
+- The `create-module` topic — the `seeds/` folder layout in a module, `generate.module` scaffolding.
+- The `use-repository` topic — the model `create` / `first` calls used inside seeds.
+- The `write-cli-command` topic — the `warlock seed` CLI flags and full preload shape.
+- The `warlock-conventions` topic — `seeds/` is the canonical folder name (singular `seed/` is incorrect).

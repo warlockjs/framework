@@ -1,6 +1,6 @@
 ---
 name: create-controller
-description: 'Author HTTP controllers in @warlock.js/core — RequestHandler signature, validated input via seal schemas, response helpers, attaching metadata. Controllers are thin functions; business logic moves to services or use-cases. Triggers: `RequestHandler`, `Request<TSchema>`, `GuardedRequestHandler`, `request.validated`, `request.input`, `controller.validation`, `controller.responseSchema`, `response.success`, `response.successCreate`; "write a controller", "attach a schema to a handler", "thin controller pattern", "guarded request type", "type the API response"; typical import `import { type RequestHandler } from "@warlock.js/core"`. Skip: response helper menu — `@warlock.js/core/send-response/SKILL.md`; schema authoring — `@warlock.js/core/validate-input/SKILL.md`; URL wiring — `@warlock.js/core/register-route/SKILL.md`; competing patterns: `express` middleware functions, `@nestjs/common` `@Controller`/`@Get` decorators.'
+description: 'Author HTTP controllers in @warlock.js/core — RequestHandler signature, validated input via seal schemas, response helpers, attaching metadata. Controllers are thin functions; business logic moves to services or use-cases. Triggers: `RequestHandler`, `Request<TSchema>`, `GuardedRequestHandler`, `request.validated`, `request.input`, `controller.validation`, `controller.responseSchema`, `response.success`, `response.successCreate`; "write a controller", "attach a schema to a handler", "thin controller pattern", "guarded request type", "type the API response"; typical import `import { type RequestHandler } from "@warlock.js/core"`. Skip: response helper menu — the `send-response` topic; schema authoring — the `validate-input` topic; URL wiring — the `register-route` topic; competing patterns: `express` middleware functions, `@nestjs/common` `@Controller`/`@Get` decorators.'
 ---
 
 # Warlock — create a controller
@@ -48,7 +48,7 @@ Prefer `request.validated()` once a schema is attached — it's typed.
 | Content type                         | Parsed by                       | Notes                                                                |
 | ------------------------------------ | -------------------------------- | --------------------------------------------------------------------- |
 | `application/json`                   | Fastify (built-in)               | objects/arrays parsed as-is                                           |
-| `multipart/form-data`                | `@fastify/multipart`             | fields + files; see [`upload-file`](../upload-file/SKILL.md)          |
+| `multipart/form-data`                | `@fastify/multipart`             | fields + files; see the `upload-file` topic          |
 | `application/x-www-form-urlencoded`  | Warlock's own content-type parser (`http/parse-urlencoded-body.ts`) | plain HTML forms, OAuth `form_post` callbacks (e.g. Apple Sign in)    |
 
 For urlencoded bodies: fields decode via `URLSearchParams`. A key sent more than once (`tag=a&tag=b`) becomes an array (`request.input("tag")` → `["a", "b"]`); every other key is a plain string. Bracket-notation keys (`a[b]=1`) are **not** expanded by the urlencoded parser itself — nesting only happens through the same shared bracket-key logic every body type already goes through, so it behaves exactly like a JSON or query-string key of that shape, no differently than today.
@@ -57,7 +57,7 @@ All three content types are held to the same `http.bodyLimit` — an over-limit 
 
 ## Returning output
 
-Pick the helper that matches the outcome. Full surface in [send-response](../send-response/SKILL.md). Quick map:
+Pick the helper that matches the outcome. Full surface in the `send-response` topic. Quick map:
 
 | Helper                             | Status | Use when                      |
 | ---------------------------------- | ------ | ----------------------------- |
@@ -134,7 +134,7 @@ Use `RequestHandler<Request<TSchema>>` for public routes, `GuardedRequestHandler
 createProductController.description = "Create a new product (admin only)";
 ```
 
-`description` feeds the OpenAPI document (`warlock generate.openapi`, see [`generate-openapi`](../generate-openapi/SKILL.md)) and surfaces in dev-server logs.
+`description` feeds the OpenAPI document (`warlock generate.openapi`, see the `generate-openapi` topic) and surfaces in dev-server logs.
 
 ## Declaring response types with `responseSchema`
 
@@ -262,7 +262,7 @@ export const getProductController: RequestHandler = async ({ request, response }
 };
 ```
 
-No `if (!product)` branch in the controller. The error class carries the HTTP semantic (`404` for `ResourceNotFoundError`, `403` for `ForbiddenError`, `400` for `BadRequestError`, `409` for `ConflictError`, `500` for `ServerError`). Full list in [`send-response`](../send-response/SKILL.md#throwing-http-errors). `product.notFound` is a translation key — see localization conventions in your project's `utils/locales.ts`.
+No `if (!product)` branch in the controller. The error class carries the HTTP semantic (`404` for `ResourceNotFoundError`, `403` for `ForbiddenError`, `400` for `BadRequestError`, `409` for `ConflictError`, `500` for `ServerError`). Full list in the `send-response` topic ("Throwing HTTP errors" section). `product.notFound` is a translation key — see localization conventions in your project's `utils/locales.ts`.
 
 ## Gotchas
 
@@ -273,6 +273,6 @@ No `if (!product)` branch in the controller. The error class carries the HTTP se
 
 ## See also
 
-- [`register-route/SKILL.md`](../register-route/SKILL.md) — wiring a controller to a URL.
-- [`send-response/SKILL.md`](../send-response/SKILL.md) — full Response helper surface.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — controller-service-repository layering.
+- The `register-route` topic — wiring a controller to a URL.
+- The `send-response` topic — full Response helper surface.
+- The `warlock-conventions` topic — controller-service-repository layering.

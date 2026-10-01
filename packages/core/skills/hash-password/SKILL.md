@@ -1,13 +1,13 @@
 ---
 name: hash-password
-description: 'One-way bcrypt password hashing — `hashPassword` / `verifyPassword`, plus the declarative `useHashedPassword()` schema transformer that auto-hashes a model''s password field on save. Salt rounds come from `src/config/encryption.ts`. Triggers: `hashPassword`, `verifyPassword`, `useHashedPassword`, `password.salt`, `bcryptjs`; "hash a user password", "verify login credentials", "auto-hash on save", "rotate a password"; typical import `import { hashPassword, verifyPassword } from "@warlock.js/core"`. Skip: reversible secrets — `@warlock.js/core/encrypt-data/SKILL.md`; the other transformers — `@warlock.js/core/use-model-transformers/SKILL.md`; config wiring — `@warlock.js/core/configure-app/SKILL.md`; competing libs `bcrypt` native, `argon2`, `scrypt`.'
+description: 'One-way bcrypt password hashing — `hashPassword` / `verifyPassword`, plus the declarative `useHashedPassword()` schema transformer that auto-hashes a model''s password field on save. Salt rounds come from `src/config/encryption.ts`. Triggers: `hashPassword`, `verifyPassword`, `useHashedPassword`, `password.salt`, `bcryptjs`; "hash a user password", "verify login credentials", "auto-hash on save", "rotate a password"; typical import `import { hashPassword, verifyPassword } from "@warlock.js/core"`. Skip: reversible secrets — the `encrypt-data` topic; the other transformers — the `use-model-transformers` topic; config wiring — the `configure-app` topic; competing libs `bcrypt` native, `argon2`, `scrypt`.'
 ---
 
 # Warlock — hash a password
 
 For storing user-typed passwords, bcrypt is the one right answer — and the only one. It's **deliberately slow** (~250ms per call with the default salt rounds), which is what makes it expensive to brute-force a stolen password database. Use it for nothing else: not API keys, not session tokens, not "this needs to be one-way."
 
-If your value needs to be read back later → [`encrypt-data/SKILL.md`](../encrypt-data/SKILL.md).
+If your value needs to be read back later → the `encrypt-data` topic.
 If you need a fast searchable fingerprint of an encrypted value → also `encrypt-data` (`hmacHash`).
 
 ## The shape
@@ -168,7 +168,7 @@ There is no `warlock add` feature for password hashing — `bcryptjs` is a plain
 
 ## Gotchas
 
-- **Never use `hashPassword` for non-password values.** A 250ms tax on every API request because someone reached for it as a "general one-way hash" — that's a performance bug waiting to happen. For one-way fingerprinting of encrypted values, use `hmacHash` (see [`encrypt-data/SKILL.md`](../encrypt-data/SKILL.md)).
+- **Never use `hashPassword` for non-password values.** A 250ms tax on every API request because someone reached for it as a "general one-way hash" — that's a performance bug waiting to happen. For one-way fingerprinting of encrypted values, use `hmacHash` (see the `encrypt-data` topic).
 - **Don't `hashPassword` on the request hot path twice.** Each call is ~250ms. If you `hashPassword(input)` then call it again as part of `verifyPassword`'s internals (you don't), you're stacking the tax. `verifyPassword(plain, storedHash)` takes the plaintext and the stored hash — that's the API.
 - **Don't swap `bcryptjs` for native `bcrypt` without a reason.** `bcryptjs` is portable across every platform (no native build), and the perf delta isn't meaningful in the password-verification workflow.
 - **The transformer detects changes by comparison.** If your model's password field is `null` and you save `null` again, it's a no-op. If it's a hash and you save the same hash string, also no-op. Only an actual value change triggers re-hashing.
@@ -176,8 +176,8 @@ There is no `warlock add` feature for password hashing — `bcryptjs` is a plain
 
 ## See also
 
-- [`use-model-transformers/SKILL.md`](../use-model-transformers/SKILL.md) — `useHashedPassword` + the two other model transformers (`useComputedSlug`, `useComputedModel`).
-- [`encrypt-data/SKILL.md`](../encrypt-data/SKILL.md) — reversible AES-256-GCM `encrypt`/`decrypt` + one-way HMAC `hmacHash` (the other two members of the encryption module).
-- [`configure-app/SKILL.md`](../configure-app/SKILL.md) — `src/config/encryption.ts` and the `password.salt` knob.
-- [`define-resource/SKILL.md`](../define-resource/SKILL.md) — where to filter the password field out of API responses.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — service layering, where the password boundary should sit.
+- The `use-model-transformers` topic — `useHashedPassword` + the two other model transformers (`useComputedSlug`, `useComputedModel`).
+- The `encrypt-data` topic — reversible AES-256-GCM `encrypt`/`decrypt` + one-way HMAC `hmacHash` (the other two members of the encryption module).
+- The `configure-app` topic — `src/config/encryption.ts` and the `password.salt` knob.
+- The `define-resource` topic — where to filter the password field out of API responses.
+- The `warlock-conventions` topic — service layering, where the password boundary should sit.

@@ -1,6 +1,6 @@
 ---
 name: upload-file
-description: 'Handle multipart file uploads — read via `request.file()` or `request.validated()`, validate with `v.file()`, save via `UploadedFile.save()` or the storage layer, transform images inline. Triggers: `UploadedFile`, `request.file`, `v.file`, `.save`, `.saveAs`, `.resize`, `.format`, `.quality`, `.image`, `.mimeType`, `.maxSize`; "accept a file upload", "validate file size and mime", "save to S3 or local disk", "resize an uploaded image on save"; typical import `import type { UploadedFile, RequestHandler } from "@warlock.js/core"`. Skip: storage drivers + presigned URLs — `@warlock.js/core/store-file/SKILL.md`; image-only transforms — `@warlock.js/core/process-image/SKILL.md`; schema rules — `@warlock.js/core/validate-input/SKILL.md`; competing libs `multer`, `formidable`, `busboy`.'
+description: 'Handle multipart file uploads — read via `request.file()` or `request.validated()`, validate with `v.file()`, save via `UploadedFile.save()` or the storage layer, transform images inline. Triggers: `UploadedFile`, `request.file`, `v.file`, `.save`, `.saveAs`, `.resize`, `.format`, `.quality`, `.image`, `.mimeType`, `.maxSize`; "accept a file upload", "validate file size and mime", "save to S3 or local disk", "resize an uploaded image on save"; typical import `import type { UploadedFile, RequestHandler } from "@warlock.js/core"`. Skip: storage drivers + presigned URLs — the `store-file` topic; image-only transforms — the `process-image` topic; schema rules — the `validate-input` topic; competing libs `multer`, `formidable`, `busboy`.'
 ---
 
 # Warlock — upload a file
@@ -208,7 +208,7 @@ v.file()                                          // must be UploadedFile
   .minHeight(200).maxHeight(4000);
 ```
 
-Size accepts either bytes (`.maxSize(5_242_880)`) or `{ unit, size }` (`{ unit: "MB", size: 5 }`). See [`validate-input`](../validate-input/SKILL.md) for the full validation pattern.
+Size accepts either bytes (`.maxSize(5_242_880)`) or `{ unit, size }` (`{ unit: "MB", size: 5 }`). See the `validate-input` topic for the full validation pattern.
 
 ### Optional file field
 
@@ -291,7 +291,7 @@ await storage.use("s3").put(await uploadedFile.buffer(), "documents/report.pdf",
 
 ### Stream a download from a stored file
 
-The reverse direction — sending a stored file back via `response.sendFile(...)` is the cleanest path. For dynamic content, use `response.stream(...)`. See [`send-response`](../send-response/SKILL.md).
+The reverse direction — sending a stored file back via `response.sendFile(...)` is the cleanest path. For dynamic content, use `response.stream(...)`. See the `send-response` topic.
 
 ## Gotchas
 
@@ -305,7 +305,7 @@ The reverse direction — sending a stored file back via `response.sendFile(...)
 
 ## See also
 
-- [`validate-input/SKILL.md`](../validate-input/SKILL.md) — `v.file()` rules and the validation pipeline.
-- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — pulling files from `request.validated()` vs `request.file()`.
-- [`send-response/SKILL.md`](../send-response/SKILL.md) — `response.sendFile(...)` for serving the stored file back.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — storage configuration and driver selection.
+- The `validate-input` topic — `v.file()` rules and the validation pipeline.
+- The `create-controller` topic — pulling files from `request.validated()` vs `request.file()`.
+- The `send-response` topic — `response.sendFile(...)` for serving the stored file back.
+- The `warlock-conventions` topic — storage configuration and driver selection.

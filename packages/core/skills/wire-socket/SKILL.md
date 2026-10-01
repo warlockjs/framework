@@ -1,6 +1,6 @@
 ---
 name: wire-socket
-description: 'Configure Socket.IO via `src/config/socket.ts`, reach the live server through `getSocketServer()` (or `app.socket` post-bootstrap), register `connection` handlers once the late-phase socket connector has booted, emit from controllers/services, use rooms and namespaces. Triggers: `app.socket`, `getSocketServer`, `SocketOptions`, `socket.io` `Server`, `socket.join`, `socket.to`, `io.of`, `io.use`; "add realtime chat", "emit socket events from a service", "use rooms and namespaces", "per-socket JWT auth". Skip: connector lifecycle — `@warlock.js/core/add-connector/SKILL.md`; app context accessors — `@warlock.js/core/use-app-context/SKILL.md`; competing libs `ws`, `socket.io` direct without Warlock connector, `uWebSockets.js`.'
+description: 'Configure Socket.IO via `src/config/socket.ts`, reach the live server through `getSocketServer()` (or `app.socket` post-bootstrap), register `connection` handlers once the late-phase socket connector has booted, emit from controllers/services, use rooms and namespaces. Triggers: `app.socket`, `getSocketServer`, `SocketOptions`, `socket.io` `Server`, `socket.join`, `socket.to`, `io.of`, `io.use`; "add realtime chat", "emit socket events from a service", "use rooms and namespaces", "per-socket JWT auth". Skip: connector lifecycle — the `add-connector` topic; app context accessors — the `use-app-context` topic; competing libs `ws`, `socket.io` direct without Warlock connector, `uWebSockets.js`.'
 ---
 
 # Warlock — wire a Socket.IO server
@@ -283,6 +283,6 @@ CLI commands, scheduled jobs, queue workers — anything running outside an HTTP
 
 ## See also
 
-- [`use-app-context/SKILL.md`](../use-app-context/SKILL.md) — `app.socket` runtime accessor + `Application` static metadata.
-- [`add-connector/SKILL.md`](../add-connector/SKILL.md) — how connectors order their boot sequence around your modules.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — where socket-related code lives (a setup function for handler registration, `services/` for emit sites).
+- The `use-app-context` topic — `app.socket` runtime accessor + `Application` static metadata.
+- The `add-connector` topic — how connectors order their boot sequence around your modules.
+- The `warlock-conventions` topic — where socket-related code lives (a setup function for handler registration, `services/` for emit sites).

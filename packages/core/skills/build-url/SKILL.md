@@ -1,11 +1,11 @@
 ---
 name: build-url
-description: 'HTTP URL helpers — `url`, `publicUrl`, `assetsUrl`, `uploadsUrl`, anchored at `app.baseUrl`. Use to render `src` / `href` / API URLs in resources and responses. `setBaseUrl` is wired by the HTTP connector from `config.get("app.baseUrl")`. Triggers: `url`, `publicUrl`, `assetsUrl`, `uploadsUrl`, `setBaseUrl`, `BASE_URL`; "render an avatar src URL", "absolute download link", "embed asset URL in email", "URL helpers vs path helpers"; typical import `import { url, publicUrl, uploadsUrl } from "@warlock.js/core"`. Skip: filesystem paths — `@warlock.js/core/resolve-path/SKILL.md`; signed CDN URLs — `@warlock.js/core/store-file/SKILL.md`; resource output — `@warlock.js/core/define-resource/SKILL.md`; competing patterns: hand-rolled `${baseUrl}/...` template strings.'
+description: 'HTTP URL helpers — `url`, `publicUrl`, `assetsUrl`, `uploadsUrl`, anchored at `app.baseUrl`. Use to render `src` / `href` / API URLs in resources and responses. `setBaseUrl` is wired by the HTTP connector from `config.get("app.baseUrl")`. Triggers: `url`, `publicUrl`, `assetsUrl`, `uploadsUrl`, `setBaseUrl`, `BASE_URL`; "render an avatar src URL", "absolute download link", "embed asset URL in email", "URL helpers vs path helpers"; typical import `import { url, publicUrl, uploadsUrl } from "@warlock.js/core"`. Skip: filesystem paths — the `resolve-path` topic; signed CDN URLs — the `store-file` topic; resource output — the `define-resource` topic; competing patterns: hand-rolled `${baseUrl}/...` template strings.'
 ---
 
 # Warlock — build a URL
 
-Path helpers ([`resolve-path/SKILL.md`](../resolve-path/SKILL.md)) give you absolute filesystem paths. URL helpers give you absolute HTTP URLs. Different jobs, often confused.
+Path helpers (the `resolve-path` topic) give you absolute filesystem paths. URL helpers give you absolute HTTP URLs. Different jobs, often confused.
 
 Use URL helpers whenever you need to render a string that goes into a browser, an HTTP client, or an email — `<img src=...>`, `<a href=...>`, an API response that includes a download link, a webhook payload.
 
@@ -173,8 +173,8 @@ Don't call `setBaseUrl` per request — it's process-global and races every othe
 
 ## See also
 
-- [`resolve-path/SKILL.md`](../resolve-path/SKILL.md) — filesystem path helpers (`uploadsPath`, `publicPath`, ...). Use for read/write; use the URL helpers for rendering.
-- [`store-file/SKILL.md`](../store-file/SKILL.md) — the `storage.url(path)` driver method, which can produce signed CDN URLs for non-local drivers (S3 etc.). Use that over `uploadsUrl` when you're on a remote driver.
-- [`upload-file/SKILL.md`](../upload-file/SKILL.md) — the `UploadedFile` lifecycle; where the path that feeds `uploadsUrl` comes from.
-- [`define-resource/SKILL.md`](../define-resource/SKILL.md) — the `url` / `uploadsUrl` / `storageUrl` casts (and resolver functions) are the right place to call URL helpers.
-- [`configure-app/SKILL.md`](../configure-app/SKILL.md) — `src/config/app.ts` and the `baseUrl` env wiring.
+- The `resolve-path` topic — filesystem path helpers (`uploadsPath`, `publicPath`, ...). Use for read/write; use the URL helpers for rendering.
+- The `store-file` topic — the `storage.url(path)` driver method, which can produce signed CDN URLs for non-local drivers (S3 etc.). Use that over `uploadsUrl` when you're on a remote driver.
+- The `upload-file` topic — the `UploadedFile` lifecycle; where the path that feeds `uploadsUrl` comes from.
+- The `define-resource` topic — the `url` / `uploadsUrl` / `storageUrl` casts (and resolver functions) are the right place to call URL helpers.
+- The `configure-app` topic — `src/config/app.ts` and the `baseUrl` env wiring.

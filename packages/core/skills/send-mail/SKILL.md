@@ -1,6 +1,6 @@
 ---
 name: send-mail
-description: 'Send transactional email — `Mail` fluent builder, `sendMail()` direct call, React Email components. Test mode auto-captures into an in-memory mailbox; dev mode logs. Triggers: `Mail.to`, `sendMail`, `setMailMode`, `mailEvents`, `assertMailSent`, `getTestMailbox`, `wasMailSentTo`, `closeAllMailers`; "send a transactional email", "build a React Email template", "configure SMTP or SES", "assert an email was sent in tests"; typical import `import { Mail, sendMail } from "@warlock.js/core"`. Skip: per-config wiring — `@warlock.js/core/configure-app/SKILL.md`; layered service patterns — `@warlock.js/core/warlock-conventions/SKILL.md`; competing libs `nodemailer` direct, `@sendgrid/mail`, `resend`, `mailgun.js`.'
+description: 'Send transactional email — `Mail` fluent builder, `sendMail()` direct call, React Email components. Test mode auto-captures into an in-memory mailbox; dev mode logs. Triggers: `Mail.to`, `sendMail`, `setMailMode`, `mailEvents`, `assertMailSent`, `getTestMailbox`, `wasMailSentTo`, `closeAllMailers`; "send a transactional email", "build a React Email template", "configure SMTP or SES", "assert an email was sent in tests"; typical import `import { Mail, sendMail } from "@warlock.js/core"`. Skip: per-config wiring — the `configure-app` topic; layered service patterns — the `warlock-conventions` topic; competing libs `nodemailer` direct, `@sendgrid/mail`, `resend`, `mailgun.js`.'
 ---
 
 # Warlock — send a mail
@@ -398,5 +398,5 @@ await Mail.to(user.email)
 
 ## See also
 
-- [`configure-app/SKILL.md`](../configure-app/SKILL.md) — `src/config/mail.ts` shape and `env()` patterns.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — where mail-sending services live.
+- The `configure-app` topic — `src/config/mail.ts` shape and `env()` patterns.
+- The `warlock-conventions` topic — where mail-sending services live.

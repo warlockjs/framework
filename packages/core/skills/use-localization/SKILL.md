@@ -1,6 +1,6 @@
 ---
 name: use-localization
-description: 'Multi-locale translations via `groupedTranslations` (declare keys), `t()` (look up; always use it in app code, never `request.t()`), `request.getLocaleCode()` (detect locale from headers/query), `getLocalized` (pick the right value from a localized-array column). Triggers: `groupedTranslations`, `t`, `request.t`, `request.trans`, `request.transFrom`, `request.getLocaleCode`, `request.setLocaleCode`, `getLocalized`; "add a translation key", "resolve a localized error message", "detect request locale", "pick the right per-locale column value"; typical import `import { t, getLocalized } from "@warlock.js/core"`. Skip: resource output — `@warlock.js/core/define-resource/SKILL.md`; module scaffold — `@warlock.js/core/create-module/SKILL.md`; competing libs `i18next`, `react-intl`, raw `@mongez/localization`.'
+description: 'Multi-locale translations via `groupedTranslations` (declare keys), `t()` (look up; always use it in app code, never `request.t()`), `request.getLocaleCode()` (detect locale from headers/query), `getLocalized` (pick the right value from a localized-array column). Triggers: `groupedTranslations`, `t`, `request.t`, `request.trans`, `request.transFrom`, `request.getLocaleCode`, `request.setLocaleCode`, `getLocalized`; "add a translation key", "resolve a localized error message", "detect request locale", "pick the right per-locale column value"; typical import `import { t, getLocalized } from "@warlock.js/core"`. Skip: resource output — the `define-resource` topic; module scaffold — the `create-module` topic; competing libs `i18next`, `react-intl`, raw `@mongez/localization`.'
 ---
 
 # Warlock — translate keys + pick localized values
@@ -115,7 +115,7 @@ When an app uses `@warlock.js/web`, `warlock dev` writes `.warlock/typings/trans
 `useTrans()` now works correctly across hydration (5.15.0): the hydration
 payload ships a `translations` key with the active locale's keywords, and
 `@warlock.js/web` registers them into this same lookup table before the
-client hydrates — see `@warlock.js/web/write-the-root/SKILL.md`'s "`useTrans()`
+client hydrates — see the `write-the-root` topic of the `warlock-js-web` skill's "`useTrans()`
 survives hydration" section for the failure this fixed.
 
 ### Locale on a specific lookup
@@ -316,10 +316,10 @@ GET /products/42?locale=ar
 
 ## See also
 
-- [`send-response/SKILL.md`](../send-response/SKILL.md) — error helpers that pair with translated messages (`response.notFound({ error: t("...") })`).
-- [`define-resource/SKILL.md`](../define-resource/SKILL.md) — using `getLocalized` inside resource output for clean per-locale responses.
-- [`create-module/SKILL.md`](../create-module/SKILL.md) — the `utils/locales.json` file is part of the generated module scaffold.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — `utils/locales.json` is auto-loaded; the suffix is mandatory.
+- The `send-response` topic — error helpers that pair with translated messages (`response.notFound({ error: t("...") })`).
+- The `define-resource` topic — using `getLocalized` inside resource output for clean per-locale responses.
+- The `create-module` topic — the `utils/locales.json` file is part of the generated module scaffold.
+- The `warlock-conventions` topic — `utils/locales.json` is auto-loaded; the suffix is mandatory.
 
 ## Route-owned web translations (5.17)
 

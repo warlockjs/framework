@@ -1,6 +1,6 @@
 ---
 name: use-request-locals
-description: 'Carry typed, server-only data through one HTTP request with `request.locals`, usually written by middleware and read by downstream middleware or controllers. Augment `RequestLocals` in the module that owns each key; v5 no longer permits arbitrary `request.foo` properties. Triggers: `request.locals`, `RequestLocals`, `request.post`, `request.organization`, `Property does not exist on type Request`, `Request index signature`; "attach data to a request", "share middleware data with a controller", "type request locals", "migrate dynamic request properties"; typical type augmentation `declare module "@warlock.js/core" { interface RequestLocals { ... } }`. Skip: computed-on-demand single-flight values and removed `fromRequest` — `@warlock.js/core/request-memo/SKILL.md`; middleware mechanics — `@warlock.js/core/write-middleware/SKILL.md`; authenticated user typing — augment `RequestUser`, not `RequestLocals`; competing patterns: `(request as any).foo`, `request.set()`, module-global mutable state.'
+description: 'Carry typed, server-only data through one HTTP request with `request.locals`, usually written by middleware and read by downstream middleware or controllers. Augment `RequestLocals` in the module that owns each key; v5 no longer permits arbitrary `request.foo` properties. Triggers: `request.locals`, `RequestLocals`, `request.post`, `request.organization`, `Property does not exist on type Request`, `Request index signature`; "attach data to a request", "share middleware data with a controller", "type request locals", "migrate dynamic request properties"; typical type augmentation `declare module "@warlock.js/core" { interface RequestLocals { ... } }`. Skip: computed-on-demand single-flight values and removed `fromRequest` — the `request-memo` topic; middleware mechanics — the `write-middleware` topic; authenticated user typing — augment `RequestUser`, not `RequestLocals`; competing patterns: `(request as any).foo`, `request.set()`, module-global mutable state.'
 ---
 
 # Warlock — use typed request locals
@@ -162,6 +162,6 @@ Writing `request.locals.organization` does not affect `request.all()`, `request.
 
 ## See also
 
-- [`request-memo/SKILL.md`](../request-memo/SKILL.md) — the `fromRequest()` migration and single-flight request memoization.
-- [`write-middleware/SKILL.md`](../write-middleware/SKILL.md) — middleware execution and registration.
-- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — reading locals in downstream controllers.
+- The `request-memo` topic — the `fromRequest()` migration and single-flight request memoization.
+- The `write-middleware` topic — middleware execution and registration.
+- The `create-controller` topic — reading locals in downstream controllers.

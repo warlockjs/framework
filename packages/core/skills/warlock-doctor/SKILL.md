@@ -1,6 +1,6 @@
 ---
 name: warlock-doctor
-description: 'Run `warlock doctor` — a read-only diagnostics command that checks routes / config / connectors / optional-peers / health endpoints / release hygiene and prints a pass/warn/fail report, exiting non-zero on any failure. Add your own probe with the `DoctorCheck` contract and `runChecks` / `formatReportLines`. Triggers: `warlock doctor`, `doctorCommand`, `DoctorCheck`, `CheckResult`, `CheckStatus`, `DoctorReport`, `runChecks`, `formatReportLines`, `printReport`, `defaultDoctorChecks`; "diagnose my app", "preflight / preflight check", "is the app healthy", "why are there 0 routes", "pre-release sanity check", "CI smoke check"; run as `npx warlock doctor`. Skip: the live `/health` + `/ready` HTTP probes — `@warlock.js/core/health-checks/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; releasing the package — `releasing-warlock-monorepo`; competing tools `npm doctor`, `nest info`, hand-rolled preflight scripts.'
+description: 'Run `warlock doctor` — a read-only diagnostics command that checks routes / config / connectors / optional-peers / health endpoints / release hygiene and prints a pass/warn/fail report, exiting non-zero on any failure. Add your own probe with the `DoctorCheck` contract and `runChecks` / `formatReportLines`. Triggers: `warlock doctor`, `doctorCommand`, `DoctorCheck`, `CheckResult`, `CheckStatus`, `DoctorReport`, `runChecks`, `formatReportLines`, `printReport`, `defaultDoctorChecks`; "diagnose my app", "preflight / preflight check", "is the app healthy", "why are there 0 routes", "pre-release sanity check", "CI smoke check"; run as `npx warlock doctor`. Skip: the live `/health` + `/ready` HTTP probes — the `health-checks` topic; authoring a general CLI command — the `write-cli-command` topic; releasing the package — `releasing-warlock-monorepo`; competing tools `npm doctor`, `nest info`, hand-rolled preflight scripts.'
 ---
 
 # Warlock — `warlock doctor`
@@ -132,7 +132,7 @@ A `⚠ routes: 0 routes registered` line is the tell that a route module threw o
 
 ## See also
 
-- [`health-checks/SKILL.md`](../health-checks/SKILL.md) — the live `/health` + `/ready` HTTP probes and the `health` registry the `health` doctor check reports on.
-- [`write-cli-command/SKILL.md`](../write-cli-command/SKILL.md) — authoring a command + its `preload` plan, the shape `doctorCommand` is built from.
-- [`add-connector/SKILL.md`](../add-connector/SKILL.md) — connector registration, which the `connectors` check enumerates.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — project layout the checks assume.
+- The `health-checks` topic — the live `/health` + `/ready` HTTP probes and the `health` registry the `health` doctor check reports on.
+- The `write-cli-command` topic — authoring a command + its `preload` plan, the shape `doctorCommand` is built from.
+- The `add-connector` topic — connector registration, which the `connectors` check enumerates.
+- The `warlock-conventions` topic — project layout the checks assume.

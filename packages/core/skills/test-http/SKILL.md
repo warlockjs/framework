@@ -1,6 +1,6 @@
 ---
 name: test-http
-description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `stopHttpTestServer`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core/tests"`. Skip: pure unit tests — `@warlock.js/core/test-service/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing libs `supertest`, `light-my-request`, `nock`.'
+description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `stopHttpTestServer`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core/tests"`. Skip: pure unit tests — the `test-service` topic; controller shape — the `create-controller` topic; competing libs `supertest`, `light-my-request`, `nock`.'
 ---
 
 # Warlock — HTTP integration tests
@@ -350,7 +350,7 @@ This is fine for normal test flow. It bites when you're inside a transaction the
 
 ## See also
 
-- [`test-service/SKILL.md`](../test-service/SKILL.md) — pure unit tests against services/repositories/models (no HTTP).
-- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — the controller shape your HTTP tests are exercising.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — module layout, where `tests/*.test.ts` files live.
-- [`write-cli-command/SKILL.md`](../write-cli-command/SKILL.md) — `warlock add test` scaffolds both global + worker setup files.
+- The `test-service` topic — pure unit tests against services/repositories/models (no HTTP).
+- The `create-controller` topic — the controller shape your HTTP tests are exercising.
+- The `warlock-conventions` topic — module layout, where `tests/*.test.ts` files live.
+- The `write-cli-command` topic — `warlock add test` scaffolds both global + worker setup files.

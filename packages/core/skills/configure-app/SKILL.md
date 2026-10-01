@@ -1,6 +1,6 @@
 ---
 name: configure-app
-description: 'Configure a Warlock app — the two layers (`warlock.config.ts` for framework-level wiring, `src/config/*.ts` for subsystems), `.env` + `env()`, the `config()` getter for runtime reads, and `app.publicUrl`/`PUBLIC_APP_URL` (the app''s public origin). Triggers: `defineConfig`, `config.get`, `config.key`, `env`, `ConfigRegistry`, `HttpConfigurations`, `AppConfigurations`, `publicUrl`, `PUBLIC_APP_URL`, `getPublicUrl`; "add a new config file", "warlock.config.ts vs src/config", "read env values", "runtime config lookup", "app public origin/URL"; typical import `import { defineConfig, config, env } from "@warlock.js/core"`. Skip: cache driver registration — `@warlock.js/cache/cache-basics/SKILL.md`; mail config — `@warlock.js/core/send-mail/SKILL.md`; storage config — `@warlock.js/core/store-file/SKILL.md`; sitemap refusal on a missing origin — `@warlock.js/web/generate-sitemap/SKILL.md`; competing libs `dotenv` direct, `convict`, `node-config`.'
+description: 'Configure a Warlock app — the two layers (`warlock.config.ts` for framework-level wiring, `src/config/*.ts` for subsystems), `.env` + `env()`, the `config()` getter for runtime reads, and `app.publicUrl`/`PUBLIC_APP_URL` (the app''s public origin). Triggers: `defineConfig`, `config.get`, `config.key`, `env`, `ConfigRegistry`, `HttpConfigurations`, `AppConfigurations`, `publicUrl`, `PUBLIC_APP_URL`, `getPublicUrl`; "add a new config file", "warlock.config.ts vs src/config", "read env values", "runtime config lookup", "app public origin/URL"; typical import `import { defineConfig, config, env } from "@warlock.js/core"`. Skip: cache driver registration — the `cache-basics` topic of the `warlock-js-cache` skill; mail config — the `send-mail` topic; storage config — the `store-file` topic; sitemap refusal on a missing origin — the `generate-sitemap` topic of the `warlock-js-web` skill; competing libs `dotenv` direct, `convict`, `node-config`.'
 ---
 
 # Warlock — configure the app
@@ -91,7 +91,7 @@ for apps that don't opt in.
 A malformed directive value (containing `;`, or with an unbalanced `'`
 count) throws `InvalidCspDirectiveError` at boot, not silently — fix the
 value in `src/config/http.ts` rather than expecting the framework to repair
-it. See [`send-response/SKILL.md`](../send-response/SKILL.md) for how the
+it. See the `send-response` topic for how the
 header lands on the response, and `@warlock.js/web`'s docs for how the
 same nonce reaches the page's `<script>` tags.
 
@@ -272,7 +272,7 @@ requires the value. `@warlock.js/web`'s sitemap is the first such consumer:
 with `web.sitemap.enabled: true` and no `app.publicUrl`/`PUBLIC_APP_URL` set,
 generation refuses (`MissingPublicUrlError`, naming both) rather than falling
 back to a request-derived host — a sitemap pointing at the wrong host is
-worse than none. See `@warlock.js/web/generate-sitemap/SKILL.md`.
+worse than none. See the `generate-sitemap` topic of the `warlock-js-web` skill.
 
 ## Common patterns
 
@@ -302,7 +302,7 @@ Internal `@warlock.js/*` packages read from `config.get("<name>")` the same way 
 
 ## See also
 
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — module layout, canonical imports, framework-wide invariants.
-- [`@warlock.js/cache/pick-cache-driver/SKILL.md`](../../../cache/skills/pick-cache-driver/SKILL.md) — picking and registering a cache driver in `src/config/cache.ts`.
-- [`send-mail/SKILL.md`](../send-mail/SKILL.md) — the `src/config/mail.ts` shape.
-- [`store-file/SKILL.md`](../store-file/SKILL.md) — the `src/config/storage.ts` shape.
+- The `warlock-conventions` topic — module layout, canonical imports, framework-wide invariants.
+- The `pick-cache-driver` topic of the `warlock-js-cache` skill — picking and registering a cache driver in `src/config/cache.ts`.
+- The `send-mail` topic — the `src/config/mail.ts` shape.
+- The `store-file` topic — the `src/config/storage.ts` shape.

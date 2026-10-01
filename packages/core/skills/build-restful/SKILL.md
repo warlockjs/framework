@@ -1,6 +1,6 @@
 ---
 name: build-restful
-description: 'Generate standard CRUD endpoints — via `router.route(path).list().show().create().update().destroy()` chain or the `Restful` base class. Pick the chain by default; reach for `Restful` when you want repository-bound defaults. Triggers: `router.route`, `Restful`, `router.restfulResource`, `RouteResource`, `.crud`, `.nest`, `beforeCreate`, `onCreate`; "build a CRUD API", "register list/show/create/update/destroy", "repository-bound default handlers", "override a single REST action"; typical import `import { router, Restful } from "@warlock.js/core"`. Skip: wider router surface — `@warlock.js/core/register-route/SKILL.md`; per-action controllers — `@warlock.js/core/create-controller/SKILL.md`; wire mapping — `@warlock.js/core/define-resource/SKILL.md`; competing pattern: hand-rolled controllers, `@nestjs/swagger` decorator-driven CRUD.'
+description: 'Generate standard CRUD endpoints — via `router.route(path).list().show().create().update().destroy()` chain or the `Restful` base class. Pick the chain by default; reach for `Restful` when you want repository-bound defaults. Triggers: `router.route`, `Restful`, `router.restfulResource`, `RouteResource`, `.crud`, `.nest`, `beforeCreate`, `onCreate`; "build a CRUD API", "register list/show/create/update/destroy", "repository-bound default handlers", "override a single REST action"; typical import `import { router, Restful } from "@warlock.js/core"`. Skip: wider router surface — the `register-route` topic; per-action controllers — the `create-controller` topic; wire mapping — the `define-resource` topic; competing pattern: hand-rolled controllers, `@nestjs/swagger` decorator-driven CRUD.'
 ---
 
 # Warlock — build a RESTful resource
@@ -262,7 +262,7 @@ router.restfulResource("/orders", new OrdersRestful());
 
 ## See also
 
-- [`register-route/SKILL.md`](../register-route/SKILL.md) — the wider router surface (`group`, `prefix`, plain verbs).
-- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — what the chain's handlers look like.
-- [`define-resource/SKILL.md`](../define-resource/SKILL.md) — wire shape for the records the chain returns.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — controller/service/repository layering rules.
+- The `register-route` topic — the wider router surface (`group`, `prefix`, plain verbs).
+- The `create-controller` topic — what the chain's handlers look like.
+- The `define-resource` topic — wire shape for the records the chain returns.
+- The `warlock-conventions` topic — controller/service/repository layering rules.

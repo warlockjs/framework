@@ -1,6 +1,6 @@
 ---
 name: use-middleware
-description: 'Attach built-in HTTP middleware to routes via the `middleware` namespace from `@warlock.js/core` — rateLimit, concurrencyLimit, maxBodySize, idempotency, maintenance, ipFilter, cache. Plus `X-Request-Id` correlation, wired automatically. Triggers: `middleware.rateLimit`, `middleware.concurrencyLimit`, `middleware.maxBodySize`, `middleware.idempotency`, `middleware.maintenance`, `middleware.ipFilter`, `middleware.cache`, `X-Request-Id`, `Idempotency-Key`; "add rate limiting", "dedupe writes by idempotency key", "cap concurrent requests", "block IPs", "cache a GET response"; typical import `import { middleware } from "@warlock.js/core"`. Skip: author custom middleware — `@warlock.js/core/write-middleware/SKILL.md`; cache singleton — `@warlock.js/cache/cache-basics/SKILL.md`; competing libs `@fastify/rate-limit` direct, `express-rate-limit`, `helmet`.'
+description: 'Attach built-in HTTP middleware to routes via the `middleware` namespace from `@warlock.js/core` — rateLimit, concurrencyLimit, maxBodySize, idempotency, maintenance, ipFilter, cache. Plus `X-Request-Id` correlation, wired automatically. Triggers: `middleware.rateLimit`, `middleware.concurrencyLimit`, `middleware.maxBodySize`, `middleware.idempotency`, `middleware.maintenance`, `middleware.ipFilter`, `middleware.cache`, `X-Request-Id`, `Idempotency-Key`; "add rate limiting", "dedupe writes by idempotency key", "cap concurrent requests", "block IPs", "cache a GET response"; typical import `import { middleware } from "@warlock.js/core"`. Skip: author custom middleware — the `write-middleware` topic; cache singleton — the `cache-basics` topic of the `warlock-js-cache` skill; competing libs `@fastify/rate-limit` direct, `express-rate-limit`, `helmet`.'
 ---
 
 # Warlock — use built-in middleware
@@ -16,7 +16,7 @@ middleware.maxBodySize("2mb");
 // ... etc
 ```
 
-For authoring your OWN middleware (custom guards, enrichment, etc.), see [`write-middleware`](../write-middleware/SKILL.md).
+For authoring your OWN middleware (custom guards, enrichment, etc.), see the `write-middleware` topic.
 
 ## The catalog
 
@@ -268,7 +268,7 @@ export default {
 
 ## See also
 
-- [`write-middleware/SKILL.md`](../write-middleware/SKILL.md) — author your OWN middleware (custom guards, enrichment).
-- [`register-route/SKILL.md`](../register-route/SKILL.md) — where middleware attaches: `router.group` and route-options.
-- [`send-response/SKILL.md`](../send-response/SKILL.md) — the response helpers used to short-circuit (`tooManyRequests`, `contentTooLarge`, `serviceUnavailable`, etc.).
-- [`@warlock.js/cache/cache-basics/SKILL.md`](../../../cache/skills/cache-basics/SKILL.md) — the cache singleton (`@warlock.js/cache`) that backs `middleware.idempotency` and `middleware.cache`.
+- The `write-middleware` topic — author your OWN middleware (custom guards, enrichment).
+- The `register-route` topic — where middleware attaches: `router.group` and route-options.
+- The `send-response` topic — the response helpers used to short-circuit (`tooManyRequests`, `contentTooLarge`, `serviceUnavailable`, etc.).
+- The `cache-basics` topic of the `warlock-js-cache` skill — the cache singleton (`@warlock.js/cache`) that backs `middleware.idempotency` and `middleware.cache`.

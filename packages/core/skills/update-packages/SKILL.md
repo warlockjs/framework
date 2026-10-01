@@ -1,6 +1,6 @@
 ---
 name: update-packages
-description: 'Keep a project current with `warlock update` — bump every `@warlock.js/*` dependency in package.json to its latest published version (range operator preserved), then run the lockfile-detected package manager install. Also covers the `warlock dev` update notice, its `u` update-and-restart keyboard shortcut, and the `devServer.checkForUpdates` toggle. Triggers: `warlock update`, `--no-install`, `--dry-run`, `--check`, `checkForUpdates`, `fetchLatestVersion`, `isNewerVersion`; "update warlock packages", "upgrade the framework", "is there a new warlock version", "update notice in the dev server", "press u to update", "dev server keyboard shortcut", "update check offline", "bump @warlock.js/* to latest"; typical CLI `warlock update`. Skip: dev/build/start runtime — `@warlock.js/core/run-app/SKILL.md`; writing a custom command — `@warlock.js/core/write-cli-command/SKILL.md`; installing a NEW feature package (auth, mail, storage) — that is `warlock add`; releasing/publishing the framework — workspace release tooling, not this command.'
+description: 'Keep a project current with `warlock update` — bump every `@warlock.js/*` dependency in package.json to its latest published version (range operator preserved), then run the lockfile-detected package manager install. Also covers the `warlock dev` update notice, its `u` update-and-restart keyboard shortcut, and the `devServer.checkForUpdates` toggle. Triggers: `warlock update`, `--no-install`, `--dry-run`, `--check`, `checkForUpdates`, `fetchLatestVersion`, `isNewerVersion`; "update warlock packages", "upgrade the framework", "is there a new warlock version", "update notice in the dev server", "press u to update", "dev server keyboard shortcut", "update check offline", "bump @warlock.js/* to latest"; typical CLI `warlock update`. Skip: dev/build/start runtime — the `run-app` topic; writing a custom command — the `write-cli-command` topic; installing a NEW feature package (auth, mail, storage) — that is `warlock add`; releasing/publishing the framework — workspace release tooling, not this command.'
 ---
 
 # Warlock — update the framework
@@ -79,7 +79,7 @@ Pressing `u` on that notice runs the whole upgrade without leaving the dev serve
 
 1. The shortcut is disarmed and the terminal handed back, so the package manager owns stdin.
 2. Every `@warlock.js/*` dependency is rewritten to latest and installed — exactly what `warlock update` does.
-3. The worker shuts down (freeing the http port) and exits `75`; the `warlock dev` supervisor spawns a replacement on the new version. See [`run-app/SKILL.md`](../run-app/SKILL.md) for the supervisor.
+3. The worker shuts down (freeing the http port) and exits `75`; the `warlock dev` supervisor spawns a replacement on the new version. See the `run-app` topic for the supervisor.
 
 What happens when it doesn't go to plan:
 
@@ -91,7 +91,7 @@ What happens when it doesn't go to plan:
 
 The shortcut is only offered when stdin is an interactive TTY. When it isn't (CI, piped stdin, a process supervisor), the notice falls back to the `Run npx warlock update` line instead — it never silently does nothing.
 
-`u` joins the dev server's standing shortcut bar (`r` restart, `c` clear, `q` quit, `h` help) — press `h` to list whatever is armed. See [`run-app/SKILL.md`](../run-app/SKILL.md) for the bar and the raw-mode / `Ctrl+C` contract.
+`u` joins the dev server's standing shortcut bar (`r` restart, `c` clear, `q` quit, `h` help) — press `h` to list whatever is armed. See the `run-app` topic for the bar and the raw-mode / `Ctrl+C` contract.
 
 It is automatically skipped when:
 
@@ -128,6 +128,6 @@ Two small zero-dependency utilities back the tooling and are exported from `@war
 
 ## See also
 
-- [`run-app/SKILL.md`](../run-app/SKILL.md) — `warlock dev` / `build` / `start` and the `devServer.*` config knobs.
-- [`write-cli-command/SKILL.md`](../write-cli-command/SKILL.md) — author your own `warlock <cmd>`.
-- [`configure-app/SKILL.md`](../configure-app/SKILL.md) — `warlock.config.ts` shape and `defineConfig`.
+- The `run-app` topic — `warlock dev` / `build` / `start` and the `devServer.*` config knobs.
+- The `write-cli-command` topic — author your own `warlock <cmd>`.
+- The `configure-app` topic — `warlock.config.ts` shape and `defineConfig`.

@@ -1,6 +1,6 @@
 ---
 name: use-repository
-description: 'Subclass `RepositoryManager` for data access — declare `source`, `filterBy`, `defaultOptions`, then call `list()`/`listCached()`/`find()`/`create()`/`update()`/`delete()`, the active/cached/cursor variants, and the `filterBy`-aware aggregates `sum()`/`avg()`/`min()`/`max()`/`groupBy()`/`aggregate()`. Triggers: `RepositoryManager`, `FilterRules`, `RepositoryOptions`, `.list`, `.listCached`, `.find`, `.findCached`, `.create`, `.update`, `.delete`, `.sum`, `.avg`, `.min`, `.max`, `.groupBy`, `.aggregate`, `simpleSelectColumns`; "create a repository", "filter rules for a list endpoint", "cursor vs page pagination", "cached vs uncached read", "sum/avg/group-by with filters"; typical import `import { RepositoryManager } from "@warlock.js/core"`. Skip: cache singleton — `@warlock.js/cache/cache-basics/SKILL.md`; use-case pipelines — `@warlock.js/core/write-use-case/SKILL.md`; wire mapping — `@warlock.js/core/define-resource/SKILL.md`; competing libs `typeorm` Repository, `prisma.client.<model>`, `@nestjs/typeorm`.'
+description: 'Subclass `RepositoryManager` for data access — declare `source`, `filterBy`, `defaultOptions`, then call `list()`/`listCached()`/`find()`/`create()`/`update()`/`delete()`, the active/cached/cursor variants, and the `filterBy`-aware aggregates `sum()`/`avg()`/`min()`/`max()`/`groupBy()`/`aggregate()`. Triggers: `RepositoryManager`, `FilterRules`, `RepositoryOptions`, `.list`, `.listCached`, `.find`, `.findCached`, `.create`, `.update`, `.delete`, `.sum`, `.avg`, `.min`, `.max`, `.groupBy`, `.aggregate`, `simpleSelectColumns`; "create a repository", "filter rules for a list endpoint", "cursor vs page pagination", "cached vs uncached read", "sum/avg/group-by with filters"; typical import `import { RepositoryManager } from "@warlock.js/core"`. Skip: cache singleton — the `cache-basics` topic of the `warlock-js-cache` skill; use-case pipelines — the `write-use-case` topic; wire mapping — the `define-resource` topic; competing libs `typeorm` Repository, `prisma.client.<model>`, `@nestjs/typeorm`.'
 ---
 
 # Warlock — use a repository
@@ -422,9 +422,9 @@ The third arg is a context object — `{ allValues, dateFormat, ... }` — for f
 
 ## See also
 
-- [`create-module/SKILL.md`](../create-module/SKILL.md) — `warlock generate.repository` and where the file lives.
-- [`@warlock.js/cache/cache-basics/SKILL.md`](../../../cache/skills/cache-basics/SKILL.md) — the cache singleton behind `listCached` / `getCached`. See sibling skills (`pick-cache-driver`, `use-swr`) for related tasks.
-- [`write-use-case/SKILL.md`](../write-use-case/SKILL.md) — calling repositories from a use-case handler.
-- [`define-resource/SKILL.md`](../define-resource/SKILL.md) — mapping repository output to the wire format.
-- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — services that consume repositories from the controller edge.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — controller → service → repository → model layering.
+- The `create-module` topic — `warlock generate.repository` and where the file lives.
+- The `cache-basics` topic of the `warlock-js-cache` skill — the cache singleton behind `listCached` / `getCached`. See sibling skills (`pick-cache-driver`, `use-swr`) for related tasks.
+- The `write-use-case` topic — calling repositories from a use-case handler.
+- The `define-resource` topic — mapping repository output to the wire format.
+- The `create-controller` topic — services that consume repositories from the controller edge.
+- The `warlock-conventions` topic — controller → service → repository → model layering.

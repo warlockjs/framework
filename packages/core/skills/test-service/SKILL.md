@@ -1,6 +1,6 @@
 ---
 name: test-service
-description: 'Pure unit tests against services, repositories, models, and use-cases — `setupTest({ connectors })` bootstraps the framework with its own DB/cache connections so you can call your code directly, and `teardownTest()` closes it. Triggers: `setupTest`, `teardownTest`, `src/test-setup.ts`, `tests.connectors`, `tests.setupTimeout`, `Application.setEnvironment`; "unit-test a service", "test a repository query", "vitest setupFiles", "skip connectors for pure-logic tests"; typical import `import { setupTest, teardownTest } from "@warlock.js/core/tests"`. Skip: HTTP integration — `@warlock.js/core/test-http/SKILL.md`; warlock add test scaffold — `@warlock.js/core/write-cli-command/SKILL.md`; competing tooling: jest direct, `supertest`, `nock`.'
+description: 'Pure unit tests against services, repositories, models, and use-cases — `setupTest({ connectors })` bootstraps the framework with its own DB/cache connections so you can call your code directly, and `teardownTest()` closes it. Triggers: `setupTest`, `teardownTest`, `src/test-setup.ts`, `tests.connectors`, `tests.setupTimeout`, `Application.setEnvironment`; "unit-test a service", "test a repository query", "vitest setupFiles", "skip connectors for pure-logic tests"; typical import `import { setupTest, teardownTest } from "@warlock.js/core/tests"`. Skip: HTTP integration — the `test-http` topic; warlock add test scaffold — the `write-cli-command` topic; competing tooling: jest direct, `supertest`, `nock`.'
 ---
 
 # Warlock — test a service
@@ -151,7 +151,7 @@ export default defineConfig({
 });
 ```
 
-The `mongezVite()` plugin handles TypeScript path resolution and the framework's module shape. Without it, your imports break the moment vitest tries to load a Warlock module. `lowerStage3Decorators()` goes **first** — it lets decorated Cascade models (`@RegisterModel`, …) load under Vitest 4 / Vite 8; see [`@warlock.js/core/lower-stage3-decorators/SKILL.md`](@warlock.js/core/lower-stage3-decorators/SKILL.md).
+The `mongezVite()` plugin handles TypeScript path resolution and the framework's module shape. Without it, your imports break the moment vitest tries to load a Warlock module. `lowerStage3Decorators()` goes **first** — it lets decorated Cascade models (`@RegisterModel`, …) load under Vitest 4 / Vite 8; see the `lower-stage3-decorators` topic.
 
 ### Keep Vitest setup out of development
 
@@ -391,9 +391,9 @@ In both cases the guard's scope matches the resource's scope, which is the point
 
 ## See also
 
-- [`test-http/SKILL.md`](../test-http/SKILL.md) — integration tests via the real HTTP server (`startHttpTestServer` + `testGet` / `testPost` / `expectJson`).
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — where tests live in a module (`tests/*.test.ts`).
-- [`write-cli-command/SKILL.md`](../write-cli-command/SKILL.md) — `warlock add test` for the initial scaffold.
+- The `test-http` topic — integration tests via the real HTTP server (`startHttpTestServer` + `testGet` / `testPost` / `expectJson`).
+- The `warlock-conventions` topic — where tests live in a module (`tests/*.test.ts`).
+- The `write-cli-command` topic — `warlock add test` for the initial scaffold.
 
 ## App modules and `importModule`
 

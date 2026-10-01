@@ -1,6 +1,6 @@
 ---
 name: write-cli-command
-description: 'Author a custom `warlock <my-cmd>` command via the `command()` factory — name, description, action, options, preload, then register in `warlock.config.ts > cli.commands` or drop in `src/app/<module>/commands/`. Also covers built-in `warlock add` feature scaffolding, including the Web starter and `index.register.ts`. Triggers: `command`, `CLICommand`, `CLICommandPreload`, `CLICommandOption`, `preload`, `preAction`, `persistent`, `colors`, `warlock add`, `warlock add bull-board`, `index.register.ts`; "write a custom warlock command", "one-off maintenance task", "ship a CLI from a package", "framework built-in commands"; typical import `import { command } from "@warlock.js/core"`. Skip: framework dev/build/start — `@warlock.js/core/run-app/SKILL.md`; warlock.config.ts wiring — `@warlock.js/core/configure-app/SKILL.md`; competing libs `commander`, `yargs`, `oclif`.'
+description: 'Author a custom `warlock <my-cmd>` command via the `command()` factory — name, description, action, options, preload, then register in `warlock.config.ts > cli.commands` or drop in `src/app/<module>/commands/`. Also covers built-in `warlock add` feature scaffolding, including the Web starter and `index.register.ts`. Triggers: `command`, `CLICommand`, `CLICommandPreload`, `CLICommandOption`, `preload`, `preAction`, `persistent`, `colors`, `warlock add`, `warlock add bull-board`, `index.register.ts`; "write a custom warlock command", "one-off maintenance task", "ship a CLI from a package", "framework built-in commands"; typical import `import { command } from "@warlock.js/core"`. Skip: framework dev/build/start — the `run-app` topic; warlock.config.ts wiring — the `configure-app` topic; competing libs `commander`, `yargs`, `oclif`.'
 ---
 
 # Warlock — write a CLI command
@@ -150,7 +150,7 @@ console.log(colors.green("✓") + " user promoted");
 
 The framework ships a fixed set of commands you call but don't author. Knowing their flags up front saves a `--help` round-trip.
 
-> For `warlock dev` / `warlock build` / `warlock start` — see [`run-app/SKILL.md`](../run-app/SKILL.md). Everything below covers the rest.
+> For `warlock dev` / `warlock build` / `warlock start` — see the `run-app` topic. Everything below covers the rest.
 
 ### Database + migrations
 
@@ -196,7 +196,7 @@ warlock generate.typings
 warlock generate                         (alias: g)      — interactive picker
 ```
 
-`<m>/<n>` is `<module>/<name>` (e.g. `products/create-product`). See [`create-module/SKILL.md`](../create-module/SKILL.md) for the full scaffolding flow.
+`<m>/<n>` is `<module>/<name>` (e.g. `products/create-product`). See the `create-module` topic for the full scaffolding flow.
 
 ### Feature installation
 
@@ -311,6 +311,6 @@ export default command({
 
 ## See also
 
-- [`run-app/SKILL.md`](../run-app/SKILL.md) — the operational commands (`dev` / `build` / `start`) with all flags and config knobs.
-- [`configure-app/SKILL.md`](../configure-app/SKILL.md) — wiring `defineConfig` and `warlock.config.ts`.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — module layout, canonical imports.
+- The `run-app` topic — the operational commands (`dev` / `build` / `start`) with all flags and config knobs.
+- The `configure-app` topic — wiring `defineConfig` and `warlock.config.ts`.
+- The `warlock-conventions` topic — module layout, canonical imports.

@@ -1,6 +1,6 @@
 ---
 name: use-model-transformers
-description: 'Three schema-side helpers — `useHashedPassword()` (bcrypt on save) attaches via `.addTransformer(...)`; `useComputedSlug(field?, scope?)` (auto-slug from another field) and `useComputedModel(callback)` (arbitrary computed-on-save value) attach via `v.computed(...)`. Triggers: `useHashedPassword`, `useComputedSlug`, `useComputedModel`, `.addTransformer`, `v.computed`, `ComputedCallback`; "auto-hash a password field", "auto-slug from title on save", "derive a value at write time", "declarative model transformers"; typical import `import { useHashedPassword, useComputedSlug } from "@warlock.js/core"`. Skip: bcrypt setup details — `@warlock.js/core/hash-password/SKILL.md`; repository writes — `@warlock.js/core/use-repository/SKILL.md`; output filtering — `@warlock.js/core/define-resource/SKILL.md`; competing patterns: manual `await hashPassword(input)` in services, ORM lifecycle hooks.'
+description: 'Three schema-side helpers — `useHashedPassword()` (bcrypt on save) attaches via `.addTransformer(...)`; `useComputedSlug(field?, scope?)` (auto-slug from another field) and `useComputedModel(callback)` (arbitrary computed-on-save value) attach via `v.computed(...)`. Triggers: `useHashedPassword`, `useComputedSlug`, `useComputedModel`, `.addTransformer`, `v.computed`, `ComputedCallback`; "auto-hash a password field", "auto-slug from title on save", "derive a value at write time", "declarative model transformers"; typical import `import { useHashedPassword, useComputedSlug } from "@warlock.js/core"`. Skip: bcrypt setup details — the `hash-password` topic; repository writes — the `use-repository` topic; output filtering — the `define-resource` topic; competing patterns: manual `await hashPassword(input)` in services, ORM lifecycle hooks.'
 ---
 
 # Warlock — declare model transformers
@@ -60,7 +60,7 @@ What it does at save time:
 | Existing row, password unchanged | Pass through (no re-hashing — stored hash preserved). |
 | Empty / undefined value         | Pass through untouched.                     |
 
-Calls `authService.hashPassword(String(value))` under the hood — same bcryptjs path as the standalone `hashPassword()` helper. See [`hash-password/SKILL.md`](../hash-password/SKILL.md) for full bcrypt setup (salt rounds, `npm install bcryptjs`).
+Calls `authService.hashPassword(String(value))` under the hood — same bcryptjs path as the standalone `hashPassword()` helper. See the `hash-password` topic for full bcrypt setup (salt rounds, `npm install bcryptjs`).
 
 ### Why declarative wins
 
@@ -214,7 +214,7 @@ Rule of thumb: transformers are for **pure, deterministic** transforms of the ro
 
 ## See also
 
-- [`hash-password/SKILL.md`](../hash-password/SKILL.md) — the bcrypt setup that `useHashedPassword` calls under the hood; salt rounds, `npm install bcryptjs`.
-- [`use-repository/SKILL.md`](../use-repository/SKILL.md) — where `create` / `save` calls happen that trigger the transformers.
-- [`define-resource/SKILL.md`](../define-resource/SKILL.md) — filtering transformed fields (`password`) out of API responses.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — schema files live in `src/app/<module>/models/<entity>/<entity>.model.ts`.
+- The `hash-password` topic — the bcrypt setup that `useHashedPassword` calls under the hood; salt rounds, `npm install bcryptjs`.
+- The `use-repository` topic — where `create` / `save` calls happen that trigger the transformers.
+- The `define-resource` topic — filtering transformed fields (`password`) out of API responses.
+- The `warlock-conventions` topic — schema files live in `src/app/<module>/models/<entity>/<entity>.model.ts`.

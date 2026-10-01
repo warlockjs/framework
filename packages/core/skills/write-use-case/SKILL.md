@@ -1,6 +1,6 @@
 ---
 name: write-use-case
-description: 'Author `useCase()` pipelines for business logic — guards, schema, before/after middleware, retry, benchmark, broadcast, lifecycle callbacks; transport-agnostic and observable by default. Input is inferred from the `schema`. Triggers: `useCase`, `UseCaseContext`, `UseCaseResult`, `retry`, `benchmark`, `broadcast`, `description`, `globalUseCasesEvents`, `UseCaseBroadcastChannel`; "encapsulate a business operation", "share logic between HTTP and CLI", "add guards and lifecycle hooks", "broadcast a use case result", "transport-agnostic pipeline"; typical import `import { useCase } from "@warlock.js/core"`. Skip: thin handler shape — `@warlock.js/core/create-controller/SKILL.md`; schema details — `@warlock.js/core/validate-input/SKILL.md`; the standalone retry util — `@warlock.js/core/retry-operation/SKILL.md`; competing libs `@nestjs/cqrs`, `inversify`, hand-rolled service classes.'
+description: 'Author `useCase()` pipelines for business logic — guards, schema, before/after middleware, retry, benchmark, broadcast, lifecycle callbacks; transport-agnostic and observable by default. Input is inferred from the `schema`. Triggers: `useCase`, `UseCaseContext`, `UseCaseResult`, `retry`, `benchmark`, `broadcast`, `description`, `globalUseCasesEvents`, `UseCaseBroadcastChannel`; "encapsulate a business operation", "share logic between HTTP and CLI", "add guards and lifecycle hooks", "broadcast a use case result", "transport-agnostic pipeline"; typical import `import { useCase } from "@warlock.js/core"`. Skip: thin handler shape — the `create-controller` topic; schema details — the `validate-input` topic; the standalone retry util — the `retry-operation` topic; competing libs `@nestjs/cqrs`, `inversify`, hand-rolled service classes.'
 ---
 
 # Warlock — write a use case
@@ -290,6 +290,6 @@ For the plain-function flavour (`warlock generate.use-case <module>/<verb-noun>`
 
 ## See also
 
-- [`@warlock.js/core/create-controller/SKILL.md`](@warlock.js/core/create-controller/SKILL.md) — the usual next step: invoke this use case from an HTTP controller.
-- [`@warlock.js/herald/publish-message/SKILL.md`](@warlock.js/herald/publish-message/SKILL.md) — the message bus the `broadcast` adapter publishes to (cross-package).
+- The `create-controller` topic — the usual next step: invoke this use case from an HTTP controller.
+- The `publish-message` topic of the `warlock-js-herald` skill — the message bus the `broadcast` adapter publishes to (cross-package).
 

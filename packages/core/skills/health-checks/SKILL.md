@@ -1,6 +1,6 @@
 ---
 name: health-checks
-description: 'Built-in liveness (`/health`) and readiness (`/ready`) endpoints plus graceful HTTP request draining for zero-downtime deploys — the `health` registry (`health.addCheck`/`removeCheck`), the `http.health.*` and `http.gracefulShutdown.*` config, and how readiness ties into `Application.isShuttingDown`. Triggers: `health`, `health.addCheck`, `health.removeCheck`, `HealthCheck`, `/health`, `/ready`, `http.health`, `http.gracefulShutdown`, `forceCloseConnections`, "liveness probe", "readiness probe", "graceful shutdown", "drain in-flight requests", "zero-downtime deploy", "kubernetes health check", "503 until ready"; typical import `import { health } from "@warlock.js/core"`. Skip: the `Application.onShutdown` / `onceBooted` lifecycle hooks — `@warlock.js/core/use-app-context/SKILL.md`; maintenance-mode 503s — `@warlock.js/core/use-middleware/SKILL.md`; connector lifecycle — `@warlock.js/core/add-connector/SKILL.md`; competing libs `@fastify/under-pressure`, `terminus`, hand-rolled `/health` controllers.'
+description: 'Built-in liveness (`/health`) and readiness (`/ready`) endpoints plus graceful HTTP request draining for zero-downtime deploys — the `health` registry (`health.addCheck`/`removeCheck`), the `http.health.*` and `http.gracefulShutdown.*` config, and how readiness ties into `Application.isShuttingDown`. Triggers: `health`, `health.addCheck`, `health.removeCheck`, `HealthCheck`, `/health`, `/ready`, `http.health`, `http.gracefulShutdown`, `forceCloseConnections`, "liveness probe", "readiness probe", "graceful shutdown", "drain in-flight requests", "zero-downtime deploy", "kubernetes health check", "503 until ready"; typical import `import { health } from "@warlock.js/core"`. Skip: the `Application.onShutdown` / `onceBooted` lifecycle hooks — the `use-app-context` topic; maintenance-mode 503s — the `use-middleware` topic; connector lifecycle — the `add-connector` topic; competing libs `@fastify/under-pressure`, `terminus`, hand-rolled `/health` controllers.'
 ---
 
 # Warlock — health checks & graceful shutdown
@@ -109,11 +109,11 @@ For an even smoother handoff, give the load balancer time to observe the 503 bef
 - **`/health` is registered straight on Fastify, not the app router.** It's infra, so it's immune to HMR and route scanning — but if your app also defines a `/health` route you'll have a collision. Rename via `http.health.path`.
 - **Readiness needs a finished boot.** Before `Application.isBooted` (e.g. while late-phase connectors are still starting) `/ready` is 503 by design — that's the point.
 - **A hanging `onShutdown` hook delays the drain.** App hooks run before connector teardown and are only bounded by your process manager's kill timeout; keep them fast. The HTTP drain itself is bounded by `gracefulShutdown.timeout`.
-- **The `maintenance` middleware is a different 503.** It allowlists `/health` by default so probes pass during maintenance — but maintenance mode is operator-toggled downtime, not readiness. See `@warlock.js/core/use-middleware/SKILL.md`.
+- **The `maintenance` middleware is a different 503.** It allowlists `/health` by default so probes pass during maintenance — but maintenance mode is operator-toggled downtime, not readiness. See the `use-middleware` topic.
 
 ## See also
 
-- [`use-app-context/SKILL.md`](../use-app-context/SKILL.md) — `Application.onShutdown` / `onceBooted` / `isShuttingDown`, the lifecycle hooks the endpoints build on.
-- [`configure-app/SKILL.md`](../configure-app/SKILL.md) — the `src/config/http.ts` shape.
-- [`add-connector/SKILL.md`](../add-connector/SKILL.md) — connector boot/shutdown order, where draining slots in.
-- [`use-middleware/SKILL.md`](../use-middleware/SKILL.md) — maintenance mode and other built-in middleware.
+- The `use-app-context` topic — `Application.onShutdown` / `onceBooted` / `isShuttingDown`, the lifecycle hooks the endpoints build on.
+- The `configure-app` topic — the `src/config/http.ts` shape.
+- The `add-connector` topic — connector boot/shutdown order, where draining slots in.
+- The `use-middleware` topic — maintenance mode and other built-in middleware.

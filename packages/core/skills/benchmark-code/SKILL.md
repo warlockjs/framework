@@ -1,6 +1,6 @@
 ---
 name: benchmark-code
-description: 'Wrap a function with `measure(name, fn, options?)` to time it and classify the latency — onComplete/onError/onFinish hooks, `latencyRange` thresholds, `BenchmarkProfiler` for percentiles, `BenchmarkSnapshots` for raw captures. Triggers: `measure`, `BenchmarkProfiler`, `BenchmarkSnapshots`, `BenchmarkChannel`, `ConsoleChannel`, `latencyRange`, `shouldBenchmarkError`; "time this operation", "profile a slow service", "emit p50/p95/p99 metrics", "classify latency against thresholds"; typical import `import { measure, BenchmarkProfiler } from "@warlock.js/core"`. Skip: retry composition — `@warlock.js/core/retry-operation/SKILL.md`; benchmark config wiring — `@warlock.js/core/configure-app/SKILL.md`; competing libs `prom-client`, `pino`, `perf_hooks`, `console.time`.'
+description: 'Wrap a function with `measure(name, fn, options?)` to time it and classify the latency — onComplete/onError/onFinish hooks, `latencyRange` thresholds, `BenchmarkProfiler` for percentiles, `BenchmarkSnapshots` for raw captures. Triggers: `measure`, `BenchmarkProfiler`, `BenchmarkSnapshots`, `BenchmarkChannel`, `ConsoleChannel`, `latencyRange`, `shouldBenchmarkError`; "time this operation", "profile a slow service", "emit p50/p95/p99 metrics", "classify latency against thresholds"; typical import `import { measure, BenchmarkProfiler } from "@warlock.js/core"`. Skip: retry composition — the `retry-operation` topic; benchmark config wiring — the `configure-app` topic; competing libs `prom-client`, `pino`, `perf_hooks`, `console.time`.'
 ---
 
 # Warlock — benchmark code
@@ -252,5 +252,5 @@ The `latency` is the *total* time including retries — useful for the SLO you a
 
 ## See also
 
-- [`retry-operation/SKILL.md`](../retry-operation/SKILL.md) — wrapping flaky operations with retry; composes inside `measure()`.
-- [`configure-app/SKILL.md`](../configure-app/SKILL.md) — wiring `src/config/benchmark.ts`.
+- The `retry-operation` topic — wrapping flaky operations with retry; composes inside `measure()`.
+- The `configure-app` topic — wiring `src/config/benchmark.ts`.

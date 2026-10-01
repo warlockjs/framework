@@ -1,6 +1,6 @@
 ---
 name: resolve-path
-description: 'Path helpers anchored at `process.cwd()` — `rootPath`, `srcPath`, `appPath`, `configPath`, `publicPath`, `storagePath`, `uploadsPath`, `cachePath`, `logsPath`, `tempPath`, `warlockPath`, `sanitizePath`. Optional `uploads.root` config overrides the uploads anchor. Triggers: `appPath`, `configPath`, `uploadsPath`, `storagePath`, `publicPath`, `cachePath`, `logsPath`, `tempPath`, `sanitizePath`, `paths`; "resolve a path inside src/app", "absolute upload destination", "sanitize a user filename", "ship uploads to a mounted volume"; typical import `import { appPath, uploadsPath } from "@warlock.js/core"`. Skip: HTTP URL helpers — `@warlock.js/core/build-url/SKILL.md`; app metadata — `@warlock.js/core/use-app-context/SKILL.md`; storage abstraction — `@warlock.js/core/store-file/SKILL.md`; competing patterns: `path.join(process.cwd(), ...)`, hand-rolled directory constants.'
+description: 'Path helpers anchored at `process.cwd()` — `rootPath`, `srcPath`, `appPath`, `configPath`, `publicPath`, `storagePath`, `uploadsPath`, `cachePath`, `logsPath`, `tempPath`, `warlockPath`, `sanitizePath`. Optional `uploads.root` config overrides the uploads anchor. Triggers: `appPath`, `configPath`, `uploadsPath`, `storagePath`, `publicPath`, `cachePath`, `logsPath`, `tempPath`, `sanitizePath`, `paths`; "resolve a path inside src/app", "absolute upload destination", "sanitize a user filename", "ship uploads to a mounted volume"; typical import `import { appPath, uploadsPath } from "@warlock.js/core"`. Skip: HTTP URL helpers — the `build-url` topic; app metadata — the `use-app-context` topic; storage abstraction — the `store-file` topic; competing patterns: `path.join(process.cwd(), ...)`, hand-rolled directory constants.'
 ---
 
 # Warlock — resolve a path
@@ -163,8 +163,8 @@ If you find yourself reaching for `path.join(process.cwd(), ...)` — that's a s
 
 ## See also
 
-- [`build-url/SKILL.md`](../build-url/SKILL.md) — HTTP URL helpers (`url`, `uploadsUrl`, `publicUrl`, `assetsUrl`) — companion for rendering URLs (not filesystem paths).
-- [`use-app-context/SKILL.md`](../use-app-context/SKILL.md) — `Application` static (env, runtime strategy, version, uptime) + `app` runtime accessor (Fastify, socket.io, router, database).
-- [`configure-app/SKILL.md`](../configure-app/SKILL.md) — `src/config/uploads.ts` for the `root` override.
-- [`store-file/SKILL.md`](../store-file/SKILL.md) — the storage abstraction (most uploads code goes through `storage.put(...)`, not raw paths).
-- [`upload-file/SKILL.md`](../upload-file/SKILL.md) — the `UploadedFile` shape that pairs with `uploadsPath`.
+- The `build-url` topic — HTTP URL helpers (`url`, `uploadsUrl`, `publicUrl`, `assetsUrl`) — companion for rendering URLs (not filesystem paths).
+- The `use-app-context` topic — `Application` static (env, runtime strategy, version, uptime) + `app` runtime accessor (Fastify, socket.io, router, database).
+- The `configure-app` topic — `src/config/uploads.ts` for the `root` override.
+- The `store-file` topic — the storage abstraction (most uploads code goes through `storage.put(...)`, not raw paths).
+- The `upload-file` topic — the `UploadedFile` shape that pairs with `uploadsPath`.

@@ -1,6 +1,6 @@
 ---
 name: encrypt-data
-description: 'Reversible AES-256-GCM `encrypt` / `decrypt` for secrets you need to read back; one-way HMAC-SHA256 `hmacHash` for deterministic fingerprints (lookup/dedup of encrypted columns). Keys come from `src/config/encryption.ts`. Triggers: `encrypt`, `decrypt`, `hmacHash`, `EncryptionConfigurations`, `APP_ENCRYPTION_KEY`, `APP_HMAC_KEY`; "store an API key reversibly", "fingerprint an encrypted column for lookup", "AES-256-GCM secret", "HMAC-SHA256 dedup key"; typical import `import { encrypt, decrypt, hmacHash } from "@warlock.js/core"`. Skip: password hashing — `@warlock.js/core/hash-password/SKILL.md`; config wiring — `@warlock.js/core/configure-app/SKILL.md`; competing libs Node `crypto` direct, `crypto-js`, `libsodium-wrappers`.'
+description: 'Reversible AES-256-GCM `encrypt` / `decrypt` for secrets you need to read back; one-way HMAC-SHA256 `hmacHash` for deterministic fingerprints (lookup/dedup of encrypted columns). Keys come from `src/config/encryption.ts`. Triggers: `encrypt`, `decrypt`, `hmacHash`, `EncryptionConfigurations`, `APP_ENCRYPTION_KEY`, `APP_HMAC_KEY`; "store an API key reversibly", "fingerprint an encrypted column for lookup", "AES-256-GCM secret", "HMAC-SHA256 dedup key"; typical import `import { encrypt, decrypt, hmacHash } from "@warlock.js/core"`. Skip: password hashing — the `hash-password` topic; config wiring — the `configure-app` topic; competing libs Node `crypto` direct, `crypto-js`, `libsodium-wrappers`.'
 ---
 
 # Warlock — encrypt and fingerprint
@@ -12,7 +12,7 @@ Two helpers, two different jobs:
 | `encrypt` / `decrypt`   | reversible | AES-256-GCM  | Secrets you need to read back (API keys, OAuth tokens).        |
 | `hmacHash`              | one-way    | HMAC-SHA256  | Deterministic fingerprint for lookup/dedup of encrypted values. |
 
-Both live in `@warlock.js/core`. For **password hashing** (a one-way job with very different requirements), reach for [`hash-password/SKILL.md`](../hash-password/SKILL.md) instead — bcrypt is the right tool there, not encrypt.
+Both live in `@warlock.js/core`. For **password hashing** (a one-way job with very different requirements), reach for the `hash-password` topic instead — bcrypt is the right tool there, not encrypt.
 
 ## The shape
 
@@ -124,7 +124,7 @@ await idempotencyKeysRepository.first({ hash: hmacHash(JSON.stringify(request)) 
 log.info("api-key", "used", { fingerprint: hmacHash(apiKey).slice(0, 8) });
 ```
 
-**Do not use `hmacHash` for passwords.** It's fast — a brute-force attack with a stolen database would clear common passwords in minutes. That's what bcrypt is for (see [`hash-password/SKILL.md`](../hash-password/SKILL.md)).
+**Do not use `hmacHash` for passwords.** It's fast — a brute-force attack with a stolen database would clear common passwords in minutes. That's what bcrypt is for (see the `hash-password` topic).
 
 ## Common patterns
 
@@ -199,10 +199,10 @@ Same payload → same key → returns the cached result. Different keys (because
 
 `encrypt` / `decrypt` / `hmacHash` use Node's built-in `crypto` — no extra dependency. They're available out of the box.
 
-Password hashing (`hashPassword`) needs `bcryptjs`, which is its own install — see [`hash-password/SKILL.md`](../hash-password/SKILL.md).
+Password hashing (`hashPassword`) needs `bcryptjs`, which is its own install — see the `hash-password` topic.
 
 ## See also
 
-- [`hash-password/SKILL.md`](../hash-password/SKILL.md) — bcrypt password hashing (the third member of the encryption module, but a different job entirely).
-- [`configure-app/SKILL.md`](../configure-app/SKILL.md) — `src/config/encryption.ts` and env wiring.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — service layering, where the encryption boundary should sit.
+- The `hash-password` topic — bcrypt password hashing (the third member of the encryption module, but a different job entirely).
+- The `configure-app` topic — `src/config/encryption.ts` and env wiring.
+- The `warlock-conventions` topic — service layering, where the encryption boundary should sit.

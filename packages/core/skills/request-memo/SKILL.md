@@ -1,6 +1,6 @@
 ---
 name: request-memo
-description: 'Memoize async work for one HTTP request with `requestMemo<T>(key, fn)` — the v5 replacement for removed `fromRequest`, with single-flight promise sharing, settled-success reuse, rejection eviction, and no cross-request fallback. Triggers: `requestMemo`, `fromRequest`, `fromRequest removed`, `request-scoped cache`, `single-flight`, `current request memo`; "migrate off fromRequest", "load this once per request", "deduplicate concurrent loaders", "cache a repository lookup during one request"; typical import `import { requestMemo } from "@warlock.js/core"`. Skip: middleware-written request state — `@warlock.js/core/use-request-locals/SKILL.md`; process-wide or cross-request caching — `@warlock.js/core/use-middleware/SKILL.md`; competing patterns: dynamic `request[key]` properties, module-global `Map`, payload `request.get()` / `request.set()`.'
+description: 'Memoize async work for one HTTP request with `requestMemo<T>(key, fn)` — the v5 replacement for removed `fromRequest`, with single-flight promise sharing, settled-success reuse, rejection eviction, and no cross-request fallback. Triggers: `requestMemo`, `fromRequest`, `fromRequest removed`, `request-scoped cache`, `single-flight`, `current request memo`; "migrate off fromRequest", "load this once per request", "deduplicate concurrent loaders", "cache a repository lookup during one request"; typical import `import { requestMemo } from "@warlock.js/core"`. Skip: middleware-written request state — the `use-request-locals` topic; process-wide or cross-request caching — the `use-middleware` topic; competing patterns: dynamic `request[key]` properties, module-global `Map`, payload `request.get()` / `request.set()`.'
 ---
 
 # Warlock — memoize work for one request
@@ -137,6 +137,6 @@ Reusing one key for different result types is a caller bug: TypeScript cannot co
 
 ## See also
 
-- [`use-request-locals/SKILL.md`](../use-request-locals/SKILL.md) — typed per-request data written by middleware.
-- [`write-middleware/SKILL.md`](../write-middleware/SKILL.md) — authoring and registering middleware.
-- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — consuming request-scoped values from controllers.
+- The `use-request-locals` topic — typed per-request data written by middleware.
+- The `write-middleware` topic — authoring and registering middleware.
+- The `create-controller` topic — consuming request-scoped values from controllers.

@@ -1,6 +1,6 @@
 ---
 name: retry-operation
-description: 'Wrap a flaky operation with `retry(fn, options)` — now provided by `@mongez/reinforcements` (not `@warlock.js/core`). `attempts` total tries, `delay` + `backoff` (linear/exponential/fn), `maxDelay`, `jitter`, `shouldRetry` to bail on permanent errors, `signal` to cancel, plus `retryable()` to pre-bind options. Triggers: `retry`, `retryable`, `RetryOptions`, `attempts`, `backoff`, `jitter`, `maxDelay`, `shouldRetry`, `signal`; "retry a flaky API call", "handle transient errors", "exponential backoff with jitter", "wrap an external request"; typical import `import { retry } from "@mongez/reinforcements"`. Skip: timing the retried op — `@warlock.js/core/benchmark-code/SKILL.md`; use-case-level `retry` option — `@warlock.js/core/write-use-case/SKILL.md`; competing libs `p-retry`, `async-retry`, `cockatiel`.'
+description: 'Wrap a flaky operation with `retry(fn, options)` — now provided by `@mongez/reinforcements` (not `@warlock.js/core`). `attempts` total tries, `delay` + `backoff` (linear/exponential/fn), `maxDelay`, `jitter`, `shouldRetry` to bail on permanent errors, `signal` to cancel, plus `retryable()` to pre-bind options. Triggers: `retry`, `retryable`, `RetryOptions`, `attempts`, `backoff`, `jitter`, `maxDelay`, `shouldRetry`, `signal`; "retry a flaky API call", "handle transient errors", "exponential backoff with jitter", "wrap an external request"; typical import `import { retry } from "@mongez/reinforcements"`. Skip: timing the retried op — the `benchmark-code` topic; use-case-level `retry` option — the `write-use-case` topic; competing libs `p-retry`, `async-retry`, `cockatiel`.'
 ---
 
 # Warlock — retry an operation
@@ -93,7 +93,7 @@ const result = await measure("publish-event", () =>
 
 ## Use-case integration
 
-`useCase()` accepts a `retry` option (the same `RetryOptions`) that wraps the **handler** — see [`@warlock.js/core/write-use-case/SKILL.md`](@warlock.js/core/write-use-case/SKILL.md). Reach for that when "retry" means "re-run the handler"; reach for raw `retry()` when only one step inside is flaky.
+`useCase()` accepts a `retry` option (the same `RetryOptions`) that wraps the **handler** — see the `write-use-case` topic. Reach for that when "retry" means "re-run the handler"; reach for raw `retry()` when only one step inside is flaky.
 
 ## Gotchas
 
@@ -105,5 +105,5 @@ const result = await measure("publish-event", () =>
 ## See also
 
 - [`mongez-reinforcements-async`](mongez-reinforcements-async) — full `retry` / `retryable` reference.
-- [`@warlock.js/core/benchmark-code/SKILL.md`](@warlock.js/core/benchmark-code/SKILL.md) — timing retried operations.
-- [`@warlock.js/core/write-use-case/SKILL.md`](@warlock.js/core/write-use-case/SKILL.md) — the use-case `retry` option.
+- The `benchmark-code` topic — timing retried operations.
+- The `write-use-case` topic — the use-case `retry` option.

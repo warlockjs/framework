@@ -1,6 +1,6 @@
 ---
 name: run-app
-description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`, `PortInUseError`, `assertPortIsAvailable`, `EADDRINUSE`, `EsbuildBinaryMissingError`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server", "port already in use"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — `@warlock.js/core/write-cli-command/SKILL.md`; config shape — `@warlock.js/core/configure-app/SKILL.md`; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
+description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`, `PortInUseError`, `assertPortIsAvailable`, `EADDRINUSE`, `EsbuildBinaryMissingError`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server", "port already in use"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — the `write-cli-command` topic; config shape — the `configure-app` topic; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
 ---
 
 # Warlock — run the app
@@ -46,7 +46,7 @@ Once the server is ready, `warlock dev` listens for single keypresses:
 | `c`      | Clear the console.                                                                                                                                                      |
 | `q`      | Graceful shutdown, exit `0` — the same path as `Ctrl+C`.                                                                                                                |
 | `h`      | Print the shortcuts that are armed right now.                                                                                                                           |
-| `u`      | **Only while an update notice is showing** — update every `@warlock.js/*` package, install, and restart. See [`update-packages/SKILL.md`](../update-packages/SKILL.md). |
+| `u`      | **Only while an update notice is showing** — update every `@warlock.js/*` package, install, and restart. See the `update-packages` topic. |
 | `Ctrl+C` | Graceful shutdown, unchanged.                                                                                                                                           |
 
 A "restart" is a fresh process (`r` and `u` both use it) — see [The supervisor](#the-supervisor) below for how that works.
@@ -152,7 +152,7 @@ export default defineConfig({
 - **`generateTypings`** — turn off if you're committing generated typings and don't want them rewritten on every boot. The `--skip-typings` flag is the per-run version.
 - **`healthCheckers`** — custom file health checker contracts (or `false` to disable). The `--skip-health` flag is the per-run version.
 - **`transpileCacheDebug`** — diagnostic only. Names `.warlock/transpile/*.js` files `<slug>.<hash>.js` and appends `// @source <path>` markers so you can eyeball which cache entry came from which source. Leave off in normal use.
-- **`checkForUpdates`** — on `warlock dev` start, check npm for a newer `@warlock.js/core` and print a one-line notice if one exists. Best-effort and non-blocking; auto-skipped in CI and non-TTY shells. In an interactive terminal the notice arms a **`u` shortcut** that updates every `@warlock.js/*` package, installs, and restarts the server; elsewhere it prints `npx warlock update` instead. The registry answer is cached for 24h in `.warlock/update-check.json`, so a day of restarts costs one lookup. See [`update-packages/SKILL.md`](../update-packages/SKILL.md).
+- **`checkForUpdates`** — on `warlock dev` start, check npm for a newer `@warlock.js/core` and print a one-line notice if one exists. Best-effort and non-blocking; auto-skipped in CI and non-TTY shells. In an interactive terminal the notice arms a **`u` shortcut** that updates every `@warlock.js/*` package, installs, and restarts the server; elsewhere it prints `npx warlock update` instead. The registry answer is cached for 24h in `.warlock/update-check.json`, so a day of restarts costs one lookup. See the `update-packages` topic.
 - **`restartOnConfigChange`** — restart the dev server when `warlock.config.ts` or any `.env*` changes (default `true`). Set `false` to get a warning instead and restart by hand. Neither file can be hot-reloaded, so without a restart the running services keep the old values.
 - **`timings`** — print a one-line, per-phase breakdown next to the `hmr update` line on every hot reload: `watcher`, `debounce`, `graph`, `reimport`, `connectors`. `watcher` is the raw-fs-notification-to-stabilised-event gap (chokidar's `awaitWriteFinish` window); `debounce` is the handler's own adaptive wait; the rest are self-explanatory. Opt-in, off by default — a disabled flag costs one boolean check per reload, since the watcher-settle bookkeeping only runs when this is on. Use it to see which phase a slow reload is actually spending time in.
 
@@ -219,7 +219,7 @@ It exists so `warlock start` can tell a promoted build from a directory that mer
 
 `warlock start` uses the same `resolveBuildConfig()` helper to find the bundle, so the two commands stay in sync no matter how you override the config. If `build` and `start` disagree on where the bundle is, it's because `warlock.config.ts` is being read with different cwds — never the case in normal operation.
 
-If the app uses `@warlock.js/web` page routes, a successful `warlock build` also writes `page-routes.manifest.json` next to the bundle (same `outdir`) — the snapshot `warlock routes:diff` compares the live dev surface against. See [`warlock-routes/SKILL.md`](../warlock-routes/SKILL.md#warlock-routesdiff--catch-page-route-drift-before-it-ships).
+If the app uses `@warlock.js/web` page routes, a successful `warlock build` also writes `page-routes.manifest.json` next to the bundle (same `outdir`) — the snapshot `warlock routes:diff` compares the live dev surface against. See the `warlock-routes` topic (its `routes:diff` section).
 
 ## `warlock start` — run the production bundle
 
@@ -396,7 +396,7 @@ If you need the same fact inside the app, use `Application.onceBooted()` / `Appl
 
 `*` — `environment` follows `NODE_ENV`. The dev command doesn't force it, but the default in most projects is `development`. `start` doesn't force it either; deployments set `NODE_ENV=production` themselves.
 
-If you need conditional behavior, branch on `Application.environment` (the orthogonal "what world am I talking to?" axis), not `runtimeStrategy` (the "how is the framework itself running?" axis). See [`use-app-context/SKILL.md`](../use-app-context/SKILL.md).
+If you need conditional behavior, branch on `Application.environment` (the orthogonal "what world am I talking to?" axis), not `runtimeStrategy` (the "how is the framework itself running?" axis). See the `use-app-context` topic.
 
 ## Common patterns
 
@@ -507,9 +507,9 @@ NODE_OPTIONS=--max-old-space-size=4096 npx warlock start
 
 ## See also
 
-- [`write-cli-command/SKILL.md`](../write-cli-command/SKILL.md) — author a custom CLI command + the rest of the built-in commands (migrate / seed / generate.* / add / storage.put / jwt.generate).
-- [`configure-app/SKILL.md`](../configure-app/SKILL.md) — `warlock.config.ts` shape and `defineConfig`.
-- [`use-app-context/SKILL.md`](../use-app-context/SKILL.md) — `Application.environment` vs `Application.runtimeStrategy`.
-- [`add-connector/SKILL.md`](../add-connector/SKILL.md) — Early vs Late connector phases (why HTTP/socket boot late in dev).
-- [`update-packages/SKILL.md`](../update-packages/SKILL.md) — `warlock update` + the dev-server update notice (`devServer.checkForUpdates`).
-- [`warlock-routes/SKILL.md`](../warlock-routes/SKILL.md) — `warlock routes` / `warlock routes:diff`, the latter comparing live page routes against the manifest `warlock build` writes.
+- The `write-cli-command` topic — author a custom CLI command + the rest of the built-in commands (migrate / seed / generate.* / add / storage.put / jwt.generate).
+- The `configure-app` topic — `warlock.config.ts` shape and `defineConfig`.
+- The `use-app-context` topic — `Application.environment` vs `Application.runtimeStrategy`.
+- The `add-connector` topic — Early vs Late connector phases (why HTTP/socket boot late in dev).
+- The `update-packages` topic — `warlock update` + the dev-server update notice (`devServer.checkForUpdates`).
+- The `warlock-routes` topic — `warlock routes` / `warlock routes:diff`, the latter comparing live page routes against the manifest `warlock build` writes.

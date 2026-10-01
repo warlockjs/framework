@@ -1,6 +1,6 @@
 ---
 name: define-resource
-description: 'Map model fields to wire-shape via `defineResource()` or `Resource` subclasses. Output-only — never put business logic, hydration, or reconciliation in a resource. Also covers the typed output: `ResourceOutput<typeof R>`, `defineResource<Out>()`, `Serialized<T, W>` and `ModelResourceRegistry`. Triggers: `defineResource`, `Resource`, `RegisterResource`, `toJSON`, `ResourceOutput`, `Serialized`, `ModelResourceRegistry`, `"self"`, `"localized"`, `"uploadsUrl"`; "shape an API response", "type a resource''s output", "what does the client receive", "nest related resources", "rename a field on output", "self-referential tree resource"; typical import `import { defineResource } from "@warlock.js/core"`. Skip: localized columns — `@warlock.js/core/use-localization/SKILL.md`; URL casting — `@warlock.js/core/build-url/SKILL.md`; controller side — `@warlock.js/core/create-controller/SKILL.md`; competing libs `@nestjs/swagger` `@ApiProperty`, `class-transformer`, hand-rolled DTO mappers.'
+description: 'Map model fields to wire-shape via `defineResource()` or `Resource` subclasses. Output-only — never put business logic, hydration, or reconciliation in a resource. Also covers the typed output: `ResourceOutput<typeof R>`, `defineResource<Out>()`, `Serialized<T, W>` and `ModelResourceRegistry`. Triggers: `defineResource`, `Resource`, `RegisterResource`, `toJSON`, `ResourceOutput`, `Serialized`, `ModelResourceRegistry`, `"self"`, `"localized"`, `"uploadsUrl"`; "shape an API response", "type a resource''s output", "what does the client receive", "nest related resources", "rename a field on output", "self-referential tree resource"; typical import `import { defineResource } from "@warlock.js/core"`. Skip: localized columns — the `use-localization` topic; URL casting — the `build-url` topic; controller side — the `create-controller` topic; competing libs `@nestjs/swagger` `@ApiProperty`, `class-transformer`, hand-rolled DTO mappers.'
 ---
 
 # Warlock — define a resource
@@ -395,6 +395,6 @@ export const CommentResource = defineResource({
 
 ## See also
 
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — the output-only rule and where logic actually lives.
-- [`build-restful/SKILL.md`](../build-restful/SKILL.md) — wiring a resource into a CRUD pipeline.
-- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — calling `new XResource(record).toJSON()` from a controller.
+- The `warlock-conventions` topic — the output-only rule and where logic actually lives.
+- The `build-restful` topic — wiring a resource into a CRUD pipeline.
+- The `create-controller` topic — calling `new XResource(record).toJSON()` from a controller.

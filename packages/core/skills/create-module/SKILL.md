@@ -1,6 +1,6 @@
 ---
 name: create-module
-description: 'Scaffold a new feature module under `src/app/<name>/` via `warlock generate.module` and the follow-up generators for controllers, models, repositories, resources, and validation schemas. Triggers: `warlock generate.module`, `generate.controller`, `generate.service`, `generate.model`, `generate.repository`, `generate.resource`, `generate.migration`, `--minimal`, `gen.m`; "scaffold a new module", "create CRUD bootstrap", "add a controller to a module", "generate a model"; typical CLI `npx warlock generate.module <name>`. Skip: framework-wide layout rules — `@warlock.js/core/warlock-conventions/SKILL.md`; routes file shape — `@warlock.js/core/register-route/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing tooling: `@nestjs/cli`, `hygen`, hand-rolled folder layouts.'
+description: 'Scaffold a new feature module under `src/app/<name>/` via `warlock generate.module` and the follow-up generators for controllers, models, repositories, resources, and validation schemas. Triggers: `warlock generate.module`, `generate.controller`, `generate.service`, `generate.model`, `generate.repository`, `generate.resource`, `generate.migration`, `--minimal`, `gen.m`; "scaffold a new module", "create CRUD bootstrap", "add a controller to a module", "generate a model"; typical CLI `npx warlock generate.module <name>`. Skip: framework-wide layout rules — the `warlock-conventions` topic; routes file shape — the `register-route` topic; controller shape — the `create-controller` topic; competing tooling: `@nestjs/cli`, `hygen`, hand-rolled folder layouts.'
 ---
 
 # Warlock — create a module
@@ -180,11 +180,11 @@ await warmupProductCache();
 
 ## See also
 
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — module layout, file suffixes, path aliases.
-- [`register-route/SKILL.md`](../register-route/SKILL.md) — what to put in `routes.ts`.
-- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — the handler shape, attaching validation.
-- [`use-repository/SKILL.md`](../use-repository/SKILL.md) — what the generated `<module>.repository.ts` looks like and how to extend it.
-- [`define-resource/SKILL.md`](../define-resource/SKILL.md) — the output mapper for the model.
-- [`validate-input/SKILL.md`](../validate-input/SKILL.md) — wiring `schema/*.schema.ts` to controllers.
-- [`write-seeder/SKILL.md`](../write-seeder/SKILL.md) — populating the generated `seeds/` folder.
-- [`use-localization/SKILL.md`](../use-localization/SKILL.md) — populating the generated `utils/locales.ts`.
+- The `warlock-conventions` topic — module layout, file suffixes, path aliases.
+- The `register-route` topic — what to put in `routes.ts`.
+- The `create-controller` topic — the handler shape, attaching validation.
+- The `use-repository` topic — what the generated `<module>.repository.ts` looks like and how to extend it.
+- The `define-resource` topic — the output mapper for the model.
+- The `validate-input` topic — wiring `schema/*.schema.ts` to controllers.
+- The `write-seeder` topic — populating the generated `seeds/` folder.
+- The `use-localization` topic — populating the generated `utils/locales.ts`.

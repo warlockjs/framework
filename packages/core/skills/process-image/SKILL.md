@@ -1,6 +1,6 @@
 ---
 name: process-image
-description: 'Transform images with the `Image` class — resize, crop, rotate, format, quality, watermark, blur, etc. — using a deferred pipeline that runs only at `save()` / `toBuffer()` / `toBase64()` / `toDataUrl()` time. Requires sharp via `warlock add image`. Triggers: `Image`, `Image.fromFile`, `Image.fromBuffer`, `Image.fromUrl`, `.resize`, `.crop`, `.watermark`, `.toBuffer`, `.toDataUrl`, `.apply`; "resize an image", "generate a thumbnail", "watermark a product photo", "build an image pipeline"; typical import `import { Image } from "@warlock.js/core"`. Skip: multipart upload entry — `@warlock.js/core/upload-file/SKILL.md`; storage persistence — `@warlock.js/core/store-file/SKILL.md`; competing libs `sharp` direct, `jimp`, `imagemagick`, `gm`.'
+description: 'Transform images with the `Image` class — resize, crop, rotate, format, quality, watermark, blur, etc. — using a deferred pipeline that runs only at `save()` / `toBuffer()` / `toBase64()` / `toDataUrl()` time. Requires sharp via `warlock add image`. Triggers: `Image`, `Image.fromFile`, `Image.fromBuffer`, `Image.fromUrl`, `.resize`, `.crop`, `.watermark`, `.toBuffer`, `.toDataUrl`, `.apply`; "resize an image", "generate a thumbnail", "watermark a product photo", "build an image pipeline"; typical import `import { Image } from "@warlock.js/core"`. Skip: multipart upload entry — the `upload-file` topic; storage persistence — the `store-file` topic; competing libs `sharp` direct, `jimp`, `imagemagick`, `gm`.'
 ---
 
 # Warlock — process an image
@@ -153,7 +153,7 @@ The wrapper exposes the underlying `sharp.Sharp` via `.image` for anything not s
 
 `UploadedFile` (from multipart uploads) has its own chainable `.resize().format().quality().save(...)` that runs through `Image` internally — same deferred execution, same transforms. Use it when the source is a multipart upload; reach for `new Image(...)` directly when the source is a buffer/path/URL.
 
-See [`upload-file`](../upload-file/SKILL.md) for the multipart entry point and [`store-file`](../store-file/SKILL.md) for persisting the output through storage drivers.
+See the `upload-file` topic for the multipart entry point and the `store-file` topic for persisting the output through storage drivers.
 
 ## Gotchas
 
@@ -166,6 +166,6 @@ See [`upload-file`](../upload-file/SKILL.md) for the multipart entry point and [
 
 ## See also
 
-- [`upload-file/SKILL.md`](../upload-file/SKILL.md) — multipart uploads, where image transforms typically start.
-- [`store-file/SKILL.md`](../store-file/SKILL.md) — persisting image output through storage drivers (local / S3 / R2 / Spaces).
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — where image-processing services live.
+- The `upload-file` topic — multipart uploads, where image transforms typically start.
+- The `store-file` topic — persisting image output through storage drivers (local / S3 / R2 / Spaces).
+- The `warlock-conventions` topic — where image-processing services live.

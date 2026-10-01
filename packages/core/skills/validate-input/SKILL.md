@@ -1,6 +1,6 @@
 ---
 name: validate-input
-description: 'Author seal schemas, attach them to controllers via `controller.validation = { schema }`, infer types via `Infer<typeof schema>`, and layer DB-aware (`unique`/`exists`) and file validators on top. Triggers: `v.object`, `v.string`, `v.email`, `Infer`, `controller.validation`, `.unique`, `.exists`, `uniqueExceptCurrentId`, `request.validated`; "validate a request body", "attach a schema to a controller", "DB-aware unique rule", "infer schema types"; typical import `import { v, type Infer } from "@warlock.js/seal"`. Skip: schema authoring foundations — `@warlock.js/seal/seal-basics/SKILL.md`; controller wiring — `@warlock.js/core/create-controller/SKILL.md`; file rules deep-dive — `@warlock.js/core/upload-file/SKILL.md`; competing libs `zod`, `joi`, `yup`, `class-validator`.'
+description: 'Author seal schemas, attach them to controllers via `controller.validation = { schema }`, infer types via `Infer<typeof schema>`, and layer DB-aware (`unique`/`exists`) and file validators on top. Triggers: `v.object`, `v.string`, `v.email`, `Infer`, `controller.validation`, `.unique`, `.exists`, `uniqueExceptCurrentId`, `request.validated`; "validate a request body", "attach a schema to a controller", "DB-aware unique rule", "infer schema types"; typical import `import { v, type Infer } from "@warlock.js/seal"`. Skip: schema authoring foundations — the `seal-basics` topic of the `warlock-js-seal` skill; controller wiring — the `create-controller` topic; file rules deep-dive — the `upload-file` topic; competing libs `zod`, `joi`, `yup`, `class-validator`.'
 ---
 
 # Warlock — validate a request
@@ -73,7 +73,7 @@ From `@warlock.js/seal` — **always import from seal directly**. `@warlock.js/c
 | `v.literal(...values)`             | exact literals               | —                                                |
 | `v.instanceof(Ctor, msg?)`         | `Ctor` instances             | —                                                |
 | `v.lazy(() => schema)`             | recursive/forward refs       | —                                                |
-| `v.file(msg?)`                     | `UploadedFile`               | `.image()`, `.accept(exts)`, `.mimeType(types)`, `.minSize(n)`, `.maxSize(n)`, `.minWidth(n)`, `.maxWidth(n)` — see [`upload-file`](../upload-file/SKILL.md) |
+| `v.file(msg?)`                     | `UploadedFile`               | `.image()`, `.accept(exts)`, `.mimeType(types)`, `.minSize(n)`, `.maxSize(n)`, `.minWidth(n)`, `.maxWidth(n)` — see the `upload-file` topic |
 | `v.computed(callback)`             | derived value                | —                                                |
 | `v.managed(callback)`              | framework-injected value     | —                                                |
 
@@ -168,7 +168,7 @@ const uploadAvatarSchema = v.object({
 });
 ```
 
-Full file chain: `.image()`, `.accept(extensions)`, `.mimeType(types)`, `.pdf()`, `.excel()`, `.word()`, `.minSize(n)`, `.maxSize(n)`, `.minWidth(px)`, `.maxWidth(px)`, `.minHeight(px)`, `.maxHeight(px)`. See [`upload-file`](../upload-file/SKILL.md) for the full upload flow.
+Full file chain: `.image()`, `.accept(extensions)`, `.mimeType(types)`, `.pdf()`, `.excel()`, `.word()`, `.minSize(n)`, `.maxSize(n)`, `.minWidth(px)`, `.maxWidth(px)`, `.minHeight(px)`, `.maxHeight(px)`. See the `upload-file` topic for the full upload flow.
 
 ### Optional file field
 
@@ -304,7 +304,7 @@ updateProductController.validation = {
 
 ## See also
 
-- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — how the schema attaches and how `request.validated()` reads.
-- [`upload-file/SKILL.md`](../upload-file/SKILL.md) — `v.file()` and how it interacts with multipart uploads.
-- [`send-response/SKILL.md`](../send-response/SKILL.md) — the 400 helper used internally by `failedSchema`.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — `Request<Schema>` type-alias convention.
+- The `create-controller` topic — how the schema attaches and how `request.validated()` reads.
+- The `upload-file` topic — `v.file()` and how it interacts with multipart uploads.
+- The `send-response` topic — the 400 helper used internally by `failedSchema`.
+- The `warlock-conventions` topic — `Request<Schema>` type-alias convention.

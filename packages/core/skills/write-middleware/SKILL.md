@@ -1,6 +1,6 @@
 ---
 name: write-middleware
-description: 'Author HTTP middleware for @warlock.js/core — the `({ request, response })` signature, short-circuit by returning a response, enrich the request with extra fields, register per-route, per-group, or app-wide. Triggers: `Middleware`, `MiddlewareResponse`, `router.group`, `guarded`, `request.detectIp`, `authMiddleware`; "write a custom middleware", "short-circuit a request", "enrich the request with extra fields", "per-route vs per-group middleware"; typical import `import type { Middleware } from "@warlock.js/core"`. Skip: built-in middleware catalog — `@warlock.js/core/use-middleware/SKILL.md`; route attachment — `@warlock.js/core/register-route/SKILL.md`; response helpers — `@warlock.js/core/send-response/SKILL.md`; competing patterns: `express` `(req, res, next)` middleware, Fastify `preHandler` hooks.'
+description: 'Author HTTP middleware for @warlock.js/core — the `({ request, response })` signature, short-circuit by returning a response, enrich the request with extra fields, register per-route, per-group, or app-wide. Triggers: `Middleware`, `MiddlewareResponse`, `router.group`, `guarded`, `request.detectIp`, `authMiddleware`; "write a custom middleware", "short-circuit a request", "enrich the request with extra fields", "per-route vs per-group middleware"; typical import `import type { Middleware } from "@warlock.js/core"`. Skip: built-in middleware catalog — the `use-middleware` topic; route attachment — the `register-route` topic; response helpers — the `send-response` topic; competing patterns: `express` `(req, res, next)` middleware, Fastify `preHandler` hooks.'
 ---
 
 # Warlock — write a middleware
@@ -51,7 +51,7 @@ export const requireFeatureFlag: Middleware = async ({ request, response }) => {
 };
 ```
 
-If you short-circuit, the controller never runs. The response helper you pick (`forbidden`, `unauthorized`, `badRequest`, etc.) sets the status — see [`send-response`](../send-response/SKILL.md).
+If you short-circuit, the controller never runs. The response helper you pick (`forbidden`, `unauthorized`, `badRequest`, etc.) sets the status — see the `send-response` topic.
 
 ## Enriching the request
 
@@ -200,7 +200,7 @@ export const optionalAuth: Middleware = async ({ request, response }) => {
 
 ## Using built-in middleware
 
-`@warlock.js/core` ships seven built-in middlewares (rate limit, concurrency cap, body cap, idempotency, maintenance, IP filter, response cache) under the `middleware` namespace from `@warlock.js/core`. They cover the patterns most apps need — see [`use-middleware`](../use-middleware/SKILL.md) for the catalog, per-primitive deep-dives, error semantics, and gotchas specific to using them.
+`@warlock.js/core` ships seven built-in middlewares (rate limit, concurrency cap, body cap, idempotency, maintenance, IP filter, response cache) under the `middleware` namespace from `@warlock.js/core`. They cover the patterns most apps need — see the `use-middleware` topic for the catalog, per-primitive deep-dives, error semantics, and gotchas specific to using them.
 
 `X-Request-Id` correlation is wired automatically (inherit + echo on every response) — the same skill covers that too. It's not a middleware; nothing to register.
 
@@ -217,8 +217,8 @@ export const optionalAuth: Middleware = async ({ request, response }) => {
 
 ## See also
 
-- [`use-middleware/SKILL.md`](../use-middleware/SKILL.md) — the built-in middleware catalog (`rateLimit`, `idempotency`, `maxBodySize`, etc.) + request-id correlation.
-- [`register-route/SKILL.md`](../register-route/SKILL.md) — where middleware attaches: `router.group` and route-options.
-- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — how the controller picks up `request.locals.user`, `request.validated()`, etc., set by upstream middleware.
-- [`send-response/SKILL.md`](../send-response/SKILL.md) — the response helpers used to short-circuit.
-- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — the `guarded()` / `guardedAdmin()` / `publicRoutes()` convention.
+- The `use-middleware` topic — the built-in middleware catalog (`rateLimit`, `idempotency`, `maxBodySize`, etc.) + request-id correlation.
+- The `register-route` topic — where middleware attaches: `router.group` and route-options.
+- The `create-controller` topic — how the controller picks up `request.locals.user`, `request.validated()`, etc., set by upstream middleware.
+- The `send-response` topic — the response helpers used to short-circuit.
+- The `warlock-conventions` topic — the `guarded()` / `guardedAdmin()` / `publicRoutes()` convention.

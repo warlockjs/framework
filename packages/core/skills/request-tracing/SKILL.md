@@ -1,6 +1,6 @@
 ---
 name: request-tracing
-description: 'Vendor-neutral request tracing hooks (`http.tracing`) — observe request start/end and named phase spans (`route.match`, `middleware`, `validation`, `handler`, `response.write`) without adopting an OTel/vendor dependency in `core`. Covers the `TracingHooks` shape, trace id derivation from an inbound W3C `traceparent` vs `request.id`, that a throwing hook is caught and reported once (never breaks the request), and zero overhead when disabled. Triggers: `http.tracing`, `TracingHooks`, `onRequestStart`, `onRequestEnd`, `onPhase`, `traceparent`, `traceId`, `dispatchPhase`, "instrument requests", "trace a request", "slow phase logging", "APM / OTel bridge for Warlock". Skip: request-id header echo/inheritance (`X-Request-Id`) — `@warlock.js/core/use-middleware/SKILL.md`; app-level structured logging — `@warlock.js/logger/logger-basics/SKILL.md`; competing libs `@opentelemetry/api` direct instrumentation, `express-request-id`, hand-rolled `X-Trace-Id` middleware.'
+description: 'Vendor-neutral request tracing hooks (`http.tracing`) — observe request start/end and named phase spans (`route.match`, `middleware`, `validation`, `handler`, `response.write`) without adopting an OTel/vendor dependency in `core`. Covers the `TracingHooks` shape, trace id derivation from an inbound W3C `traceparent` vs `request.id`, that a throwing hook is caught and reported once (never breaks the request), and zero overhead when disabled. Triggers: `http.tracing`, `TracingHooks`, `onRequestStart`, `onRequestEnd`, `onPhase`, `traceparent`, `traceId`, `dispatchPhase`, "instrument requests", "trace a request", "slow phase logging", "APM / OTel bridge for Warlock". Skip: request-id header echo/inheritance (`X-Request-Id`) — the `use-middleware` topic; app-level structured logging — the `logger-basics` topic of the `warlock-js-logger` skill; competing libs `@opentelemetry/api` direct instrumentation, `express-request-id`, hand-rolled `X-Trace-Id` middleware.'
 ---
 
 # Warlock — request tracing hooks
@@ -131,7 +131,7 @@ instead of adding a separate hook API. They add three phases:
    trace keeps the same id through Warlock.
 2. Otherwise `traceId` falls back to `request.id` (the framework's own
    per-request correlation id — see
-   [`use-middleware/SKILL.md`](../use-middleware/SKILL.md#request-id-correlation)
+   the `use-middleware` topic (its "Request ID correlation" section)
    for how that id is generated/inherited/echoed).
 
 `ctx.requestId` is always `request.id`, regardless of which branch produced
@@ -152,7 +152,7 @@ deriveTraceId(undefined, "req-abc123");
 
 Tracing does **not** add a response header of its own. `core` already echoes
 `request.id` back as `X-Request-Id` on every response (see
-[`use-middleware/SKILL.md`](../use-middleware/SKILL.md#request-id-correlation)) —
+the `use-middleware` topic, "Request ID correlation" section) —
 apps correlate through that existing header. When a valid inbound
 `traceparent` is present, `ctx.traceId` inside your hooks carries that trace
 id even though the response header still reflects `request.id`; if you need
@@ -226,6 +226,6 @@ export default {
 
 ## See also
 
-- [`use-middleware/SKILL.md`](../use-middleware/SKILL.md#request-id-correlation) — `X-Request-Id` inheritance/echo, the header tracing correlates through.
-- [`use-app-context/SKILL.md`](../use-app-context/SKILL.md) — request-scoped ALS context (`request`/`response`) tracing hooks run inside.
-- [`@warlock.js/logger/logger-basics/SKILL.md`](../../../logger/skills/logger-basics/SKILL.md) — structured logging; tracing hooks are the place to bridge phase timing into your log channel.
+- The `use-middleware` topic ("Request ID correlation" section) — `X-Request-Id` inheritance/echo, the header tracing correlates through.
+- The `use-app-context` topic — request-scoped ALS context (`request`/`response`) tracing hooks run inside.
+- The `logger-basics` topic of the `warlock-js-logger` skill — structured logging; tracing hooks are the place to bridge phase timing into your log channel.

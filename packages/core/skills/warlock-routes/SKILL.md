@@ -1,11 +1,11 @@
 ---
 name: warlock-routes
-description: 'Run `warlock routes` — a read-only command that lists the registered HTTP routes as a verb-colored table (method / path / name / action / middleware-count / source), a sibling of `warlock doctor`. Filter with `--method` / `--path` / `--name`, or emit normalized rows as JSON with `--json`. Also covers `warlock routes:diff`, which compares live page routes against the last `warlock build`''s route snapshot and exits non-zero on drift. Triggers: `warlock routes`, `routesCommand`, `warlock routes:diff`, `routesDiffCommand`, "list my routes", "show all routes", "route table", "what endpoints does my app expose", "dump routes as JSON", "which routes have middleware", "route map for CI", "did my page routes drift from the last build"; run as `npx warlock routes` / `npx warlock routes:diff`. Skip: read-only health/preflight checks — `@warlock.js/core/warlock-doctor/SKILL.md`; defining/naming/grouping routes — `@warlock.js/core/register-route/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; competing tools `nest`/`express` route listers, `php artisan route:list`.'
+description: 'Run `warlock routes` — a read-only command that lists the registered HTTP routes as a verb-colored table (method / path / name / action / middleware-count / source), a sibling of `warlock doctor`. Filter with `--method` / `--path` / `--name`, or emit normalized rows as JSON with `--json`. Also covers `warlock routes:diff`, which compares live page routes against the last `warlock build`''s route snapshot and exits non-zero on drift. Triggers: `warlock routes`, `routesCommand`, `warlock routes:diff`, `routesDiffCommand`, "list my routes", "show all routes", "route table", "what endpoints does my app expose", "dump routes as JSON", "which routes have middleware", "route map for CI", "did my page routes drift from the last build"; run as `npx warlock routes` / `npx warlock routes:diff`. Skip: read-only health/preflight checks — the `warlock-doctor` topic; defining/naming/grouping routes — the `register-route` topic; authoring a general CLI command — the `write-cli-command` topic; competing tools `nest`/`express` route listers, `php artisan route:list`.'
 ---
 
 # Warlock — `warlock routes`
 
-`warlock routes` lists every registered HTTP route as a table. It's the read-only sibling of [`warlock doctor`](../warlock-doctor/SKILL.md): it boots the app far enough to register route modules — but **starts no connectors**, so it never opens a database, cache, or socket connection.
+`warlock routes` lists every registered HTTP route as a table. It's the read-only sibling of the `warlock-doctor` topic: it boots the app far enough to register route modules — but **starts no connectors**, so it never opens a database, cache, or socket connection.
 
 ```bash
 npx warlock routes
@@ -123,7 +123,7 @@ and exits non-zero.
 
 ## See also
 
-- [`warlock-doctor/SKILL.md`](../warlock-doctor/SKILL.md) — the read-only diagnostics sibling; its `routes` check warns when this table would be empty.
-- [`register-route/SKILL.md`](../register-route/SKILL.md) — defining, naming, and grouping the routes this command lists.
-- [`run-app/SKILL.md`](../run-app/SKILL.md) — `warlock build`, the command that produces the snapshot `routes:diff` compares against.
-- [`write-cli-command/SKILL.md`](../write-cli-command/SKILL.md) — the command + `preload` shape `routesCommand` is built from.
+- The `warlock-doctor` topic — the read-only diagnostics sibling; its `routes` check warns when this table would be empty.
+- The `register-route` topic — defining, naming, and grouping the routes this command lists.
+- The `run-app` topic — `warlock build`, the command that produces the snapshot `routes:diff` compares against.
+- The `write-cli-command` topic — the command + `preload` shape `routesCommand` is built from.
