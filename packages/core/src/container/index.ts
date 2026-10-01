@@ -7,8 +7,13 @@ import {
   getRegisteredContainerInstances,
   registerContainerInstance,
 } from "./container-instance-registry";
+import type { DevelopmentAppModules } from "./development-app-modules";
 import type { DevelopmentModelModules } from "./development-model-modules";
 
+export type {
+  DevelopmentAppModuleEntry,
+  DevelopmentAppModules,
+} from "./development-app-modules";
 export type {
   DevelopmentModelModuleEntry,
   DevelopmentModelModules,
@@ -29,6 +34,7 @@ export type ContainerTypes = {
   socket: Server;
   "database.source": DataSource;
   "development.modelModules": DevelopmentModelModules;
+  "development.appModules": DevelopmentAppModules;
 };
 
 type ContainerKeys = keyof ContainerTypes | (string & {});

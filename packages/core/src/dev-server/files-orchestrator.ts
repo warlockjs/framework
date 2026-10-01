@@ -3,6 +3,7 @@ import { init } from "es-module-lexer";
 import { fileURLToPath } from "node:url";
 import type { MessagePort } from "node:worker_threads";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
+import { getDevelopmentAppModuleRegistry } from "./app-module-registry";
 import { DependencyGraph } from "./dependency-graph";
 import { devLogDim, devLogSuccess } from "./dev-logger";
 import { FileEventHandler } from "./file-event-handler";
@@ -74,9 +75,21 @@ export class FilesOrchestrator {
   /** Resolve callbacks for pending `flushVersionBumps()` calls. */
   private readonly pendingFlushes: Array<() => void> = [];
 
+  /**
+   * Files bumped since the last `flushVersionBumps()`. They are published to
+   * the development app-module carrier only once the hook thread acknowledged
+   * the bump, so a subscriber that imports the published URL cannot get the
+   * previous instance.
+   */
+  private pendingBumpedPaths: string[] = [];
+
   public isInitialized = false;
 
   public constructor() {
+    // Web creates its Vite bridge after this orchestrator exists; create the
+    // carrier now so it can subscribe before the first bump happens.
+    getDevelopmentAppModuleRegistry();
+
     this.fileOperations = new FileOperations(
       this.files,
       this.dependencyGraph,
@@ -168,7 +181,10 @@ export class FilesOrchestrator {
    * a fresh `?v=N` URL → Node cache miss → fresh content.
    */
   public bumpVersion(absolutePath: string): void {
-    this.loaderPort?.postMessage({ type: "bump", absolutePath });
+    if (!this.loaderPort) return;
+
+    this.loaderPort.postMessage({ type: "bump", absolutePath });
+    this.pendingBumpedPaths.push(absolutePath);
   }
 
   /**
@@ -181,8 +197,19 @@ export class FilesOrchestrator {
   public flushVersionBumps(): Promise<void> {
     if (!this.loaderPort) return Promise.resolve();
 
+    // Everything posted before this `sync` message is processed by the hook
+    // thread before it answers, so exactly this batch is safe to publish on ack.
+    const bumpedPaths = this.pendingBumpedPaths;
+    this.pendingBumpedPaths = [];
+
     return new Promise<void>((resolve) => {
-      this.pendingFlushes.push(resolve);
+      this.pendingFlushes.push(() => {
+        const appModules = getDevelopmentAppModuleRegistry();
+
+        for (const absolutePath of bumpedPaths) appModules.bump(absolutePath);
+
+        resolve();
+      });
       this.loaderPort!.postMessage({ type: "sync" });
     });
   }
