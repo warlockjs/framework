@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.28.0
+
+### Added
+
+- **`warlock generate.postman`** writes a Postman Collection v2.1.0 (`storage/postman/collection.json`, or `--out`) derived from the same OpenAPI document as `generate.openapi` (options: `--title`, `--server`, `--include-pages`), so the two can never disagree. Each tag is a folder, each operation a request with an example body generated from its schema (JSON as raw, multipart as form-data), saved responses for every declared status, `{{baseUrl}}` and `{{token}}` collection variables, collection-level bearer auth for `authMiddleware()` routes and `noauth` on public ones. `openApiToPostmanCollection(document, options?)` is exported (pure, deterministic `_postman_id`), and `getDevelopmentPostmanCollection()` returns the collection for the running dev process.
+
 ## 5.27.0 - 2026-10-01
 
 ### Added

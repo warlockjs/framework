@@ -1,6 +1,6 @@
 ---
 name: generate-openapi
-description: 'Generate an OpenAPI 3.1 document from the registered routes with `warlock generate.openapi` (default `storage/openapi/openapi.json`) and read it live in the dev-only API docs page at `/__warlock/docs`. Documents paths, path/query parameters, request bodies from Seal validation, responses from `handler.responseSchema`, 401/422 and bearer/cookie security from `authMiddleware()`. Triggers: `generate.openapi`, `openApiGeneratorCommand`, `buildOpenApiDocument`, `getDevelopmentOpenApiDocument`, `responseSchema`, `--include-pages`, `/__warlock/docs`; "OpenAPI", "Swagger", "API docs", "import my API into Postman or Insomnia", "document my routes". Skip: declaring response types on a handler — `@warlock.js/core/create-controller/SKILL.md`; the devtools dashboard — `@warlock.js/devtools/devtools-overview/SKILL.md`; listing routes — `@warlock.js/core/warlock-routes/SKILL.md`.'
+description: 'Generate an OpenAPI 3.1 document from the registered routes with `warlock generate.openapi` (default `storage/openapi/openapi.json`), write a Postman collection from it with `warlock generate.postman` (default `storage/postman/collection.json`), and read it live in the dev-only API docs page at `/__warlock/docs`. Documents paths, path/query parameters, request bodies from Seal validation, responses from `handler.responseSchema`, 401/422 and bearer/cookie security from `authMiddleware()`. Triggers: `generate.openapi`, `openApiGeneratorCommand`, `buildOpenApiDocument`, `getDevelopmentOpenApiDocument`, `generate.postman`, `openApiToPostmanCollection`, `getDevelopmentPostmanCollection`, `responseSchema`, `--include-pages`, `/__warlock/docs`; "OpenAPI", "Swagger", "API docs", "import my API into Postman or Insomnia", "document my routes". Skip: declaring response types on a handler — `@warlock.js/core/create-controller/SKILL.md`; the devtools dashboard — `@warlock.js/devtools/devtools-overview/SKILL.md`; listing routes — `@warlock.js/core/warlock-routes/SKILL.md`.'
 ---
 
 # Warlock — generate an OpenAPI document
@@ -93,6 +93,34 @@ With `@warlock.js/devtools` installed (`warlock add devtools`), `warlock dev` se
 ## Use the file in a client
 
 The output is plain OpenAPI 3.1 JSON, so any tool that reads an OpenAPI file can use it: import `storage/openapi/openapi.json` into Postman or Insomnia (their Import action), or feed it to a client generator. Support for 3.1 is the tool's; if an old version refuses it, update the tool. Regenerate the file whenever routes change, or commit it if you publish it.
+
+## Postman
+
+`warlock generate.postman` writes a Postman Collection v2.1.0. It is derived from the OpenAPI document (the same registration child and options as `generate.openapi`), never from the routes directly, so the collection and the OpenAPI file always agree.
+
+```bash
+npx warlock generate.postman
+# Postman collection written to <root>/storage/postman/collection.json (3 folders, 17 requests). Import it in Postman and set the {{token}} variable.
+```
+
+| Option            | Default                                   | Meaning                                                            |
+| ----------------- | ----------------------------------------- | ------------------------------------------------------------------ |
+| `--out`, `-o`     | `storage/postman/collection.json`         | Output file, relative to the project root.                          |
+| `--title`         | `name` in `package.json`                  | Collection name; the collection id is a stable hash of it.          |
+| `--server`        | `http://<host>:<port>` from the `http` config | Value of the `{{baseUrl}}` variable.                              |
+| `--include-pages` | off                                       | Also include page (SSR) routes.                                     |
+
+What the collection contains:
+
+- One folder per tag (the first path segment), in order of first appearance; untagged operations sit at the root.
+- One request per operation, named by its summary (the route `label`) or `operationId`. `{id}` becomes the `:id` path variable; query parameters are rows (optional ones disabled); the operation description and parameter descriptions carry over.
+- A JSON body with a `Content-Type` header and an **example generated from the schema** (strings by format such as `email` or `date-time`, `0`, `false`, the first `enum` value, one array item, resources resolved with cycles cut). A multipart body becomes form-data with file rows.
+- A saved response for every declared status, with an example body.
+- Collection variables `baseUrl` and `token`. When any route is guarded by `authMiddleware()`, the collection uses bearer auth with `{{token}}`; public routes are set to no auth so the token is not sent. A cookie-only route has a description note: Postman keeps cookies per domain, so sign in against `{{baseUrl}}` first.
+
+To use it: in Postman choose **Import** and pick the file, open the collection's **Variables** tab, paste a token into `token` (for example the `token` from your login response), and adjust `baseUrl` if needed. Regenerate and re-import when routes change.
+
+Programmatic use: `openApiToPostmanCollection(document, { title?, baseUrl? })` is exported from `@warlock.js/core` (pure and deterministic), and `getDevelopmentPostmanCollection()` returns `{ collection, warnings }` for the running dev process (it throws outside `warlock dev`, like `getDevelopmentOpenApiDocument`).
 
 ## Programmatic use
 

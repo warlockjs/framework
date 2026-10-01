@@ -11,7 +11,7 @@ export const DEFAULT_OPENAPI_OUTPUT = "storage/openapi/openapi.json";
 
 type OptionValue = CommandActionData["options"][string];
 
-function stringOption(value: OptionValue | undefined): string | undefined {
+export function stringOption(value: OptionValue | undefined): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }
 

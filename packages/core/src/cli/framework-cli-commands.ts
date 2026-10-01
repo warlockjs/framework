@@ -17,6 +17,7 @@ import {
 } from "./commands/generate/generate.command";
 import { migrateCommand } from "./commands/migrate.command";
 import { openApiGeneratorCommand } from "./commands/openapi-generator.command";
+import { postmanGeneratorCommand } from "./commands/postman-generator.command";
 import { routesCommand, routesDiffCommand } from "./commands/routes.command";
 import { seedCommand } from "./commands/seed.command";
 import { startProductionCommand } from "./commands/start-production.command";
@@ -29,6 +30,7 @@ export const frameworkCommands = [
   devServerCommand,
   typingsGeneratorCommand,
   openApiGeneratorCommand,
+  postmanGeneratorCommand,
 
   // diagnostics commands
   doctorCommand,

@@ -1,6 +1,13 @@
+import { openApiToPostmanCollection } from "./postman/openapi-to-postman-collection";
+import type { PostmanCollection, PostmanCollectionOptions } from "./postman/postman-types";
 import type { OpenApiBuildResult } from "./types";
 
 type DevelopmentOpenApiProvider = () => Promise<OpenApiBuildResult>;
+
+export type DevelopmentPostmanResult = {
+  collection: PostmanCollection;
+  warnings: string[];
+};
 
 let provider: DevelopmentOpenApiProvider | undefined;
 
@@ -24,4 +31,17 @@ export async function getDevelopmentOpenApiDocument(): Promise<OpenApiBuildResul
   }
 
   return provider();
+}
+
+/**
+ * The Postman collection (v2.1.0) for the routes registered in this process: the development
+ * OpenAPI document run through `openApiToPostmanCollection`, so both always agree. Throws
+ * outside `warlock dev`, like `getDevelopmentOpenApiDocument`.
+ */
+export async function getDevelopmentPostmanCollection(
+  options: PostmanCollectionOptions = {},
+): Promise<DevelopmentPostmanResult> {
+  const { document, warnings } = await getDevelopmentOpenApiDocument();
+
+  return { collection: openApiToPostmanCollection(document, options), warnings };
 }
