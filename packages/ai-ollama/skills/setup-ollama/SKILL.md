@@ -1,6 +1,6 @@
 ---
 name: setup-ollama
-description: 'Wire @warlock.js/ai-ollama — new OllamaSDK({host?, headers?}) for local / self-hosted Ollama via the official ollama client (not OpenAI-compat). chat + embed, daemon-down error handling. .model({name, vision?, reasoning?}) with cost-truth capabilities — reasoning inferred from thinking-model tags (deepseek-r1/qwq/qwen3/gpt-oss…), promptCaching/audio/pdf honestly false; options.reasoning → Ollama native `think` flag; usage reasoningTokens/cachedTokens stay undefined (none reported). Triggers: `OllamaSDK`, `ollama.model`, `ollama.embedder`, `embedder.embedMany`, `ollama.count`, `host`, `headers`, `reasoning`, `think`, thinking models, `deepseek-r1`, `qwq`, `qwen3`, `gpt-oss`; "use ollama with warlock", "run llama3 locally", "self-hosted llama", "ollama reasoning / thinking models", "deepseek-r1 with warlock"; typical import `import { OllamaSDK } from "@warlock.js/ai-ollama"`. Skip: agent loop — `@warlock.js/ai/run-ai-agent/SKILL.md`; provider choice — `@warlock.js/ai/pick-ai-provider/SKILL.md`; embeddings core — `@warlock.js/ai/embed-text/SKILL.md`; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`; raw `ollama` npm, Vercel `@ai-sdk/ollama`; OpenAI-compat gateway via `@warlock.js/ai-openai` `baseURL`.'
+description: 'Wire @warlock.js/ai-ollama — new OllamaSDK({host?, headers?}) for local / self-hosted Ollama via the official ollama client (not OpenAI-compat). chat + embed, daemon-down error handling. .model({name, vision?, reasoning?}) with cost-truth capabilities — reasoning inferred from thinking-model tags (deepseek-r1/qwq/qwen3/gpt-oss…), promptCaching/audio/pdf honestly false; options.reasoning → Ollama native `think` flag; usage reasoningTokens/cachedTokens stay undefined (none reported). Triggers: `OllamaSDK`, `ollama.model`, `ollama.embedder`, `embedder.embedMany`, `ollama.count`, `host`, `headers`, `reasoning`, `think`, thinking models, `deepseek-r1`, `qwq`, `qwen3`, `gpt-oss`; "use ollama with warlock", "run llama3 locally", "self-hosted llama", "ollama reasoning / thinking models", "deepseek-r1 with warlock"; typical import `import { OllamaSDK } from "@warlock.js/ai-ollama"`. Skip: agent loop — the `run-ai-agent` topic of the `warlock-js-ai` skill; provider choice — the `pick-ai-provider` topic of the `warlock-js-ai` skill; embeddings core — the `embed-text` topic of the `warlock-js-ai` skill; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`; raw `ollama` npm, Vercel `@ai-sdk/ollama`; OpenAI-compat gateway via `@warlock.js/ai-openai` `baseURL`.'
 ---
 
 # `@warlock.js/ai-ollama`
@@ -133,6 +133,6 @@ Per-call `Usage` comes from the chat response's `prompt_eval_count` (→ `input`
 
 ## See also
 
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md)
-- [`@warlock.js/ai/pick-ai-provider/SKILL.md`](@warlock.js/ai/pick-ai-provider/SKILL.md)
-- [`@warlock.js/ai/embed-text/SKILL.md`](@warlock.js/ai/embed-text/SKILL.md)
+- The `run-ai-agent` topic of the `warlock-js-ai` skill
+- The `pick-ai-provider` topic of the `warlock-js-ai` skill
+- The `embed-text` topic of the `warlock-js-ai` skill
