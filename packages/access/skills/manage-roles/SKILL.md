@@ -1,6 +1,6 @@
 ---
 name: manage-roles
-description: 'Assign and read roles in `@warlock.js/access` — the ejected `UserRole.assign` / `UserRole.revoke` (the `user_roles` table) followed by `access.flush`, plus `hasRole` / `hasAnyRole` / `hasAllRoles`. The role→permission catalog is the ejected `Role` table (dynamic). TRIGGER: `UserRole.assign`, `UserRole.revoke`, `access.flush`, `hasRole`, `hasAnyRole`, `hasAllRoles`, `Role` table, "give a user a role", "assign role", "check a user role", "roles per tenant". Skip: permission checks — `@warlock.js/access/check-permissions/SKILL.md`; resolver choice — `@warlock.js/access/configure-access/SKILL.md`.'
+description: 'Assign and read roles in `@warlock.js/access` — the ejected `UserRole.assign` / `UserRole.revoke` (the `user_roles` table) followed by `access.flush`, plus `hasRole` / `hasAnyRole` / `hasAllRoles`. The role→permission catalog is the ejected `Role` table (dynamic). TRIGGER: `UserRole.assign`, `UserRole.revoke`, `access.flush`, `hasRole`, `hasAnyRole`, `hasAllRoles`, `Role` table, "give a user a role", "assign role", "check a user role", "roles per tenant". Skip: permission checks — the `check-permissions` topic; resolver choice — the `configure-access` topic.'
 ---
 
 # Manage roles
@@ -62,10 +62,10 @@ The ejected `UserRole` is a thin cascade model — `{ user_id, user_type, role, 
 
 ## Roles stored elsewhere?
 
-If roles live on the user (a `roles` column) or in a token claim, you don't use `UserRole` — you manage assignment your way and a resolver reads them. See [`implement-resolver`](@warlock.js/access/implement-resolver/SKILL.md).
+If roles live on the user (a `roles` column) or in a token claim, you don't use `UserRole` — you manage assignment your way and a resolver reads them. See the `implement-resolver` topic.
 
 ## See also
 
-- [`@warlock.js/access/configure-access/SKILL.md`](@warlock.js/access/configure-access/SKILL.md) — choosing the resolver.
-- [`@warlock.js/access/implement-resolver/SKILL.md`](@warlock.js/access/implement-resolver/SKILL.md) — non-table role storage.
+- The `configure-access` topic — choosing the resolver.
+- The `implement-resolver` topic — non-table role storage.
 ```

@@ -1,6 +1,6 @@
 ---
 name: define-policies
-description: 'ABAC conditions in `@warlock.js/access` — `definePolicy(permission, (user, resource, ctx) => boolean)` adds an instance-level rule (ownership / tenant / state) on top of the RBAC grant, evaluated when an authorization check carries a `resource`. TRIGGER: `definePolicy`, "ownership check", "only their own", "can edit this specific record", "ABAC", "policy", "resource-level permission", `authorize(user, perm, { resource })`. Skip: plain grant checks — `@warlock.js/access/check-permissions/SKILL.md`.'
+description: 'ABAC conditions in `@warlock.js/access` — `definePolicy(permission, (user, resource, ctx) => boolean)` adds an instance-level rule (ownership / tenant / state) on top of the RBAC grant, evaluated when an authorization check carries a `resource`. TRIGGER: `definePolicy`, "ownership check", "only their own", "can edit this specific record", "ABAC", "policy", "resource-level permission", `authorize(user, perm, { resource })`. Skip: plain grant checks — the `check-permissions` topic.'
 ---
 
 # Define policies (ABAC)
@@ -36,7 +36,7 @@ So `gate("orders.update")` (a route gate, no resource) checks the grant; the per
 ## The decision = grant AND policy
 
 - No grant → denied (the policy never runs).
-- Grant + no policy registered → **denied by default** (`strictPolicies: true`, the 5.13+ default) — a typo'd permission or a forgotten `import "./policies"` must never silently degrade an instance check to a class-level one. Logs a one-time `log.warn` naming the permission either way. Set `strictPolicies: false` in the access config (see [`configure-access`](@warlock.js/access/configure-access/SKILL.md)) to explicitly restore the pre-5.13 RBAC-only fallback (allowed).
+- Grant + no policy registered → **denied by default** (`strictPolicies: true`, the 5.13+ default) — a typo'd permission or a forgotten `import "./policies"` must never silently degrade an instance check to a class-level one. Logs a one-time `log.warn` naming the permission either way. Set `strictPolicies: false` in the access config (see the `configure-access` topic) to explicitly restore the pre-5.13 RBAC-only fallback (allowed).
 - Grant + policy → the policy decides.
 
 Policies **deny**, they don't grant — a policy can't let a user past a permission they don't hold.
@@ -65,4 +65,4 @@ definePolicy("orders.refund", (user, order, ctx) =>
 
 ## See also
 
-- [`@warlock.js/access/check-permissions/SKILL.md`](@warlock.js/access/check-permissions/SKILL.md) — `authorize(…, { resource })`.
+- The `check-permissions` topic — `authorize(…, { resource })`.

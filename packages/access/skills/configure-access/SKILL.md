@@ -1,6 +1,6 @@
 ---
 name: configure-access
-description: 'Configure `@warlock.js/access` — the REQUIRED `resolver` (the quickstart `DefaultAccessResolver` over a fixed code map vs the ejected, DB-backed `DatabaseAccessResolver`), `cache: { ttl }`, and the ambient tenant via the resolver''s optional `resolveTenant()`. TRIGGER: `AccessConfigurations`, `config.access`, `src/config/access.ts`, "set up permissions", "DefaultAccessResolver", "DatabaseAccessResolver", "access cache ttl", "access tenant". Skip: checking permissions — `@warlock.js/access/check-permissions/SKILL.md`; custom storage — `@warlock.js/access/implement-resolver/SKILL.md`.'
+description: 'Configure `@warlock.js/access` — the REQUIRED `resolver` (the quickstart `DefaultAccessResolver` over a fixed code map vs the ejected, DB-backed `DatabaseAccessResolver`), `cache: { ttl }`, and the ambient tenant via the resolver''s optional `resolveTenant()`. TRIGGER: `AccessConfigurations`, `config.access`, `src/config/access.ts`, "set up permissions", "DefaultAccessResolver", "DatabaseAccessResolver", "access cache ttl", "access tenant". Skip: checking permissions — the `check-permissions` topic; custom storage — the `implement-resolver` topic.'
 ---
 
 # Configure access
@@ -44,7 +44,7 @@ const access: AccessConfigurations = {
 export default access;
 ```
 
-Assign roles via the ejected `UserRole.assign(user, "editor", tenant)` — it flushes that user's cached set for you (see [`manage-roles`](@warlock.js/access/manage-roles/SKILL.md)).
+Assign roles via the ejected `UserRole.assign(user, "editor", tenant)` — it flushes that user's cached set for you (see the `manage-roles` topic).
 
 ## The full shape
 
@@ -62,7 +62,7 @@ type AccessConfigurations = {
 
 An instance check (`{ resource }`) for a permission with no registered ABAC policy **denies by default** (`strictPolicies: true`) — a forgotten policy must never fail open. The miss is logged once per permission (`log.warn`) either way.
 
-Set `strictPolicies: false` to explicitly restore the pre-5.13 behavior: fall back to the RBAC grant alone (ALLOWS — any holder of the permission can act on ANY resource, a plausible IDOR). See [`define-policies`](@warlock.js/access/define-policies/SKILL.md) for the full decision table.
+Set `strictPolicies: false` to explicitly restore the pre-5.13 behavior: fall back to the RBAC grant alone (ALLOWS — any holder of the permission can act on ANY resource, a plausible IDOR). See the `define-policies` topic for the full decision table.
 
 > **Breaking in 5.13:** `strictPolicies` now defaults to `true` and DENIES (it used to default to `false` and ALLOW). Set `strictPolicies: false` to keep the old fail-open fallback.
 
@@ -84,6 +84,6 @@ The engine caches each user's resolved set (`cache.ttl`, default `10m`). Roles c
 
 ## See also
 
-- [`@warlock.js/access/implement-resolver/SKILL.md`](@warlock.js/access/implement-resolver/SKILL.md) — write a resolver for your own storage.
-- [`@warlock.js/access/manage-roles/SKILL.md`](@warlock.js/access/manage-roles/SKILL.md) — assign / revoke with the ejected table.
+- The `implement-resolver` topic — write a resolver for your own storage.
+- The `manage-roles` topic — assign / revoke with the ejected table.
 ```

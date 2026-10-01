@@ -1,6 +1,6 @@
 ---
 name: check-permissions
-description: 'Check permissions in `@warlock.js/access` — `can` / `cannot` / `canAll` / `canAny` (boolean), `authorize` / `authorizeAll` / `authorizeAny` (throw 403), and the `gate` / `gateAny` / `gateAll` route middleware. Class-level vs instance-level (pass a `resource` to run its policy). TRIGGER: `can(`, `authorize(`, `canAll`, `canAny`, `gate`, `gateAny`, `gateAll`, "check a permission", "protect route by permission", "403 forbidden", "any vs all permissions". Skip: ownership / tenant conditions — `@warlock.js/access/define-policies/SKILL.md`; role checks — `@warlock.js/access/manage-roles/SKILL.md`.'
+description: 'Check permissions in `@warlock.js/access` — `can` / `cannot` / `canAll` / `canAny` (boolean), `authorize` / `authorizeAll` / `authorizeAny` (throw 403), and the `gate` / `gateAny` / `gateAll` route middleware. Class-level vs instance-level (pass a `resource` to run its policy). TRIGGER: `can(`, `authorize(`, `canAll`, `canAny`, `gate`, `gateAny`, `gateAll`, "check a permission", "protect route by permission", "403 forbidden", "any vs all permissions". Skip: ownership / tenant conditions — the `define-policies` topic; role checks — the `manage-roles` topic.'
 ---
 
 # Check permissions
@@ -44,7 +44,7 @@ await authorizeAll(user, ["orders.update", "orders.viewCost"]);
 
 ## Instance-level — "this resource"
 
-Pass a `resource` and the permission's policy runs on top of the grant (see [`define-policies`](@warlock.js/access/define-policies/SKILL.md)):
+Pass a `resource` and the permission's policy runs on top of the grant (see the `define-policies` topic):
 
 ```ts
 const order = await Order.find(orderId);
@@ -67,5 +67,5 @@ await authorize(user, "orders.update", { resource: order, tenant }); // grant AN
 
 ## See also
 
-- [`@warlock.js/access/define-policies/SKILL.md`](@warlock.js/access/define-policies/SKILL.md) — the `{ resource }` conditions.
-- [`@warlock.js/auth/protect-routes/SKILL.md`](@warlock.js/auth/protect-routes/SKILL.md) — `authMiddleware`, which runs first.
+- The `define-policies` topic — the `{ resource }` conditions.
+- The `protect-routes` topic of the `warlock-js-auth` skill — `authMiddleware`, which runs first.

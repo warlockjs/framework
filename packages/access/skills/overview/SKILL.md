@@ -28,11 +28,11 @@ Skip if you only need "is the user an admin" — `authMiddleware("admin")` from 
 
 ## Skills index
 
-- [`configure-access`](@warlock.js/access/configure-access/SKILL.md) — the required resolver (`DefaultAccessResolver` vs the ejected `DatabaseAccessResolver`), cache + tenant.
-- [`check-permissions`](@warlock.js/access/check-permissions/SKILL.md) — `can` / `cannot` / `canAll` / `canAny` / `authorize*` + the `gate*` middleware.
-- [`define-policies`](@warlock.js/access/define-policies/SKILL.md) — `definePolicy` for ownership / tenant / state conditions (ABAC).
-- [`manage-roles`](@warlock.js/access/manage-roles/SKILL.md) — assign / revoke via the ejected `UserRole` + `access.flush`, `hasRole` / `hasAnyRole` / `hasAllRoles`.
-- [`implement-resolver`](@warlock.js/access/implement-resolver/SKILL.md) — connect the engine to your storage (a DB catalog, a column, a pivot, a token claim).
+- `configure-access` — the required resolver (`DefaultAccessResolver` vs the ejected `DatabaseAccessResolver`), cache + tenant.
+- `check-permissions` — `can` / `cannot` / `canAll` / `canAny` / `authorize*` + the `gate*` middleware.
+- `define-policies` — `definePolicy` for ownership / tenant / state conditions (ABAC).
+- `manage-roles` — assign / revoke via the ejected `UserRole` + `access.flush`, `hasRole` / `hasAnyRole` / `hasAllRoles`.
+- `implement-resolver` — connect the engine to your storage (a DB catalog, a column, a pivot, a token claim).
 
 ## What it deliberately doesn't do
 
@@ -42,5 +42,5 @@ Skip if you only need "is the user an admin" — `authMiddleware("admin")` from 
 
 ## See also
 
-- [`@warlock.js/auth/overview/SKILL.md`](@warlock.js/auth/overview/SKILL.md) — authentication, the layer below.
-- [`@warlock.js/auth/protect-routes/SKILL.md`](@warlock.js/auth/protect-routes/SKILL.md) — `authMiddleware`; stack `gate` after it.
+- The `overview` topic of the `warlock-js-auth` skill — authentication, the layer below.
+- The `protect-routes` topic of the `warlock-js-auth` skill — `authMiddleware`; stack `gate` after it.

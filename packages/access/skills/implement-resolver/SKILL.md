@@ -1,6 +1,6 @@
 ---
 name: implement-resolver
-description: 'Connect `@warlock.js/access` to your role/permission storage by implementing the `AccessResolver` contract (`resolveRoles` / `resolvePermissions`, optional `resolveTenant`) — for a DB-backed catalog, a user column, a pivot table, a token claim, or an external directory. The engine owns matching / caching / policies; the resolver only fetches. TRIGGER: `AccessResolver`, `DatabaseAccessResolver`, `resolveTenant`, "custom resolver", "where do roles come from", "roles in a token claim", "permissions from an external API", "implement resolver". Skip: the quickstart `DefaultAccessResolver` — `@warlock.js/access/configure-access/SKILL.md`.'
+description: 'Connect `@warlock.js/access` to your role/permission storage by implementing the `AccessResolver` contract (`resolveRoles` / `resolvePermissions`, optional `resolveTenant`) — for a DB-backed catalog, a user column, a pivot table, a token claim, or an external directory. The engine owns matching / caching / policies; the resolver only fetches. TRIGGER: `AccessResolver`, `DatabaseAccessResolver`, `resolveTenant`, "custom resolver", "where do roles come from", "roles in a token claim", "permissions from an external API", "implement resolver". Skip: the quickstart `DefaultAccessResolver` — the `configure-access` topic.'
 ---
 
 # Implement a resolver
@@ -102,5 +102,5 @@ class DirectResolver implements AccessResolver {
 
 ## See also
 
-- [`@warlock.js/access/configure-access/SKILL.md`](@warlock.js/access/configure-access/SKILL.md) — the quickstart `DefaultAccessResolver`.
+- The `configure-access` topic — the quickstart `DefaultAccessResolver`.
 ```
