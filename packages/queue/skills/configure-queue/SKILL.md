@@ -1,6 +1,6 @@
 ---
 name: configure-queue
-description: 'Configure `@warlock.js/queue`: the declarative `src/config/queue.ts` (`QueueConfig` — `connection`, `prefix`, `defaultQueue`, `defaultJobOptions`, `workers: { enabled, concurrency, shutdownTimeout }`), registering `queueConnector()` in `warlock.config.ts > connectors`, running a dispatch-only process, and graceful shutdown. Programmatic `setQueueConfig` / `startWorkers` / `closeQueue` for scripts and tests. Triggers: `QueueConfig`, `queueConnector`, `setQueueConfig`, `startWorkers`, `closeQueue`, `workers.enabled`, `shutdownTimeout`; "configure the queue", "connect BullMQ to Redis", "disable workers in the web process", "graceful shutdown of jobs". Skip: writing jobs — `@warlock.js/queue/define-jobs/SKILL.md`.'
+description: 'Configure `@warlock.js/queue`: the declarative `src/config/queue.ts` (`QueueConfig` — `connection`, `prefix`, `defaultQueue`, `defaultJobOptions`, `workers: { enabled, concurrency, shutdownTimeout }`), registering `queueConnector()` in `warlock.config.ts > connectors`, running a dispatch-only process, and graceful shutdown. Programmatic `setQueueConfig` / `startWorkers` / `closeQueue` for scripts and tests. Triggers: `QueueConfig`, `queueConnector`, `setQueueConfig`, `startWorkers`, `closeQueue`, `workers.enabled`, `shutdownTimeout`; "configure the queue", "connect BullMQ to Redis", "disable workers in the web process", "graceful shutdown of jobs". Skip: writing jobs — the `define-jobs` topic.'
 ---
 
 # Configure the queue
@@ -56,4 +56,4 @@ Every process must use the same `prefix`, or they will not see each other's jobs
 
 ## Dashboard
 
-`QueueConfig` also takes a `dashboard: { enabled, path, middleware }` block — see [`manage-failed-jobs`](../manage-failed-jobs/SKILL.md#dashboard-optional) for the `warlock add bull-board` setup and the production guard (`QueueDashboardUnguardedError`).
+`QueueConfig` also takes a `dashboard: { enabled, path, middleware }` block — see the "Dashboard (optional)" section of the `manage-failed-jobs` topic for the `warlock add bull-board` setup and the production guard (`QueueDashboardUnguardedError`).

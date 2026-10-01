@@ -20,7 +20,7 @@ Durable background jobs. Jobs are stored in **Redis** (required), retried on fai
 
 ## Skills index
 
-- [`configure-queue`](@warlock.js/queue/configure-queue/SKILL.md) — `src/config/queue.ts`, `queueConnector()`, workers on/off, shutdown.
-- [`define-jobs`](@warlock.js/queue/define-jobs/SKILL.md) — `defineJob`, `dispatch` options, retries, progress, `find`.
-- [`manage-failed-jobs`](@warlock.js/queue/manage-failed-jobs/SKILL.md) — `failedJobs`, `retryFailedJob`, the bull-board dashboard.
-- [`queue-notifications`](@warlock.js/queue/queue-notifications/SKILL.md) — `bullmqQueue()` for notifications `.queue()`.
+- `configure-queue` — `src/config/queue.ts`, `queueConnector()`, workers on/off, shutdown.
+- `define-jobs` — `defineJob`, `dispatch` options, retries, progress, `find`.
+- `manage-failed-jobs` — `failedJobs`, `retryFailedJob`, the bull-board dashboard.
+- `queue-notifications` — `bullmqQueue()` for notifications `.queue()`.
