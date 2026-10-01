@@ -412,11 +412,15 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
     const errors: ValidationResult["errors"] = [];
     const validatedData: any = {};
 
+    // Child validators settle in completion order, so errors are collected per
+    // field and flattened in declared schema order for deterministic output.
+    const fieldErrors: Array<ValidationResult["errors"]> = [];
+
     const userInputEntries = Object.entries(this.schema).filter(
       ([, validator]) => !this.isComputedValidator(validator),
     );
 
-    const validationPromises = userInputEntries.map(async ([key, validator]) => {
+    const validationPromises = userInputEntries.map(async ([key, validator], index) => {
       const value =
         mutatedData?.[key] !== undefined ? mutatedData[key] : validator.getDefaultValue();
 
@@ -436,11 +440,17 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
       }
 
       if (childResult.isValid === false) {
-        errors.push(...childResult.errors);
+        fieldErrors[index] = childResult.errors;
       }
     });
 
     await Promise.all(validationPromises);
+
+    for (const childErrors of fieldErrors) {
+      if (childErrors) {
+        errors.push(...childErrors);
+      }
+    }
 
     // If Phase 1 failed, return early
     if (errors.length > 0) {
@@ -456,7 +466,9 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
     // ═══════════════════════════════════════════════════════════
     const computedFields = this.getComputedFields();
 
-    const computedPromises = Object.entries(computedFields).map(async ([key, validator]) => {
+    const computedErrors: Array<ValidationResult["errors"]> = [];
+
+    const computedPromises = Object.entries(computedFields).map(async ([key, validator], index) => {
       const childContext: SchemaContext = {
         ...context,
         parent: validatedData,
@@ -472,11 +484,17 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
       }
 
       if (childResult.isValid === false) {
-        errors.push(...childResult.errors);
+        computedErrors[index] = childResult.errors;
       }
     });
 
     await Promise.all(computedPromises);
+
+    for (const childErrors of computedErrors) {
+      if (childErrors) {
+        errors.push(...childErrors);
+      }
+    }
 
     // If Phase 2 failed, return early
     if (errors.length > 0) {
@@ -487,8 +505,18 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
       };
     }
 
+    // Fields were assigned in the order their validators finished; re-emit
+    // them in declared schema order so the output shape is deterministic.
+    const orderedData: any = {};
+
+    for (const key of Object.keys(this.schema)) {
+      if (key in validatedData) {
+        orderedData[key] = validatedData[key];
+      }
+    }
+
     // Remove undefined values
-    const cleanedData = removeUndefinedValues(validatedData);
+    const cleanedData = removeUndefinedValues(orderedData);
 
     const transformedData = await this.startTransformationPipeline(cleanedData, context);
 

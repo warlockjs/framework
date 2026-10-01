@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/seal` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.28.0
+
+### Fixed
+
+- `v.object()` now emits its validated output (and reports child errors) in declared schema order instead of the order async field validators happened to finish, so output key order is deterministic; unknown keys kept by `allowUnknown()` follow the declared keys in input order.
+
 ## 5.27.0 - 2026-10-01
 
 ### Changed
