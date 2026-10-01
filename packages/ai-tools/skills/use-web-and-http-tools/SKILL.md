@@ -1,6 +1,6 @@
 ---
 name: use-web-and-http-tools
-description: 'Wire the @warlock.js/ai-tools belt — web search, fetch/scrape, HTTP/REST, calculator, date-time — into an agent under their guardrails. Triggers: `ai.tools.webSearch`, `ai.tools.fetchUrl`, `ai.tools.http`, `ai.tools.calculator`, `ai.tools.dateTime`, `webSearchTool`, `fetchUrlTool`, `httpRequestTool`, `calculatorTool`, `dateTimeTool`, `web_search`, `fetch_url`, `http_request`, `calculator`, `date_time`, `WebToolError`, `HttpPolicyError`, `CalculatorError`, `DateTimeError`, `allowHosts`, `allowMethods`, `allowPrivateNetwork`, `baseUrl`, `maxBytes`, `guardedFetch`, `SearchProvider`, `TAVILY_API_KEY`; ''give an agent web search'', ''let an agent fetch/scrape a page'', ''let an agent call a REST API'', ''restrict which hosts/methods an agent can hit'', ''add a calculator/date tool to an agent'', ''SSRF guardrail for an agent tool'', ''let a tool reach an internal/dev service''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: connecting to an external MCP server — `@warlock.js/ai-tools/connect-mcp-server/SKILL.md`; exposing tools AS an MCP server — `@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`; filesystem/shell tools — `@warlock.js/ai-workspace/use-a-workspace/SKILL.md`; defining your own custom tool — `@warlock.js/ai/define-ai-tool/SKILL.md`.'
+description: 'Wire the @warlock.js/ai-tools belt — web search, fetch/scrape, HTTP/REST, calculator, date-time — into an agent under their guardrails. Triggers: `ai.tools.webSearch`, `ai.tools.fetchUrl`, `ai.tools.http`, `ai.tools.calculator`, `ai.tools.dateTime`, `webSearchTool`, `fetchUrlTool`, `httpRequestTool`, `calculatorTool`, `dateTimeTool`, `web_search`, `fetch_url`, `http_request`, `calculator`, `date_time`, `WebToolError`, `HttpPolicyError`, `CalculatorError`, `DateTimeError`, `allowHosts`, `allowMethods`, `allowPrivateNetwork`, `baseUrl`, `maxBytes`, `guardedFetch`, `SearchProvider`, `TAVILY_API_KEY`; ''give an agent web search'', ''let an agent fetch/scrape a page'', ''let an agent call a REST API'', ''restrict which hosts/methods an agent can hit'', ''add a calculator/date tool to an agent'', ''SSRF guardrail for an agent tool'', ''let a tool reach an internal/dev service''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: connecting to an external MCP server — the `connect-mcp-server` topic; exposing tools AS an MCP server — the `expose-as-mcp-server` topic; filesystem/shell tools — the `use-a-workspace` topic of the `warlock-js-ai-workspace` skill; defining your own custom tool — the `define-ai-tool` topic of the `warlock-js-ai` skill.'
 ---
 
 # Use the web + HTTP tool belt
@@ -122,8 +122,8 @@ if (error instanceof WebToolError && error.type === "denied-host") {
 
 ## See also
 
-- [`@warlock.js/ai-tools/connect-mcp-server/SKILL.md`](@warlock.js/ai-tools/connect-mcp-server/SKILL.md) — adapt an external MCP server's tools as agent tools.
-- [`@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`](@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md) — publish these tools AS an MCP server.
-- [`@warlock.js/ai-workspace/use-a-workspace/SKILL.md`](@warlock.js/ai-workspace/use-a-workspace/SKILL.md) — the filesystem + shell tool belt (jailed `read_file` / `edit_file` / `run_shell` / …).
-- [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) — the `tool()` / `ToolContract` seam every tool here is built on.
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent that consumes these tools.
+- The `connect-mcp-server` topic — adapt an external MCP server's tools as agent tools.
+- The `expose-as-mcp-server` topic — publish these tools AS an MCP server.
+- The `use-a-workspace` topic of the `warlock-js-ai-workspace` skill — the filesystem + shell tool belt (jailed `read_file` / `edit_file` / `run_shell` / …).
+- The `define-ai-tool` topic of the `warlock-js-ai` skill — the `tool()` / `ToolContract` seam every tool here is built on.
+- The `run-ai-agent` topic of the `warlock-js-ai` skill — running the agent that consumes these tools.
