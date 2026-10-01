@@ -1,6 +1,6 @@
 ---
 name: orchestrate-contexts
-description: 'Orchestrate multiple Context<TStore> instances via the contextManager singleton — register, buildStores, runAll, enterAll, clearAll. Triggers: `contextManager`, `register`, `buildStores`, `runAll`, `enterAll`, `clearAll`, `unregister`, `getContext`, `hasContext`; "run multiple contexts active for the same scope", "register contexts at boot", "avoid nested run() calls for request + database + tenant"; typical import `import { contextManager } from "@warlock.js/context"`. Skip: defining a single context class — `@warlock.js/context/define-context/SKILL.md`; native `AsyncLocalStorage` nesting, `cls-hooked` namespaces.'
+description: 'Orchestrate multiple Context<TStore> instances via the contextManager singleton — register, buildStores, runAll, enterAll, clearAll. Triggers: `contextManager`, `register`, `buildStores`, `runAll`, `enterAll`, `clearAll`, `unregister`, `getContext`, `hasContext`; "run multiple contexts active for the same scope", "register contexts at boot", "avoid nested run() calls for request + database + tenant"; typical import `import { contextManager } from "@warlock.js/context"`. Skip: defining a single context class — the `define-context` topic; native `AsyncLocalStorage` nesting, `cls-hooked` namespaces.'
 ---
 
 # Orchestrate contexts — `contextManager`
@@ -57,7 +57,7 @@ app.use(async (req, res, next) => {
 });
 ```
 
-`buildStores(payload)` calls each registered context's `buildStore(payload)` (the abstract method on `Context<TStore>` — see [`@warlock.js/context/define-context/SKILL.md`](@warlock.js/context/define-context/SKILL.md)) and returns `{ [contextName]: store }`.
+`buildStores(payload)` calls each registered context's `buildStore(payload)` (the abstract method on `Context<TStore>` — see the `define-context` topic) and returns `{ [contextName]: store }`.
 
 `runAll(stores, fn)` nests every context's `run()` in registration order, then invokes `fn` at the innermost layer. All contexts are active inside `fn`.
 

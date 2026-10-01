@@ -23,7 +23,7 @@ Each `Context<TStore>` subclass declares a typed store shape and what payload bu
 
 Two task skills cover everything. The first one is the daily-use one; the second is for when you have multiple contexts active at the same time.
 
-### [`define-context/`](../define-context/SKILL.md)
+### `define-context`
 
 Extend `Context<TStore>` to declare what your context stores and how it's
 built. Implement `buildStore(payload?)`; use `run` / `enter` / `update` /
@@ -34,7 +34,7 @@ Load when sharing data (user, tenant, trace id) across async calls
 without threading it through every function — i.e. ~90% of the time you
 use this package.
 
-### [`orchestrate-contexts/`](../orchestrate-contexts/SKILL.md)
+### `orchestrate-contexts`
 
 Register multiple `Context<TStore>` instances on the `contextManager`
 singleton and run them all together with a single call. Covers
@@ -63,5 +63,5 @@ Load when several contexts apply to the same scope (request + database
 
 ## See also
 
-- [`@warlock.js/core/overview/SKILL.md`](@warlock.js/core/overview/SKILL.md) — the parent framework; `context` is one of its foundation packages.
-- `mongez-agent-kit-authoring-skills` (load via agent-kit sync) — how this `overview/SKILL.md` becomes the front-door skill in `.claude/skills/warlock-js-context-overview/`.
+- The `overview` topic of the `warlock-js-core` skill — the parent framework; `context` is one of its foundation packages.
+- `mongez-agent-kit-authoring-skills` (load via agent-kit sync) — how this `overview` topic becomes the front-door skill in `.claude/skills/warlock-js-context-overview/`.
