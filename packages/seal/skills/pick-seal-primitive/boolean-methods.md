@@ -1,6 +1,6 @@
 # `v.boolean()` — method reference
 
-Picking guide is in [`@warlock.js/seal/pick-seal-primitive/SKILL.md`](@warlock.js/seal/pick-seal-primitive/SKILL.md). Membership rules (`.in`/`.oneOf`) inherited from PrimitiveValidator — see [`@warlock.js/seal/compose-seal-modifiers/SKILL.md`](@warlock.js/seal/compose-seal-modifiers/SKILL.md).
+Picking guide is in the `pick-seal-primitive` topic. Membership rules (`.in`/`.oneOf`) inherited from PrimitiveValidator — see the `compose-seal-modifiers` topic.
 
 ## Strict equality
 

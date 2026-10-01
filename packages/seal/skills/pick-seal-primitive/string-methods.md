@@ -2,7 +2,7 @@
 
 Reference for `v.string()` / `v.email()`. Covers length, format, content, color, mutators (case, trim, mask, slug, base64, …) and what each maps to in JSON Schema.
 
-For the picking guide (`v.string` vs `v.scalar` vs `v.literal`), see [`@warlock.js/seal/pick-seal-primitive/SKILL.md`](@warlock.js/seal/pick-seal-primitive/SKILL.md). For `.optional()` / `.nullable()` / `.default()` / `.in()` / `.oneOf()`, see [`@warlock.js/seal/compose-seal-modifiers/SKILL.md`](@warlock.js/seal/compose-seal-modifiers/SKILL.md).
+For the picking guide (`v.string` vs `v.scalar` vs `v.literal`), see the `pick-seal-primitive` topic. For `.optional()` / `.nullable()` / `.default()` / `.in()` / `.oneOf()`, see the `compose-seal-modifiers` topic.
 
 ## Length
 
@@ -136,7 +136,7 @@ JSON Schema: `format: "color"` for `.hexColor()`; the others map to `format: "co
 
 ## Mutator vs transformer
 
-The methods above are **all mutators** — they reshape the value *before* validation rules run. If you want post-validation reshaping, attach via `.addTransformer(fn)` (see [`@warlock.js/seal/compose-seal-modifiers/SKILL.md`](@warlock.js/seal/compose-seal-modifiers/SKILL.md)).
+The methods above are **all mutators** — they reshape the value *before* validation rules run. If you want post-validation reshaping, attach via `.addTransformer(fn)` (see the `compose-seal-modifiers` topic).
 
 Practical implication: `v.string().min(3).trim()` runs `min(3)` against the *un-trimmed* input. To check trimmed length, mutate first: `v.string().trim().min(3)`.
 

@@ -1,6 +1,6 @@
 ---
 name: extend-seal-with-plugins
-description: 'Author a custom seal plugin to add validator methods (`.slug`, `.postalCode`, etc) — `SealPlugin` shape, `registerPlugin` lifecycle, TS prototype augmentation. Triggers: `SealPlugin`, `registerPlugin`, `unregisterPlugin`, `hasPlugin`, `getInstalledPlugins`, `StringValidator`, `NumberValidator`, `DateValidator`, `BaseValidator`, `install`, `uninstall`; "how do I add a custom validator method", "write a seal plugin", "extend v.string with .slug", "module augmentation for seal"; typical import `import { StringValidator, registerPlugin, type SealPlugin } from "@warlock.js/seal"`. Skip: built-in primitives — `@warlock.js/seal/pick-seal-primitive/SKILL.md`; bridge typing — `@warlock.js/seal/bridge-standard-schema/SKILL.md`; competing `zod` `.refine`/`.transform`.'
+description: 'Author a custom seal plugin to add validator methods (`.slug`, `.postalCode`, etc) — `SealPlugin` shape, `registerPlugin` lifecycle, TS prototype augmentation. Triggers: `SealPlugin`, `registerPlugin`, `unregisterPlugin`, `hasPlugin`, `getInstalledPlugins`, `StringValidator`, `NumberValidator`, `DateValidator`, `BaseValidator`, `install`, `uninstall`; "how do I add a custom validator method", "write a seal plugin", "extend v.string with .slug", "module augmentation for seal"; typical import `import { StringValidator, registerPlugin, type SealPlugin } from "@warlock.js/seal"`. Skip: built-in primitives — the `pick-seal-primitive` topic; bridge typing — the `bridge-standard-schema` topic; competing `zod` `.refine`/`.transform`.'
 ---
 
 # Extend seal with plugins
@@ -9,7 +9,7 @@ Seal exposes a plugin system so you can add validator methods without forking th
 
 ## When to reach for a plugin
 
-- The validator method you want **does not exist** in built-in seal — check [`@warlock.js/seal/pick-seal-primitive/SKILL.md`](@warlock.js/seal/pick-seal-primitive/SKILL.md) and its method references first.
+- The validator method you want **does not exist** in built-in seal — check the `pick-seal-primitive` topic and its method references first.
 - The validation is **stable and reusable** across modules — domain-specific formats (IBAN, postal codes, tax IDs, license plates, internal ID schemes).
 - You want the **chainable syntax** — `v.string().slug()` reads better than `v.string().pattern(/.../).addMutator(s => slugify(s))` at every call site.
 
@@ -100,7 +100,7 @@ declare module "@warlock.js/seal" {
 
 After this file is included in the project's `tsconfig.json` (via `include` or a side-effect import), `v.string().slug()` autocompletes and type-checks everywhere.
 
-**Important.** The augmentation has to declare on the **class** (`StringValidator`), not the factory return type. The factory return widens with `& StandardSchemaV1<...>` (see [`@warlock.js/seal/bridge-standard-schema/SKILL.md`](@warlock.js/seal/bridge-standard-schema/SKILL.md)) — augmentations on the intersection don't propagate. Patch the class, augment the class; the factory return picks up the new methods through structural inference.
+**Important.** The augmentation has to declare on the **class** (`StringValidator`), not the factory return type. The factory return widens with `& StandardSchemaV1<...>` (see the `bridge-standard-schema` topic) — augmentations on the intersection don't propagate. Patch the class, augment the class; the factory return picks up the new methods through structural inference.
 
 ## Larger example — postal codes per country
 

@@ -1,6 +1,6 @@
 # `v.array(itemValidator)` — method reference
 
-The inner validator runs against each element. Failure on any element fails the array. Picking guide (array vs tuple vs record) is in [`@warlock.js/seal/define-structural-shape/SKILL.md`](@warlock.js/seal/define-structural-shape/SKILL.md).
+The inner validator runs against each element. Failure on any element fails the array. Picking guide (array vs tuple vs record) is in the `define-structural-shape` topic.
 
 ## Length
 

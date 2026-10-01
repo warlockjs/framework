@@ -1,6 +1,6 @@
 # `v.object({...})` — method reference
 
-Picking guide for structural validators is in [`@warlock.js/seal/define-structural-shape/SKILL.md`](@warlock.js/seal/define-structural-shape/SKILL.md). For field-level chaining (`.required` / `.optional` / `.attribute`), see [`@warlock.js/seal/compose-seal-modifiers/SKILL.md`](@warlock.js/seal/compose-seal-modifiers/SKILL.md).
+Picking guide for structural validators is in the `define-structural-shape` topic. For field-level chaining (`.required` / `.optional` / `.attribute`), see the `compose-seal-modifiers` topic.
 
 ## Schema composition
 

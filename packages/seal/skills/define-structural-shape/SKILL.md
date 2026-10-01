@@ -1,6 +1,6 @@
 ---
 name: define-structural-shape
-description: 'Compose `v.object` / `v.array` / `v.record` / `v.tuple` / `v.union` / `v.discriminatedUnion` / `v.lazy`. Triggers: `v.object`, `v.array`, `v.record`, `v.tuple`, `v.union`, `v.discriminatedUnion`, `v.lazy`, `ObjectValidator`; "how do I build an object schema", "dynamic-keyed record", "tagged union with discriminator", "recursive schema", "self-referencing schema"; typical import `import { v, type Infer } from "@warlock.js/seal"`. Skip: leaf primitives — `@warlock.js/seal/pick-seal-primitive/SKILL.md`; modifiers — `@warlock.js/seal/compose-seal-modifiers/SKILL.md`; standard-schema bridge — `@warlock.js/seal/bridge-standard-schema/SKILL.md`; competing libs `zod`, `valibot`.'
+description: 'Compose `v.object` / `v.array` / `v.record` / `v.tuple` / `v.union` / `v.discriminatedUnion` / `v.lazy`. Triggers: `v.object`, `v.array`, `v.record`, `v.tuple`, `v.union`, `v.discriminatedUnion`, `v.lazy`, `ObjectValidator`; "how do I build an object schema", "dynamic-keyed record", "tagged union with discriminator", "recursive schema", "self-referencing schema"; typical import `import { v, type Infer } from "@warlock.js/seal"`. Skip: leaf primitives — the `pick-seal-primitive` topic; modifiers — the `compose-seal-modifiers` topic; standard-schema bridge — the `bridge-standard-schema` topic; competing libs `zod`, `valibot`.'
 ---
 
 # Structural validators — picking guide
@@ -124,11 +124,11 @@ Use for: trees (categories, file systems), threaded data (comment chains), mutua
 | One of N scalar types | `v.union([...])` |
 | One of N object shapes with a tag field | `v.discriminatedUnion(key, [...])` |
 | Self-referencing or forward reference | `v.lazy(() => schema)` |
-| One of N constants | `v.literal(...values)` (not structural — see [`@warlock.js/seal/pick-seal-primitive/SKILL.md`](@warlock.js/seal/pick-seal-primitive/SKILL.md)) |
+| One of N constants | `v.literal(...values)` (not structural — see the `pick-seal-primitive` topic) |
 
 ## A note on cascade Models
 
-`@warlock.js/cascade` Models declare `static schema: ObjectValidator<TSchema>`. Passing a `v.object({...})` works directly — the factory return widens to fit the Model's invariant generic without breaking type checking. If TS complains *"`ObjectValidator<{specific}>` is not assignable to `ObjectValidator<TSchema>`"*, that's the variance trap and the answer isn't to widen the schema — it's almost always that `Model<TSchema>` was parameterized with a hand-rolled type that drifted from the schema's inferred shape. Fix the type, not the schema. See [`@warlock.js/seal/bridge-standard-schema/SKILL.md`](@warlock.js/seal/bridge-standard-schema/SKILL.md).
+`@warlock.js/cascade` Models declare `static schema: ObjectValidator<TSchema>`. Passing a `v.object({...})` works directly — the factory return widens to fit the Model's invariant generic without breaking type checking. If TS complains *"`ObjectValidator<{specific}>` is not assignable to `ObjectValidator<TSchema>`"*, that's the variance trap and the answer isn't to widen the schema — it's almost always that `Model<TSchema>` was parameterized with a hand-rolled type that drifted from the schema's inferred shape. Fix the type, not the schema. See the `bridge-standard-schema` topic.
 
 ## Method-surface reference
 

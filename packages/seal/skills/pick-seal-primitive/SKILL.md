@@ -1,6 +1,6 @@
 ---
 name: pick-seal-primitive
-description: 'Pick the right `v` factory primitive — string / int / literal / date / enum / computed / managed / instanceof / any. Triggers: `v.string`, `v.email`, `v.number`, `v.int`, `v.float`, `v.numeric`, `v.boolean`, `v.scalar`, `v.date`, `v.literal`, `v.enum`, `v.instanceof`, `v.computed`, `v.managed`, `v.any`; "v.string vs v.scalar", "v.literal vs v.enum", "v.date vs v.instanceof(Date)", "what is v.computed"; typical import `import { v } from "@warlock.js/seal"`. Skip: structural shapes — `@warlock.js/seal/define-structural-shape/SKILL.md`; modifiers — `@warlock.js/seal/compose-seal-modifiers/SKILL.md`; competing libs `zod`, `valibot`, `yup`.'
+description: 'Pick the right `v` factory primitive — string / int / literal / date / enum / computed / managed / instanceof / any. Triggers: `v.string`, `v.email`, `v.number`, `v.int`, `v.float`, `v.numeric`, `v.boolean`, `v.scalar`, `v.date`, `v.literal`, `v.enum`, `v.instanceof`, `v.computed`, `v.managed`, `v.any`; "v.string vs v.scalar", "v.literal vs v.enum", "v.date vs v.instanceof(Date)", "what is v.computed"; typical import `import { v } from "@warlock.js/seal"`. Skip: structural shapes — the `define-structural-shape` topic; modifiers — the `compose-seal-modifiers` topic; competing libs `zod`, `valibot`, `yup`.'
 ---
 
 # Picking the right primitive
@@ -124,7 +124,7 @@ Both are **skipped** when their parent `v.object` generates JSON Schema — they
 | Date in the past | `v.date().past()` |
 | File upload | `v.instanceof(File)` |
 | Class instance (not Date) | `v.instanceof(Ctor)` |
-| Discriminated union | see [`@warlock.js/seal/define-structural-shape/SKILL.md`](@warlock.js/seal/define-structural-shape/SKILL.md) |
+| Discriminated union | see the `define-structural-shape` topic |
 | Derived value (computed from siblings) | `v.computed<T>(callback)` |
 | Framework-injected value | `v.managed<T>(callback)` |
 | Free-form / pass-through | `v.any()` (only when you've thought about it) |
@@ -138,7 +138,7 @@ Each primitive's full method list lives in a sibling file:
 - [`date-methods.md`](./date-methods.md) — `.min` / `.before` / `.after` / `.today` / `.past` / `.future` / `.weekDay` / `.minAge` / `.year` / `.quarter` / `.toISOString` / …
 - [`boolean-methods.md`](./boolean-methods.md) — `.accepted` / `.declined` / `.mustBeTrue` / `.mustBeFalse` / `.acceptedIf` / `.declinedWithout` / …
 
-For cross-cutting modifiers (`.optional`/`.nullable`/`.default`/`.catch`/`.in`/`.oneOf`), see [`@warlock.js/seal/compose-seal-modifiers/SKILL.md`](@warlock.js/seal/compose-seal-modifiers/SKILL.md). For containers (object/array/record/tuple/union), see [`@warlock.js/seal/define-structural-shape/SKILL.md`](@warlock.js/seal/define-structural-shape/SKILL.md).
+For cross-cutting modifiers (`.optional`/`.nullable`/`.default`/`.catch`/`.in`/`.oneOf`), see the `compose-seal-modifiers` topic. For containers (object/array/record/tuple/union), see the `define-structural-shape` topic.
 
 ## Things NOT to do
 

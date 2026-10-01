@@ -1,6 +1,6 @@
 # `v.date()` — method reference
 
-`v.date()` ships a built-in mutator that normalizes strings, timestamps, and `Date` objects to a `Date` before rules run. Picking guide (`v.date()` vs `v.instanceof(Date)`) is in [`@warlock.js/seal/pick-seal-primitive/SKILL.md`](@warlock.js/seal/pick-seal-primitive/SKILL.md).
+`v.date()` ships a built-in mutator that normalizes strings, timestamps, and `Date` objects to a `Date` before rules run. Picking guide (`v.date()` vs `v.instanceof(Date)`) is in the `pick-seal-primitive` topic.
 
 ## Range — global value comparison
 

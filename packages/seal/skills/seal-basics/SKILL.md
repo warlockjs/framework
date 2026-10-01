@@ -65,15 +65,15 @@ root `v` factory when a schema needs other factories.
 
 The 12 things that are true in every seal use:
 
-1. **Public API is the `v` factory.** Never `new ObjectValidator(...)` from app code — bare classes lose the StandardSchema bridge typing. See [`@warlock.js/seal/bridge-standard-schema/SKILL.md`](@warlock.js/seal/bridge-standard-schema/SKILL.md).
+1. **Public API is the `v` factory.** Never `new ObjectValidator(...)` from app code — bare classes lose the StandardSchema bridge typing. See the `bridge-standard-schema` topic.
 2. **Every factory return is a `StandardSchemaV1<Infer.Output<T>>`.** Pass seal schemas straight into `StandardSchemaV1<T>`-typed slots — no casts.
 3. **Two inference helpers — `Infer.Input<T>` and `Infer.Output<T>`.** Bare `Infer<T>` is an alias for `Infer.Input<T>` (the dominant usage: HTTP bodies, DTOs, form payloads). Use `Infer.Output<T>` for validated state (Cascade `Model<>` params, post-`validate()` data). See [the rules below](#inferinput-vs-inferoutput).
 4. **Fields are required by default.** Mark optional explicitly: `.optional()`. Skip `.required()` — canonical seal style omits the redundant call; inferred types already show what's required.
-5. **`validate(schema, data)` never throws.** Returns `Promise<ValidationResult>` with `{ isValid, data, errors }` — the validated value is `result.data`. See [`@warlock.js/seal/handle-seal-errors/SKILL.md`](@warlock.js/seal/handle-seal-errors/SKILL.md).
+5. **`validate(schema, data)` never throws.** Returns `Promise<ValidationResult>` with `{ isValid, data, errors }` — the validated value is `result.data`. See the `handle-seal-errors` topic.
 6. **Validators are immutable by default.** Every chain method (`.min(3)`, `.email()`, `.optional()`, …) returns a clone. Toggle with the `.mutable` getter.
 7. **Two pipelines: mutators (pre-validation), transformers (post-validation).** Order: `default → mutators → required check → required-condition rule → other rules → transformers → data`. `.catch(fallback)` rescues any failure on leaf validators.
 8. **Cross-field rules need a `v.object` parent.** Standalone scalar validators have no siblings to resolve against.
-9. **JSON Schema generation is built-in.** `schema.toJsonSchema(target)` for `"draft-2020-12"` (default), `"draft-07"`, `"openapi-3.0"`, `"openai-strict"`. See [`@warlock.js/seal/generate-json-schema/SKILL.md`](@warlock.js/seal/generate-json-schema/SKILL.md).
+9. **JSON Schema generation is built-in.** `schema.toJsonSchema(target)` for `"draft-2020-12"` (default), `"draft-07"`, `"openapi-3.0"`, `"openai-strict"`. See the `generate-json-schema` topic.
 10. **`v.computed` / `v.managed` derive — they don't validate inputs.** They produce values from siblings or context, and are **skipped** when the parent `v.object` emits JSON Schema (runtime-only constructs — calling `.toJsonSchema()` on one directly throws).
 11. **`v.lazy(() => schema)` for recursive shapes.** Defers resolution until validate-time so self-referencing types work.
 12. **`v.discriminatedUnion(field, branches)` for tagged unions.** Routes by a literal discriminator field instead of `matchesType()` trial — precise errors, exact inference.
@@ -111,13 +111,13 @@ Both flavours widen with `| null` when `.nullable()` is set.
 
 | If the task is about… | Load |
 | --- | --- |
-| Picking the right primitive (`v.string` vs `v.scalar`, `v.literal` vs `v.enum`, `v.date` vs `v.instanceof(Date)`) | [`@warlock.js/seal/pick-seal-primitive/SKILL.md`](@warlock.js/seal/pick-seal-primitive/SKILL.md) |
-| Building object / array / record / tuple / union schemas, discriminated unions, recursive schemas | [`@warlock.js/seal/define-structural-shape/SKILL.md`](@warlock.js/seal/define-structural-shape/SKILL.md) |
-| Modifiers — `.required` / `.optional` / `.nullable` / `.default` / `.catch` / `.omit`, transformer vs mutator pipelines, membership rules | [`@warlock.js/seal/compose-seal-modifiers/SKILL.md`](@warlock.js/seal/compose-seal-modifiers/SKILL.md) |
-| Reading `ValidationResult`, branching on `error.type`, error message customization, translation | [`@warlock.js/seal/handle-seal-errors/SKILL.md`](@warlock.js/seal/handle-seal-errors/SKILL.md) |
-| Generating JSON Schema for OpenAI strict / OpenAPI / draft-07 | [`@warlock.js/seal/generate-json-schema/SKILL.md`](@warlock.js/seal/generate-json-schema/SKILL.md) |
-| Why a `StandardSchemaV1<T>` slot accepts/rejects a schema, the phantom-intersection design, `Result<unknown>` errors | [`@warlock.js/seal/bridge-standard-schema/SKILL.md`](@warlock.js/seal/bridge-standard-schema/SKILL.md) |
-| Authoring custom seal plugins to add validator methods | [`@warlock.js/seal/extend-seal-with-plugins/SKILL.md`](@warlock.js/seal/extend-seal-with-plugins/SKILL.md) |
+| Picking the right primitive (`v.string` vs `v.scalar`, `v.literal` vs `v.enum`, `v.date` vs `v.instanceof(Date)`) | The `pick-seal-primitive` topic |
+| Building object / array / record / tuple / union schemas, discriminated unions, recursive schemas | The `define-structural-shape` topic |
+| Modifiers — `.required` / `.optional` / `.nullable` / `.default` / `.catch` / `.omit`, transformer vs mutator pipelines, membership rules | The `compose-seal-modifiers` topic |
+| Reading `ValidationResult`, branching on `error.type`, error message customization, translation | The `handle-seal-errors` topic |
+| Generating JSON Schema for OpenAI strict / OpenAPI / draft-07 | The `generate-json-schema` topic |
+| Why a `StandardSchemaV1<T>` slot accepts/rejects a schema, the phantom-intersection design, `Result<unknown>` errors | The `bridge-standard-schema` topic |
+| Authoring custom seal plugins to add validator methods | The `extend-seal-with-plugins` topic |
 
 ## Things NOT to do
 

@@ -1,6 +1,6 @@
 # `v.number()` / `v.int()` / `v.float()` / `v.numeric()` — method reference
 
-All four share this surface. The picking guide (which factory to call) is in [`@warlock.js/seal/pick-seal-primitive/SKILL.md`](@warlock.js/seal/pick-seal-primitive/SKILL.md). For `.optional()` / `.in()` / `.oneOf()`, see [`@warlock.js/seal/compose-seal-modifiers/SKILL.md`](@warlock.js/seal/compose-seal-modifiers/SKILL.md).
+All four share this surface. The picking guide (which factory to call) is in the `pick-seal-primitive` topic. For `.optional()` / `.in()` / `.oneOf()`, see the `compose-seal-modifiers` topic.
 
 ## Range — global value comparison
 
