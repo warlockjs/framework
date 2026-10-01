@@ -17,6 +17,20 @@ import {
 const MAX_SELF_DEPTH = 10;
 
 /**
+ * Whether the given schema entry is an `arrayOf` item schema
+ */
+function isArrayOfSchema(value: unknown): value is ResourceArraySchema {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (value as { __type?: unknown }).__type === "arrayOf" &&
+    typeof (value as { schema?: unknown }).schema === "object" &&
+    (value as { schema?: unknown }).schema !== null
+  );
+}
+
+/**
  * Resource contract
  */
 export interface ResourceContract<Out = GenericObject> {
@@ -161,10 +175,19 @@ export class Resource implements ResourceContract {
         parsed[key] = value;
       } else if (typeof value === "string") {
         parsed[key] = ResourceFieldBuilder.fromCastType(value);
-      } else if (Array.isArray(value) && value.length === 2 && typeof value[0] === "string") {
-        const builder = ResourceFieldBuilder.fromCastType(value[1] as string);
+      } else if (
+        Array.isArray(value) &&
+        value.length === 2 &&
+        typeof value[0] === "string" &&
+        typeof value[1] === "string"
+      ) {
+        const builder = ResourceFieldBuilder.fromCastType(value[1]);
         builder.setInputKey(value[0]);
         parsed[key] = builder;
+      } else if (isArrayOfSchema(value)) {
+        // arrayOf item schemas follow the same rules as the top level: cast
+        // strings and tuples become builders (nested arrayOf recurses).
+        parsed[key] = { ...value, schema: Resource.normalizeSchema(value.schema) };
       } else {
         parsed[key] = value;
       }

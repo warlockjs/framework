@@ -100,6 +100,23 @@ describe("defineResource output types", () => {
     }>();
   });
 
+  it("types arrayOf item cast strings (number, string?, date, string[]) like top-level casts", () => {
+    const OrderResource = defineResource({
+      schema: {
+        lines: {
+          __type: "arrayOf",
+          schema: { qty: "number", note: "string?", shippedAt: "date", labels: "string[]" },
+        },
+      },
+    });
+
+    type OrderJson = ResourceOutput<typeof OrderResource>;
+
+    expectTypeOf<OrderJson["lines"]>().toEqualTypeOf<
+      { qty: number; note: string | null; shippedAt: DateOutput; labels: string[] }[]
+    >();
+  });
+
   it("keeps a nested-resource field required and non-nullable (an empty list is [], not undefined)", () => {
     const TagResource = defineResource({ schema: { label: "string" } });
     const PostResource = defineResource({ schema: { id: "number", tags: TagResource } });
