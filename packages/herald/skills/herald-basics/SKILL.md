@@ -83,10 +83,10 @@ herald("analytics").channel("events").publish({ /* ... */ }); // → analytics
 
 | If the task is about… | Load |
 | --- | --- |
-| Publishing messages — single + batch + publish options (priority, ttl, delay, persistent, headers) | [`@warlock.js/herald/publish-message/SKILL.md`](@warlock.js/herald/publish-message/SKILL.md) |
-| Subscribing to messages — handler signature, message context (ack/nack/retry), prefetch, retry policy, dead-letter | [`@warlock.js/herald/consume-message/SKILL.md`](@warlock.js/herald/consume-message/SKILL.md) |
-| Request/response (RPC) — `channel.request(...)` + `channel.respond(...)` for synchronous-style calls over a message bus | [`@warlock.js/herald/request-and-respond/SKILL.md`](@warlock.js/herald/request-and-respond/SKILL.md) |
-| Schema-validated channels — `.channel(name, { schema })` with `@warlock.js/seal` | See [`@warlock.js/seal/seal-basics/SKILL.md`](@warlock.js/seal/seal-basics/SKILL.md) + skills below |
+| Publishing messages — single + batch + publish options (priority, ttl, delay, persistent, headers) | the `publish-message` topic |
+| Subscribing to messages — handler signature, message context (ack/nack/retry), prefetch, retry policy, dead-letter | the `consume-message` topic |
+| Request/response (RPC) — `channel.request(...)` + `channel.respond(...)` for synchronous-style calls over a message bus | the `request-and-respond` topic |
+| Schema-validated channels — `.channel(name, { schema })` with `@warlock.js/seal` | See the `seal-basics` topic of the `warlock-js-seal` skill + skills below |
 
 ## Things NOT to do
 
@@ -98,4 +98,4 @@ herald("analytics").channel("events").publish({ /* ... */ }); // → analytics
 ## See also
 
 - README at `@warlock.js/herald/README.md` for the full API surface and RabbitMQ / Kafka driver config
-- [`@warlock.js/seal/seal-basics/SKILL.md`](@warlock.js/seal/seal-basics/SKILL.md) — schema validation
+- The `seal-basics` topic of the `warlock-js-seal` skill — schema validation

@@ -1,6 +1,6 @@
 ---
 name: request-and-respond
-description: 'Synchronous-style RPC over the message bus — channel.request<R>(payload, {timeout}) waits for a reply, channel.respond(handler) registers the responder, ctx.reply(response) sends the answer. Triggers: `channel.request`, `channel.respond`, `ctx.reply`, `timeout`, `correlationId`, `headers.correlationId`; "RPC over message bus", "request-response across services", "wait for a reply", "internal service-to-service call instead of HTTP"; typical import `import { herald } from "@warlock.js/herald"`. Skip: setup — `@warlock.js/herald/herald-basics/SKILL.md`; fire-and-forget — `@warlock.js/herald/publish-message/SKILL.md`; consumer ctx flow — `@warlock.js/herald/consume-message/SKILL.md`; competing libs `amqplib` RPC, `nats` request/reply; NestJS `ClientProxy.send`; gRPC; HTTP.'
+description: 'Synchronous-style RPC over the message bus — channel.request<R>(payload, {timeout}) waits for a reply, channel.respond(handler) registers the responder, ctx.reply(response) sends the answer. Triggers: `channel.request`, `channel.respond`, `ctx.reply`, `timeout`, `correlationId`, `headers.correlationId`; "RPC over message bus", "request-response across services", "wait for a reply", "internal service-to-service call instead of HTTP"; typical import `import { herald } from "@warlock.js/herald"`. Skip: setup — the `herald-basics` topic; fire-and-forget — the `publish-message` topic; consumer ctx flow — the `consume-message` topic; competing libs `amqplib` RPC, `nats` request/reply; NestJS `ClientProxy.send`; gRPC; HTTP.'
 ---
 
 # Request-response over the bus
@@ -70,5 +70,5 @@ Each `request()` generates its own correlation ID and an exclusive reply queue u
 
 ## See also
 
-- [`@warlock.js/herald/publish-message/SKILL.md`](@warlock.js/herald/publish-message/SKILL.md) — fire-and-forget pattern
-- [`@warlock.js/herald/consume-message/SKILL.md`](@warlock.js/herald/consume-message/SKILL.md) — subscribe + ctx flow control (including `ctx.reply`)
+- The `publish-message` topic — fire-and-forget pattern
+- The `consume-message` topic — subscribe + ctx flow control (including `ctx.reply`)

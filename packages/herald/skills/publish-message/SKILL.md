@@ -1,11 +1,11 @@
 ---
 name: publish-message
-description: 'Publish messages to a channel — .publish(payload, options?) for single, .publishBatch([...], options?) for batch, with priority / ttl / delay / persistent / correlationId / headers options. Optional schema validation via .channel(name, {schema}). Triggers: `publish`, `publishBatch`, `channel`, `priority`, `ttl`, `delay`, `persistent`, `correlationId`, `headers`, `schema`; "publish a message", "emit an event after a domain change", "fan out a notification", "schedule delayed work", "batch publish"; typical import `import { herald } from "@warlock.js/herald"`. Skip: setup — `@warlock.js/herald/herald-basics/SKILL.md`; consuming — `@warlock.js/herald/consume-message/SKILL.md`; RPC — `@warlock.js/herald/request-and-respond/SKILL.md`; competing libs `amqplib`, `kafkajs`, `bullmq`; NestJS `ClientProxy.emit`.'
+description: 'Publish messages to a channel — .publish(payload, options?) for single, .publishBatch([...], options?) for batch, with priority / ttl / delay / persistent / correlationId / headers options. Optional schema validation via .channel(name, {schema}). Triggers: `publish`, `publishBatch`, `channel`, `priority`, `ttl`, `delay`, `persistent`, `correlationId`, `headers`, `schema`; "publish a message", "emit an event after a domain change", "fan out a notification", "schedule delayed work", "batch publish"; typical import `import { herald } from "@warlock.js/herald"`. Skip: setup — the `herald-basics` topic; consuming — the `consume-message` topic; RPC — the `request-and-respond` topic; competing libs `amqplib`, `kafkajs`, `bullmq`; NestJS `ClientProxy.emit`.'
 ---
 
 # Publish messages
 
-Push messages into a channel. The consumer side picks them up via [`@warlock.js/herald/consume-message/SKILL.md`](@warlock.js/herald/consume-message/SKILL.md).
+Push messages into a channel. The consumer side picks them up via the `consume-message` topic.
 
 ## Single publish
 
@@ -48,7 +48,7 @@ const channel = herald().channel("user.created", { schema: userSchema });
 await channel.publish({ userId: 1, email: "invalid" });   // Throws — fails .email()
 ```
 
-The schema runs `validate()` before the message hits the broker. Invalid payloads never leave the producer. See [`@warlock.js/seal/seal-basics/SKILL.md`](@warlock.js/seal/seal-basics/SKILL.md).
+The schema runs `validate()` before the message hits the broker. Invalid payloads never leave the producer. See the `seal-basics` topic of the `warlock-js-seal` skill.
 
 ## Publish options
 
@@ -135,11 +135,11 @@ export const createUserUseCase = useCase({
 });
 ```
 
-The adapter publishes the broadcast envelope's `payload` to `channel(event.event)`. It's structurally typed, so herald keeps no dependency on core. See [`@warlock.js/core/write-use-case/SKILL.md`](@warlock.js/core/write-use-case/SKILL.md) for the `broadcast` option (payload projection, custom event name, payload-safety rules).
+The adapter publishes the broadcast envelope's `payload` to `channel(event.event)`. It's structurally typed, so herald keeps no dependency on core. See the `write-use-case` topic of the `warlock-js-core` skill for the `broadcast` option (payload projection, custom event name, payload-safety rules).
 
 ## Event classes (`EventMessage`) — the typed event layer
 
-Raw `channel(name).publish(payload)` is the low-level path. For domain events that travel between modules, herald ships a higher-level pair: define the event once as a class, publish instances of it, and consume them with an [`EventConsumer`](@warlock.js/herald/consume-message/SKILL.md). The channel name comes from the event's `eventName` — no string to keep in sync across producer and consumer.
+Raw `channel(name).publish(payload)` is the low-level path. For domain events that travel between modules, herald ships a higher-level pair: define the event once as a class, publish instances of it, and consume them with an `EventConsumer` (the `consume-message` topic). The channel name comes from the event's `eventName` — no string to keep in sync across producer and consumer.
 
 ```ts
 import { defineEvent, publishEvent } from "@warlock.js/herald";
@@ -168,5 +168,5 @@ Set an optional `version` on the event (instance field) to drive the consumer's 
 
 ## See also
 
-- [`@warlock.js/herald/consume-message/SKILL.md`](@warlock.js/herald/consume-message/SKILL.md) — the receiving side
-- [`@warlock.js/herald/request-and-respond/SKILL.md`](@warlock.js/herald/request-and-respond/SKILL.md) — when you need a reply
+- The `consume-message` topic — the receiving side
+- The `request-and-respond` topic — when you need a reply
