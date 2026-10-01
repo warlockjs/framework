@@ -1,11 +1,11 @@
 ---
 name: evaluate-system-prompt
-description: 'Grade a single trace''s LAST captured system prompt from the dashboard drawer — the dashboard''s only write-capable feature, config-gated via `DashboardOptions.evaluate` (`ai.config({ panoptic: { dashboard: { evaluate: { model, instructions } } } })`). Triggers: `evaluate`, `EvaluateConfig`, `EvaluateVerdict`, `evaluateSystemPrompt`, `extractLastSystemPrompt`, `findSpanById`, "Evaluate system prompt" button, `POST .../spans/:spanId/evaluate`, grading a prompt from a real trace, judging a captured system prompt, per-run instructions override, judge model factory; ''evaluate this trace''s prompt'', ''grade the system prompt from the dashboard'', ''judge a captured run'', ''score a live system prompt''. Skip: grading raw prompt TEXT you already have in code (no trace involved) — `@warlock.js/ai`''s `ai.prompts().validate({ criteria })`, the same judge machinery this wraps; a DATASET of test cases run through an agent — `@warlock.js/ai`''s `ai.dataset` + `agent.eval`; viewing/filtering/grouping traces without grading them — `@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`; capturing the content this feature reads — `@warlock.js/ai-panoptic/export-traces/SKILL.md` (`captureContent`).'
+description: 'Grade a single trace''s LAST captured system prompt from the dashboard drawer — the dashboard''s only write-capable feature, config-gated via `DashboardOptions.evaluate` (`ai.config({ panoptic: { dashboard: { evaluate: { model, instructions } } } })`). Triggers: `evaluate`, `EvaluateConfig`, `EvaluateVerdict`, `evaluateSystemPrompt`, `extractLastSystemPrompt`, `findSpanById`, "Evaluate system prompt" button, `POST .../spans/:spanId/evaluate`, grading a prompt from a real trace, judging a captured system prompt, per-run instructions override, judge model factory; ''evaluate this trace''s prompt'', ''grade the system prompt from the dashboard'', ''judge a captured run'', ''score a live system prompt''. Skip: grading raw prompt TEXT you already have in code (no trace involved) — `@warlock.js/ai`''s `ai.prompts().validate({ criteria })`, the same judge machinery this wraps; a DATASET of test cases run through an agent — `@warlock.js/ai`''s `ai.dataset` + `agent.eval`; viewing/filtering/grouping traces without grading them — the `use-local-dashboard` topic; capturing the content this feature reads — the `export-traces` topic (`captureContent`).'
 ---
 
 # Evaluate a trace's system prompt from the dashboard
 
-A drawer button that grades the LAST `{role: "system"}` message captured on the selected span — not the whole conversation, not the tool code, just the system prompt that was actually in effect for that run. It's the dashboard's only write-capable feature: every other route is `GET`-only and read-only by design (see `use-local-dashboard/SKILL.md`'s security note); this one POSTs, and it's off unless you explicitly opt in.
+A drawer button that grades the LAST `{role: "system"}` message captured on the selected span — not the whole conversation, not the tool code, just the system prompt that was actually in effect for that run. It's the dashboard's only write-capable feature: every other route is `GET`-only and read-only by design (see the `use-local-dashboard` topic's security note); this one POSTs, and it's off unless you explicitly opt in.
 
 ## Enable it
 
@@ -81,6 +81,6 @@ curl -X POST 'http://127.0.0.1:4319/api/traces/tr_1/spans/sp_1/evaluate' \
 
 ## See also
 
-- [`@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`](@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md) — the dashboard this feature is a drawer action of; its security note now says "every route is GET-only and read-only EXCEPT the one opt-in write route `evaluate` enables."
-- [`@warlock.js/ai-panoptic/export-traces/SKILL.md`](@warlock.js/ai-panoptic/export-traces/SKILL.md) — `captureContent` (and `fullHistory`), the prerequisite for `span.input` to carry anything gradable.
+- The `use-local-dashboard` topic — the dashboard this feature is a drawer action of; its security note now says "every route is GET-only and read-only EXCEPT the one opt-in write route `evaluate` enables."
+- The `export-traces` topic — `captureContent` (and `fullHistory`), the prerequisite for `span.input` to carry anything gradable.
 - `ai.prompts().validate({ criteria })` in `@warlock.js/ai` — the sibling capability this reuses: grading raw prompt TEXT you already have in code, no trace or dashboard involved.

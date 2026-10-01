@@ -1,6 +1,6 @@
 ---
 name: query-traces
-description: 'Retain @warlock.js/ai-panoptic traces in a queryable store — in-memory, or cache-backed so they survive a process restart — and slice them after the fact: get one run by id, list a session, filter failed runs in a window, roll up usage + cost. Triggers: `createInMemoryTraceStore`, `createCacheTraceStore`, `CacheTraceStoreHandle`, `CacheTraceStoreOptions`, `CacheDriverInput`, `store.ready`, `TraceStoreContract`, `TraceQuery`, `TraceAggregate`, `InMemoryTraceStoreOptions`, `store.query`, `store.aggregate`, `store.get`, `store.add`, `store.clear`, `store.size`, `capacity`, `prefix`, `onError`, `sumUsage`, `emptyUsage`, `matchTrace`; ''query collected traces'', ''aggregate AI cost per session'', ''how much did this session spend'', ''list failed runs'', ''retain traces in memory'', ''persist traces across a restart'', ''cache-backed trace store'', ''Redis trace store'', ''roll up token usage''; typical import `import { createInMemoryTraceStore, createCacheTraceStore } from "@warlock.js/ai-panoptic"`. Skip: sending traces to an external backend (OTel/Langfuse/console/file) — `@warlock.js/ai-panoptic/export-traces/SKILL.md`; wiring the subscriber into a run — `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`.'
+description: 'Retain @warlock.js/ai-panoptic traces in a queryable store — in-memory, or cache-backed so they survive a process restart — and slice them after the fact: get one run by id, list a session, filter failed runs in a window, roll up usage + cost. Triggers: `createInMemoryTraceStore`, `createCacheTraceStore`, `CacheTraceStoreHandle`, `CacheTraceStoreOptions`, `CacheDriverInput`, `store.ready`, `TraceStoreContract`, `TraceQuery`, `TraceAggregate`, `InMemoryTraceStoreOptions`, `store.query`, `store.aggregate`, `store.get`, `store.add`, `store.clear`, `store.size`, `capacity`, `prefix`, `onError`, `sumUsage`, `emptyUsage`, `matchTrace`; ''query collected traces'', ''aggregate AI cost per session'', ''how much did this session spend'', ''list failed runs'', ''retain traces in memory'', ''persist traces across a restart'', ''cache-backed trace store'', ''Redis trace store'', ''roll up token usage''; typical import `import { createInMemoryTraceStore, createCacheTraceStore } from "@warlock.js/ai-panoptic"`. Skip: sending traces to an external backend (OTel/Langfuse/console/file) — the `export-traces` topic; wiring the subscriber into a run — the `observe-with-panoptic` topic.'
 ---
 
 # Query traces — the in-memory queryable store
@@ -27,7 +27,7 @@ const failed = store.query({ status: "failed" });
 const spend = store.aggregate({ sessionId: "session-42" });
 ```
 
-> The store is also a valid `collector.use(...)` target directly — `panoptic({ collector: createCollector().use(store) })` — see [`observe-with-panoptic/SKILL.md`](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md) for bring-your-own-collector wiring.
+> The store is also a valid `collector.use(...)` target directly — `panoptic({ collector: createCollector().use(store) })` — see the `observe-with-panoptic` topic for bring-your-own-collector wiring.
 
 ## The store contract
 
@@ -128,7 +128,7 @@ const store = createInMemoryTraceStore({ capacity: 1000 });
 
 Overwriting an existing `traceId` refreshes its insertion position, so a re-collected run is treated as newest for eviction — eviction stays honest under overwrite.
 
-> The in-memory store has no secondary indexes: `get` / `add` are O(1), `query` / `aggregate` are O(n) scans. That is the right trade-off for dev/test and modest-volume runtime use. For high-volume or durable retention, write a custom `TraceStoreContract` (or export to a backend with [`export-traces`](@warlock.js/ai-panoptic/export-traces/SKILL.md)) backed by a real datastore.
+> The in-memory store has no secondary indexes: `get` / `add` are O(1), `query` / `aggregate` are O(n) scans. That is the right trade-off for dev/test and modest-volume runtime use. For high-volume or durable retention, write a custom `TraceStoreContract` (or export to a backend with the `export-traces` topic) backed by a real datastore.
 
 ## Persisting across a restart — `createCacheTraceStore`
 
@@ -179,7 +179,7 @@ type CacheTraceStoreHandle = TraceStoreContract & ExporterContract & {
 
 Ordering uses an **internal monotonic counter**, not `Date.now()`, so the persisted index stays a stable total order even when many traces land in the same millisecond — FIFO eviction stays honest across a restart.
 
-> The usual path is declarative: `ai.config({ panoptic: { cache, dashboard: true } })` constructs this store, awaits `ready()`, and wires it under the dashboard for you — see [`use-local-dashboard/SKILL.md`](@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md). Reach for `createCacheTraceStore` directly only when you manage the store / collector yourself.
+> The usual path is declarative: `ai.config({ panoptic: { cache, dashboard: true } })` constructs this store, awaits `ready()`, and wires it under the dashboard for you — see the `use-local-dashboard` topic. Reach for `createCacheTraceStore` directly only when you manage the store / collector yourself.
 
 ## Summing usage yourself
 
@@ -198,6 +198,6 @@ for (const trace of store.query({ sessionId })) {
 
 ## See also
 
-- [`@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md) — wiring the `panoptic(...)` subscriber and bring-your-own-collector so the store fills as runs complete.
-- [`@warlock.js/ai-panoptic/export-traces/SKILL.md`](@warlock.js/ai-panoptic/export-traces/SKILL.md) — sending traces to an external backend instead of (or alongside) retaining them in memory; writing a custom sink.
-- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — the `BaseReport` the collector projects into the `Trace` this store retains.
+- The `observe-with-panoptic` topic — wiring the `panoptic(...)` subscriber and bring-your-own-collector so the store fills as runs complete.
+- The `export-traces` topic — sending traces to an external backend instead of (or alongside) retaining them in memory; writing a custom sink.
+- The `run-ai-agent` topic of the `warlock-js-ai` skill — the `BaseReport` the collector projects into the `Trace` this store retains.
