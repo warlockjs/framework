@@ -1,6 +1,6 @@
 ---
 name: queue-notifications
-description: "Send notifications asynchronously through the herald backend or the BullMQ driver. Configure a QueueDispatcher in config/notifications.ts, then use notif.queue(to, data, options?) to enqueue rendered jobs. Herald uses heraldQueue() and startNotificationsWorker(); bullmqQueue({ attempts, backoff }) from @warlock.js/notifications uses BullMQ (lazy-loading the optional @warlock.js/queue peer), supports retries, and honours SendOptions.delay. Without a queue configured, .queue() rejects NoQueueDispatcherError. Triggers: heraldQueue, bullmqQueue, startNotificationsWorker, QueueDispatcher, .queue(, async notifications, queue notifications, notification worker, background notifications, notifications.dispatch. Skip: synchronous sends - @warlock.js/notifications/define-notification/SKILL.md; herald itself - @warlock.js/herald/*."
+description: "Send notifications asynchronously through the herald backend or the BullMQ driver. Configure a QueueDispatcher in config/notifications.ts, then use notif.queue(to, data, options?) to enqueue rendered jobs. Herald uses heraldQueue() and startNotificationsWorker(); bullmqQueue({ attempts, backoff }) from @warlock.js/notifications uses BullMQ (lazy-loading the optional @warlock.js/queue peer), supports retries, and honours SendOptions.delay. Without a queue configured, .queue() rejects NoQueueDispatcherError. Triggers: heraldQueue, bullmqQueue, startNotificationsWorker, QueueDispatcher, .queue(, async notifications, queue notifications, notification worker, background notifications, notifications.dispatch. Skip: synchronous sends - the `define-notification` topic; herald itself - @warlock.js/herald/*."
 ---
 
 # Queue notifications (async)
@@ -105,6 +105,6 @@ await orderShipped.queue(user, { order }, { idempotencyKey: `ship:${order.id}` }
 
 ## See also
 
-- [`define-notification/SKILL.md`](../define-notification/SKILL.md) - `.queue()` on a defined notification.
-- [`configure-notifications/SKILL.md`](../configure-notifications/SKILL.md) - the `queue` config slot.
-- [`@warlock.js/herald/herald-basics/SKILL.md`](../../../herald/skills/herald-basics/SKILL.md) - connecting the broker.
+- The `define-notification` topic - `.queue()` on a defined notification.
+- The `configure-notifications` topic - the `queue` config slot.
+- The `herald-basics` topic of the `warlock-js-herald` skill - connecting the broker.

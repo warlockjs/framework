@@ -1,6 +1,6 @@
 ---
 name: use-in-app
-description: 'Use the `inApp` facade for the in-app/database channel''s READ side: `inApp.configure({ model: Notification })` or `{ repository: myRepo }` binds the store AND returns the channel; `inApp.list / listUnread / countUnread / markAsRead / markAsUnread` are RECIPIENT-SCOPED by construction (no IDOR — `markAsRead(user, id)` cannot flip another user''s row even with a foreign id). `countUnread` uses `RepositoryManager.countCached` for the badge fast-path. Triggers: `inApp.configure`, `inApp.list`, `inApp.listUnread`, `inApp.countUnread`, `inApp.markAsRead`, `inApp.markAsUnread`, `BaseNotificationsRepository`, `DatabaseNotification`, `NotificationsFilter`, "in-app notifications", "mark notification as read", "unread count", "notification badge", "IDOR-safe markAsRead"; typical import `import { inApp } from "@warlock.js/notifications"`. Skip: writing notifications (use `defineNotification` or `notify.database`) — `@warlock.js/notifications/define-notification/SKILL.md`; the migration columns — `@warlock.js/notifications/write-notification-migration/SKILL.md`; wiring it into config — `@warlock.js/notifications/configure-notifications/SKILL.md`.'
+description: 'Use the `inApp` facade for the in-app/database channel''s READ side: `inApp.configure({ model: Notification })` or `{ repository: myRepo }` binds the store AND returns the channel; `inApp.list / listUnread / countUnread / markAsRead / markAsUnread` are RECIPIENT-SCOPED by construction (no IDOR — `markAsRead(user, id)` cannot flip another user''s row even with a foreign id). `countUnread` uses `RepositoryManager.countCached` for the badge fast-path. Triggers: `inApp.configure`, `inApp.list`, `inApp.listUnread`, `inApp.countUnread`, `inApp.markAsRead`, `inApp.markAsUnread`, `BaseNotificationsRepository`, `DatabaseNotification`, `NotificationsFilter`, "in-app notifications", "mark notification as read", "unread count", "notification badge", "IDOR-safe markAsRead"; typical import `import { inApp } from "@warlock.js/notifications"`. Skip: writing notifications (use `defineNotification` or `notify.database`) — the `define-notification` topic; the migration columns — the `write-notification-migration` topic; wiring it into config — the `configure-notifications` topic.'
 ---
 
 # `inApp` — in-app notification read API
@@ -166,7 +166,7 @@ database: inApp.configure({ repository: notificationsRepository }),
 
 ## See also
 
-- [`notifications-basics/SKILL.md`](../notifications-basics/SKILL.md) — package front door.
-- [`configure-notifications/SKILL.md`](../configure-notifications/SKILL.md) — wire `inApp.configure` into the config.
-- [`write-notification-migration/SKILL.md`](../write-notification-migration/SKILL.md) — `notificationColumns(Notification)`, named from `columnMap`.
-- [`define-notification/SKILL.md`](../define-notification/SKILL.md) — create rows via the database channel.
+- The `notifications-basics` topic — package front door.
+- The `configure-notifications` topic — wire `inApp.configure` into the config.
+- The `write-notification-migration` topic — `notificationColumns(Notification)`, named from `columnMap`.
+- The `define-notification` topic — create rows via the database channel.

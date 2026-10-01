@@ -1,6 +1,6 @@
 ---
 name: write-notification-migration
-description: 'Create the notifications table with the `notificationColumns(Notification)` factory + cascade `Migration.create`. Column NAMES come from the model''s `columnMap` (recipient / tenant / readAt / isRead); the fixed columns are `type` / `title` / `body` / `payload` / `idempotency_key`. Set `{ idType: "bigint" }` for integer-key apps; UUID remains the default. Read-state follows columnMap presence: `readAt` → nullable timestamp, `isRead` → indexed boolean, both → both. Defaults to `user_id` + `read_at` when no columnMap. Spread + extend for extras (FK references, composite indexes). Triggers: `notificationColumns`, `Migration.create` for notifications, "create the notifications table", "notification migration", "add organization_id to notifications", `is_read` column, `read_at` column, `idempotency_key` column; typical import `import { Migration } from "@warlock.js/cascade"; import { notificationColumns } from "@warlock.js/notifications"`. Skip: generic cascade migration writing — `@warlock.js/cascade/write-migration/SKILL.md`; the model itself — `@warlock.js/notifications/use-in-app/SKILL.md`.'
+description: 'Create the notifications table with the `notificationColumns(Notification)` factory + cascade `Migration.create`. Column NAMES come from the model''s `columnMap` (recipient / tenant / readAt / isRead); the fixed columns are `type` / `title` / `body` / `payload` / `idempotency_key`. Set `{ idType: "bigint" }` for integer-key apps; UUID remains the default. Read-state follows columnMap presence: `readAt` → nullable timestamp, `isRead` → indexed boolean, both → both. Defaults to `user_id` + `read_at` when no columnMap. Spread + extend for extras (FK references, composite indexes). Triggers: `notificationColumns`, `Migration.create` for notifications, "create the notifications table", "notification migration", "add organization_id to notifications", `is_read` column, `read_at` column, `idempotency_key` column; typical import `import { Migration } from "@warlock.js/cascade"; import { notificationColumns } from "@warlock.js/notifications"`. Skip: generic cascade migration writing — the `write-migration` topic of the `warlock-js-cascade` skill; the model itself — the `use-in-app` topic.'
 ---
 
 # Write the notifications migration
@@ -58,7 +58,7 @@ export default Migration.create(Notification, {
 });
 ```
 
-Mirror any extra column in the model `schema`. To make it filterable, add a method to a custom repository (see `use-in-app/SKILL.md`).
+Mirror any extra column in the model `schema`. To make it filterable, add a method to a custom repository (see the `use-in-app` topic).
 
 ## Column naming follows `columnMap`
 
@@ -71,10 +71,10 @@ class Notification extends DatabaseNotification {
 // → notificationColumns(Notification) emits `userId` + `readAt`
 ```
 
-Without a model passed, defaults to `user_id` + `read_at` (read_at-only). See [`use-in-app/SKILL.md`](../use-in-app/SKILL.md) for the full `columnMap` shape.
+Without a model passed, defaults to `user_id` + `read_at` (read_at-only). See the `use-in-app` topic for the full `columnMap` shape.
 
 ## See also
 
-- [`use-in-app/SKILL.md`](../use-in-app/SKILL.md) — the model + repository the migration backs.
-- [`@warlock.js/cascade/write-migration/SKILL.md`](../../../cascade/skills/write-migration/SKILL.md) — generic Cascade migration form, `Migration.alter`, etc.
-- [`@warlock.js/cascade/manage-data-sources/SKILL.md`](../../../cascade/skills/manage-data-sources/SKILL.md) — multi-data-source setup.
+- The `use-in-app` topic — the model + repository the migration backs.
+- The `write-migration` topic of the `warlock-js-cascade` skill — generic Cascade migration form, `Migration.alter`, etc.
+- The `manage-data-sources` topic of the `warlock-js-cascade` skill — multi-data-source setup.

@@ -1,6 +1,6 @@
 ---
 name: observe-notifications
-description: 'Wire metrics, logging, tracing, and audits via `notifications.on(event, handler)` — four events fire per (channel, recipient): `sending` (gates passed, about to hit the transport), `sent` (succeeded), `failed` (channel threw — carries the Error), `skipped` (a pre-send gate dropped it — carries `reason: "preference" | "rate-limit"`). Every event carries the recipient as `notifiable?` (undefined only for raw-target ad-hoc sends) and a `dispatchId` — `sending` and its terminal `sent`/`failed` share it, so observers can pair them (spans, latency, hung-send detection). `sent`/`failed` also carry `durationMs`. Handler exceptions are logged-and-swallowed so one bad listener can not break the dispatcher. `on(...)` returns an unsubscribe function; `off(event, handler)` exists for symmetry. Triggers: `notifications.on`, `notifications.off`, `"sending"` event, `"sent"` event, `"failed"` event, `"skipped"` event, `dispatchId`, `durationMs`, `NotificationEvents`, "notification metrics", "notification latency", "trace notifications", "notification audit log", "track notification drops"; typical import `import { notifications } from "@warlock.js/notifications"`. Skip: building notifications — `@warlock.js/notifications/define-notification/SKILL.md`; configuring the preference/rate-limit gates that produce `skipped` — `@warlock.js/notifications/configure-notifications/SKILL.md`.'
+description: 'Wire metrics, logging, tracing, and audits via `notifications.on(event, handler)` — four events fire per (channel, recipient): `sending` (gates passed, about to hit the transport), `sent` (succeeded), `failed` (channel threw — carries the Error), `skipped` (a pre-send gate dropped it — carries `reason: "preference" | "rate-limit"`). Every event carries the recipient as `notifiable?` (undefined only for raw-target ad-hoc sends) and a `dispatchId` — `sending` and its terminal `sent`/`failed` share it, so observers can pair them (spans, latency, hung-send detection). `sent`/`failed` also carry `durationMs`. Handler exceptions are logged-and-swallowed so one bad listener can not break the dispatcher. `on(...)` returns an unsubscribe function; `off(event, handler)` exists for symmetry. Triggers: `notifications.on`, `notifications.off`, `"sending"` event, `"sent"` event, `"failed"` event, `"skipped"` event, `dispatchId`, `durationMs`, `NotificationEvents`, "notification metrics", "notification latency", "trace notifications", "notification audit log", "track notification drops"; typical import `import { notifications } from "@warlock.js/notifications"`. Skip: building notifications — the `define-notification` topic; configuring the preference/rate-limit gates that produce `skipped` — the `configure-notifications` topic.'
 ---
 
 # Observe notifications
@@ -61,6 +61,6 @@ A handler that throws is logged and swallowed — the other handlers for the sam
 
 ## See also
 
-- [`notifications-basics/SKILL.md`](../notifications-basics/SKILL.md) — front door + mental model.
-- [`configure-notifications/SKILL.md`](../configure-notifications/SKILL.md) — `preferences` / `rateLimit` slots that emit `skipped`.
-- [`send-ad-hoc/SKILL.md`](../send-ad-hoc/SKILL.md) — when `notifiable` is undefined in events.
+- The `notifications-basics` topic — front door + mental model.
+- The `configure-notifications` topic — `preferences` / `rateLimit` slots that emit `skipped`.
+- The `send-ad-hoc` topic — when `notifiable` is undefined in events.

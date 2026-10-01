@@ -1,6 +1,6 @@
 ---
 name: define-channel
-description: 'Add a custom notification channel — `defineChannel<P>({ name, route?, send })` returns a `Channel<P>` you register in the `channels` map of `setNotificationConfig`. `name` matches the key in `NotificationChannels` (extend via `declare module` for typing); `route(notifiable)` resolves the recipient''s address (defaults to `{ id }` when omitted); `send({ payload, route, notifiable, options })` does the actual transport. Use for Slack/Discord/internal-webhook/anything else — `fetch`-based with NO SDK is the simplest variant. Channels that load a heavy SDK should follow the lazy-import pattern from the develop-feature playbook. Triggers: `defineChannel`, `Channel<P>`, "custom notification channel", "add discord channel", "slack channel", "webhook channel", "new channel type", `declare module "@warlock.js/notifications"`; typical import `import { defineChannel } from "@warlock.js/notifications"`. Skip: lazy-loading an optional SDK behind the channel — `D:/xampp/htdocs/mongez/node/.claude/skills/develop-warlock.js-feature/SKILL.md`; using built-in channels — `@warlock.js/notifications/configure-notifications/SKILL.md`.'
+description: 'Add a custom notification channel — `defineChannel<P>({ name, route?, send })` returns a `Channel<P>` you register in the `channels` map of `setNotificationConfig`. `name` matches the key in `NotificationChannels` (extend via `declare module` for typing); `route(notifiable)` resolves the recipient''s address (defaults to `{ id }` when omitted); `send({ payload, route, notifiable, options })` does the actual transport. Use for Slack/Discord/internal-webhook/anything else — `fetch`-based with NO SDK is the simplest variant. Channels that load a heavy SDK should follow the lazy-import pattern from the develop-feature playbook. Triggers: `defineChannel`, `Channel<P>`, "custom notification channel", "add discord channel", "slack channel", "webhook channel", "new channel type", `declare module "@warlock.js/notifications"`; typical import `import { defineChannel } from "@warlock.js/notifications"`. Skip: lazy-loading an optional SDK behind the channel — the `develop-warlock.js-feature` workspace skill; using built-in channels — the `configure-notifications` topic.'
 ---
 
 # `defineChannel` — custom channels
@@ -74,7 +74,7 @@ Throw to fail the send. The dispatcher catches per channel, fires a `failed` eve
 
 ## SDK-backed channels — lazy-import the SDK
 
-Channels that wrap a heavy SDK (Twilio, Slack SDK, FCM SDK) should follow the lazy-import pattern so apps that don't use them don't pay the install/load cost. The recipe + race-safe template lives in [`develop-warlock.js-feature`](../../../../.claude/skills/develop-warlock.js-feature/SKILL.md) — copy from there; do not invent a variant.
+Channels that wrap a heavy SDK (Twilio, Slack SDK, FCM SDK) should follow the lazy-import pattern so apps that don't use them don't pay the install/load cost. The recipe + race-safe template lives in the `develop-warlock.js-feature` workspace skill — copy from there; do not invent a variant.
 
 Sketch:
 
@@ -101,7 +101,7 @@ export const slackChannel = (config: { token: string }) =>
 
 ## See also
 
-- [`configure-notifications/SKILL.md`](../configure-notifications/SKILL.md) — register channels in the config.
-- [`send-ad-hoc/SKILL.md`](../send-ad-hoc/SKILL.md) — `notify.<custom-channel>` works after registration.
-- [`define-notification/SKILL.md`](../define-notification/SKILL.md) — multi-channel renderers with the custom channel key.
-- `D:/xampp/htdocs/mongez/node/.claude/skills/develop-warlock.js-feature/SKILL.md` — lazy-import pattern for SDK-backed channels.
+- The `configure-notifications` topic — register channels in the config.
+- The `send-ad-hoc` topic — `notify.<custom-channel>` works after registration.
+- The `define-notification` topic — multi-channel renderers with the custom channel key.
+- The `develop-warlock.js-feature` workspace skill — lazy-import pattern for SDK-backed channels.

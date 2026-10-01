@@ -89,10 +89,10 @@ await inApp.markAsRead(user, "ntf_123");
 
 ## See also
 
-- [`configure-notifications/SKILL.md`](../configure-notifications/SKILL.md) — wire `config/notifications.ts`.
-- [`define-notification/SKILL.md`](../define-notification/SKILL.md) — reusable multi-channel definitions.
-- [`send-ad-hoc/SKILL.md`](../send-ad-hoc/SKILL.md) — `notify.<channel>` shorthand.
-- [`use-in-app/SKILL.md`](../use-in-app/SKILL.md) — `inApp` read API.
-- [`define-channel/SKILL.md`](../define-channel/SKILL.md) — custom channels.
-- [`write-notification-migration/SKILL.md`](../write-notification-migration/SKILL.md) — columnMap-driven columns.
-- [`observe-notifications/SKILL.md`](../observe-notifications/SKILL.md) — events + metrics.
+- The `configure-notifications` topic — wire `config/notifications.ts`.
+- The `define-notification` topic — reusable multi-channel definitions.
+- The `send-ad-hoc` topic — `notify.<channel>` shorthand.
+- The `use-in-app` topic — `inApp` read API.
+- The `define-channel` topic — custom channels.
+- The `write-notification-migration` topic — columnMap-driven columns.
+- The `observe-notifications` topic — events + metrics.
