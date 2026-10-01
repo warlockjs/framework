@@ -6,4 +6,4 @@
 
 ## Skills
 
-- [sitemap-overview](@warlock.js/sitemap/sitemap-overview/SKILL.md): (no description)
+- [sitemap-overview](@warlock.js/sitemap/sitemap-overview/SKILL.md): Front-door orientation for `@warlock.js/sitemap`: framework-blind `Sitemap` and streaming `SitemapIndex` builders, URL metadata, hreflang, Google image entries, sharding, diagnostics, and atomic publication. Use when adding or debugging sitemap output; Warlock page discovery and `/sitemap.xml` routing belong to `@warlock.js/web`.
