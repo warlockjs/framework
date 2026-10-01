@@ -183,6 +183,12 @@ function explicitGroup(sourceFile: string, value: string): string {
   return value;
 }
 
+function defaultGroup(sourceFile: string, defaultNamespace: string | (() => string)): string {
+  const namespace = typeof defaultNamespace === "function" ? defaultNamespace() : defaultNamespace;
+
+  return namespace === "" ? "" : explicitGroup(sourceFile, namespace);
+}
+
 function isObject(value: JsonValue): value is JsonObject {
   return value instanceof Map;
 }
@@ -245,7 +251,12 @@ function collectEntries(
 export function parseLocaleDictionary(input: {
   sourceFile: string;
   source: string;
-  defaultNamespace: string;
+  /**
+   * The group used when the file declares no `$group`. A function is called
+   * only in that case, so a namespace that cannot be derived (e.g. from a
+   * folder name) never fails a file that names its own `$group`.
+   */
+  defaultNamespace: string | (() => string);
   localeCodes?: readonly string[];
 }): ParsedLocaleDictionary {
   const { sourceFile, source, defaultNamespace, localeCodes } = input;
@@ -256,9 +267,7 @@ export function parseLocaleDictionary(input: {
     fail(sourceFile, "$group", "'$group' must be a string");
   const group =
     groupValue === undefined
-      ? defaultNamespace === ""
-        ? ""
-        : explicitGroup(sourceFile, defaultNamespace)
+      ? defaultGroup(sourceFile, defaultNamespace)
       : explicitGroup(sourceFile, groupValue);
   const entries: LocaleDictionaryEntries = Object.create(null) as LocaleDictionaryEntries;
   const rootEntries = new Map(parsed);

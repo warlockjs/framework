@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `parseLocaleDictionary()` accepts `defaultNamespace` as a function, called only when the file declares no `$group`, so a folder that cannot name a namespace never fails a file with an explicit `$group`.
 - `warlock dev` publishes each `src/app` file it reloads (`{ url, generation }`, after the loader hook confirms the bump) through the `development.appModules` container key, so `@warlock.js/web` can load the same module instance in page loaders.
 
 ## 5.28.0 - 2026-10-01
