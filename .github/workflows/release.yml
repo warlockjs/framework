@@ -84,13 +84,13 @@ jobs:
       # .git/config -- the token is passed per step below, so nothing else in
       # the job (package tests included) can read it from disk.
       - name: Checkout the framework
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
 
@@ -177,7 +177,7 @@ jobs:
 
       - name: Keep the tarballs and handoff
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: warlock-${{ inputs.version }}-artifacts
           path: |
@@ -240,7 +240,7 @@ jobs:
 
       - name: Keep the logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: warlock-${{ inputs.version }}-logs
           path: .release-logs
