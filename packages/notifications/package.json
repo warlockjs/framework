@@ -1,0 +1,59 @@
+{
+  "name": "@warlock.js/notifications",
+  "version": "5.29.0",
+  "type": "module",
+  "description": "Multi-channel notifications for Warlock.js — define once, fire anywhere; mail / in-app database / pluggable custom channels with preferences, rate limits, and idempotency.",
+  "main": "./src/index.ts",
+  "warlock": {
+    "environment": "server"
+  },
+  "module": "./src/index.ts",
+  "typings": "./src/index.ts",
+  "dependencies": {
+    "@warlock.js/cache": "workspace:^",
+    "@warlock.js/cascade": "workspace:^",
+    "@warlock.js/core": "workspace:^",
+    "@warlock.js/logger": "workspace:^"
+  },
+  "optionalDependencies": {
+    "@warlock.js/herald": "5.29.0"
+  },
+  "peerDependencies": {
+    "@warlock.js/queue": "5.29.0"
+  },
+  "peerDependenciesMeta": {
+    "@warlock.js/queue": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest --watch",
+    "generate:llms": "node scripts/generate-llms.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warlockjs/notifications"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@vitest/coverage-v8": "4.1.10",
+    "@warlock.js/queue": "workspace:^",
+    "typescript": "^5.9.3",
+    "vitest": "4.1.10"
+  },
+  "keywords": [
+    "notifications",
+    "mail",
+    "in-app",
+    "multi-channel",
+    "warlock.js",
+    "typescript"
+  ],
+  "author": "hassanzohdy",
+  "license": "MIT",
+  "packageManager": "pnpm@11.24.0"
+}

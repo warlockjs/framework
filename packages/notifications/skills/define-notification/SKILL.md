@@ -1,0 +1,133 @@
+---
+name: define-notification
+description: 'Build a reusable multi-channel notification with `defineNotification<Data>({ type, via, ...renderers })`. `type` is the stable identifier preference/rate-limit gates use AND defaults the database channel''s `type`. `via` is `ChannelName[]` OR `(data, to) => ChannelName[]` for per-recipient channel selection. Renderers are `(data, to, ctx) => NotificationChannels[C]`; `ctx` carries `locale` + `meta` from `SendOptions`. The returned object exposes `.send(to|to[], data, options?)`, `.queue(to|to[], data, options?)`, and `.only(...channels)`. Per-recipient + per-channel `Promise.allSettled` isolates failures; the database channel''s `type` is auto-defaulted from `def.type`; `SendOptions.idempotencyKey` is injected into the database payload. Triggers: `defineNotification`, `via`, "reusable notification", "multi-channel notification", "send through several channels at once", "render per channel", `RenderContext`, `def.type`; "force on a notification", "queue with delay"; typical import `import { defineNotification } from "@warlock.js/notifications"`. Skip: single-channel ad-hoc sends — the `send-ad-hoc` topic; adding a brand-new channel — the `define-channel` topic; observing dispatch outcomes — the `observe-notifications` topic.'
+---
+
+# `defineNotification` — reusable multi-channel notification
+
+The reusable pattern. Define a notification once with `type` + `via` + a renderer per channel; fire it anywhere with `.send` / `.queue` / `.only`.
+
+## Shape
+
+```ts
+defineNotification<Data>({
+  type: string,                                       // REQUIRED — gate key + database default
+  via: ChannelName[] | (data, to) => ChannelName[],   // static array OR per-recipient callback
+  mail?:     (data, to, ctx) => MailPayload,
+  database?: (data, to, ctx) => Omit<DatabasePayload, "type">, // `type` defaulted from `def.type`
+  // ...one renderer per channel listed in `via`
+});
+```
+
+Returns `{ send, queue, only }`:
+
+| Method | Signature | What it does |
+|---|---|---|
+| `.send` | `(to, data, options?)` | Render + dispatch synchronously. |
+| `.queue` | `(to, data, options?)` | Render + enqueue. Throws if no queue dispatcher is configured. |
+| `.only(...channels)` | returns `{send, queue, only}` | Restrict dispatch to a subset of channels. |
+
+`to` accepts a `Notifiable` OR a `Notifiable[]`. Fan-out emits one render+dispatch per recipient with per-recipient + per-channel `Promise.allSettled` (one failure does not abort the others).
+
+## Static `via`
+
+```ts
+export const welcome = defineNotification<{ name: string }>({
+  type: "welcome",
+  via: ["mail"],
+  mail: ({ name }) => ({ subject: "Welcome", html: `<p>Hi ${name}</p>` }),
+});
+
+await welcome.send(user, { name: "Hasan" });
+```
+
+## Dynamic `via` per recipient
+
+```ts
+export const orderShipped = defineNotification<{ order: Order }>({
+  type: "order.shipped",
+  via: (_data, to) =>
+    to.get("telegram_chat_id")
+      ? ["database", "telegram"]
+      : ["database", "mail"],
+  database: ({ order }) => ({ title: `Order #${order.number} shipped` }),
+  mail: ({ order }, to) => ({
+    subject: `Order #${order.number} shipped`,
+    html: `<p>Hi ${to.get("name")}, on the way.</p>`,
+  }),
+  // telegram: ... (Phase 2 — bridges)
+});
+```
+
+## The renderer's 3rd arg — `RenderContext`
+
+```ts
+mail: ({ campaignId }, to, { locale = "en", meta }) => ({
+  subject: subjectsByLocale[locale],
+  html:    htmlByLocale[locale],
+}),
+
+// usage:
+await marketing.queue(user, payload, {
+  locale: user.get("locale"),
+  meta:   { campaignId, source: "blast" },
+});
+```
+
+`ctx` carries `locale` + `meta` from `SendOptions`. `meta` flows through to every observability event too.
+
+## Database channel — `type` is defaulted
+
+The `database` renderer may OMIT `type` — the dispatcher injects `def.type` automatically. This keeps the notification type in ONE place.
+
+```ts
+defineNotification({
+  type: "order.shipped",   // ← single source of truth
+  via: ["database"],
+  database: () => ({ title: "Shipped" }), // type omitted; dispatcher injects "order.shipped"
+});
+```
+
+## Fan-out
+
+```ts
+await orderShipped.send([buyer, salesRep], { order });
+// One render+dispatch per recipient. Database does N inserts (Phase 0);
+// Phase 1 ships a single bulk insert via `Channel.sendMany?`.
+```
+
+## `.only(...)` — restrict channels
+
+```ts
+await orderShipped.only("mail").send(user, { order });
+// `via` is filtered to just "mail"; other channels are skipped.
+```
+
+## Queue (Phase 2)
+
+```ts
+await orderShipped.queue(user, { order }, { delay: "10m" });
+// Throws NoQueueDispatcherError if no `queue` is configured in config/notifications.ts.
+```
+
+## SendOptions
+
+| Field | Effect |
+|---|---|
+| `delay` | Reserved — `"10m"` / `"3d"` / `600` (seconds). NOT honored yet: both `.send()` and the current `.queue()` worker dispatch immediately; delay-aware delivery is a follow-up. |
+| `locale` | Passed to renderers via `RenderContext.locale`. |
+| `meta` | Passed to renderers + included in every observability event. |
+| `idempotencyKey` | Injected into the database payload (dedupe via unique index). |
+| `force` | Bypass `PreferenceProvider`. Does NOT bypass `RateLimiter`. |
+| `type` | Ignored by `defineNotification` — see `send-ad-hoc` for ad-hoc gating. |
+
+## Failure isolation
+
+Per-recipient: each recipient gets an independent `Promise.allSettled`. Per-channel: each channel within a recipient gets an independent `allSettled`. A throw becomes a `failed` event on the event bus AND re-throws within its own slot — never aborts siblings.
+
+## See also
+
+- The `notifications-basics` topic — package front door.
+- The `send-ad-hoc` topic — `notify.<channel>` per-channel shorthand.
+- The `configure-notifications` topic — wire channels + preferences + rate-limit + queue.
+- The `observe-notifications` topic — `notifications.on("sending" | "sent" | "failed" | "skipped", …)`.
