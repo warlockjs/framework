@@ -1,0 +1,28 @@
+{
+  "name": "@warlock.js/sitemap",
+  "version": "5.29.0",
+  "description": "A framework-blind sitemap builder: entries in, a valid sitemaps.org document out. Zero runtime dependencies.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "warlock": {
+    "environment": "server"
+  },
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warlockjs/sitemap"
+  },
+  "devDependencies": {
+    "vitest": "4.1.10",
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@11.24.0"
+}
