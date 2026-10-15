@@ -11,8 +11,6 @@
     "skipLibCheck": true,
     "noEmit": true,
     "paths": {
-      "web/*": ["../v5/app/src/web/*"],
-      "app/*": ["../v5/app/src/app/*"],
       "@warlock.js/web": ["./src/index.ts"],
       "@warlock.js/core": ["../core/src/index.ts"],
       "@warlock.js/seal": ["../seal/src/index.ts"],
