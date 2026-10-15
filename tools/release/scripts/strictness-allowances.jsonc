@@ -1,0 +1,53 @@
+{
+  // Strictness ratchet baseline, re-measured on 2026-09-09 with:
+  // `node --import tsx builder/scripts/strictness-gate.ts`
+  // Every package keeps its own config for resolution and file inclusion, while
+  // the tsconfig.base.json strictness contract is enforced for every compile.
+  // The resulting rise for formerly lenient packages is truth arriving, not a
+  // regression. From this re-seeded baseline, these numbers may only go DOWN.
+  // `builder` has no TypeScript config, so it is unmeasured, not zero.
+  //
+  // 2026-09-14: consumer-contract flags (isolatedModules,
+  // noFallthroughCasesInSwitch) added — every package is now compiled at
+  // least as strictly as the scaffolded consumer app's tsconfig.json, not
+  // just the shared strict/noUncheckedIndexedAccess/forceConsistentCasingInFileNames
+  // contract. Re-measured with:
+  // `node --import tsx builder/scripts/strictness-gate.ts`
+  // `core` fell 119 -> 47 and `web` rose 186 -> 187; every other package's
+  // count was unchanged. Ratchet applied both directions per policy.
+  "access": 0,
+  "ai": 463,
+  "ai-anthropic": 19,
+  "ai-bedrock": 27,
+  "ai-deepseek": 0,
+  "ai-google": 38,
+  "ai-groq": 0,
+  "ai-live": 1,
+  "ai-mistral": 0,
+  "ai-ollama": 30,
+  "ai-openai": 31,
+  "ai-panoptic": 61,
+  "ai-tools": 69,
+  "ai-workspace": 19,
+  "ai-xai": 0,
+  "auth": 22,
+  "cache": 16,
+  "cascade": 0,
+  "context": 0,
+  "core": 46,
+  "create-warlock": 9,
+  "devtools": 0,
+  "docs": 18,
+  "fs": 1,
+  "herald": 0,
+  "logger": 0,
+  "notifications": 0,
+  "queue": 0,
+  "scheduler": 23,
+  "seal": 0,
+  // 2026-09-18: new package in 5.15.0. Seeded at 0 deliberately — a package
+  // written today has no reason to start with an allowance, and the ratchet
+  // only moves down.
+  "sitemap": 0,
+  "web": 178
+}
