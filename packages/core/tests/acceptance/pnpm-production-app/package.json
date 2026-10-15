@@ -1,0 +1,14 @@
+{
+  "name": "warlock-pnpm-acceptance-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Deliberately minimal app that must build and boot under pnpm's strict layout. Declares @warlock.js/core and nothing else — see README.md. Install settings and the lockstep overrides live in pnpm-workspace.yaml, which is where pnpm 11 reads them.",
+  "scripts": {
+    "build": "warlock build",
+    "start": "warlock start"
+  },
+  "dependencies": {
+    "@warlock.js/core": "file:./vendor/core.tgz"
+  }
+}

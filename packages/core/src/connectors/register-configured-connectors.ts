@@ -1,0 +1,148 @@
+/**
+ * Registration half of the `connectors` config key.
+ *
+ * ONE key drives both halves of a connector's life: `warlock build` reads the
+ * same array to drain each connector's build contribution, and this function
+ * registers that array with the connectors manager so the runtime boots it.
+ * Reading them from one place is the whole point — a bundle "built for" web
+ * that "boots without" web is a green build with a missing client bundle, and
+ * the failure is silent. A second key would let the two drift; this cannot.
+ *
+ * Two callers, two ways in:
+ *
+ * - The generated production entry PASSES the array explicitly. Inside a
+ *   bundled artifact nothing ever loads `warlock.config.ts` — the build
+ *   imports it statically so esbuild bakes it into the bundle, then hands the
+ *   array straight here. No config manager, no runtime file read. It also
+ *   passes `expectedNames` — the list the build resolved — so a config that
+ *   resolves differently at startup is refused instead of booted.
+ * - The dev preloader OMITS the array and lets this read the already-resolved
+ *   warlock config, which dev has loaded by then. It also omits
+ *   `expectedNames`, so dev gets NO drift check — deliberately. Drift is a
+ *   relationship between what a build baked and what a runtime registers, and
+ *   dev has no build: there is nothing to drift from, and inventing a second
+ *   source of truth to compare against would create the disagreement this
+ *   check exists to prevent. The absence of a check on this path is the
+ *   design, not an omission — do not harmonise it with the production path.
+ *   A conditional config that works in dev and is refused at production boot
+ *   is this working as intended, not a gap.
+ *
+ * Idempotent either way: a connector whose name an EARLIER CALL in the same
+ * process already registered is skipped rather than stacked, since a duplicate
+ * would boot and shut down twice. A built-in's name is not that case — it is
+ * reserved, and an array claiming one is refused rather than skipped.
+ */
+import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
+import { assertNoReservedConnectorNames } from "./assert-no-reserved-connector-names";
+import { assertUniqueConnectorNames } from "./assert-unique-connector-names";
+import { connectorsManager } from "./connectors-manager";
+import type { Connector } from "./types";
+
+export type RegisterConfiguredConnectorsOptions = {
+  /**
+   * The connector names, in order, that the build resolved. The generated
+   * production entry bakes this in; every other caller omits it.
+   */
+  expectedNames?: string[];
+};
+
+export function registerConfiguredConnectors(
+  connectors?: Connector[],
+  options: RegisterConfiguredConnectorsOptions = {},
+): void {
+  const registering = connectors ?? configuredConnectors();
+
+  // First, and before the drift check: a name listed twice is registered once
+  // here but was drained twice by the build, and the two lists the drift check
+  // compares are identical in that case — so it would wave the array through
+  // and the asymmetry would survive into the boot. Reported as the duplicate it
+  // is, rather than as whatever the next check happens to make of it.
+  assertUniqueConnectorNames(registering);
+
+  // Then the names that were taken before this array was ever read. The skip
+  // below treats an already-held name as idempotency, which is right for a name
+  // an EARLIER CALL registered — the same array arriving twice in one process —
+  // and wrong for a built-in: nothing the app configured put that name there, so
+  // the skip would drop a connector the app asked for and the build already
+  // prepared artifacts for. Same call the build makes, so neither half can be
+  // reached with an array the other refuses.
+  assertNoReservedConnectorNames(registering);
+
+  // Before anything is registered: a half-registered manager is worse than a
+  // refused boot, because the phases would start on top of it.
+  if (options.expectedNames) {
+    assertNoConnectorDrift(options.expectedNames, registering);
+  }
+
+  for (const connector of registering) {
+    if (connectorsManager.has(connector.name)) continue;
+
+    connectorsManager.register(connector);
+  }
+}
+
+/**
+ * Refuses a boot whose connector list is not the one the build was made from.
+ *
+ * `connectors` in warlock.config is a normal expression, so it may read the
+ * environment — the build resolves it once, and the artifact re-evaluates the
+ * same source at startup. Nothing forces the two results to agree, and when
+ * they do not the failure is silent: the bundle carries what a connector
+ * contributed at build time while the runtime never boots it, or boots one the
+ * build never prepared for.
+ *
+ * Order counts as a difference. The build drains connector contributions
+ * SEQUENTIALLY in config-array order — each one writing files and merging
+ * esbuild options on top of what the previous ones left — so the same names in
+ * another order describe an artifact produced by a drain sequence this build
+ * never ran. Start order is NOT the reason: connectors start in PRIORITY order,
+ * and the array's order only breaks ties between equal priorities.
+ *
+ * Names only — this compares WHICH connectors are present, never how any of
+ * them is configured, so it cannot catch a connector pointed at the wrong
+ * database. Saying so in the message is the point: a check that reads as
+ * broader than it is buys false confidence.
+ */
+function assertNoConnectorDrift(expectedNames: string[], connectors: Connector[]): void {
+  const actualNames = connectors.map((connector) => connector.name);
+
+  const matches =
+    expectedNames.length === actualNames.length &&
+    expectedNames.every((name, index) => name === actualNames[index]);
+
+  if (matches) return;
+
+  throw new Error(
+    "The connector list this server booted with does not match the list its build was made from.\n" +
+      `  expected (resolved when the app was built): ${formatNames(expectedNames)}\n` +
+      `  actual (handed over at boot): ${formatNames(actualNames)}\n` +
+      "This compares the set and order of connectors only, and says nothing about how any connector is configured. " +
+      "It usually means `connectors` in warlock.config resolves differently here than it did at build time — " +
+      "rebuild the app in the same configuration environment this server runs in, " +
+      "or make the array resolve to the same connectors in both.",
+  );
+}
+
+function formatNames(names: string[]): string {
+  return `[${names.map((name) => JSON.stringify(name)).join(", ")}]`;
+}
+
+/**
+ * The connectors the resolved warlock config declares.
+ *
+ * Reached only when the caller omitted the array. An unloaded config here is
+ * not "nothing to register" — it is a caller asking this function to read a
+ * source that does not exist yet, so it throws instead of returning empty.
+ * Returning empty is how the production entry once registered NOTHING while
+ * reporting success: the bundle booted none of the connectors it was built
+ * for, and no line of output said so.
+ */
+function configuredConnectors(): Connector[] {
+  if (!warlockConfigManager.isLoaded) {
+    throw new Error(
+      "registerConfiguredConnectors: warlock config is not loaded; pass the connectors array explicitly or load the config first",
+    );
+  }
+
+  return warlockConfigManager.get("connectors") ?? [];
+}

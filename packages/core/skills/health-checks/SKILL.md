@@ -1,0 +1,119 @@
+---
+name: health-checks
+description: 'Built-in liveness (`/health`) and readiness (`/ready`) endpoints plus graceful HTTP request draining for zero-downtime deploys — the `health` registry (`health.addCheck`/`removeCheck`), the `http.health.*` and `http.gracefulShutdown.*` config, and how readiness ties into `Application.isShuttingDown`. Triggers: `health`, `health.addCheck`, `health.removeCheck`, `HealthCheck`, `/health`, `/ready`, `http.health`, `http.gracefulShutdown`, `forceCloseConnections`, "liveness probe", "readiness probe", "graceful shutdown", "drain in-flight requests", "zero-downtime deploy", "kubernetes health check", "503 until ready"; typical import `import { health } from "@warlock.js/core"`. Skip: the `Application.onShutdown` / `onceBooted` lifecycle hooks — the `use-app-context` topic; maintenance-mode 503s — the `use-middleware` topic; connector lifecycle — the `add-connector` topic; competing libs `@fastify/under-pressure`, `terminus`, hand-rolled `/health` controllers.'
+---
+
+# Warlock — health checks & graceful shutdown
+
+Two endpoints and a drain, so a load balancer never routes to an instance that isn't ready and a deploy never kills an in-flight request. All built in; no controller to hand-roll.
+
+## The two endpoints
+
+The HTTP connector registers them on the Fastify server during boot (before route scanning), so they exist by the time the server listens:
+
+| Path | Probe | 200 when | 503 when |
+| --- | --- | --- | --- |
+| `/health` | liveness | the process is up | shutdown has begun |
+| `/ready` | readiness | booted **and** not shutting down **and** every check passes | before boot, during shutdown, or any failing check |
+
+**Liveness** answers "should the orchestrator RESTART me?" — it ignores dependency checks (a failing DB doesn't mean restart the pod). **Readiness** answers "should the load balancer ROUTE to me?" — it gates on boot completion, shutdown state, and your registered checks.
+
+```
+GET /health → 200 {"status":"ok"}
+GET /ready  → 200 {"status":"ok","checks":{"db":true}}
+            → 503 {"status":"error","checks":{"db":false}}
+```
+
+### Config
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+const httpConfigurations: HttpConfigurations = {
+  health: {
+    enabled: true,          // default; set false to remove both endpoints
+    path: "/health",        // liveness path
+    readinessPath: "/ready", // readiness path
+  },
+};
+
+export default httpConfigurations;
+```
+
+## Readiness checks
+
+Readiness is `isBooted && !isShuttingDown` plus every registered check. Register a check from a connector, a `main.ts`, or anywhere:
+
+```ts
+import { health } from "@warlock.js/core";
+
+health.addCheck("db", async () => {
+  return database.isConnected();
+});
+
+health.removeCheck("db"); // unregister later if needed
+```
+
+A check returns `boolean | Promise<boolean>`. **A thrown error counts as a failed check** (it's surfaced in the `checks` map + the 503, not logged — probes poll often, so a failure is a normal signal, not an error event). Keep checks cheap and fast; they run on every `/ready` poll.
+
+### Routes-registered readiness signal
+
+A booted HTTP app that ends up with **zero routes** almost always means a route module failed to register silently — without this check it would 404 every request while reporting ready. `health.addRoutesRegisteredCheck(getRouteCount)` registers a `"routes"` check that fails while the count is `0`:
+
+```ts
+import { health, router } from "@warlock.js/core";
+
+health.addRoutesRegisteredCheck(() => router.routeCount());
+// pass a second arg to rename the check, e.g. "http-routes"
+```
+
+The count is passed as a getter so the registry stays decoupled from the router. Apps with no HTTP surface simply never register it.
+
+## Graceful shutdown (request draining)
+
+On SIGINT/SIGTERM the framework tears down in order: **app `onShutdown` hooks → connectors in reverse priority**. The HTTP connector's teardown drains instead of dropping:
+
+1. `Application.isShuttingDown` flips `true` at the very start → `/ready` immediately returns 503, so the load balancer stops sending new traffic.
+2. Fastify stops accepting new requests (answers 503 while closing) and lets in-flight ones finish.
+3. Draining is bounded by a timeout so one stuck request can't hang the deploy — after it, the server force-closes and a warning is logged.
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+const httpConfigurations: HttpConfigurations = {
+  gracefulShutdown: {
+    timeout: 10_000,              // ms to wait for in-flight drain (default 10s)
+    forceCloseConnections: "idle", // close idle keep-alives, let active finish (default)
+  },
+};
+
+export default httpConfigurations;
+```
+
+`forceCloseConnections`: `"idle"` (default) closes idle keep-alive connections and lets active requests finish; `true` force-closes everything immediately; `false` waits for every connection.
+
+## The zero-downtime deploy flow
+
+```
+SIGTERM → isShuttingDown = true → /ready returns 503
+        → LB stops routing new requests to this instance
+        → in-flight requests drain (up to gracefulShutdown.timeout)
+        → app onShutdown hooks already ran (db/cache still up)
+        → connectors close in reverse → process exits
+```
+
+For an even smoother handoff, give the load balancer time to observe the 503 before the server closes — e.g. an `onShutdown` hook with a short `sleep` matched to your LB's health-check interval.
+
+## Gotchas
+
+- **`/health` is registered straight on Fastify, not the app router.** It's infra, so it's immune to HMR and route scanning — but if your app also defines a `/health` route you'll have a collision. Rename via `http.health.path`.
+- **Readiness needs a finished boot.** Before `Application.isBooted` (e.g. while late-phase connectors are still starting) `/ready` is 503 by design — that's the point.
+- **A hanging `onShutdown` hook delays the drain.** App hooks run before connector teardown and are only bounded by your process manager's kill timeout; keep them fast. The HTTP drain itself is bounded by `gracefulShutdown.timeout`.
+- **The `maintenance` middleware is a different 503.** It allowlists `/health` by default so probes pass during maintenance — but maintenance mode is operator-toggled downtime, not readiness. See the `use-middleware` topic.
+
+## See also
+
+- The `use-app-context` topic — `Application.onShutdown` / `onceBooted` / `isShuttingDown`, the lifecycle hooks the endpoints build on.
+- The `configure-app` topic — the `src/config/http.ts` shape.
+- The `add-connector` topic — connector boot/shutdown order, where draining slots in.
+- The `use-middleware` topic — maintenance mode and other built-in middleware.

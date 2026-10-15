@@ -1,0 +1,959 @@
+import { colors } from "@mongez/copper";
+import {
+  ensureDirectoryAsync,
+  fileExistsAsync,
+  getFileAsync,
+  getJsonFileAsync,
+  putFileAsync,
+  removeDirectoryAsync,
+} from "@warlock.js/fs";
+import esbuild from "esbuild";
+import glob from "fast-glob";
+import path from "path";
+import { assertNoReservedConnectorNames } from "../connectors/assert-no-reserved-connector-names";
+import { assertUniqueConnectorNames } from "../connectors/assert-unique-connector-names";
+import type { Connector, ConnectorBuildContext, ConnectorEsbuildPatch } from "../connectors/types";
+import { configKeyFromPath } from "../config/config-key-from-path";
+import {
+  isConfigFile,
+  isEventFile,
+  isLocaleFile,
+  isMainFile,
+  isRouteFile,
+  isWorkerFile,
+} from "../dev-server/special-file-patterns";
+import { tsconfigManager } from "../dev-server/tsconfig-manager";
+import { appPath, rootPath, warlockPath } from "../utils";
+import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
+import { assertGeneratedImportsAreDeclared } from "./assert-generated-imports";
+import { bundleFrameworkDependencies } from "./bundle-framework-dependencies";
+import { dedupe, runEmitContributions, runGenerateContributions } from "./build-contributions";
+import { writeDistBuildManifestAsync } from "./dist-build-manifest";
+import { nativeNodeModulesPlugin } from "./esbuild-plugins";
+import { assertEsbuildBinaryIsLinked } from "./esbuild-preflight";
+import { collectRouteRegistrationSnapshot } from "./route-registration-snapshot";
+import { clearOwnedRouteTypes } from "../dev-server/route-types-publisher";
+import {
+  commitDistAsync,
+  createTempOutputDir,
+  rollbackDistAsync,
+  stageDistAsync,
+  type StagedDist,
+} from "./promote-dist";
+import { resolveBuildConfig, type ResolvedBuildConfig } from "./resolve-build-config";
+import { tsconfigPathAliases } from "./tsconfig-path-aliases";
+import { toKebabCase } from "@mongez/reinforcements";
+
+/**
+ * Recreates `require`, `__filename` and `__dirname` at the top of an ESM bundle.
+ *
+ * Bundled CommonJS dependencies call `require("node:assert")` and read
+ * `__dirname` to locate their own assets. Neither exists in an ES module, so
+ * esbuild substitutes a stub that throws — **after the build has reported
+ * success**. `Dynamic require of "node:assert" is not supported` is that stub
+ * firing, and it is the defect this shim removes.
+ *
+ * `__dirname` matters as much as `require`: without it a dependency resolving
+ * an asset path silently gets `undefined` and fails later, further from the
+ * cause.
+ *
+ * Written as one line because esbuild inserts a banner verbatim above the
+ * bundle and a multi-line string here would shift every mapped line.
+ */
+const ESM_INTEROP_SHIM =
+  "import{createRequire as __wlCreateRequire}from'node:module';" +
+  "import{fileURLToPath as __wlFileURLToPath}from'node:url';" +
+  "import{dirname as __wlDirname}from'node:path';" +
+  "const require=__wlCreateRequire(import.meta.url);" +
+  "const __filename=__wlFileURLToPath(import.meta.url);" +
+  "const __dirname=__wlDirname(__filename);";
+
+/**
+ * Combine the framework's banner with the user's, keeping both.
+ *
+ * esbuild's `banner` is an object keyed by output type, and every merge in the
+ * path to it — the config merge and the options spread — REPLACES that object
+ * rather than merging it. So whichever is applied second silently deletes the
+ * other. This is the only place the two can coexist.
+ *
+ * The shim goes first: it defines `require`, which a user banner may use.
+ *
+ * @param userBanner banner from `warlock.config.ts`, if any
+ * @param shim the interop shim, or undefined when it does not apply
+ */
+function mergeBanner(
+  userBanner: Record<string, string> | undefined,
+  shim: string | undefined,
+): Record<string, string> | undefined {
+  if (!shim) return userBanner;
+
+  const userJs = userBanner?.js;
+
+  return {
+    ...userBanner,
+    js: userJs ? `${shim}${userJs}` : shim,
+  };
+}
+
+/**
+ * Prefix every generated file uses to reach the app root.
+ *
+ * Generated sources are written into `.warlock/production/`, two levels below
+ * the app root, so `../../` lands back on it — the same hop already spelled
+ * out in the `../../src/app/…` and `../../src/config/…` imports the module and
+ * config-loader generators emit. Named once so a generator that needs a new
+ * app-root file (`warlock.config`) cannot pick a different depth.
+ */
+const APP_ROOT_FROM_PRODUCTION_DIR = "../../";
+
+/**
+ * Production Builder
+ * Generates production-ready files and bundles them for deployment
+ * Build options are loaded from warlock.config.ts
+ */
+export class ProductionBuilder {
+  private options!: ResolvedBuildConfig;
+  private readonly productionDir = warlockPath("production");
+
+  /**
+   * Connectors declared in `warlock.config.ts`. Read statically — `build`
+   * never calls `boot()`/`start()` on them; it only
+   * drains their `build` contributions.
+   */
+  private connectors: readonly Connector[] = [];
+
+  /**
+   * The contributors' merged esbuild patch, produced by the `generate` pass
+   * and consumed by {@link bundle}.
+   */
+  private contributedEsbuild: ConnectorEsbuildPatch = {};
+
+  /** Browser-safe API metadata captured in a fresh registration-only child. */
+  private namedApiRoutes?: readonly import("../router/types").NamedApiRoute[];
+
+  /**
+   * Main build entry point
+   *
+   * The esbuild bundle is written into a TEMP directory next to the real
+   * output directory, never into it, and that directory is renamed over
+   * `outdir` as one filesystem operation — so `outdir` is never observed as
+   * a mix of the old build and the new one, and a build that fails before
+   * that rename never touches `outdir` at all.
+   *
+   * `this.options.outdir` is NOT repointed at the temp directory while that
+   * happens, and must never be. It is not merely a write target: consumers
+   * BAKE it into runtime output — `web`'s build contribution derives the
+   * `clientDir` recorded in its pages manifest from it
+   * (`web/src/build/contribution.ts`) — so a temp path reaching them
+   * produces an artifact whose browser paths point at a directory promotion
+   * has since renamed away. The temp path is passed explicitly, as a
+   * parameter, to the one operation that writes into it ({@link bundle});
+   * everything else, `buildContext()` included, keeps reading the final
+   * destination.
+   *
+   * That is also why promotion is STAGED rather than done at the very end.
+   * Connector `emit` hooks write real artifacts (the web client bundle) and
+   * see the final `outdir`, so they must run when `outdir` genuinely holds
+   * this build — after the rename, not before it, or promotion would replace
+   * the directory they just wrote into. The previous build is kept parked
+   * aside until they finish: `emit` throwing rolls the whole promotion back,
+   * and the build-success marker `warlock start` checks is written last of
+   * all, so a failure at any point leaves no `dist` that start will boot.
+   */
+  public async build(): Promise<void> {
+    console.log(colors.cyan("Building for production...\n"));
+
+    // Step 0: Fail fast when esbuild's native binary never got linked (the
+    // state pnpm leaves a project in when its build-script approval gate
+    // blocked esbuild's postinstall) rather than let bundling die on esbuild's
+    // own cryptic "package could not be found" error several steps from now.
+    assertEsbuildBinaryIsLinked();
+
+    // Step 1: Initialize options from config
+    await this.initializeOptions();
+
+    const finalOutDir = this.options.outdir!;
+    const tempOutDir = createTempOutputDir(finalOutDir);
+
+    // Set once the temp directory has been renamed onto `finalOutDir`. Its
+    // presence is what tells the catch below whether a failure has a
+    // promotion to undo or only a temp directory to discard.
+    let staged: StagedDist | undefined;
+
+    try {
+      // Step 2: Generate combined files
+      await this.generateCombinedFiles();
+
+      // Step 3: Generate entry point
+      await this.generateEntryPoint();
+
+      // Step 4: Refuse to bundle code the app could not resolve at runtime
+      await this.assertGeneratedImports();
+
+      // Step 4.5: Drain the connectors' `generate` contributions
+      await this.captureNamedApiRoutesForWeb();
+      const contributed = await this.runGenerateContributions();
+
+      // Step 4.6: Re-assert over what the contributors just wrote.
+      //
+      // Step 4 only saw core's own generated files; a contributor writes its
+      // code (a pages barrel, say) AFTER that assertion, so an undeclared bare
+      // specifier in it reaches the bundle unchecked. Under
+      // `packages: "external"` that specifier survives verbatim into the
+      // artifact and dies as ERR_MODULE_NOT_FOUND at runtime — the same failure
+      // step 4 exists to prevent. Skipped when nothing contributed: re-globbing
+      // and re-reading the production dir is pure cost in the common case.
+      if (contributed) {
+        await this.assertGeneratedImports();
+      }
+
+      // Step 5: Bundle with esbuild into the temp directory. The ONLY
+      // operation handed that path — it is a write target, not config.
+      await this.bundle(tempOutDir);
+
+      // Step 5.5: Promote the bundle into `outdir`, keeping the previous
+      // build parked aside. `outdir` now holds exactly this build, so the
+      // steps below write into — and record — the real destination.
+      staged = await stageDistAsync(tempOutDir, finalOutDir);
+
+      // Step 5.6: Drain the connectors' `emit` contributions — after the
+      // bundle is in place (so what they write survives promotion and the
+      // paths they bake in resolve), and BEFORE step 6 deletes the
+      // production directory they may still read.
+      await runEmitContributions(this.connectors, this.buildContext());
+
+      // Step 5.7: Mark `dist` as a genuine, complete build — the one thing
+      // `warlock start` trusts. Written LAST on purpose: every earlier step
+      // can still fail, and until this file exists nothing will boot what
+      // they left behind.
+      await writeDistBuildManifestAsync(finalOutDir);
+
+      // Step 5.8: Commit — drop the parked previous build. Cannot throw.
+      await commitDistAsync(staged);
+    } catch (error) {
+      if (staged) {
+        // The promotion already happened; put the previous build back and
+        // take this half-finished one out of `outdir`.
+        await rollbackDistAsync(staged);
+      } else {
+        // Nothing this build produced ever reached `outdir` — discard the
+        // temp directory and leave `outdir` exactly as it was.
+        await removeDirectoryAsync(tempOutDir).catch(() => undefined);
+      }
+
+      throw error;
+    }
+
+    // Step 6: Remove production folder
+    await removeDirectoryAsync(this.productionDir);
+
+    console.log(colors.green("Build complete!"));
+    console.log(`Start production server by running ${colors.cyan("warlock start")}`);
+  }
+
+  /**
+   * Initialize options from warlock.config.ts
+   */
+  private async initializeOptions(): Promise<void> {
+    this.options = resolveBuildConfig();
+    // Same config object `resolveBuildConfig` just read — `warlock build`
+    // preloads warlock.config.ts, so no additional load happens here.
+    const connectors = warlockConfigManager.get("connectors") ?? [];
+
+    // Checked here, where the array is first read, so nothing downstream has
+    // drained anything yet: the `generate` and `emit` passes run per ENTRY, so
+    // a name listed twice would write its files and merge its esbuild options
+    // twice into an artifact the runtime then boots that name only once from.
+    // A build that half-applied a connector and reported success is worse than
+    // one that never started.
+    assertUniqueConnectorNames([...connectors]);
+
+    // And here rather than only at boot, for the same reason: a name a built-in
+    // already owns is skipped by the runtime, so an artifact built from it
+    // carries the custom connector's generated files and esbuild patches while
+    // the server boots the built-in instead. Refusing it at boot alone would
+    // mean the build had already emitted that artifact — the failure has to
+    // land on the developer running `warlock build`, not on whoever starts the
+    // server. Same assertion the registration half calls, over the same names.
+    assertNoReservedConnectorNames([...connectors]);
+
+    this.connectors = connectors;
+
+    // Ensure production directory exists
+    await ensureDirectoryAsync(this.productionDir);
+  }
+
+  /**
+   * The context handed to every build contribution.
+   */
+  private buildContext(): ConnectorBuildContext {
+    return {
+      productionDir: this.productionDir,
+      appRoot: rootPath(),
+      options: this.options,
+      namedApiRoutes: this.namedApiRoutes,
+    };
+  }
+
+  /**
+   * Web route declarations need application API registration, which cannot be
+   * inferred from generated files. Capture it once in a disposable child before
+   * contributors write build artifacts; no connector lifecycle runs there.
+   */
+  private async captureNamedApiRoutesForWeb(): Promise<void> {
+    if (!this.connectors.some((connector) => connector.name === "web")) {
+      await clearOwnedRouteTypes(rootPath());
+      return;
+    }
+
+    this.namedApiRoutes = (
+      await collectRouteRegistrationSnapshot({
+        cwd: rootPath(),
+        timeoutMs: this.options.routeRegistrationTimeoutMs,
+      })
+    ).routes;
+  }
+
+  /**
+   * Drain the `generate` hooks and fold what they returned back into the
+   * build.
+   *
+   * The entry point is REGENERATED here rather than generated later. The
+   * contribution slot is fixed — after `assertGeneratedImports` (so nothing
+   * bundles that the app could not resolve) and before `bundle` — while
+   * `generateEntryPoint` must stay at step 3, because `app.ts` is itself
+   * generated code the assertion has to see; moving it past the assertion
+   * would silently drop the entry from that check. Rewriting one small file
+   * is cheaper than losing either guarantee, and the write is pure
+   * (`generatedFiles` + these imports), so doing it twice is not a
+   * correctness risk.
+   *
+   * @returns whether any connector ran a `generate` hook — the caller uses it
+   * to decide if the import assertion is worth a second pass. Keyed on the
+   * hook EXISTING, not on what it returned: a hook that returns nothing may
+   * still have written files into `productionDir`, and those are exactly the
+   * files the second pass is there to read.
+   */
+  private async runGenerateContributions(): Promise<boolean> {
+    const contributed = this.connectors.some((connector) => Boolean(connector.build?.generate));
+
+    const { entryImports, esbuild } = await runGenerateContributions(
+      this.connectors,
+      this.buildContext(),
+    );
+
+    this.contributedEsbuild = esbuild;
+
+    if (entryImports.length > 0) {
+      await this.generateEntryPoint(entryImports);
+    }
+
+    return contributed;
+  }
+
+  /**
+   * Track which special files were generated
+   */
+  private generatedFiles = {
+    locales: false,
+    events: false,
+    main: false,
+    routes: false,
+    workers: false,
+  };
+
+  /**
+   * Generate all combined files
+   */
+  private async generateCombinedFiles(): Promise<void> {
+    console.log(colors.yellow("   Generating production files..."));
+
+    // Generate bootstrap.ts file
+    await this.generateBootstrap();
+
+    // Generate config loader
+    await this.generateConfigLoader();
+
+    // Generate special files and track which ones have content
+    const [locales, events, main, routes, workers] = await Promise.all([
+      this.generateLocales(),
+      this.generateEvents(),
+      this.generateMain(),
+      this.generateRoutes(),
+      this.generateWorkers(),
+    ]);
+
+    this.generatedFiles = { locales, events, main, routes, workers };
+  }
+
+  /**
+   * Generate bootstrap.ts - ensures bootstrap() runs first and sets production environment
+   */
+  private async generateBootstrap(): Promise<void> {
+    // ESM hoists imports, so the app bootstrap must be the first import to run first
+    const appBootstrapImport = (await fileExistsAsync(appPath("bootstrap.ts")))
+      ? "import './../../src/app/bootstrap';\n"
+      : "";
+
+    const content = `${appBootstrapImport}import { bootstrap, Application } from "@warlock.js/core";
+
+// Production runtime; NODE_ENV is only defaulted so an explicit value (e.g. staging) wins
+Application.setRuntimeStrategy("production");
+if (!process.env.NODE_ENV) {
+  Application.setEnvironment("production");
+}
+
+// Bootstrap the application
+bootstrap();
+`;
+
+    await putFileAsync(path.join(this.productionDir, "bootstrap.ts"), content);
+  }
+
+  /**
+   * Fail the build when generated code imports a package the app does not
+   * declare.
+   *
+   * The bundler is configured `packages: "external"`, so every bare specifier
+   * written above survives verbatim into an artifact that resolves against the
+   * **consuming app's** node_modules. A framework-internal dependency imported
+   * there resolves by accident under npm/yarn hoisting and dies under pnpm —
+   * which is how a production app shipped that could not boot. Rewriting the
+   * offending import fixes today's bundle; this check is what stops the next
+   * change to the generator from quietly reintroducing it.
+   */
+  private async assertGeneratedImports(): Promise<void> {
+    const generatedPaths = await glob("**/*.{ts,tsx,js,mjs}", {
+      cwd: this.productionDir,
+      absolute: false,
+    });
+
+    const [files, appPackage] = await Promise.all([
+      Promise.all(
+        generatedPaths.map(async (file) => ({
+          file,
+          content: await getFileAsync(path.join(this.productionDir, file)),
+        })),
+      ),
+      getJsonFileAsync<{ dependencies?: Record<string, string> }>(rootPath("package.json")),
+    ]);
+
+    assertGeneratedImportsAreDeclared(files, Object.keys(appPackage.dependencies ?? {}));
+  }
+
+  /**
+   * Glob `src/app` and keep the files the shared dev-server predicate accepts,
+   * so production discovers exactly what the dev collector does.
+   * Returns relative paths from .warlock/production/ to src/app/
+   */
+  private async globModule(matches: (relativePath: string) => boolean): Promise<string[]> {
+    const files = await glob("**/*.{ts,tsx,json}", {
+      cwd: appPath(),
+      absolute: false,
+    });
+
+    // e.g., "users/main.ts" -> "../../src/app/users/main"
+    return files
+      .filter((file) => matches("src/app/" + file))
+      .sort()
+      .map((file) => "../../src/app/" + file.replace(/\.(ts|tsx)$/, ""));
+  }
+
+  /**
+   * Generate config-loader.ts
+   */
+  private async generateConfigLoader(): Promise<void> {
+    const configDirectory = path.join(process.cwd(), "src/config");
+
+    const files = await glob("**/*.{ts,tsx}", {
+      cwd: configDirectory,
+      absolute: false,
+    });
+
+    // Same key rule as the dev config loader: the raw path, never camel-cased
+    const configNames = files
+      .filter((f) => isConfigFile("src/config/" + f))
+      .map((f) => ({
+        path: f.replace(/\.(ts|tsx)$/, ""),
+        key: configKeyFromPath("src/config/" + f),
+      }))
+      .filter((entry): entry is { path: string; key: string } => entry.key !== undefined)
+      .sort((a, b) => a.path.localeCompare(b.path));
+
+    // Only `@warlock.js/core` — the one package the app itself declares. See
+    // `assertGeneratedImportsAreDeclared`: `@mongez/config` is core's own
+    // dependency, so a bare import of it resolved by luck under npm/yarn
+    // hoisting and died under pnpm's strict layout.
+    const imports: string[] = [
+      'import { setConfig, configSpecialHandlers } from "@warlock.js/core";',
+    ];
+    const configImports: string[] = [];
+    const configSetCalls: string[] = [];
+    const executors: string[] = [];
+
+    configNames.forEach(({ path: configPath, key }, index) => {
+      // Index-based identifier: keys like "rate-limit" or "mail/smtp" are not valid names
+      const varName = `config${index}`;
+      configImports.push(`import ${varName} from "../../src/config/${configPath}";`);
+      configSetCalls.push(`setConfig(${JSON.stringify(key)}, ${varName});`);
+      executors.push(`await configSpecialHandlers.execute(${JSON.stringify(key)}, ${varName});`);
+    });
+
+    // ESM hoists imports, so prestart must be the first import to run first
+    const prestartImports = (await fileExistsAsync(appPath("prestart.ts")))
+      ? ["import './../../src/app/prestart';"]
+      : [];
+
+    const content = [
+      ...prestartImports,
+      ...imports,
+      "",
+      "// Config imports",
+      ...configImports,
+      "",
+      "// Register configs",
+      ...configSetCalls,
+      "",
+      "// Special handlers",
+      ...executors,
+      "",
+    ].join("\n");
+
+    await putFileAsync(path.join(this.productionDir, "config-loader.ts"), content);
+  }
+
+  /**
+   * Generate locales.ts (only if there are locale files)
+   * @returns true if file was generated with content
+   */
+  private async generateLocales(): Promise<boolean> {
+    const files = await this.globModule(isLocaleFile);
+    if (files.length === 0) return false;
+    const content = files
+      .map((file, index) => {
+        if (!file.endsWith(".json")) return `import "${file}";`;
+        const moduleFolder = file.split("/").at(-3)!;
+        return [
+          `import dictionary${index} from "${file}";`,
+          'import { registerLocaleDictionary } from "@warlock.js/core";',
+          `registerLocaleDictionary({ sourceFile: ${JSON.stringify(file)}, source: JSON.stringify(dictionary${index}), defaultNamespace: ${JSON.stringify(moduleFolder)} });`,
+        ].join("\n");
+      })
+      .join("\n");
+    await putFileAsync(path.join(this.productionDir, "locales.ts"), content + "\n");
+    return true;
+  }
+
+  /**
+   * Generate events.ts (only if there are event files)
+   * @returns true if file was generated with content
+   */
+  private async generateEvents(): Promise<boolean> {
+    const files = await this.globModule(isEventFile);
+    if (files.length === 0) return false;
+    await this.generateImportsFile(files, "events.ts");
+    return true;
+  }
+
+  /**
+   * Generate main.ts (only if there are main files)
+   * @returns true if file was generated with content
+   */
+  private async generateMain(): Promise<boolean> {
+    const files = await this.globModule(isMainFile);
+    if (files.length === 0) return false;
+    await this.generateImportsFile(files, "main.ts");
+    return true;
+  }
+
+  /**
+   * Generate routes.ts (only if there are route files)
+   * @returns true if file was generated with content
+   */
+  private async generateRoutes(): Promise<boolean> {
+    const files = await this.globModule(isRouteFile);
+    if (files.length === 0) return false;
+    await this.generateImportsFile(files, "routes.ts");
+    return true;
+  }
+
+  /**
+   * Generate workers.ts (only if there are worker files)
+   * @returns true if file was generated with content
+   */
+  private async generateWorkers(): Promise<boolean> {
+    const files = await this.globModule(isWorkerFile);
+    if (files.length === 0) return false;
+    await this.generateImportsFile(files, "workers.ts");
+    return true;
+  }
+
+  /**
+   * Generate a file with imports from all given files
+   */
+  private async generateImportsFile(importPaths: string[], outputFile: string): Promise<void> {
+    const imports = importPaths.map((importPath) => `import "${importPath}";`);
+    const content = imports.join("\n") + "\n";
+    await putFileAsync(path.join(this.productionDir, outputFile), content);
+  }
+
+  /**
+   * Generate the main entry point (app.ts)
+   *
+   * @param contributedImports lines from connector `generate` hooks, appended
+   * to section 4 after `./routes`
+   */
+  private async generateEntryPoint(contributedImports: string[] = []): Promise<void> {
+    console.log(colors.yellow("   Generating entry point..."));
+
+    // The names this build resolved, baked in as a literal. The entry imports
+    // the config source, and that source is re-evaluated at startup — an
+    // env-conditional `connectors` array can hand the boot a different list
+    // than the one drained here. A literal is the only part of the array that
+    // survives into the artifact unchanged, so it is what the boot compares
+    // against.
+    const expectedNames = this.connectors
+      .map((connector) => JSON.stringify(connector.name))
+      .join(", ");
+
+    // Build imports based on which files were generated
+    const imports: string[] = [
+      "// 1. Bootstrap (loads .env, initializes framework)",
+      'import "./bootstrap";',
+      "",
+      "// 2. Load configs",
+      'import "./config-loader";',
+      "",
+      // Registration has to sit between the config being available and the
+      // first phase starting: the connectors listed in `connectors` are the
+      // same ones this build drained contributions from, so the bundle boots
+      // exactly what it was built for. Register any later and an early-phase
+      // connector would miss its own start.
+      "// 2.5 Register connectors declared in warlock.config (the same array this",
+      "//     build read its contributions from, so built-for and boots-with match).",
+      "//     The config is imported STATICALLY so esbuild bakes it into the bundle",
+      "//     and the array is handed over explicitly — an artifact has no",
+      "//     warlock.config.ts beside it to read at runtime, and a registration",
+      "//     that quietly found nothing to register is the exact drift this",
+      "//     section exists to prevent.",
+      "//     `expectedNames` is the list this build resolved, in order — boot",
+      "//     refuses to start when the config hands over a different set or order.",
+      'import { registerConfiguredConnectors } from "@warlock.js/core";',
+      `import warlockConfig from "${APP_ROOT_FROM_PRODUCTION_DIR}warlock.config";`,
+      `registerConfiguredConnectors(warlockConfig.connectors ?? [], { expectedNames: [${expectedNames}] });`,
+      "",
+      "// 2.6 Fail fast on a busy port. `http` is a LATE-phase connector, so its",
+      "//     own preflight is not reached until the database and cache have",
+      "//     connected and every app module has been imported — seconds of work",
+      "//     thrown away before anyone learns the port was taken. This probe is",
+      "//     a bind-and-release on a socket that is never served, and it reports",
+      "//     on stderr because no log channel is configured this early.",
+      'import { Application, connectorsManager, ConnectorLifecyclePhase, preflightConfiguredHttpPort } from "@warlock.js/core";',
+      'if (Application.hasRole("api") || Application.hasRole("web")) {',
+      "  await preflightConfiguredHttpPort();",
+      "}",
+      "",
+      "// 3. Start early-phase connectors (database, cache, logger, ...)",
+      "//    so data sources, cache, etc. are ready before app code runs",
+      "await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);",
+    ];
+
+    // App code uses dynamic `await import(...)` so each module's side
+    // effects fire at THIS point in execution. Static imports would be
+    // hoisted to module-instantiation time (before the early-phase await
+    // resolves), which is exactly the bug this split is meant to fix.
+    //
+    // The guarantee comes from the imports being DYNAMIC — esbuild wraps a
+    // dynamically-imported module in its `__esm(() => {…})` helper and runs
+    // it at the await, not at instantiation. It does NOT come from
+    // `splitting: true`, which only decides one-file-vs-chunks. This
+    // previously said splitting was required; it is not, and `singleBundle`
+    // (splitting: false) preserves the ordering.
+    imports.push("", "// 4. Load app code (events, locales, main, routes)");
+
+    if (this.generatedFiles.events) {
+      imports.push('await import("./events");');
+    }
+    if (this.generatedFiles.locales) {
+      imports.push('await import("./locales");');
+    }
+    if (this.generatedFiles.main) {
+      imports.push('await import("./main");');
+    }
+    if (this.generatedFiles.routes) {
+      imports.push('if (Application.hasRole("api")) {', '  await import("./routes");', "}");
+    }
+    if (this.generatedFiles.workers) {
+      imports.push('if (Application.hasRole("worker")) {', '  await import("./workers");', "}");
+    }
+
+    // Contributor imports come AFTER `./routes`, never before: a connector
+    // that registers pages needs the routes app code already collected —
+    // the same ordering dev uses (routes first, then the connector installs
+    // on top of them). Emitted verbatim; the contributor writes the whole
+    // statement (e.g. `await import("./pages");`).
+    imports.push(...contributedImports);
+
+    // A rejecting validator (Application.onValidateBoot) must abort boot
+    // before late-phase connectors bind a port.
+    imports.push(
+      "",
+      "// 5. Run startup validators registered via Application.onValidateBoot(...)",
+      "await Application.runStartupValidators();",
+    );
+
+    // Start late-phase connectors after app code registers routes/listeners
+    imports.push(
+      "",
+      "// 6. Start late-phase connectors (http, socket) â€” routes and",
+      "//    listeners registered by app code are now ready to bind",
+      "await connectorsManager.startPhase(ConnectorLifecyclePhase.Late);",
+      "",
+      "// 7. Signal a complete boot so `Application.onceBooted(...)` listeners fire",
+      "Application.markBooted({ environment: Application.environment, runtimeStrategy: Application.runtimeStrategy });",
+      "connectorsManager.shutdownOnProcessKill();",
+    );
+
+    const content = imports.join("\n") + "\n";
+    await putFileAsync(path.join(this.productionDir, "app.ts"), content);
+  }
+
+  /**
+   * Bundle with esbuild
+   *
+   * @param writeOutDir the directory esbuild writes into — the build's
+   * private temp directory, NOT `options.outdir`. Taken as a parameter
+   * rather than read off `this.options` because the two are different paths
+   * with different meanings: `options.outdir` is the final destination every
+   * consumer bakes into the artifact, and this is only where bytes land
+   * before promotion moves them there.
+   */
+  private async bundle(writeOutDir: string): Promise<void> {
+    console.log(colors.magenta("   Bundling with esbuild..."));
+
+    const entryPoint = path.join(this.productionDir, "app.ts");
+    const outFileName = this.options.outFile!;
+    // Strip extension so entryNames produces "<base>.js" via esbuild
+    const entryName = path.basename(outFileName, path.extname(outFileName));
+
+    // `singleBundle` and `esmShim` are ours, not esbuild's — it throws on
+    // unknown keys, and the user options are spread into its call verbatim.
+    const singleBundle = this.options.singleBundle === true;
+    const esmShim = this.options.esmShim !== false;
+    // Read before deleting: the merged banner is applied AFTER the user
+    // spread, so a user banner must not be lost to it or clobber the shim.
+    const userBanner = this.options.banner;
+
+    // `outFile` and `entryPath` are REQUIRED on ResolvedBuildConfig on purpose:
+    // resolve-build-config.ts documents that widening them pushed a lie downstream
+    // into start-production.command.ts, which then could not trust its own config.
+    // This is the one place they must be absent - the object is spread into esbuild's
+    // call verbatim and esbuild throws on unknown keys.
+    //
+    // Stripped off a LOCAL COPY of `this.options`, never off `this.options`
+    // itself: `buildContext()` hands `this.options` to every `generate`/`emit`
+    // contribution hook, including the `emit` pass that runs AFTER this method
+    // returns (`build()` step 5.6). Deleting these keys from the shared object
+    // used to leave those hooks reading `undefined` for `outFile`, `entryPath`,
+    // `singleBundle`, `esmShim` and `banner` even though `ConnectorBuildContext`
+    // types them as present. A shallow copy is enough — every field this method
+    // reads off it is either scalar or already re-merged below (`define`,
+    // `external`, `loader`, `banner`), so nothing here needs a deep clone.
+    const esbuildOptions: Partial<ResolvedBuildConfig> = { ...this.options };
+
+    delete esbuildOptions.outFile;
+    delete esbuildOptions.entryPath;
+    delete esbuildOptions.singleBundle;
+    delete esbuildOptions.esmShim;
+    delete esbuildOptions.banner;
+    delete esbuildOptions.routeRegistrationTimeoutMs;
+
+    await ensureDirectoryAsync(writeOutDir);
+
+    const alias = this.buildAliasMapFromTsconfig();
+
+    // Whether this build decides externality per import EDGE
+    // (`bundle-framework-dependencies.ts`, which explains the rule at
+    // length) or keeps the blunt `packages: "external"`.
+    //
+    // Not in `singleBundle` mode: that bundles everything by definition, and
+    // a plugin that can only ever ADD an external would silently narrow it.
+    // Not when the user set `packages` themselves: their value has always
+    // won over the default below, and it must keep winning — the plugin is
+    // the default's implementation, not a new policy layered on top.
+    const perEdgeExternals = !singleBundle && (esbuildOptions as any).packages === undefined;
+
+    // The user can override `format`, so gate the shim on the EFFECTIVE
+    // format rather than on the default below. A CJS build already has
+    // `require` and friends; injecting them there would be a redefinition.
+    const isEsm = (esbuildOptions.format ?? "esm") === "esm";
+    const banner = mergeBanner(userBanner, esmShim && isEsm ? ESM_INTEROP_SHIM : undefined);
+
+    // Contributor patch, split into the part that can ride the spread order
+    // and the three keys that cannot. `jsx` and `jsxImportSource` are placed
+    // BEFORE the user spread below, which gives the ruled precedence for
+    // free: builder defaults < contributor < user config.
+    //
+    // `define`, `external` and `loader` are pulled out because a spread
+    // REPLACES them wholesale — the same trap `banner` documents. Two
+    // contributors' env defines, a contributor's optional peers plus the
+    // user's, or a contributor's `.svg` loader alongside the user's `.png`,
+    // must both survive, so they are merged by key/by set and re-applied
+    // after the spread with the user still winning per key.
+    const {
+      define: contributedDefine,
+      external: contributedExternal,
+      loader: contributedLoader,
+      plugins: contributedPlugins,
+      ...contributedOptions
+    } = this.contributedEsbuild;
+
+    const userDefine: Record<string, string> | undefined = esbuildOptions.define;
+    const userExternal: string[] | undefined = esbuildOptions.external;
+    const userLoader: ConnectorEsbuildPatch["loader"] = esbuildOptions.loader;
+
+    const define =
+      contributedDefine || userDefine ? { ...contributedDefine, ...userDefine } : undefined;
+
+    const loader =
+      contributedLoader || userLoader ? { ...contributedLoader, ...userLoader } : undefined;
+
+    const external =
+      contributedExternal || userExternal
+        ? dedupe([...(contributedExternal ?? []), ...(userExternal ?? [])])
+        : undefined;
+
+    if (singleBundle) {
+      console.log(
+        colors.magenta(
+          "   Single-bundle mode — one JS file" +
+            (esmShim && isEsm ? " with the ESM interop shim" : "") +
+            ". Native .node addons are still emitted alongside it.",
+        ),
+      );
+    }
+
+    try {
+      await esbuild.build({
+        platform: "node",
+        entryPoints: [entryPoint],
+        bundle: true,
+        // Both are DEFAULTS the user can override — they sit before the
+        // `...esbuildOptions` spread deliberately. `singleBundle` moves them,
+        // an explicit `splitting`/`packages` in warlock.config.ts beats both.
+        //
+        // Phase ordering does not depend on `splitting`: it comes from the
+        // generated app.ts using dynamic `await import(...)` (see
+        // generateAppEntry above), which esbuild defers to the call site in
+        // either mode. Splitting only decides one file vs chunks.
+        splitting: !singleBundle,
+        // `"bundle"` under `perEdgeExternals` is not "bundle everything":
+        // the plugin below returns `external: true` for every bare specifier
+        // this build must not bundle, which is all of them bar the framework's
+        // own declared dependencies. Saying `"external"` here instead would
+        // externalise them before the plugin could rule.
+        packages: singleBundle || perEdgeExternals ? "bundle" : "external",
+        minify: esbuildOptions.minify,
+        sourcemap: esbuildOptions.sourcemap === true ? "linked" : esbuildOptions.sourcemap,
+        format: "esm",
+        // Targeting a concrete Node version (not "esnext") so esbuild
+        // transpiles TC39 stage 3 decorators into helpers â€” Node does not
+        // implement them natively yet.
+        target: ["node22"],
+        entryNames: entryName,
+        alias,
+        plugins: [
+          nativeNodeModulesPlugin,
+          // BEFORE the framework-dependency plugin, and the order is
+          // load-bearing: the first `onResolve` callback to answer wins, and
+          // `app/users/...` is a bare specifier the other one would rule
+          // external.
+          tsconfigPathAliases(this.tsconfigPathAliasConfig()),
+          ...(perEdgeExternals
+            ? [bundleFrameworkDependencies({ appRoot: rootPath(), aliasKeys: Object.keys(alias) })]
+            : []),
+          // Contributor plugins run last: they load their own file types and
+          // must not shadow the resolvers above.
+          ...(contributedPlugins ?? []),
+        ],
+        // Between the defaults and the user spread — the ruled precedence.
+        ...contributedOptions,
+        ...(esbuildOptions as any),
+        // AFTER the spread, and NOT overridable: `esbuildOptions.outdir` rides
+        // that spread carrying the FINAL destination, which is exactly where
+        // this build must not write yet. The final path is the user's setting
+        // and stays authoritative for everyone reading the config — it is only
+        // this one esbuild call that is redirected, and only until promotion
+        // moves the result onto that very path.
+        outdir: writeOutDir,
+        // AFTER the spread for the same reason `banner` is: a spread replaces
+        // these objects instead of merging them, so the merged values are
+        // re-applied here. The user still wins — they were merged in last.
+        ...(define ? { define } : {}),
+        ...(external ? { external } : {}),
+        ...(loader ? { loader } : {}),
+        // AFTER the spread, and intentionally so: `banner` is an object, and
+        // both the config merge and this spread REPLACE it wholesale rather
+        // than merging. Left as a default above, any user banner would delete
+        // the shim; left to the spread, the shim would delete theirs. The
+        // merge is the only form that keeps both.
+        ...(banner ? { banner } : {}),
+      });
+    } catch (e) {
+      console.log(e);
+      throw e;
+    }
+  }
+
+  /**
+   * The WILDCARD half of the same tsconfig `paths` map that
+   * {@link ProductionBuilder.buildAliasMapFromTsconfig} reads the exact half
+   * of. `tsconfig-path-aliases.ts` explains why the two halves need different
+   * mechanisms — in short, esbuild's `alias` option cannot express a wildcard,
+   * so the entries it skips have to be resolved by a plugin instead of being
+   * left to no one.
+   */
+  private tsconfigPathAliasConfig(): { baseUrl: string; paths: Record<string, string[]> } {
+    tsconfigManager.init();
+
+    return {
+      baseUrl: path.resolve(process.cwd(), tsconfigManager.baseUrl),
+      paths: tsconfigManager.aliases as Record<string, string[]>,
+    };
+  }
+
+  /**
+   * Build an alias map from tsconfig `paths` so esbuild resolves local
+   * source aliases (e.g. `@warlock.js/cascade`) to their on-disk source
+   * folders during bundling. Without this, `packages: "external"` would
+   * leave those bare specifiers as raw imports and Node would fail to
+   * resolve them at runtime (they aren't installed in node_modules).
+   *
+   * Only exact (non-wildcard) aliases are included â€” esbuild's `alias`
+   * option doesn't support glob-style mappings. The wildcard half is not
+   * dropped, it is handled elsewhere: see
+   * {@link ProductionBuilder.tsconfigPathAliasConfig}.
+   */
+  private buildAliasMapFromTsconfig(): Record<string, string> {
+    tsconfigManager.init();
+
+    const alias: Record<string, string> = {};
+    const baseUrl = path.resolve(process.cwd(), tsconfigManager.baseUrl);
+
+    for (const [from, to] of Object.entries(tsconfigManager.aliases)) {
+      if (from.endsWith("/*") || !Array.isArray(to) || to.length === 0) {
+        continue;
+      }
+
+      const target = to[0];
+
+      if (target === undefined) {
+        continue;
+      }
+
+      alias[from] = path.resolve(baseUrl, target);
+    }
+
+    return alias;
+  }
+}

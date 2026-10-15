@@ -1,0 +1,1625 @@
+import type { CookieSerializeOptions } from "@fastify/cookie";
+import type { OutgoingHttpHeaders } from "node:http";
+import config from "@mongez/config";
+import type { EventSubscription } from "@mongez/events";
+import events from "@mongez/events";
+import { fileExistsAsync } from "@warlock.js/fs";
+import { isIterable, isPlainObject, isScalar } from "@mongez/supportive-is";
+import type { LogLevel } from "@warlock.js/logger";
+import { log } from "@warlock.js/logger";
+import type { ValidationResult } from "@warlock.js/seal";
+import type { FastifyReply } from "fastify";
+import fs from "fs";
+import mime from "mime";
+import path from "path";
+import type React from "react";
+import { type ReactNode } from "react";
+import { Application } from "../application/application";
+import {
+  LOCALE_COOKIE_NAME,
+  LOCALE_PREFERENCE_COOKIE_NAME,
+  resolveLocaleConfiguration,
+} from "../config/locale-configuration";
+import { UnknownLocaleError } from "../errors/unknown-locale-error";
+import type { Route } from "../router";
+import { StorageFile } from "../storage";
+import { renderReact } from "./../react";
+import type { Request } from "./request";
+import { matchesIfNoneMatch } from "./uploads/matches-if-none-match";
+import { flushPendingCookies } from "./flush-pending-cookies";
+import { streamReactResponse, type PipeableReactStream } from "./stream-react-response";
+import type { ResponseEvent, ResponseSSEController, ResponseStreamController } from "./types";
+import type { XMLable } from "./xmlable";
+
+type CookieValue = string | number | boolean | Record<string, any> | Array<any>;
+
+/**
+ * Cookie options accepted by `response.cookie()`.
+ *
+ * Extends Fastify's `CookieSerializeOptions` with `raw` — set to `true` to
+ * skip the default `JSON.stringify` of the value and write it as-is. Use for
+ * plain-string cookies (session tokens, opaque IDs) that shouldn't be JSON-quoted.
+ *
+ * When `raw: true`, non-string values are coerced via `String(value)`. The
+ * read side (`request.cookie(name)`) tries `JSON.parse` first and falls back
+ * to the raw string on parse failure, so round-tripping a raw string cookie
+ * Just Works.
+ */
+export type CookieOptions = CookieSerializeOptions & {
+  /**
+   * Skip JSON.stringify and write the value as-is.
+   *
+   * @default false
+   */
+  raw?: boolean;
+};
+
+export enum ResponseStatus {
+  OK = 200,
+  CREATED = 201,
+  ACCEPTED = 202,
+  MOVED_PERMANENTLY = 301,
+  FOUND = 302,
+  SEE_OTHER = 303,
+  NOT_MODIFIED = 304,
+  TEMPORARY_REDIRECT = 307,
+  PERMANENT_REDIRECT = 308,
+  NO_CONTENT = 204,
+  BAD_REQUEST = 400,
+  UNAUTHORIZED = 401,
+  FORBIDDEN = 403,
+  NOT_FOUND = 404,
+  METHOD_NOT_ALLOWED = 405,
+  CONFLICT = 409,
+  TOO_MANY_REQUESTS = 429,
+  INTERNAL_SERVER_ERROR = 500,
+  SERVICE_UNAVAILABLE = 503,
+}
+
+/**
+ * Options for sending files
+ */
+export type SendFileOptions = {
+  cacheTime?: number;
+  immutable?: boolean;
+  inline?: boolean;
+  filename?: string;
+};
+
+/**
+ * Options for sending buffers
+ */
+export type SendBufferOptions = SendFileOptions & {
+  contentType?: string;
+  etag?: string;
+};
+
+/**
+ * The cookie flags every response cookie gets unless something overrides them.
+ *
+ * Computed per call rather than hoisted to a constant because `secure` depends
+ * on the environment, which is not known at module-evaluation time.
+ *
+ * `secure` is relaxed in development only: a `Secure` cookie is dropped by the
+ * browser over plain http, which would silently break every local login. It
+ * stays on everywhere else, including test and staging.
+ */
+function secureCookieDefaults(): CookieSerializeOptions {
+  return {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: !Application.isDevelopment,
+  };
+}
+
+export class Response {
+  /**
+   * Current route
+   */
+  protected route!: Route;
+
+  /**
+   * Underlying Fastify reply — a public escape hatch to capabilities the
+   * framework's high-level helpers don't yet cover.
+   *
+   * **Prefer framework methods first**: `response.send()`, `response.header()`,
+   * `response.cookie()`, `response.sendFile()`, `response.stream()`, etc.
+   * They wire status codes, content-type detection, the event lifecycle, and
+   * the cache-pattern replay path correctly.
+   *
+   * **Reach for `baseResponse` only** when the framework genuinely lacks a
+   * helper for what you need — and when you do, file an issue so we can add
+   * it. Streaming and SSE are the precedent here: they bypass `send()`
+   * deliberately because the framework didn't ship chunked-write support
+   * natively at the time. Reaching here for non-streaming work means a
+   * missing helper, not an answer.
+   */
+  public baseResponse!: FastifyReply;
+
+  /**
+   * Current status code
+   */
+  protected currentStatusCode = 200;
+
+  /**
+   * Current response body
+   */
+  protected currentBody: any;
+
+  /**
+   * Request object
+   */
+  public request!: Request;
+
+  /**
+   * Internal events related to this particular response object
+   */
+  protected events = new Map<string, any[]>();
+
+  /**
+   * Parsed body
+   * This will return the parsed body of the response
+   * Please note that if this property is called before the response is sent, it will return undefined
+   */
+  public parsedBody: any;
+
+  /**
+   * Get raw response
+   */
+  public get raw() {
+    return this.baseResponse.raw;
+  }
+
+  /**
+   * Get Current response body
+   */
+  public get body() {
+    return this.currentBody;
+  }
+
+  /**
+   * Set response body
+   */
+  public set body(body: any) {
+    this.currentBody = body;
+  }
+
+  /**
+   * Add event on sending response
+   */
+  public onSending(callback: any) {
+    this.events.set("sending", [...(this.events.get("sending") || []), callback]);
+
+    return this;
+  }
+
+  /**
+   * Add event on sent response
+   */
+  public onSent(callback: any) {
+    this.events.set("sent", [...(this.events.get("sent") || []), callback]);
+
+    return this;
+  }
+
+  /**
+   * Set the Fastify response object
+   */
+  public setResponse(response: FastifyReply) {
+    this.baseResponse = response;
+
+    // Listen to the 'finish' event to track when response is fully sent
+    // This works for all response types: JSON, streams, buffers, files, etc.
+    this.baseResponse.raw.once("finish", () => {
+      this.request.endTime = Date.now();
+    });
+
+    return this;
+  }
+
+  /**
+   * Reset the response state
+   */
+  public reset() {
+    this.route = {} as Route;
+    this.currentBody = null;
+    this.currentStatusCode = 200;
+  }
+
+  /**
+   * Set current route
+   */
+  public setRoute(route: Route) {
+    this.route = route;
+
+    return this;
+  }
+
+  /**
+   * Get the content type
+   */
+  public get contentType() {
+    return this.baseResponse.getHeader("Content-Type");
+  }
+
+  /**
+   * Set the content type
+   */
+  public setContentType(contentType: string) {
+    this.baseResponse.header("Content-Type", contentType);
+
+    return this;
+  }
+
+  /**
+   * Get the status code
+   */
+  public get statusCode(): number {
+    return this.currentStatusCode ?? this.baseResponse.statusCode;
+  }
+
+  /**
+   * Check if response status is ok
+   */
+  public get isOk() {
+    return this.currentStatusCode >= 200 && this.currentStatusCode < 300;
+  }
+
+  /**
+   * Check if the response has been sent
+   */
+  public get sent() {
+    return this.baseResponse.sent;
+  }
+
+  /**
+   * Add a listener to the response event
+   */
+  public static on(
+    event: ResponseEvent,
+    listener: (response: Response) => void,
+  ): EventSubscription {
+    return events.subscribe(`response.${event}`, listener);
+  }
+
+  /**
+   * Trigger the response event
+   */
+  protected static async trigger(event: ResponseEvent, ...args: any[]) {
+    // make a timeout to make sure the request events is executed first
+    return new Promise((resolve) => {
+      setImmediate(async () => {
+        await events.triggerAllAsync(`response.${event}`, ...args);
+        resolve(true);
+      });
+    });
+  }
+
+  /**
+   * Parse body
+   */
+  protected async parseBody() {
+    return await this.parse(this.currentBody);
+  }
+
+  /**
+   * Parse the given value
+   */
+  public async parse(value: any): Promise<any> {
+    // if it is a falsy value, return it
+    if (!value || isScalar(value)) return value;
+
+    // binary and stream bodies pass through untouched (Buffer has a `toJSON`)
+    if (Buffer.isBuffer(value) || value instanceof Uint8Array || typeof value.pipe === "function") {
+      return value;
+    }
+
+    // a Map serialises as a plain object rather than an array of pairs
+    if (value instanceof Map) {
+      return await this.parse(Object.fromEntries(value));
+    }
+
+    // if it has a `toJSON` method, call it and await the result then return it
+    if (value.toJSON) {
+      value.request = this.request;
+      return await value.toJSON();
+    }
+
+    // if it is iterable, an array or array-like object then parse each item
+    if (isIterable(value)) {
+      const values = Array.from(value);
+
+      return Promise.all(
+        values.map(async (item: any) => {
+          return await this.parse(item);
+        }),
+      );
+    }
+
+    // if not plain object, then return it
+    if (!isPlainObject(value)) {
+      return value;
+    }
+
+    // loop over the object and check if the value and call `parse` on it
+    // parse into a copy so caller-owned (e.g. cached) objects are never rewritten
+    const parsed: Record<string, any> = {};
+
+    for (const key in value) {
+      parsed[key] = await this.parse(value[key]);
+    }
+
+    return parsed;
+  }
+
+  /**
+   * Make a log message
+   */
+  public log(message: string, level: LogLevel = "info") {
+    if (!config.get("http.log")) return;
+
+    log.log({
+      module: "response",
+      action: this.route.method + " " + this.route.path.replace("/*", "") + `:${this.request.id}`,
+      message,
+      type: level,
+      context: {
+        request: this.request,
+        response: this,
+      },
+    });
+  }
+
+  /**
+   * Check if returning response is json
+   */
+  public get isJson() {
+    return this.getHeader("Content-Type") === "application/json";
+  }
+
+  /**
+   * Send the response
+   * @param data - Response data
+   * @param statusCode - HTTP status code
+   * @param triggerEvents - Whether to trigger response events (default: true)
+   */
+  public async send(data?: any, statusCode?: number, triggerEvents = true): Promise<Response> {
+    // Defensive guard against double-send. The underlying Fastify reply silently
+    // ignores subsequent sends once `sent === true`, which has historically hidden
+    // middleware bugs (cache-pattern replay paths that returned `baseResponse.send`
+    // ended up re-entering `Response.send` with the FastifyReply as the body).
+    // Surfacing the misuse via `error`-level log makes the bug loud without
+    // crashing production traffic.
+    if (this.baseResponse.sent) {
+      log.error(
+        "response",
+        "send",
+        `send() called on already-sent response (request:${this.request?.id ?? "unknown"}) — likely a middleware bug`,
+      );
+
+      return this;
+    }
+
+    if (statusCode) {
+      this.currentStatusCode = statusCode;
+    }
+
+    if (data === this) return this;
+
+    if (data !== undefined) {
+      this.currentBody = data;
+    }
+
+    if (!this.currentStatusCode) {
+      this.currentStatusCode = 200;
+    }
+
+    this.log("Sending response");
+    // Auto-pick `application/json` only when no content-type was set by the caller.
+    // This preserves explicit overrides (e.g. `application/vnd.api+json` from a
+    // cache replay, `application/problem+json` from an RFC 7807 error response)
+    // while keeping the convenience default for the common object-body path.
+    if (Array.isArray(this.currentBody) || isPlainObject(this.currentBody)) {
+      if (!this.baseResponse.getHeader("Content-Type")) {
+        this.setContentType("application/json");
+      }
+    }
+
+    if (triggerEvents) {
+      await Response.trigger("sending", this);
+
+      for (const callback of this.events.get("sending") || []) {
+        await callback(this);
+      }
+
+      if (this.isJson) {
+        await Response.trigger("sendingJson", this);
+        for (const callback of this.events.get("sendingJson") || []) {
+          await callback(this);
+        }
+
+        if (this.isOk) {
+          await Response.trigger("sendingSuccessJson", this);
+          for (const callback of this.events.get("sendingSuccessJson") || []) {
+            await callback(this);
+          }
+        }
+      }
+    }
+
+    // parse the body and make sure it is transformed to sync data instead of async data
+    if (typeof this.currentBody !== "string") {
+      this.parsedBody = await this.parseBody();
+    } else {
+      this.parsedBody = data;
+    }
+
+    // Set the status first
+    this.baseResponse.status(this.currentStatusCode);
+
+    // Then send the response with the parsed body
+    await this.baseResponse.send(this.parsedBody);
+
+    this.log("Response sent");
+
+    if (triggerEvents) this.fireSentEvents();
+
+    return this;
+  }
+
+  /**
+   * Fire the post-send lifecycle (`sent`, `success`, status-specific and `error`
+   * events). Every helper that writes to the Fastify reply directly (noContent,
+   * redirect, sendFile, sendBuffer, sendImage, downloadFile) goes through here.
+   */
+  protected fireSentEvents(statusCode?: number) {
+    if (statusCode) this.currentStatusCode = statusCode;
+
+    // trigger the sent event
+    Response.trigger("sent", this);
+
+    for (const callback of this.events.get("sent") || []) {
+      callback(this);
+    }
+
+    // trigger the success event if the status code is 2xx
+    if (this.currentStatusCode >= 200 && this.currentStatusCode < 300) {
+      Response.trigger("success", this);
+    }
+
+    // trigger the successCreate event if the status code is 201
+    if (this.currentStatusCode === 201) {
+      Response.trigger("successCreate", this);
+    }
+
+    // trigger the badRequest event if the status code is 400
+    if (this.currentStatusCode === 400) {
+      Response.trigger("badRequest", this);
+    }
+
+    // trigger the unauthorized event if the status code is 401
+    if (this.currentStatusCode === 401) {
+      Response.trigger("unauthorized", this);
+    }
+
+    // trigger the forbidden event if the status code is 403
+    if (this.currentStatusCode === 403) {
+      Response.trigger("forbidden", this);
+    }
+
+    // trigger the notFound event if the status code is 404
+    if (this.currentStatusCode === 404) {
+      Response.trigger("notFound", this);
+    }
+
+    // trigger the content too large event if the status code is 413
+    if (this.currentStatusCode === 413) {
+      Response.trigger("contentTooLarge", this);
+    }
+
+    // trigger the throttled event if the status code is 429
+    if (this.currentStatusCode === 429) {
+      Response.trigger("throttled", this);
+    }
+
+    // trigger the serverError event if the status code is 500
+    if (this.currentStatusCode === 500) {
+      Response.trigger("serverError", this);
+    }
+
+    // trigger the error event if the status code is 4xx or 5xx
+    if (this.currentStatusCode >= 400) {
+      Response.trigger("error", this);
+    }
+  }
+
+  /** Send a bare 304 and fire the lifecycle. */
+  protected send304() {
+    const reply = this.baseResponse.status(304).send();
+
+    this.fireSentEvents(304);
+
+    return reply;
+  }
+
+  /** Send a raw stream/buffer body and fire the lifecycle. */
+  protected sendRaw(body: any) {
+    const reply = this.baseResponse.send(body);
+
+    this.fireSentEvents(this.baseResponse.statusCode);
+
+    return reply;
+  }
+
+  /**
+   * Replay a previously-captured response shape — used by cache-pattern
+   * middlewares (idempotency, response cache) to send a cached response
+   * without re-running the controller.
+   *
+   * Preserves the cached status code, content-type, and any extra headers,
+   * then sends the body through the standard `send()` pipeline so the full
+   * event lifecycle still fires (`sent`, `success`, status-specific events).
+   * That keeps cross-cutting observers (logger, metrics, audit) consistent
+   * between fresh and replayed responses.
+   *
+   * @example
+   * // Inside a cache-pattern middleware on HIT:
+   * return response.header("X-Cache", "HIT").replay({
+   *   status: cached.status,
+   *   body: cached.body,
+   *   contentType: cached.contentType,
+   * });
+   */
+  public replay(cached: {
+    status: number;
+    body: unknown;
+    contentType?: string;
+    headers?: Record<string, string>;
+  }): Promise<Response> {
+    this.setStatusCode(cached.status);
+
+    if (cached.contentType) {
+      this.setContentType(cached.contentType);
+    }
+
+    if (cached.headers) {
+      for (const [name, value] of Object.entries(cached.headers)) {
+        this.header(name, value);
+      }
+    }
+
+    return this.send(cached.body);
+  }
+
+  /**
+   * Send html response
+   */
+  public html(data: string, statusCode?: number) {
+    return this.setContentType("text/html").send(data, statusCode);
+  }
+
+  /**
+   * Render the given react component
+   */
+  public render(element: React.ReactElement | React.ComponentType, status = 200) {
+    return this.setStatusCode(status).html(renderReact(element));
+  }
+
+  /**
+   * Send an xml response.
+   *
+   * Accepts either a raw XML string or an `XMLable` — anything with a
+   * `toXML()` method, structurally typed so packages like
+   * `@warlock.js/sitemap` never need to import core. This is the BOUNDED
+   * path only: a very large document should be streamed from generated
+   * files instead of passed through here.
+   */
+  public xml(body: string | XMLable, statusCode?: number) {
+    if (typeof body === "string") {
+      return this.setContentType("application/xml").send(body, statusCode);
+    }
+
+    if (typeof body?.toXML !== "function") {
+      throw new TypeError(
+        "response.xml() expects a string or an XMLable value (an object with a toXML() method).",
+      );
+    }
+
+    return this.setContentType("application/xml").send(body.toXML(), statusCode);
+  }
+
+  /**
+   * Send plain text response
+   */
+  public text(data: string, statusCode?: number) {
+    return this.setContentType("text/plain").send(data, statusCode);
+  }
+
+  /**
+   * Create a streaming response for progressive/chunked data sending
+   *
+   * This method allows you to send data in chunks and control when the response ends.
+   * Perfect for Server-Sent Events (SSE), progressive rendering, or streaming large responses.
+   *
+   * @example
+   * ```ts
+   * const stream = response.stream("text/html");
+   * stream.send("<html><body>");
+   * stream.send("<h1>Hello</h1>");
+   * stream.render(<MyComponent />);
+   * stream.send("</body></html>");
+   * stream.end();
+   * ```
+   *
+   * @param contentType - The content type for the stream (default: "text/plain")
+   * @returns Stream controller with send(), render(), and end() methods
+   */
+  public stream(contentType = "text/plain"): ResponseStreamController {
+    // Set headers using the response API
+    this.setContentType(contentType);
+    this.header("Transfer-Encoding", "chunked");
+    this.header("Cache-Control", "no-cache");
+    this.header("Connection", "keep-alive");
+    this.header("X-Content-Type-Options", "nosniff");
+
+    // Trigger sending events
+    Response.trigger("sending", this);
+    for (const callback of this.events.get("sending") || []) {
+      callback(this);
+    }
+
+    this.log("Starting stream");
+
+    // Track stream state
+    let isEnded = false;
+    const chunks: any[] = [];
+
+    // Write headers to start the stream
+    // Note: We use raw here because we need chunked encoding control
+    // This is the only valid use case for bypassing Fastify's abstraction
+    this.flushPendingCookies();
+    this.baseResponse.raw.writeHead(this.statusCode, this.getHeaders() as any);
+
+    return {
+      /**
+       * Send a chunk of data to the client
+       * @param data - Data to send (string, Buffer, or any serializable data)
+       */
+      send: (data: any) => {
+        if (isEnded) {
+          throw new Error("Cannot send data: stream has already ended");
+        }
+
+        this.baseResponse.raw.write(data);
+
+        return this;
+      },
+
+      /**
+       * Render a React component and send it as a chunk
+       * @param element - React element or component to render
+       */
+      render: (element: ReactNode) => {
+        if (isEnded) {
+          throw new Error("Cannot render: stream has already ended");
+        }
+
+        const html = renderReact(element);
+        chunks.push(html);
+        this.baseResponse.raw.write(html);
+
+        return this;
+      },
+
+      /**
+       * End the stream and trigger completion events
+       */
+      end: () => {
+        if (isEnded) {
+          return this;
+        }
+
+        isEnded = true;
+
+        // Store the streamed content for logging/debugging
+        this.currentBody = chunks;
+        this.parsedBody = chunks;
+
+        // End the response
+        this.baseResponse.raw.end();
+
+        this.log("Stream ended");
+
+        // Trigger sent events
+        Response.trigger("sent", this);
+        for (const callback of this.events.get("sent") || []) {
+          callback(this);
+        }
+
+        // Trigger success event if status is 2xx
+        if (this.isOk) {
+          Response.trigger("success", this);
+        }
+
+        // Trigger status-specific events
+        if (this.currentStatusCode === 201) {
+          Response.trigger("successCreate", this);
+        }
+
+        return this;
+      },
+
+      /**
+       * Check if the stream has ended
+       */
+      get ended() {
+        return isEnded;
+      },
+    };
+  }
+
+  /**
+   * Pipe a React server stream (`renderToPipeableStream`) onto this
+   * response — the Stage 1 streaming SSR seam. Writes the already-committed
+   * status and headers, then pipes; aborts the React render if the client
+   * disconnects before the stream finishes.
+   *
+   * This is the ONLY sanctioned way for `@warlock.js/web` to put a React
+   * stream on the wire: it never touches `response.raw` itself, it calls
+   * this method, which does (`stream-react-response.ts`).
+   *
+   * @example
+   * ```ts
+   * const pipeableStream = await renderPageToPipeableStream(element);
+   * await response.streamReact(pipeableStream);
+   * ```
+   */
+  public streamReact(pipeableStream: PipeableReactStream): Promise<void> {
+    Response.trigger("sending", this);
+    for (const callback of this.events.get("sending") || []) {
+      callback(this);
+    }
+
+    this.flushPendingCookies();
+
+    return streamReactResponse({
+      raw: this.baseResponse.raw,
+      statusCode: this.statusCode,
+      headers: this.getHeaders() as OutgoingHttpHeaders,
+      pipeableStream,
+    }).then(() => {
+      Response.trigger("sent", this);
+      for (const callback of this.events.get("sent") || []) {
+        callback(this);
+      }
+
+      if (this.isOk) {
+        Response.trigger("success", this);
+      }
+    });
+  }
+
+  /**
+   * Create a Server-Sent Events (SSE) stream
+   *
+   * SSE is a standard for pushing real-time updates from server to client.
+   * Perfect for live notifications, progress updates, or real-time data feeds.
+   *
+   * @example
+   * ```ts
+   * const sse = response.sse();
+   *
+   * // Send events
+   * sse.send("message", { text: "Hello!" });
+   * sse.send("notification", { type: "info", message: "Update available" }, "msg-123");
+   *
+   * // Keep connection alive
+   * const keepAlive = setInterval(() => sse.comment("ping"), 30000);
+   *
+   * // Clean up when done
+   * clearInterval(keepAlive);
+   * sse.end();
+   * ```
+   *
+   * @returns SSE controller with send(), comment(), and end() methods
+   */
+  public sse(): ResponseSSEController {
+    // Set SSE-specific headers
+    this.setContentType("text/event-stream");
+    this.header("Cache-Control", "no-cache, no-store, must-revalidate");
+    this.header("Connection", "keep-alive");
+    this.header("X-Accel-Buffering", "no"); // Disable nginx buffering
+
+    // Trigger sending events
+    Response.trigger("sending", this);
+    for (const callback of this.events.get("sending") || []) {
+      callback(this);
+    }
+
+    this.log("Starting SSE stream");
+
+    // Track stream state
+    let isEnded = false;
+    const events: any[] = [];
+    const disconnectHandlers: Array<() => void> = [];
+
+    // Write headers to start the stream
+    this.flushPendingCookies();
+    this.baseResponse.raw.writeHead(this.statusCode, this.getHeaders() as any);
+
+    // Detect client disconnect â€” set isEnded silently and invoke cleanup handlers.
+    // Without this, background jobs keep writing to a dead socket after the client drops.
+    this.baseResponse.raw.on("close", () => {
+      if (!isEnded) {
+        isEnded = true;
+        this.log("SSE client disconnected");
+        for (const handler of disconnectHandlers) {
+          handler();
+        }
+      }
+    });
+
+    const controller: ResponseSSEController = {
+      /**
+       * Send an SSE event
+       * @param event - Event name (e.g., "message", "chunk", "done")
+       * @param data - Event data (will be JSON stringified)
+       * @param id - Optional event ID for client-side Last-Event-ID tracking (reconnect support)
+       */
+      send: (event: string, data: any, id?: string): ResponseSSEController => {
+        // Silent no-op after disconnect â€” background jobs should not crash when
+        // the client drops mid-stream. The onDisconnect handler handles cleanup.
+        if (isEnded) return controller;
+
+        let message = "";
+        if (id) message += `id: ${id}\n`;
+        message += `event: ${event}\n`;
+        message += `data: ${JSON.stringify(data)}\n\n`;
+
+        events.push({ event, data, id });
+        this.baseResponse.raw.write(message);
+
+        return controller;
+      },
+
+      /**
+       * Send a comment (keeps connection alive, invisible to client)
+       * Useful for preventing timeout on long-lived connections
+       * @param text - Comment text
+       */
+      comment: (text: string): ResponseSSEController => {
+        // Silent no-op after disconnect
+        if (isEnded) return controller;
+
+        this.baseResponse.raw.write(`: ${text}\n\n`);
+
+        return controller;
+      },
+
+      /**
+       * End the SSE stream and trigger completion events
+       */
+      end: (): ResponseSSEController => {
+        if (isEnded) return controller;
+
+        isEnded = true;
+
+        // Store the events for logging/debugging
+        this.currentBody = events;
+        this.parsedBody = events;
+
+        // End the response
+        this.baseResponse.raw.end();
+
+        this.log("SSE stream ended");
+
+        // Trigger sent events
+        Response.trigger("sent", this);
+        for (const callback of this.events.get("sent") || []) {
+          callback(this);
+        }
+
+        // Trigger success event if status is 2xx
+        if (this.isOk) {
+          Response.trigger("success", this);
+        }
+
+        return controller;
+      },
+
+      /**
+       * Register a handler to be called when the client disconnects.
+       * Use this to clean up EventEmitter listeners, cancel background jobs, etc.
+       *
+       * @example
+       * ```ts
+       * const sse = response.sse();
+       * const listener = (chunk) => sse.send("chunk", { chunk });
+       * eventBus.on(aiMessageId, listener);
+       * sse.onDisconnect(() => eventBus.off(aiMessageId, listener));
+       * ```
+       */
+      onDisconnect: (handler: () => void): ResponseSSEController => {
+        disconnectHandlers.push(handler);
+        return controller;
+      },
+
+      /**
+       * Check if the stream has ended (either via end() or client disconnect)
+       */
+      get ended() {
+        return isEnded;
+      },
+    };
+
+    return controller;
+  }
+
+  /**
+   * Set the status code
+   */
+  public setStatusCode(statusCode: number) {
+    this.currentStatusCode = statusCode;
+
+    return this;
+  }
+
+  /**
+   * Redirect the user to another route
+   */
+  public redirect(url: string, statusCode = 302) {
+    this.baseResponse.redirect(url, statusCode);
+    this.fireSentEvents(statusCode);
+
+    return this;
+  }
+
+  /**
+   * Permanent redirect
+   */
+  public permanentRedirect(url: string) {
+    this.baseResponse.redirect(url, 301);
+    this.fireSentEvents(301);
+
+    return this;
+  }
+
+  /**
+   * Get the response time
+   */
+  public getResponseTime() {
+    return this.baseResponse.elapsedTime;
+  }
+
+  /**
+   * Remove a specific header
+   */
+  public removeHeader(key: string) {
+    this.baseResponse.removeHeader(key);
+
+    return this;
+  }
+
+  /**
+   * Get a specific header
+   */
+  public getHeader(key: string) {
+    return this.baseResponse.getHeader(key);
+  }
+
+  /**
+   * Get the response headers
+   */
+  /**
+   * Serialise cookies parked by `response.cookie()` into the `set-cookie`
+   * header. Must run right before any raw `writeHead`, which bypasses
+   * `@fastify/cookie`'s `onSend` flush.
+   */
+  public flushPendingCookies() {
+    flushPendingCookies(this.baseResponse);
+
+    return this;
+  }
+
+  public getHeaders() {
+    return this.baseResponse.getHeaders();
+  }
+
+  /**
+   * Set multiple headers
+   */
+  public headers(headers: Record<string, string>) {
+    this.baseResponse.headers(headers);
+
+    return this;
+  }
+
+  /**
+   * Set the response header
+   */
+  public header(key: string, value: any) {
+    this.baseResponse.header(key, value);
+
+    return this;
+  }
+
+  /**
+   * Set a cookie on the response.
+   *
+   * Values are JSON-stringified by default so structured cookies round-trip
+   * cleanly with `request.cookie(name)`. Pass `{ raw: true }` to skip the
+   * JSON wrapping for plain-string cookies (session tokens, opaque IDs).
+   *
+   * **Secure by default.** `httpOnly: true`, `sameSite: "lax"`, and — outside
+   * development — `secure: true` are applied unless you override them. These
+   * are the flags whose absence never fails a test and is fatal in production:
+   * without `httpOnly` any injected script can read the cookie, without
+   * `secure` it travels in cleartext, without `sameSite` it rides along on
+   * cross-site requests. Opting out is explicit, per call or via
+   * `http.cookies.options`.
+   *
+   * Precedence, lowest to highest: framework defaults → `http.cookies.options`
+   * → the per-call `options` argument.
+   *
+   * @example
+   * // JSON-wrapped (default) — round-trips with request.cookie()
+   * response.cookie("prefs", { theme: "dark" }, { maxAge: 3600 });
+   *
+   * @example
+   * // Raw string — no JSON quoting; useful for tokens / opaque IDs
+   * response.cookie("session", "abc.def.ghi", { raw: true });
+   *
+   * @example
+   * // Deliberately readable by client-side JS
+   * response.cookie("theme", "dark", { httpOnly: false });
+   */
+  public cookie(name: string, value: CookieValue, options: CookieOptions = {}) {
+    const { raw, ...cookieOptions } = options;
+    const defaultOptions = config.get("http.cookies.options", {});
+    const serializedValue = raw ? String(value) : JSON.stringify(value);
+    const mergedCookieOptions = {
+      ...secureCookieDefaults(),
+      ...defaultOptions,
+      ...cookieOptions,
+    };
+
+    if (
+      typeof mergedCookieOptions.maxAge === "number" &&
+      Number.isFinite(mergedCookieOptions.maxAge)
+    ) {
+      mergedCookieOptions.maxAge = Math.trunc(mergedCookieOptions.maxAge);
+    }
+
+    this.baseResponse.setCookie(name, serializedValue, mergedCookieOptions);
+
+    return this;
+  }
+
+  /**
+   * Set the active locale for subsequent requests.
+   *
+   * Writes the SAME cookie `request.locale` reads (`LOCALE_COOKIE_NAME`,
+   * owned by the framework, never a string an app hardcodes) — the two sides
+   * are read from one shared constant so they cannot name the cookie
+   * differently. Written raw (no JSON quoting), matching how
+   * `Request.resolveLocale()` reads it back.
+   *
+   * Any `Set-Cookie` this emits revokes public cacheability for the response,
+   * including a page that opted into `public, max-age` — a per-visitor
+   * locale cookie replayed from a shared cache would hand visitor A's locale
+   * to visitor B.
+   *
+   * @throws {UnknownLocaleError} when `locale` is outside the app's
+   * configured `app.localeCodes` allow-list. Silently accepting an
+   * unconfigured locale would set a cookie the app can never actually serve.
+   *
+   * @example
+   * response.setLocale("ar");
+   */
+  public setLocale(locale: string) {
+    const { localeCodes } = resolveLocaleConfiguration(
+      config.get("app.localeCode"),
+      config.get("app.localeCodes"),
+    );
+
+    if (localeCodes !== undefined && !localeCodes.includes(locale)) {
+      throw new UnknownLocaleError(locale, localeCodes);
+    }
+
+    // A controller's explicit server-side choice is authoritative. The
+    // preference cookie is host-only by contract, so clearing it must never
+    // inherit an application's configured cookie Domain.
+    this.baseResponse.clearCookie(LOCALE_PREFERENCE_COOKIE_NAME, {
+      path: "/",
+      sameSite: "lax",
+      httpOnly: false,
+      domain: undefined,
+    });
+
+    return this.cookie(LOCALE_COOKIE_NAME, locale, { raw: true });
+  }
+
+  /**
+   * Clear a cookie from the response
+   *
+   * @example
+   * response.clearCookie('token', { path: '/' });
+   */
+  public clearCookie(name: string, options?: CookieSerializeOptions) {
+    const defaultOptions = config.get("http.cookies.options", {});
+    this.baseResponse.clearCookie(name, { ...defaultOptions, ...options });
+
+    return this;
+  }
+
+  /**
+   * Clear every cookie NAME the current request sent — best-effort, not
+   * exhaustive: HTTP gives the server no way to discover a cookie's `Path`
+   * or `Domain`, only the name, so a cookie originally set on a `path` or
+   * `domain` other than the one this call targets (the framework default,
+   * or whatever is passed here / configured via `http.cookies.options`)
+   * will NOT be deleted, and nothing will report that — the browser just
+   * silently ignores a `Set-Cookie` whose scope doesn't match. Pass an
+   * explicit `path` / `domain` for cookies the app knows it owns on a
+   * non-default scope; call `clearCookie()` per name for anything else.
+   *
+   * @example
+   * response.clearCookies();
+   * response.clearCookies({ path: '/admin' });
+   */
+  public clearCookies(options?: CookieSerializeOptions) {
+    for (const name of Object.keys(this.request.cookies)) {
+      this.clearCookie(name, options);
+    }
+
+    return this;
+  }
+
+  /**
+   * Alias to header method
+   */
+  public setHeader(key: string, value: any) {
+    return this.header(key, value);
+  }
+
+  /**
+   * Send an error response with status code 500
+   */
+  public serverError(data: any) {
+    return this.send(data, 500);
+  }
+
+  /**
+   * Send a forbidden response with status code 403
+   */
+  public forbidden(
+    data: any = {
+      error: "You are not allowed to access this resource, FORBIDDEN",
+    },
+  ) {
+    return this.send(data, 403);
+  }
+
+  /**
+   * Send a service unavailable response with status code 503
+   */
+  public serviceUnavailable(data: any) {
+    return this.send(data, 503);
+  }
+
+  /**
+   * Send an unauthorized response with status code 401
+   */
+  public unauthorized(
+    data: any = {
+      error: "unauthorized",
+    },
+  ) {
+    return this.send(data, 401);
+  }
+
+  /**
+   * Send a not found response with status code 404
+   */
+  public notFound(
+    data: any = {
+      error: "notFound",
+    },
+  ) {
+    return this.send(data, 404);
+  }
+
+  /**
+   * Send a bad request response with status code 400
+   */
+  public badRequest(data: any) {
+    return this.send(data, 400);
+  }
+
+  /**
+   * Send a content too large response with status code 413
+   */
+  public contentTooLarge(data: any) {
+    return this.send(data, 413);
+  }
+
+  /**
+   * Send a success response with status code 201
+   */
+  public successCreate(data: any) {
+    return this.send(data, 201);
+  }
+
+  /**
+   * Send a success response
+   */
+  public success(data: any = { success: true }) {
+    return this.send(data);
+  }
+
+  /**
+   * Send a no content response with status code 204
+   */
+  public noContent() {
+    const reply = this.baseResponse.status(204).send();
+
+    this.fireSentEvents(204);
+
+    return reply;
+  }
+
+  /**
+   * Send an accepted response with status code 202
+   * Used for async operations that have been accepted but not yet processed
+   */
+  public accepted(data: any = { message: "Request accepted for processing" }) {
+    return this.send(data, 202);
+  }
+
+  /**
+   * Send a conflict response with status code 409
+   */
+  public conflict(data: any = { error: "Resource conflict" }) {
+    return this.send(data, 409);
+  }
+
+  /**
+   * Send a too many requests response with status code 429
+   */
+  public tooManyRequests(data: any) {
+    return this.send(data, 429);
+  }
+
+  /**
+   * Send an unprocessable entity response with status code 422
+   * Used for semantic validation errors
+   */
+  public unprocessableEntity(data: any) {
+    return this.send(data, 422);
+  }
+
+  /**
+   * Apply response options (cache, disposition, etag)
+   * Shared helper for sendFile and sendBuffer
+   */
+  /**
+   * Build an RFC 6266–safe `Content-Disposition` value for a file name.
+   *
+   * HTTP header values must be ISO-8859-1; Node's `setHeader` throws
+   * `ERR_INVALID_CHAR` on any other byte, so a raw `filename="تقرير.pdf"` would
+   * crash the response (a 500 the moment the name is non-ASCII). RFC 6266 solves
+   * this with two parameters emitted together:
+   *   - `filename="<ascii>"`     — sanitised ASCII fallback for legacy clients
+   *   - `filename*=UTF-8''<pct>` — RFC 5987 ext-value; modern browsers restore
+   *                                the real (e.g. Arabic) name.
+   */
+  private contentDisposition(type: "inline" | "attachment", rawName: string): string {
+    // Strip CR/LF first so a crafted file name can never inject extra headers.
+    const name = (rawName || "file").replace(/[\r\n]/g, "");
+
+    // ASCII fallback: replace quote/backslash + every non-printable-ASCII byte
+    // (covers all multibyte characters) so the quoted-string is always legal.
+    const ascii =
+      name
+        .replace(/["\\]/g, "_")
+        .replace(/[^\x20-\x7E]/g, "_")
+        .trim() || "file";
+
+    // Pure-ASCII name → the quoted form is enough; no ext-value needed.
+    if (!/[^\x20-\x7E]/.test(name)) {
+      return `${type}; filename="${ascii}"`;
+    }
+
+    // RFC 5987 ext-value. `encodeURIComponent` leaves ' ( ) * unescaped, but they
+    // are not valid `attr-char`, so percent-encode those too.
+    const encoded = encodeURIComponent(name).replace(
+      /['()*]/g,
+      (char) => "%" + char.charCodeAt(0).toString(16).toUpperCase(),
+    );
+
+    return `${type}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+  }
+
+  private applyResponseOptions(options: SendBufferOptions, defaultFilename?: string): boolean {
+    // Set content type if provided
+    if (options.contentType) {
+      this.baseResponse.type(options.contentType);
+    }
+
+    // Set cache headers if specified
+    if (options.cacheTime) {
+      const cacheControl = options.immutable
+        ? `public, max-age=${options.cacheTime}, immutable`
+        : `public, max-age=${options.cacheTime}`;
+      this.header("Cache-Control", cacheControl);
+      this.header("Expires", new Date(Date.now() + options.cacheTime * 1000).toUTCString());
+    }
+
+    // Set ETag if provided (for conditional requests)
+    if (options.etag) {
+      this.header("ETag", options.etag);
+
+      // Check If-None-Match for conditional request
+      const ifNoneMatch = this.request.header("if-none-match");
+      if (ifNoneMatch && matchesIfNoneMatch(ifNoneMatch, options.etag)) {
+        this.log("Content not modified (ETag match), sending 304");
+        this.send304();
+        return true; // Indicates 304 was sent
+      }
+    }
+
+    // Set Content-Disposition if inline or filename is specified
+    if (options.inline !== undefined || options.filename) {
+      const disposition = options.inline ? "inline" : "attachment";
+      const filename = options.filename || defaultFilename || "file";
+      this.header("Content-Disposition", this.contentDisposition(disposition, filename));
+    }
+
+    return false; // No 304 sent
+  }
+
+  /**
+   * Send a file as a response
+   */
+  public async sendFile(filePath: string | StorageFile, options?: number | SendFileOptions) {
+    if (filePath instanceof StorageFile) {
+      filePath = filePath.absolutePath!;
+    }
+
+    this.log(`Sending file: ${filePath}`);
+
+    // Check if file exists first
+    if (!(await fileExistsAsync(filePath))) {
+      return this.notFound({
+        error: "File Not Found",
+      });
+    }
+
+    try {
+      // Normalize options to object format
+      const opts = typeof options === "number" ? { cacheTime: options } : options || {};
+
+      // Get file stats for ETag and Last-Modified
+      const stats = await fs.promises.stat(filePath);
+      const lastModified = stats.mtime;
+
+      // Generate ETag based on file size and modification time
+      const etag = `"${stats.size}-${stats.mtime.getTime()}"`;
+
+      // Set Last-Modified header
+      this.header("Last-Modified", lastModified.toUTCString());
+      this.header("ETag", etag);
+
+      // Set content type
+      const contentType = this.getFileContentType(filePath);
+      this.baseResponse.type(contentType);
+
+      // Apply common response options (cache, disposition)
+      const defaultFilename = path.basename(filePath);
+      const sent304 = this.applyResponseOptions({ ...opts, etag, contentType }, defaultFilename);
+      if (sent304) return this.baseResponse;
+
+      // Check conditional request headers
+      const ifNoneMatch = this.request.header("if-none-match");
+      const ifModifiedSince = this.request.header("if-modified-since");
+
+      // Handle If-None-Match (ETag validation)
+      if (ifNoneMatch && matchesIfNoneMatch(ifNoneMatch, etag)) {
+        this.log("File not modified (ETag match), sending 304");
+        return this.send304();
+      }
+
+      // Handle If-Modified-Since (Last-Modified validation)
+      // RFC 9110: If-Modified-Since is ignored when If-None-Match is present.
+      // The header has second precision, so floor the mtime to seconds.
+      if (ifModifiedSince && !ifNoneMatch) {
+        const modifiedSinceDate = new Date(ifModifiedSince);
+        if (
+          Math.floor(lastModified.getTime() / 1000) <=
+          Math.floor(modifiedSinceDate.getTime() / 1000)
+        ) {
+          this.log("File not modified (Last-Modified check), sending 304");
+          return this.send304();
+        }
+      }
+
+      // Use streaming for efficient file sending
+      const stream = fs.createReadStream(filePath);
+
+      // Handle stream errors
+      stream.on("error", (error) => {
+        this.log(`Error reading file: ${error.message}`, "error");
+        if (!this.baseResponse.sent) {
+          this.serverError({
+            error: "Error reading file",
+            message: error.message,
+          });
+        }
+      });
+
+      // Send the stream (endTime will be set by finish event listener)
+      return this.sendRaw(stream);
+    } catch (error: any) {
+      this.log(`Error sending file: ${error.message}`, "error");
+      return this.serverError({
+        error: "Error sending file",
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * Send buffer as a response
+   * Useful for dynamically generated content (e.g., resized images, generated PDFs)
+   */
+  public sendBuffer(buffer: Buffer, options?: number | SendBufferOptions) {
+    this.log("Sending buffer");
+
+    // Normalize options to object format
+    const opts = typeof options === "number" ? { cacheTime: options } : options || {};
+
+    // Apply common response options (cache, disposition, etag)
+    const sent304 = this.applyResponseOptions(opts);
+    if (sent304) return this.baseResponse;
+
+    // Note: endTime is set in the main send() method for non-streaming responses
+    return this.sendRaw(buffer);
+  }
+
+  /**
+   * Send an Image instance as a response
+   * Automatically detects image format and sets content type
+   */
+  public async sendImage(
+    image: any, // Type as 'any' to avoid circular dependency with Image class
+    options?: number | (Omit<SendBufferOptions, "contentType"> & { contentType?: string }),
+  ) {
+    this.log("Sending image");
+
+    // Normalize options to object format
+    const opts = typeof options === "number" ? { cacheTime: options } : options || {};
+
+    // Get image metadata to determine format
+    const metadata = await image.metadata();
+    const format = metadata.format || "jpeg";
+
+    // Convert image to buffer
+    const buffer = await image.toBuffer();
+
+    // Auto-set content type if not provided
+    const contentType = opts.contentType || `image/${format}`;
+
+    // Auto-generate ETag if not provided
+    // Format: "format-widthxheight-size" (e.g., "jpeg-800x600-45231")
+    // This catches changes in dimensions, quality, filters, and format
+    if (!opts.etag) {
+      const width = metadata.width || 0;
+      const height = metadata.height || 0;
+      opts.etag = `"${format}-${width}x${height}-${buffer.length}"`;
+    }
+
+    // Apply common response options with auto-detected content type
+    const sent304 = this.applyResponseOptions({ ...opts, contentType });
+    if (sent304) return this.baseResponse;
+
+    // Note: endTime is set in the main send() method for non-streaming responses
+    return this.sendRaw(buffer);
+  }
+
+  /**
+   * Send file and cache it
+   * Cache time in seconds
+   * Cache time will be one year
+   */
+  public sendCachedFile(path: string | StorageFile, cacheTime = 31536000) {
+    return this.sendFile(path, cacheTime);
+  }
+
+  /**
+   * Download the given file path
+   */
+  public download(path: string, filename?: string) {
+    return this.downloadFile(path, filename);
+  }
+
+  /**
+   * Download the given file path
+   */
+  public async downloadFile(filePath: string, filename?: string) {
+    // Check if file exists first
+    if (!(await fileExistsAsync(filePath))) {
+      return this.notFound({
+        error: "File Not Found",
+      });
+    }
+
+    try {
+      if (!filename) {
+        filename = path.basename(filePath);
+      }
+
+      this.baseResponse.header(
+        "Content-Disposition",
+        this.contentDisposition("attachment", filename),
+      );
+
+      // this.baseResponse.header("Content-Type", this.getFileContentType(filePath));
+      this.baseResponse.header("Content-Type", "application/octet-stream");
+
+      const stream = fs.createReadStream(filePath);
+
+      // Handle stream errors
+      stream.on("error", (error) => {
+        this.log(`Error reading file for download: ${error.message}`, "error");
+        if (!this.baseResponse.sent) {
+          this.serverError({
+            error: "Error reading file",
+            message: error.message,
+          });
+        }
+      });
+
+      // Send the stream (endTime will be set by finish event listener)
+      return this.sendRaw(stream);
+    } catch (error: any) {
+      this.log(`Error downloading file: ${error.message}`, "error");
+      return this.serverError({
+        error: "Error downloading file",
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * Get content type of the given path
+   */
+  public getFileContentType(filePath: string) {
+    const type = mime.getType(filePath) || "application/octet-stream";
+    return type;
+  }
+
+  /**
+   * Mark the response as failed
+   */
+  public failedSchema(result: ValidationResult) {
+    const { errors, inputKey, inputError, status } = {
+      errors: "errors",
+      inputKey: "input",
+      inputError: "error",
+      status: 422,
+      ...config.get("validation.response", {}),
+    };
+
+    log.error("request", "validation", `${this.request.id} - Validation failed`);
+
+    return this.send(
+      {
+        [errors]: result.errors.map((error) => ({
+          [inputKey]: error.input,
+          [inputError]: error.error,
+        })),
+      },
+      status,
+    );
+  }
+}

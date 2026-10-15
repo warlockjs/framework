@@ -1,0 +1,54 @@
+/**
+ * Registration half of the `connectors` config key.
+ *
+ * ONE key drives both halves of a connector's life: `warlock build` reads the
+ * same array to drain each connector's build contribution, and this function
+ * registers that array with the connectors manager so the runtime boots it.
+ * Reading them from one place is the whole point — a bundle "built for" web
+ * that "boots without" web is a green build with a missing client bundle, and
+ * the failure is silent. A second key would let the two drift; this cannot.
+ *
+ * Two callers, two ways in:
+ *
+ * - The generated production entry PASSES the array explicitly. Inside a
+ *   bundled artifact nothing ever loads `warlock.config.ts` — the build
+ *   imports it statically so esbuild bakes it into the bundle, then hands the
+ *   array straight here. No config manager, no runtime file read.
+ * - The dev preloader OMITS the array and lets this read the already-resolved
+ *   warlock config, which dev has loaded by then.
+ *
+ * Idempotent either way: a connector whose name is already registered — a
+ * built-in, or the result of an earlier call in the same process — is skipped
+ * rather than stacked, since a duplicate would boot and shut down twice.
+ */
+import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
+import { connectorsManager } from "./connectors-manager";
+import type { Connector } from "./types";
+
+export function registerConfiguredConnectors(connectors?: Connector[]): void {
+  for (const connector of connectors ?? configuredConnectors()) {
+    if (connectorsManager.has(connector.name)) continue;
+
+    connectorsManager.register(connector);
+  }
+}
+
+/**
+ * The connectors the resolved warlock config declares.
+ *
+ * Reached only when the caller omitted the array. An unloaded config here is
+ * not "nothing to register" — it is a caller asking this function to read a
+ * source that does not exist yet, so it throws instead of returning empty.
+ * Returning empty is how the production entry once registered NOTHING while
+ * reporting success: the bundle booted none of the connectors it was built
+ * for, and no line of output said so.
+ */
+function configuredConnectors(): Connector[] {
+  if (!warlockConfigManager.isLoaded) {
+    throw new Error(
+      "registerConfiguredConnectors: warlock config is not loaded; pass the connectors array explicitly or load the config first",
+    );
+  }
+
+  return warlockConfigManager.get("connectors") ?? [];
+}

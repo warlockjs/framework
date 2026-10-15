@@ -1,0 +1,1002 @@
+import { ensureDirectoryAsync } from "@warlock.js/fs";
+import { constants } from "fs";
+import { access, readFile, writeFile } from "fs/promises";
+import { moduleResolve } from "import-meta-resolve";
+import { join, resolve } from "path";
+import { pathToFileURL } from "node:url";
+import ts from "typescript";
+import { warlockPath } from "../utils";
+import { devLogDim, devLogError, devLogInfo, devLogSuccess, devServeLog } from "./dev-logger";
+import { readConfigAst } from "./read-config-ast";
+import { runTypingsGeneration, type TypingsGenerationPorts } from "./run-typings-generation";
+import { filesOrchestrator } from "./files-orchestrator";
+import { Path } from "../utils/normalized-path";
+import { extractTranslationKeys } from "./extract-translation-keys";
+import {
+  isModuleLocaleDictionaryPath,
+  isTranslationRegisteringSource,
+} from "./translation-keys-sources";
+import { parseLocaleDictionary } from "../localization";
+import { getFilesFromDirectory } from "./utils";
+import {
+  extractModelResourceEntries,
+  renderModelResourceRegistry,
+  writeFileIfChanged,
+  type ModelResourceEntry,
+} from "./model-resource-typings";
+import { parseImports } from "./parse-imports";
+
+type RouteLocaleBuildModule = {
+  listRouteLocaleKeys?: (options: {
+    appRoot?: string;
+  }) => readonly string[] | Promise<readonly string[]>;
+};
+
+const WEB_PACKAGE = "@warlock.js/web";
+const WEB_BUILD_PACKAGE = "@warlock.js/web/build";
+
+function isAbsentOptionalWebPackage(thrown: unknown): boolean {
+  return (
+    typeof thrown === "object" &&
+    thrown !== null &&
+    "code" in thrown &&
+    (thrown as { code?: unknown }).code === "ERR_MODULE_NOT_FOUND" &&
+    thrown instanceof Error &&
+    thrown.message.includes(`Cannot find package '${WEB_PACKAGE}'`)
+  );
+}
+
+/** Load the build-only web key lister without creating a core-to-web static edge. */
+export async function listRouteLocaleKeysForTypeGeneration(
+  appRoot = process.cwd(),
+): Promise<readonly string[]> {
+  // Published web entries are import-only. Resolve with ESM conditions from
+  // the consuming project; require.resolve rejects those installed exports.
+  const projectUrl = pathToFileURL(resolve(appRoot, "package.json"));
+
+  try {
+    moduleResolve(WEB_PACKAGE, projectUrl);
+  } catch (thrown) {
+    if (isAbsentOptionalWebPackage(thrown)) return [];
+    throw thrown;
+  }
+
+  const buildModuleUrl = moduleResolve(WEB_BUILD_PACKAGE, projectUrl);
+  const buildModule = (await import(buildModuleUrl.href)) as RouteLocaleBuildModule;
+
+  if (typeof buildModule.listRouteLocaleKeys !== "function") {
+    throw new Error(
+      `${WEB_BUILD_PACKAGE} does not export listRouteLocaleKeys. Upgrade @warlock.js/web to a compatible version.`,
+    );
+  }
+
+  return buildModule.listRouteLocaleKeys({ appRoot });
+}
+
+/** True only for the route-locales convention under the canonical web root. */
+export function isRouteLocalesJsonPath(path: string): boolean {
+  const normalized = Path.normalize(path);
+  const relativePath = normalized.startsWith("src/") ? normalized : Path.toRelative(normalized);
+  return /^src\/web(?:\/.*)?\/locales\.json$/.test(relativePath);
+}
+
+/**
+ * Typings manifest structure for tracking file hashes
+ */
+type TypingsManifest = {
+  version: string;
+  lastBuildTime: number;
+  storage: {
+    sourceHash: string;
+    drivers: string[];
+  } | null;
+  config: Record<
+    string,
+    {
+      sourceHash: string;
+      typeName: string | null;
+      importSource: string | null;
+      keys: string[];
+    }
+  >;
+};
+
+/**
+ * TypeGenerator - Generates TypeScript type definitions from config files
+ *
+ * Parses source config files using the TypeScript Compiler API to extract
+ * keys and generate module augmentation types for IDE autocomplete.
+ *
+ * Uses manifest-based reconciliation to only regenerate when source files change.
+ */
+export class TypeGenerator {
+  /**
+   * Output directory for generated typings
+   */
+  private outputDir = warlockPath("typings");
+
+  /**
+   * Path to typings manifest file
+   */
+  private manifestPath = join(this.outputDir, "typings-manifest.json");
+
+  /**
+   * Cached manifest data
+   */
+  private manifest: TypingsManifest | null = null;
+
+  /**
+   * Cache for config type info and keys
+   */
+  private configCache = new Map<
+    string,
+    {
+      sourceHash: string;
+      typeName: string | null;
+      importSource: string | null;
+      keys: string[];
+    }
+  >();
+
+  /**
+   * Generate all framework type definitions
+   *
+   * Uses manifest-based reconciliation:
+   * - If output files don't exist: full regeneration
+   * - If files exist: only regenerate changed configs
+   */
+  public async generateAll(): Promise<void> {
+    await this.ensureOutputDir();
+
+    const storageFile = join(this.outputDir, "storage.d.ts");
+    const configFile = join(this.outputDir, "config.d.ts");
+    const translationsFile = join(this.outputDir, "translations.d.ts");
+
+    const [manifestExists, storageExists, configExists, translationsExist] = await Promise.all([
+      this.exists(this.manifestPath),
+      this.exists(storageFile),
+      this.exists(configFile),
+      this.exists(translationsFile),
+    ]);
+
+    if (!manifestExists || !storageExists || !configExists || !translationsExist) {
+      // Full regeneration (first run or files deleted)
+      await this.fullGeneration();
+    } else {
+      // Load manifest for hash comparison
+      await this.loadManifest();
+      // Reconciliation: only regenerate changed files
+      await this.reconcile();
+    }
+
+    await this.generateTranslationTypes();
+    await this.generateModelResourceTypes();
+
+    await this.saveManifest();
+  }
+
+  /**
+   * Full regeneration of all type files
+   */
+  private async fullGeneration(): Promise<void> {
+    // Generate storage types
+    const storageConfigPath = await this.findConfigFile("storage");
+    if (storageConfigPath) {
+      this.generateStorageTypes(storageConfigPath);
+    }
+
+    // Generate config types
+    await this.generateConfigTypes();
+  }
+
+  /**
+   * Reconcile: only regenerate changed files
+   */
+  private async reconcile(): Promise<void> {
+    const files = filesOrchestrator.getFiles();
+    let storageChanged = false;
+    let configChanged = false;
+    let unchangedCount = 0;
+
+    this.configCache.clear();
+
+    // Check storage config
+    for (const [path, fileManager] of files) {
+      if (path.startsWith("src/config/storage")) {
+        const manifestEntry = this.manifest?.storage;
+        if (!manifestEntry || manifestEntry.sourceHash !== fileManager.hash) {
+          storageChanged = true;
+          await this.generateStorageTypes(path);
+        }
+        break;
+      }
+    }
+
+    // Check config files
+    for (const [path, fileManager] of files) {
+      if (!path.startsWith("src/config/")) continue;
+      if (
+        path
+          .split("/")
+          .pop()
+          ?.replace(/[.][^.]+$/, "") === "index"
+      )
+        continue;
+
+      // Extract config name (remove dir prefix and extension)
+      const configName = path.replace("src/config/", "").replace(/\.[^.]+$/, "");
+
+      const manifestEntry = this.manifest?.config[configName];
+
+      if (!manifestEntry || manifestEntry.sourceHash !== fileManager.hash) {
+        // File changed or new - regenerate
+        configChanged = true;
+        const info = await this.extractConfigInfo(fileManager.absolutePath, configName);
+
+        this.configCache.set(configName, {
+          sourceHash: fileManager.hash,
+          typeName: info.typeName,
+          importSource: info.importSource,
+          keys: info.keys,
+        });
+      } else {
+        // Unchanged - load from manifest
+        unchangedCount++;
+        this.configCache.set(configName, manifestEntry);
+      }
+    }
+
+    if (configChanged) {
+      await this.writeConfigTypesFromCache();
+    } else {
+      devLogInfo(`Config types unchanged (${unchangedCount} configs cached)`);
+    }
+  }
+
+  /**
+   * Generate storage driver name types
+   */
+  public async generateStorageTypes(configPath: string): Promise<void> {
+    try {
+      const driverKeys = await this.extractStorageDriverKeys(configPath);
+
+      if (driverKeys.length === 0) {
+        devServeLog("⚠️ No storage drivers found in config");
+        return;
+      }
+
+      // Get file hash from filesOrchestrator
+      const fileManager = filesOrchestrator.getFiles().get(configPath);
+      const sourceHash = fileManager?.hash || "";
+
+      // Update manifest
+      if (!this.manifest) {
+        this.manifest = this.createEmptyManifest();
+      }
+      this.manifest.storage = {
+        sourceHash,
+        drivers: driverKeys,
+      };
+
+      const interfaceContent = driverKeys
+        .map((k) => `    ${this.toInterfaceKey(k)}: true;`)
+        .join("\n");
+
+      const content = `// Auto-generated by Warlock.js - DO NOT EDIT
+// Generated from: ${configPath}
+// Regenerates on dev-server start and when storage config changes
+
+import "@warlock.js/core";
+
+declare module "@warlock.js/core" {
+  interface StorageDriverRegistry {
+${interfaceContent}
+  }
+}
+`;
+
+      const outputPath = join(this.outputDir, "storage.d.ts");
+      await writeFile(outputPath, content, "utf-8");
+
+      devLogSuccess(`Generated storage types: ${driverKeys.join(", ")}`);
+    } catch (error) {
+      devServeLog(`⚠️ Failed to generate storage types: ${error}`);
+    }
+  }
+
+  /**
+   * Check if a file change should trigger type regeneration
+   */
+  public shouldRegenerateTypes(changedPath: string): boolean {
+    return (
+      changedPath.includes("src/config/") ||
+      changedPath.includes("config/") ||
+      this.isLocalesFile(changedPath) ||
+      isRouteLocalesJsonPath(changedPath)
+    );
+  }
+
+  /**
+   * Handle file change - uses incremental update via cache
+   */
+  public async handleFileChange(changedPath: string): Promise<void> {
+    if (!this.shouldRegenerateTypes(changedPath)) {
+      return;
+    }
+
+    // Regenerate storage types if storage config changed
+    if (changedPath.includes("config/storage")) {
+      await this.generateStorageTypes(changedPath);
+      await this.saveManifest();
+      return;
+    }
+
+    if (this.isLocalesFile(changedPath) || isRouteLocalesJsonPath(changedPath)) {
+      await this.generateTranslationTypes();
+      return;
+    }
+
+    // Extract config name from path
+    const match = changedPath.match(/config\/([^/]+)\.[^.]+$/);
+    if (!match) {
+      return;
+    }
+
+    const configName = match[1];
+    if (!configName || configName === "index") return;
+
+    devLogInfo(`Config changed: ${configName}, updating...`);
+
+    // Get file manager for hash
+    const fileManager = filesOrchestrator.getFiles().get(changedPath);
+    const sourceHash = fileManager?.hash || Date.now().toString();
+
+    // Update only the changed config in cache (use optimized combined extraction)
+    const configDir = join(process.cwd(), "src/config");
+    const configPath = join(configDir, `${configName}.ts`);
+
+    const info = await this.extractConfigInfo(configPath, configName);
+
+    this.configCache.set(configName, {
+      sourceHash,
+      typeName: info.typeName,
+      importSource: info.importSource,
+      keys: info.keys,
+    });
+
+    // Regenerate config.d.ts from cache
+    await this.writeConfigTypesFromCache();
+    await this.saveManifest();
+  }
+
+  /**
+   * Generate config types - populates cache and writes file
+   */
+  public async generateConfigTypes(): Promise<void> {
+    try {
+      const files = filesOrchestrator.getFiles();
+
+      // Clear and repopulate cache
+      this.configCache.clear();
+
+      for (const [path, fileManager] of files) {
+        if (!path.startsWith("src/config/")) continue;
+        if (
+          path
+            .split("/")
+            .pop()
+            ?.replace(/[.][^.]+$/, "") === "index"
+        )
+          continue;
+
+        // Extract config name
+        const configName = path.replace("src/config/", "").replace(/\.[^.]+$/, "");
+
+        // One parse per config, both extractions off it — see `read-config-ast.ts`.
+        const info = await this.extractConfigInfo(fileManager.absolutePath, configName);
+
+        this.configCache.set(configName, {
+          sourceHash: fileManager.hash,
+          typeName: info.typeName,
+          importSource: info.importSource,
+          keys: info.keys,
+        });
+      }
+
+      await this.writeConfigTypesFromCache();
+    } catch (error) {
+      devServeLog(`⚠️ Failed to generate config types: ${error}`);
+    }
+  }
+
+  /**
+   * Files (relative paths) that contributed to the last generated registry —
+   * used to notice a registering file being deleted, since by the time a
+   * delete event reaches {@link executeTypingsGenerator} the file is already
+   * gone from `filesOrchestrator`'s map and its content can no longer be
+   * inspected.
+   */
+  private translationSourceFiles = new Set<string>();
+
+  /**
+   * Generate web's app-augmented translation-key registry.
+   *
+   * Scans every discovered app source file — not only dedicated
+   * `utils/locales.*` files — for `groupedTranslations` calls, both the
+   * named-group and object forms, at any nesting depth. Dynamic group names,
+   * dictionaries, or keys cannot be resolved statically and are skipped; an
+   * app relying on those must document them itself.
+   */
+  private async generateTranslationTypes(): Promise<void> {
+    const keys = new Set<string>();
+    const sourceFiles = new Set<string>();
+
+    for (const [path, fileManager] of filesOrchestrator.getFiles()) {
+      if (!isTranslationRegisteringSource(path, fileManager.source)) {
+        continue;
+      }
+
+      sourceFiles.add(path);
+
+      if (isModuleLocaleDictionaryPath(path)) {
+        const dictionary = parseLocaleDictionary({
+          sourceFile: path,
+          source: fileManager.source,
+          defaultNamespace: path.split("/")[2]!,
+        });
+        for (const key of Object.keys(dictionary.entries)) {
+          keys.add(key);
+        }
+        continue;
+      }
+
+      const sourceFile = await readConfigAst(fileManager.absolutePath);
+      if (sourceFile) {
+        for (const key of extractTranslationKeys(sourceFile)) {
+          keys.add(key);
+        }
+      }
+    }
+
+    // The dev source map intentionally tracks executable TypeScript only. Module
+    // dictionaries are JSON data, so discover them directly without loading app
+    // code; use the runtime parser to keep `$group` and flattening identical.
+    for (const absolutePath of await getFilesFromDirectory(
+      join(process.cwd(), "src", "app"),
+      "**/utils/locales.json",
+    )) {
+      const path = Path.toRelative(absolutePath);
+      sourceFiles.add(path);
+      const dictionary = parseLocaleDictionary({
+        sourceFile: path,
+        source: await readFile(absolutePath, "utf-8"),
+        defaultNamespace: path.split("/")[2]!,
+      });
+      for (const key of Object.keys(dictionary.entries)) {
+        keys.add(key);
+      }
+    }
+
+    for (const key of await listRouteLocaleKeysForTypeGeneration()) {
+      keys.add(key);
+    }
+
+    this.translationSourceFiles = sourceFiles;
+
+    const entries = Array.from(keys)
+      .sort()
+      .map((key) => `    ${JSON.stringify(key)}: true;`)
+      .join("\n");
+    const content = `// Auto-generated by Warlock.js - DO NOT EDIT
+// Generated from groupedTranslations calls and route-locales JSON in discovered
+// app source. Dynamic group names/keys cannot be resolved statically and are
+// not included here — document those yourself.
+
+import "@warlock.js/web";
+
+declare module "@warlock.js/web" {
+  interface TranslationKeyRegistry {
+${entries}
+  }
+}
+`;
+
+    await writeFile(join(this.outputDir, "translations.d.ts"), content, "utf-8");
+    devLogSuccess(`Generated translation types: ${keys.size} keys`);
+  }
+
+  /**
+   * Files that contributed to the last `model-resources.d.ts`: the model files
+   * and the modules their resources were resolved to. Kept for the same reason
+   * as {@link translationSourceFiles}: a deleted file is already gone from the
+   * orchestrator when the batch reaches {@link executeTypingsGenerator}.
+   */
+  private modelResourceSourceFiles = new Set<string>();
+
+  /**
+   * Generate `model-resources.d.ts`: the `ModelResourceRegistry` augmentation
+   * behind `Serialized<Model>`.
+   *
+   * Reads every discovered model file (`*.model.ts`) and records the ones that
+   * declare `static resource = <Identifier>`. Static AST read only, no app
+   * module is imported; see `model-resource-typings.ts` for what is skipped.
+   * The file is rewritten only when its text changes.
+   */
+  private async generateModelResourceTypes(): Promise<void> {
+    try {
+      const entries: ModelResourceEntry[] = [];
+      const sourceFiles = new Set<string>();
+      const skippedModels: string[] = [];
+
+      for (const [path, fileManager] of filesOrchestrator.getFiles()) {
+        if (fileManager.type !== "model" || !fileManager.source.includes("resource")) continue;
+
+        const imports = await parseImports(fileManager.source, fileManager.absolutePath);
+        const extraction = extractModelResourceEntries({
+          source: fileManager.source,
+          absolutePath: fileManager.absolutePath,
+          resolveImport: (specifier) => imports.get(specifier)?.absolutePath,
+        });
+
+        if (extraction.entries.length > 0) sourceFiles.add(path);
+
+        for (const entry of extraction.entries) {
+          entries.push(entry);
+          sourceFiles.add(Path.toRelative(entry.resourceFile));
+        }
+
+        for (const skipped of extraction.skipped) {
+          skippedModels.push(`${skipped.className} (${skipped.reason})`);
+        }
+      }
+
+      this.modelResourceSourceFiles = sourceFiles;
+
+      const written = await writeFileIfChanged(
+        join(this.outputDir, "model-resources.d.ts"),
+        renderModelResourceRegistry(entries, this.outputDir),
+      );
+
+      if (written) devLogSuccess(`Generated model resource types: ${entries.length} models`);
+
+      if (skippedModels.length > 0) {
+        devLogDim(
+          `Model resources not typed (not statically resolvable): ${skippedModels.join(", ")}`,
+        );
+      }
+    } catch (error) {
+      devServeLog(`⚠️ Failed to generate model resource types: ${error}`);
+    }
+  }
+
+  private isLocalesFile(path: string): boolean {
+    return Path.normalize(path).includes("/utils/locales.");
+  }
+
+  /**
+   * Quote an interface key that isn't a valid JS identifier (e.g. a config
+   * named `use-cases` or a storage driver `do-spaces`) so the generated
+   * `.d.ts` stays syntactically valid. Identifier-safe names are left bare
+   * to keep the output clean.
+   */
+  private toInterfaceKey(name: string): string {
+    return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) ? name : JSON.stringify(name);
+  }
+
+  /**
+   * Write config.d.ts from cached data
+   */
+  private async writeConfigTypesFromCache(): Promise<void> {
+    const configTypeInfos: Array<{
+      name: string;
+      typeName: string | null;
+      importSource: string | null;
+    }> = [];
+    const allKeys: string[] = [];
+
+    // Update manifest config section
+    if (!this.manifest) {
+      this.manifest = this.createEmptyManifest();
+    }
+    this.manifest.config = {};
+
+    for (const [name, data] of this.configCache) {
+      configTypeInfos.push({
+        name,
+        typeName: data.typeName,
+        importSource: data.importSource,
+      });
+      allKeys.push(...data.keys);
+
+      // Store in manifest
+      this.manifest.config[name] = data;
+    }
+
+    // Group imports by source
+    const imports = new Map<string, Set<string>>();
+    for (const info of configTypeInfos) {
+      if (info.typeName && info.importSource) {
+        if (!imports.has(info.importSource)) {
+          imports.set(info.importSource, new Set());
+        }
+        imports.get(info.importSource)!.add(info.typeName);
+      }
+    }
+
+    const importStatements = Array.from(imports.entries())
+      .map(([source, types]) => `import type { ${Array.from(types).join(", ")} } from "${source}";`)
+      .join("\n");
+
+    const configEntries = configTypeInfos
+      .map((info) => `    ${this.toInterfaceKey(info.name)}: ${info.typeName || "unknown"};`)
+      .join("\n");
+
+    const keyEntries = allKeys.map((key) => `    "${key}": true;`).join("\n");
+
+    const content = `// Auto-generated by Warlock.js - DO NOT EDIT
+// Regenerates on dev-server start and when config files change
+
+${importStatements}
+import "@warlock.js/core";
+
+declare module "@warlock.js/core" {
+  interface ConfigRegistry {
+${configEntries}
+  }
+
+  interface ConfigKeyRegistry {
+${keyEntries}
+  }
+}
+`;
+
+    const outputPath = join(this.outputDir, "config.d.ts");
+    await writeFile(outputPath, content, "utf-8");
+
+    devLogSuccess(
+      `Generated config types: ${this.configCache.size} configs, ${allKeys.length} keys`,
+    );
+  }
+
+  // ============================================================
+  // Manifest Management
+  // ============================================================
+
+  /**
+   * Load manifest from disk
+   */
+  private async loadManifest(): Promise<boolean> {
+    try {
+      if (await this.exists(this.manifestPath)) {
+        const content = await readFile(this.manifestPath, "utf-8");
+        this.manifest = JSON.parse(content);
+        return true;
+      }
+    } catch {
+      // Manifest corrupted or missing
+    }
+    this.manifest = null;
+    return false;
+  }
+
+  /**
+   * Save manifest to disk
+   */
+  private async saveManifest(): Promise<void> {
+    if (!this.manifest) {
+      this.manifest = this.createEmptyManifest();
+    }
+    this.manifest.lastBuildTime = Date.now();
+
+    await writeFile(this.manifestPath, JSON.stringify(this.manifest, null, 2), "utf-8");
+  }
+
+  /**
+   * Create empty manifest structure
+   */
+  private createEmptyManifest(): TypingsManifest {
+    return {
+      version: "1.0.0",
+      lastBuildTime: Date.now(),
+      storage: null,
+      config: {},
+    };
+  }
+
+  // ============================================================
+  // Type Extraction Methods
+  // ============================================================
+
+  /**
+   * Extract BOTH type info AND keys in a single pass
+   *
+   * One parse serves both extractions. It used to be one whole TypeScript
+   * Program per file — halved from two by an earlier pass, which optimised
+   * inside a premise that did not need to hold. `read-config-ast.ts` has the
+   * numbers.
+   *
+   * @param configPath Absolute path to the config file
+   * @param configName Config name (e.g., "auth", "notifications")
+   * @returns Combined result with type info and keys
+   */
+  private async extractConfigInfo(
+    configPath: string,
+    configName: string,
+  ): Promise<{
+    typeName: string | null;
+    importSource: string | null;
+    keys: string[];
+  }> {
+    if (!(await this.exists(configPath))) {
+      return { typeName: null, importSource: null, keys: [] };
+    }
+
+    // Parse, do not resolve — `read-config-ast.ts` explains why, with numbers.
+    const sourceFile = await readConfigAst(configPath);
+
+    if (!sourceFile) {
+      return { typeName: null, importSource: null, keys: [] };
+    }
+
+    // === Type Info Extraction ===
+    const importedTypes = new Map<string, string>();
+    const localExportedTypes = new Set<string>();
+    let foundTypeName: string | null = null;
+
+    // === Keys Extraction ===
+    const keys: string[] = [];
+
+    const visitForTypes = (node: ts.Node): void => {
+      // Collect imported types
+      if (ts.isImportDeclaration(node)) {
+        const moduleSpecifier = node.moduleSpecifier;
+        if (ts.isStringLiteral(moduleSpecifier)) {
+          const source = moduleSpecifier.text;
+          const importClause = node.importClause;
+          if (importClause?.namedBindings && ts.isNamedImports(importClause.namedBindings)) {
+            for (const element of importClause.namedBindings.elements) {
+              importedTypes.set(element.name.text, source);
+            }
+          }
+        }
+      }
+
+      // Collect locally exported types
+      if (ts.isTypeAliasDeclaration(node)) {
+        const modifiers = ts.getModifiers(node);
+        if (modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
+          localExportedTypes.add(node.name.text);
+        }
+      }
+
+      // Collect locally exported interfaces
+      if (ts.isInterfaceDeclaration(node)) {
+        const modifiers = ts.getModifiers(node);
+        if (modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
+          localExportedTypes.add(node.name.text);
+        }
+      }
+
+      // Find type used on config variable + extract keys
+      if (ts.isVariableDeclaration(node)) {
+        // Type info
+        if (node.type && ts.isTypeReferenceNode(node.type)) {
+          foundTypeName = node.type.typeName.getText(sourceFile);
+        }
+
+        // Keys extraction
+        if (node.initializer && ts.isObjectLiteralExpression(node.initializer)) {
+          const visitKeys = (objNode: ts.ObjectLiteralExpression, prefix: string): void => {
+            for (const prop of objNode.properties) {
+              if (ts.isPropertyAssignment(prop) && prop.name) {
+                const keyName = prop.name.getText(sourceFile);
+                const fullKey = prefix ? `${prefix}.${keyName}` : keyName;
+                keys.push(fullKey);
+                if (ts.isObjectLiteralExpression(prop.initializer)) {
+                  visitKeys(prop.initializer, fullKey);
+                }
+              }
+            }
+          };
+          visitKeys(node.initializer, configName);
+        }
+      }
+
+      ts.forEachChild(node, visitForTypes);
+    };
+
+    ts.forEachChild(sourceFile, visitForTypes);
+
+    // Resolve type info
+    let typeName: string | null = null;
+    let importSource: string | null = null;
+
+    if (foundTypeName) {
+      if (importedTypes.has(foundTypeName)) {
+        typeName = foundTypeName;
+        importSource = importedTypes.get(foundTypeName)!;
+      } else if (localExportedTypes.has(foundTypeName)) {
+        typeName = foundTypeName;
+        const relativePath = Path.toRelative(configPath).replace(/\.(ts|tsx)$/, "");
+        importSource = `../../${relativePath}`;
+      }
+    }
+
+    return { typeName, importSource, keys };
+  }
+
+  /**
+   * Extract driver keys from storage config
+   */
+  private async extractStorageDriverKeys(configPath: string): Promise<string[]> {
+    const absolutePath = resolve(configPath);
+
+    if (!(await this.exists(absolutePath))) {
+      devServeLog(`⚠️ Storage config not found: ${absolutePath}`);
+      return [];
+    }
+
+    const sourceFile = await readConfigAst(absolutePath);
+
+    if (!sourceFile) {
+      devServeLog(`⚠️ Could not parse storage config: ${absolutePath}`);
+      return [];
+    }
+
+    const keys: string[] = [];
+
+    const visit = (node: ts.Node): void => {
+      if (ts.isPropertyAssignment(node)) {
+        const propName = node.name.getText(sourceFile);
+
+        if (propName === "drivers" && ts.isObjectLiteralExpression(node.initializer)) {
+          for (const prop of node.initializer.properties) {
+            if (ts.isPropertyAssignment(prop) || ts.isShorthandPropertyAssignment(prop)) {
+              const keyName = prop.name?.getText(sourceFile);
+
+              if (keyName) {
+                keys.push(keyName);
+              }
+            }
+          }
+        }
+      }
+
+      ts.forEachChild(node, visit);
+    };
+
+    ts.forEachChild(sourceFile, visit);
+
+    return keys;
+  }
+
+  /**
+   * Find a config file by name
+   */
+  private async findConfigFile(configName: string): Promise<string | undefined> {
+    const possiblePaths = [`src/config/${configName}.ts`, `config/${configName}.ts`];
+
+    for (const path of possiblePaths) {
+      const fullPath = join(process.cwd(), path);
+
+      if (await this.exists(fullPath)) {
+        return path;
+      }
+    }
+
+    try {
+      const files = filesOrchestrator.getFiles();
+
+      for (const [filePath] of files) {
+        if (filePath.includes(`config/${configName}`)) {
+          return filePath;
+        }
+      }
+    } catch {
+      // Files orchestrator not initialized yet
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Ensure output directory exists
+   */
+  private async ensureOutputDir(): Promise<void> {
+    await ensureDirectoryAsync(this.outputDir);
+  }
+
+  /**
+   * Check if a path exists (async wrapper)
+   */
+  private async exists(path: string): Promise<boolean> {
+    try {
+      await access(path, constants.F_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * The ports `runTypingsGeneration` needs, bound to this instance and this
+   * package's dev logger.
+   */
+  private get typingsGenerationPorts(): TypingsGenerationPorts {
+    return {
+      generate: () => this.generateAll(),
+      info: (message) => devLogInfo(message),
+      success: (message) => devLogSuccess(message),
+      error: (message) => devLogError(message),
+    };
+  }
+
+  /**
+   * Generate every config's typings.
+   *
+   * Runs IN THIS PROCESS. It used to spawn `npx warlock generate.typings`,
+   * which could not resolve in a source checkout — see
+   * `run-typings-generation.ts` for the whole story.
+   */
+  public async executeGenerateAllCommand(): Promise<void> {
+    await runTypingsGeneration(this.typingsGenerationPorts);
+  }
+
+  /**
+   * Regenerate typings after a batch reload — but only when the batch
+   * plausibly touched something the typings depend on: a config file, a file
+   * that registers translation keys, or a registering file that was deleted.
+   *
+   * A deleted file is already gone from `filesOrchestrator` by the time this
+   * runs (deletes are processed before `dev-server:batch-complete` fires), so
+   * its content can't be re-checked here — `translationSourceFiles` is the
+   * set from the last generation, kept for exactly this comparison.
+   */
+  public async executeTypingsGenerator(upcomingFiles: string[]): Promise<void> {
+    const files = filesOrchestrator.getFiles();
+
+    const aKnownTranslationSourceVanished = Array.from(this.translationSourceFiles).some(
+      (path) => !files.has(path),
+    );
+
+    const aKnownModelResourceSourceVanished = Array.from(this.modelResourceSourceFiles).some(
+      (path) => !files.has(path),
+    );
+
+    const touchedAConfig =
+      aKnownTranslationSourceVanished ||
+      aKnownModelResourceSourceVanished ||
+      Array.from(new Set(upcomingFiles)).some((file) => {
+        const normalizedPath = Path.normalize(file);
+        if (normalizedPath.includes("src/config/")) return true;
+        if (isRouteLocalesJsonPath(normalizedPath)) return true;
+        if (isModuleLocaleDictionaryPath(normalizedPath)) return true;
+        if (this.translationSourceFiles.has(normalizedPath)) return true;
+        if (this.modelResourceSourceFiles.has(normalizedPath)) return true;
+        if (files.get(normalizedPath)?.type === "model") return true;
+
+        const fileManager = files.get(normalizedPath);
+        return (
+          fileManager !== undefined &&
+          isTranslationRegisteringSource(normalizedPath, fileManager.source)
+        );
+      });
+
+    if (!touchedAConfig) return;
+
+    /*
+      The changed paths are deliberately NOT passed along. The previous version
+      built a `files` array here and then threw it away, spawning the same
+      whole-project command as the branch above — so "incremental" was a name,
+      not a behaviour. `generateAll()` reads the orchestrator, which the batch
+      reload has already updated, so the full pass is both correct and the only
+      pass that ever actually ran.
+    */
+    await runTypingsGeneration(this.typingsGenerationPorts);
+  }
+}
+
+/**
+ * Singleton instance for use throughout dev-server
+ */
+export const typeGenerator = new TypeGenerator();

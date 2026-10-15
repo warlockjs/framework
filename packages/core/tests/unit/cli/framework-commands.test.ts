@@ -1,0 +1,134 @@
+import { describe, expect, it } from "vitest";
+import { addCommand } from "../../../src/cli/commands/add.command";
+import { migrateCommand } from "../../../src/cli/commands/migrate.command";
+import { routesCommand } from "../../../src/cli/commands/routes.command";
+import { seedCommand } from "../../../src/cli/commands/seed.command";
+import {
+  generateCommand,
+  generateModuleCommand,
+} from "../../../src/cli/commands/generate/generate.command";
+
+/**
+ * Validates the framework command DEFINITIONS — name, alias, preload plan,
+ * and parsed option metadata — without executing their actions (which would
+ * touch a database / disk). These assert the "planning" surface only.
+ */
+const optionNames = (command: { commandOptions: { name: string }[] }) =>
+  command.commandOptions.map((option) => option.name);
+
+describe("migrateCommand definition", () => {
+  it("declares its name and database/storage preload plan", () => {
+    expect(migrateCommand.name).toBe("migrate");
+    expect(migrateCommand.commandPreload).toEqual({
+      config: ["database", "log"],
+      connectors: ["database", "logger", "storage"],
+    });
+  });
+
+  // `env: true` was removed from the declaration, not defaulted to false: env
+  // is loaded for every command that declares a preload block, so the flag was
+  // decoration. Asserting its ABSENCE keeps it from being re-added by someone
+  // who reads the deprecated type field and assumes it still does something.
+  it("no longer declares the dead env preload flag", () => {
+    expect(migrateCommand.commandPreload).not.toHaveProperty("env");
+  });
+
+  it("declares --pending as a boolean so it cannot swallow a positional", () => {
+    const pending = migrateCommand.commandOptions.find((option) => option.name === "pending");
+
+    expect(pending).toBeDefined();
+    expect(pending?.type).toBe("boolean");
+  });
+
+  it("parses every option into a name with the expected alias", () => {
+    const fresh = migrateCommand.commandOptions.find((option) => option.name === "fresh");
+    const path = migrateCommand.commandOptions.find((option) => option.name === "path");
+
+    expect(fresh?.alias).toBe("f");
+    expect(path?.alias).toBe("p");
+  });
+
+  it("keeps the comma-less --pending-only flag (no alias)", () => {
+    const pendingOnly = migrateCommand.commandOptions.find(
+      (option) => option.name === "pendingOnly",
+    );
+
+    expect(pendingOnly).toBeDefined();
+    expect(pendingOnly?.alias).toBe("");
+  });
+});
+
+describe("seedCommand definition", () => {
+  it("plans a full bootstrap with database/cache/logger/storage connectors", () => {
+    expect(seedCommand.name).toBe("seed");
+    expect(seedCommand.commandPreload).toMatchObject({
+      bootstrap: true,
+      config: true,
+      connectors: ["database", "cache", "logger", "storage"],
+    });
+  });
+
+  it("carries a defaultValue on the transaction option", () => {
+    const transaction = seedCommand.commandOptions.find((option) => option.name === "transaction");
+
+    expect(transaction?.defaultValue).toBe(true);
+    expect(transaction?.alias).toBe("t");
+  });
+});
+
+describe("routesCommand definition", () => {
+  it("bootstraps to register routes but starts NO connectors (read-only)", () => {
+    expect(routesCommand.name).toBe("routes");
+    expect(routesCommand.commandPreload).toEqual({
+      config: true,
+      env: true,
+      bootstrap: true,
+    });
+    expect(routesCommand.commandPreload?.connectors).toBeUndefined();
+  });
+
+  it("declares the filter + json options with their aliases", () => {
+    const byName = (name: string) =>
+      routesCommand.commandOptions.find((option) => option.name === name);
+
+    expect(byName("method")?.alias).toBe("m");
+    expect(byName("path")?.alias).toBe("p");
+    expect(byName("name")?.alias).toBe("n");
+    expect(byName("json")?.alias).toBe("j");
+    expect(byName("json")?.type).toBe("boolean");
+  });
+});
+
+describe("addCommand definition", () => {
+  it('parses "--package-manager, -pm" into a camelCase name plus the pm alias', () => {
+    // The declaration now uses a comma (wave 2, C4:B6), so `-pm` is a real alias
+    // and the name is camelCased (C4:B5).
+    const packageManager = addCommand.commandOptions.find(
+      (option) => option.name === "packageManager",
+    );
+
+    expect(packageManager).toBeDefined();
+    expect(packageManager?.alias).toBe("pm");
+  });
+
+  it("exposes --no-install as noInstall", () => {
+    expect(optionNames(addCommand)).toContain("noInstall");
+  });
+});
+
+describe("generate command family definition", () => {
+  it("exposes the master generate command with alias g", () => {
+    expect(generateCommand.name).toBe("generate <generator> [args...]");
+    expect(generateCommand.commandAlias).toBe("g");
+  });
+
+  it("registers --force and --dry-run on the master command", () => {
+    expect(optionNames(generateCommand)).toEqual(expect.arrayContaining(["force", "dryRun"]));
+  });
+
+  it("exposes generate.module with its minimal flag", () => {
+    expect(generateModuleCommand.name).toBe("generate.module <name>");
+    expect(generateModuleCommand.commandAlias).toBe("gen.m");
+    expect(optionNames(generateModuleCommand)).toContain("minimal");
+  });
+});

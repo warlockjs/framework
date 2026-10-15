@@ -1,0 +1,153 @@
+import { v } from "@warlock.js/seal";
+import { describe, expect, it, vi } from "vitest";
+import { validateAll } from "../../../src/validation/validateAll";
+
+/**
+ * validateAll() only touches a small, well-defined slice of Request/Response,
+ * so thin structural stubs stand in for the full HTTP objects.
+ */
+const makeRequest = (
+  data: Record<string, unknown>,
+  params: Record<string, unknown> = {},
+) => {
+  return {
+    body: data,
+    query: {},
+    params,
+    headers: {},
+    allExceptParams: () => data,
+    setValidatedData: vi.fn(),
+  };
+};
+
+const makeResponse = () => {
+  return {
+    statusCode: 0,
+    send: vi.fn((payload: unknown, status?: number) => ({ sent: payload, status })),
+    failedSchema: vi.fn((result: unknown) => ({ failed: result })),
+    setStatusCode: vi.fn(function (this: { statusCode: number }, code: number) {
+      this.statusCode = code;
+    }),
+  };
+};
+
+describe("validateAll - schema validation", () => {
+  it("includes a declared route param when validating the default request sources", async () => {
+    const request = makeRequest({ title: "Hello" }, { id: "post-1" });
+    const response = makeResponse();
+
+    await validateAll(
+      { schema: v.object({ id: v.string(), title: v.string() }) } as never,
+      request as never,
+      response as never,
+    );
+
+    expect(request.setValidatedData).toHaveBeenCalledWith({ id: "post-1", title: "Hello" });
+    expect(response.failedSchema).not.toHaveBeenCalled();
+  });
+
+  it("keeps a body value when it has the same name as a declared route param", async () => {
+    const request = makeRequest({ id: "body-id", title: "Hello" }, { id: "param-id" });
+    const response = makeResponse();
+
+    await validateAll(
+      { schema: v.object({ id: v.string(), title: v.string() }) } as never,
+      request as never,
+      response as never,
+    );
+
+    expect(request.setValidatedData).toHaveBeenCalledWith({ id: "body-id", title: "Hello" });
+  });
+
+  it("does not include undeclared route params in default schema validation", async () => {
+    const request = makeRequest({ title: "Hello" }, { id: "post-1", slug: "hello" });
+    const response = makeResponse();
+
+    await validateAll(
+      { schema: v.object({ id: v.string(), title: v.string() }) } as never,
+      request as never,
+      response as never,
+    );
+
+    expect(request.setValidatedData).toHaveBeenCalledWith({ id: "post-1", title: "Hello" });
+  });
+
+  it("returns nothing and stores validated data when the schema passes", async () => {
+    const request = makeRequest({ name: "Hasan", age: 30 });
+    const response = makeResponse();
+
+    const validation = {
+      schema: v.object({ name: v.string().required(), age: v.int().min(18) }),
+      validating: ["body"] as const,
+    };
+
+    const result = await validateAll(validation as never, request as never, response as never);
+
+    expect(result).toBeUndefined();
+    expect(request.setValidatedData).toHaveBeenCalledWith({ name: "Hasan", age: 30 });
+    expect(response.failedSchema).not.toHaveBeenCalled();
+  });
+
+  it("calls response.failedSchema when the schema fails", async () => {
+    const request = makeRequest({ name: "Hasan", age: 10 });
+    const response = makeResponse();
+
+    const validation = {
+      schema: v.object({ name: v.string().required(), age: v.int().min(18) }),
+      validating: ["body"] as const,
+    };
+
+    await validateAll(validation as never, request as never, response as never);
+
+    expect(response.failedSchema).toHaveBeenCalledTimes(1);
+    expect(request.setValidatedData).not.toHaveBeenCalled();
+
+    const failedResult = response.failedSchema.mock.calls[0][0] as { isValid: boolean };
+    expect(failedResult.isValid).toBe(false);
+  });
+
+  it("does nothing when no validation is provided", async () => {
+    const request = makeRequest({});
+    const response = makeResponse();
+
+    await expect(
+      validateAll(undefined as never, request as never, response as never),
+    ).resolves.toBeUndefined();
+
+    expect(request.setValidatedData).not.toHaveBeenCalled();
+  });
+});
+
+describe("validateAll - custom validate function", () => {
+  it("sends the failure with the configured status (default 400) when validate fails (C1:B13)", async () => {
+    const request = makeRequest({});
+    const response = makeResponse();
+
+    response.statusCode = 422;
+
+    const failure = { message: "custom failure" };
+
+    const validation = {
+      validate: vi.fn(async () => failure),
+    };
+
+    const result = await validateAll(validation as never, request as never, response as never);
+
+    expect(response.send).toHaveBeenCalledWith(failure, 400);
+    expect(result).toEqual({ sent: failure, status: 400 });
+  });
+
+  it("passes through when the custom validate returns nothing", async () => {
+    const request = makeRequest({});
+    const response = makeResponse();
+
+    const validation = {
+      validate: vi.fn(async () => undefined),
+    };
+
+    const result = await validateAll(validation as never, request as never, response as never);
+
+    expect(result).toBeUndefined();
+    expect(validation.validate).toHaveBeenCalledWith({ request, response });
+  });
+});

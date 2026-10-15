@@ -1,0 +1,308 @@
+---
+name: configure-app
+description: 'Configure a Warlock app — the two layers (`warlock.config.ts` for framework-level wiring, `src/config/*.ts` for subsystems), `.env` + `env()`, the `config()` getter for runtime reads, and `app.publicUrl`/`PUBLIC_APP_URL` (the app''s public origin). Triggers: `defineConfig`, `config.get`, `config.key`, `env`, `ConfigRegistry`, `HttpConfigurations`, `AppConfigurations`, `publicUrl`, `PUBLIC_APP_URL`, `getPublicUrl`; "add a new config file", "warlock.config.ts vs src/config", "read env values", "runtime config lookup", "app public origin/URL"; typical import `import { defineConfig, config, env } from "@warlock.js/core"`. Skip: cache driver registration — the `cache-basics` topic of the `warlock-js-cache` skill; mail config — the `send-mail` topic; storage config — the `store-file` topic; sitemap refusal on a missing origin — the `generate-sitemap` topic of the `warlock-js-web` skill; competing libs `dotenv` direct, `convict`, `node-config`.'
+---
+
+# Warlock — configure the app
+
+Two config layers, one source of env, one read API. Get those four mental model bits straight and the rest is filing.
+
+## The shape
+
+**Layer 1 — framework wiring.** One file at the project root: `warlock.config.ts`. Exports a `defineConfig({...})` call. Governs the bootstrap/server/build/devServer/cli/database hooks.
+
+**Layer 2 — subsystem config.** One file per subsystem in `src/config/<name>.ts`. Each file `export default` a typed config object. Auto-loaded; registered under the file's basename (`http.ts` → `config.get("http")`).
+
+```ts title="warlock.config.ts"
+import { authMigrations, registerAuthCleanupCommand } from "@warlock.js/auth";
+import { defineConfig } from "@warlock.js/core";
+
+export default defineConfig({
+  devServer: {
+    healthCheckers: false,
+    generateTypings: false,
+  },
+  cli: {
+    commands: [registerAuthCleanupCommand()],
+  },
+  build: {
+    minify: true,
+  },
+  database: {
+    migrations: authMigrations,
+  },
+});
+```
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+import { Application, env } from "@warlock.js/core";
+
+const httpConfigurations: HttpConfigurations = {
+  port: env("HTTP_PORT", 3000),
+  host: env("HTTP_HOST", "localhost"),
+  log: true,
+  fileUploadLimit: 12 * 1024 * 1024 * 1024,
+  rateLimit: {
+    max: 260,
+    duration: 60 * 1000,
+  },
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  },
+  cookies: {
+    secret: env("COOKIE_SECRET", "super-secret-key-change-me"),
+    options: {
+      httpOnly: true,
+      secure: Application.isProduction,
+      path: "/",
+    },
+  },
+  csp: {
+    enabled: true,
+    directives: {
+      "img-src": ["'self'", "data:", "https://cdn.example.com"],
+    },
+  },
+};
+
+export default httpConfigurations;
+```
+
+### `csp` — Content-Security-Policy (5.12.0)
+
+Opt-in (`enabled: true`) `Content-Security-Policy` header, built per-request
+from a documented default policy plus your `directives`, with the
+framework's own per-request nonce always added to `script-src`:
+
+```
+default-src 'self'; script-src 'self' 'nonce-<request nonce>'; style-src 'self';
+img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'
+```
+
+A directive you name under `directives` **replaces** the default list for
+that directive (never merged element-wise) — declare the full value list you
+want. Set `reportOnly: true` to emit `Content-Security-Policy-Report-Only`
+instead while you observe violations without blocking anything. Absent or
+`enabled: false` (the default) emits no header at all — no behaviour change
+for apps that don't opt in.
+
+A malformed directive value (containing `;`, or with an unbalanced `'`
+count) throws `InvalidCspDirectiveError` at boot, not silently — fix the
+value in `src/config/http.ts` rather than expecting the framework to repair
+it. See the `send-response` topic for how the
+header lands on the response, and `@warlock.js/web`'s docs for how the
+same nonce reaches the page's `<script>` tags.
+
+## Which layer holds what
+
+| Setting                                                | Layer                          |
+| ------------------------------------------------------ | ------------------------------ |
+| Build/bundler options (minify, sourcemap, outFile)     | `warlock.config.ts > build`    |
+| Dev server (HMR scope, health checkers, typings)       | `warlock.config.ts > devServer`|
+| Package migrations (external `@warlock.js/*` packages) | `warlock.config.ts > database` |
+| CLI commands (registered via `warlock <cmd>`)          | `warlock.config.ts > cli`      |
+| HTTP server tuning per env (port, host, retry)         | `warlock.config.ts > server`   |
+| HTTP runtime (CORS, cookies, rate limits, upload size) | `src/config/http.ts`           |
+| App identity (name, baseUrl, publicUrl, timezone, locales) | `src/config/app.ts`        |
+| Subsystem configs (auth, mail, storage, cache, ai, …)  | `src/config/<name>.ts`         |
+
+Heuristic: if the setting changes how the framework **boots, builds, or scaffolds**, it goes in `warlock.config.ts`. If it changes how a **subsystem behaves at runtime**, it goes in `src/config/`.
+
+## `.env` and `env()`
+
+`env(key, default?)` reads from `process.env` and **auto-coerces** known shapes:
+
+- `"true"` / `"false"` → `boolean`
+- Numeric strings → `number`
+- Falls back to the `default` argument when unset
+
+```ts
+import { env } from "@warlock.js/core";
+
+env("HTTP_PORT", 3000);             // number
+env("CACHE_LOGGING", false);        // boolean
+env("BASE_URL", "http://localhost:3000"); // string
+env("REDIS_URL");                   // undefined if unset
+```
+
+`env` is re-exported from `@warlock.js/core` (sourced from `@mongez/dotenv`). Use this — not `process.env.X` — so callers consistently get coerced values.
+
+`.env.local` overrides `.env`. Project ships a `.env.example` listing the keys.
+
+## Reading config at runtime — `config()`
+
+`config` has two methods. Both accept a default:
+
+```ts
+import { config } from "@warlock.js/core";
+
+// Whole group — typed by ConfigRegistry augmentation
+const http = config.get("http");
+const httpPort = http.port;
+
+// Dot-notation key
+const port = config.key<number>("http.port", 3000);
+const baseUrl = config.key("app.baseUrl");
+```
+
+Use `config.get("name")` when you need the whole subsystem object; `config.key("a.b.c")` for a single value.
+
+The `ConfigRegistry` interface is augmented by generated typings — once you add `src/config/foo.ts` and rerun typings, `config.get("foo")` autocompletes. Until then, pass an explicit generic.
+
+## Anatomy of a `src/config/<name>.ts`
+
+1. Import the typed shape (`HttpConfigurations`, `AppConfigurations`, `CacheConfigurations<DriverNames>`, `MailConfigurations`, `StorageConfigurations`, …) from `@warlock.js/core` (or `@warlock.js/cache` for cache).
+2. Build the object, typed as that shape — TS will surface missing keys.
+3. Pull values from `env(...)` where they belong in `.env`. Hard-code immutable choices.
+4. `export default` the object.
+
+That's the contract. Filename → config key. No registration, no manifest, no side effects.
+
+## Special handlers
+
+Some subsystems need to do extra work when their config loads (e.g. set the active locale, register a driver). Those have a special handler attached internally — for the most part you don't see them. The takeaway: changing a config file at dev time fires the handler again automatically.
+
+## The `config/ai.ts` eject + auto-import block
+
+`warlock add ai` ejects `src/config/ai.ts` — a declarative `Partial<AIConfig>` default export applied on boot by the `ai` connector (`ai.config(...)`), the same special-handler pattern as above. Two things make it unusual:
+
+1. **An auto-managed import block at the top.** The ejected file opens with a marker pair:
+
+   ```ts title="src/config/ai.ts"
+   import type { AIConfig } from "@warlock.js/ai";
+
+   // >>> warlock:ai-packages (auto-managed) >>>
+   // <<< warlock:ai-packages <<<
+
+   const ai: Partial<AIConfig> = {
+     // defaultStore, panoptic, …
+   };
+
+   export default ai;
+   ```
+
+2. **Satellite features link side-effect imports into that block.** `warlock add ai-tools | ai-panoptic | ai-workspace` inserts e.g. `import "@warlock.js/ai-workspace";` right after the marker (idempotent — re-running is a no-op). Those side-effect imports register the satellites' surface on the `ai` object (`ai.tools` / `ai.mcp`, `ai.workspace`, panoptic's wiring) **before** the connector applies the config, so a single `ai.config(...)` call sees the full augmented surface. Keep the marker block and don't hand-reorder it.
+
+The five provider features (`ai-openai`, `ai-google`, `ai-anthropic`, `ai-bedrock`, `ai-ollama`) only add their package — they don't touch `config/ai.ts`; you wire a provider's model in your agent code.
+
+## Multi-file or conditional config
+
+A config file is just a TS module. Branch on `env(...)` if production should differ from development:
+
+```ts title="src/config/storage.ts"
+import {
+  env,
+  type StorageConfigurations,
+  storageConfigurations,
+  storagePath,
+} from "@warlock.js/core";
+
+const storageOptions: StorageConfigurations = {
+  default: env("STORAGE_DRIVER", "local"),
+  drivers: {
+    local: storageConfigurations.local({
+      root: storagePath(),
+      urlPrefix: "/uploads",
+    }),
+    r2: storageConfigurations.r2({
+      bucket: env("R2_BUCKET"),
+      endpoint: env("R2_ENDPOINT"),
+      accessKeyId: env("R2_ACCESS_KEY_ID"),
+      secretAccessKey: env("R2_SECRET_ACCESS_KEY"),
+      accountId: env("R2_ACCOUNT_ID"),
+      region: env("R2_REGION", "auto"),
+      publicDomain: env("R2_BASE_URL"),
+    }),
+  },
+};
+
+export default storageOptions;
+```
+
+Same shape — TS validates the union; runtime picks the `default` key.
+
+## Multi-server settings (5.20.0)
+
+- `http.rateLimit` — `@fastify/rate-limit` options (`redis`, `nameSpace`, ...); `enabled: false` disables.
+- `socket.adapter` — adapter factory for cross-server broadcast.
+- `cache.silenceSingleServerWarning`, `storage.silenceSingleServerWarning`, `socket.silenceSingleServerWarning` — silence the production warnings for in-memory cache, local storage, and adapter-less sockets.
+
+`http.modelValidationErrorStatus` sets the status for a Cascade model-write validation failure (a model failing its own schema on save). It defaults to `500` with an opaque body, because request input is already validated with a `422` before the model is touched. Set a `4xx` (e.g. `422`) to treat it as a client error instead; the response then carries `{ errors }`.
+
+## Per-env knobs
+
+For one-off switches gated on environment, the canonical pattern is `Application.isProduction` (also `isDevelopment`, `isTest`):
+
+```ts
+import { Application } from "@warlock.js/core";
+
+const config = {
+  cookies: {
+    secure: Application.isProduction,
+  },
+};
+```
+
+Avoid scattering `process.env.NODE_ENV === "production"` checks — they don't get the same default-handling.
+
+### `app.publicUrl` — the app's public origin (5.15.0)
+
+```ts title="src/config/app.ts"
+import type { AppConfigurations } from "@warlock.js/core";
+
+const appConfigurations: AppConfigurations = {
+  appName: "My App",
+  publicUrl: "https://example.com",
+};
+
+export default appConfigurations;
+```
+
+The one absolute-URL source every consumer that needs one — the sitemap
+route, canonical links, OG tags, absolute URLs in mail — reads instead of
+keeping its own copy. Optional in general (most apps have no consumer that
+needs it yet); read it with `getPublicUrl()`, which returns `app.publicUrl`,
+falling back to the `PUBLIC_APP_URL` env var, or `undefined` when neither is
+set.
+
+`getPublicUrl()` never throws — it is a consumer's job to fail loudly when it
+requires the value. `@warlock.js/web`'s sitemap is the first such consumer:
+with `web.sitemap.enabled: true` and no `app.publicUrl`/`PUBLIC_APP_URL` set,
+generation refuses (`MissingPublicUrlError`, naming both) rather than falling
+back to a request-derived host — a sitemap pointing at the wrong host is
+worse than none. See the `generate-sitemap` topic of the `warlock-js-web` skill.
+
+## Common patterns
+
+### Adding a new subsystem
+
+1. Create `src/config/<name>.ts` exporting a default object.
+2. (Optional) Augment `ConfigRegistry` in a `.d.ts` if you want `config.get("<name>")` to autocomplete.
+3. Read it where needed: `config.get("<name>")` or `config.key("<name>.field")`.
+
+That's the whole flow. No barrel, no register call.
+
+### Per-tenant config
+
+For multi-tenancy, don't put per-tenant values in `src/config/`. Resolve at runtime from the tenant context and pass into the subsystem's per-call options (e.g. `Mail.config(tenant.mailSettings)`).
+
+### Package config
+
+Internal `@warlock.js/*` packages read from `config.get("<name>")` the same way app code does. When wiring a package config (e.g. `src/config/cache.ts`), the package surface (`cache.init()`) reads the registered values on boot.
+
+## Gotchas
+
+- **One `default` export per config file.** Anything else won't be picked up. A named export is invisible to the loader.
+- **`env(key)` returns the env value coerced, not the literal string.** `env("HTTP_LOG")` returns `true`/`false`, not `"true"`. Type the default to match.
+- **Don't mutate `config` at runtime.** It's read-only by convention. For dynamic overrides, fold into the call-site options (e.g. `cache.set(key, val, { driver: "redis" })`).
+- **`Application.isProduction` is preferred over `process.env.NODE_ENV` checks** in config files — same source, but it survives `setEnvironment(...)` and reads consistently.
+- **`warlock.config.ts` is the boot config; `src/config/` is the runtime config.** Putting runtime tuning into `warlock.config.ts` doesn't crash but won't be visible via `config.get(...)`.
+
+## See also
+
+- The `warlock-conventions` topic — module layout, canonical imports, framework-wide invariants.
+- The `pick-cache-driver` topic of the `warlock-js-cache` skill — picking and registering a cache driver in `src/config/cache.ts`.
+- The `send-mail` topic — the `src/config/mail.ts` shape.
+- The `store-file` topic — the `src/config/storage.ts` shape.

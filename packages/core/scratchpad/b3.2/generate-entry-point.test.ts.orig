@@ -1,0 +1,217 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+/**
+ * D7b — the generated production entry (`.warlock/production/app.ts`) must
+ * emit `await Application.runStartupValidators();` between the app-code
+ * imports and the late-phase connector start, so a rejecting validator
+ * aborts boot before the http connector binds a port. Asserted on the
+ * generated TEXT's shape (exact statement + ordering), not a keyword search.
+ */
+
+const putFileAsync = vi.hoisted(() =>
+  vi.fn(async (_filePath: string, _content: string) => undefined),
+);
+
+vi.mock("@warlock.js/fs", () => ({
+  ensureDirectoryAsync: vi.fn(async () => undefined),
+  fileExistsAsync: vi.fn(async () => false),
+  getFileAsync: vi.fn(async () => ""),
+  getJsonFileAsync: vi.fn(async () => ({})),
+  putFileAsync,
+  removeDirectoryAsync: vi.fn(async () => undefined),
+}));
+
+const { ProductionBuilder } = await import("../../../src/production/production-builder");
+
+/** `generateEntryPoint` is private; reach it the same way the class itself
+ * reaches its own private fields — through an instance cast. */
+type BuilderInternals = {
+  generatedFiles: { locales: boolean; events: boolean; main: boolean; routes: boolean };
+  generateEntryPoint(): Promise<void>;
+};
+
+function generatedEntryContent(
+  generatedFiles: BuilderInternals["generatedFiles"],
+): Promise<string> {
+  const builder = new ProductionBuilder() as unknown as BuilderInternals;
+  builder.generatedFiles = generatedFiles;
+
+  return builder.generateEntryPoint().then(() => {
+    const call = putFileAsync.mock.calls.find(([path]) => path.endsWith("app.ts"));
+    return call?.[1] as string;
+  });
+}
+
+describe("ProductionBuilder.generateEntryPoint — D7 boot-order wiring", () => {
+  beforeEach(() => {
+    putFileAsync.mockClear();
+  });
+
+  it("emits the validators call between the app-code imports and the late-phase connector start", async () => {
+    const content = await generatedEntryContent({
+      locales: true,
+      events: true,
+      main: true,
+      routes: true,
+    });
+
+    const lastAppImportIndex = content.indexOf('await import("./routes");');
+    const validatorsIndex = content.indexOf("await Application.runStartupValidators();");
+    const latePhaseIndex = content.indexOf(
+      "await connectorsManager.startPhase(ConnectorLifecyclePhase.Late);",
+    );
+
+    expect(lastAppImportIndex).toBeGreaterThan(-1);
+    expect(validatorsIndex).toBeGreaterThan(-1);
+    expect(latePhaseIndex).toBeGreaterThan(-1);
+
+    expect(validatorsIndex).toBeGreaterThan(lastAppImportIndex);
+    expect(latePhaseIndex).toBeGreaterThan(validatorsIndex);
+  });
+
+  it("still emits the validators call before the late phase when no app files were generated", async () => {
+    const content = await generatedEntryContent({
+      locales: false,
+      events: false,
+      main: false,
+      routes: false,
+    });
+
+    const earlyPhaseIndex = content.indexOf(
+      "await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);",
+    );
+    const validatorsIndex = content.indexOf("await Application.runStartupValidators();");
+    const latePhaseIndex = content.indexOf(
+      "await connectorsManager.startPhase(ConnectorLifecyclePhase.Late);",
+    );
+
+    expect(earlyPhaseIndex).toBeGreaterThan(-1);
+    expect(validatorsIndex).toBeGreaterThan(earlyPhaseIndex);
+    expect(latePhaseIndex).toBeGreaterThan(validatorsIndex);
+  });
+
+  it("does not introduce a new import — Application is already imported for early-phase startup", async () => {
+    const content = await generatedEntryContent({
+      locales: false,
+      events: false,
+      main: false,
+      routes: false,
+    });
+
+    const importLines = content
+      .split("\n")
+      .filter((line) => line.trimStart().startsWith("import "));
+
+    expect(importLines).toEqual([
+      'import "./bootstrap";',
+      'import "./config-loader";',
+      'import { registerConfiguredConnectors } from "@warlock.js/core";',
+      'import warlockConfig from "../../warlock.config";',
+      'import { Application, connectorsManager, ConnectorLifecyclePhase } from "@warlock.js/core";',
+    ]);
+  });
+});
+
+/**
+ * The entry must register the connectors declared in `warlock.config` before
+ * any phase starts, so the bundle boots exactly the connectors this build
+ * drained contributions from.
+ *
+ * The array is BAKED IN: the entry imports the app's `warlock.config`
+ * statically — so esbuild bundles it — and passes `connectors` as an argument.
+ * An artifact has no config file beside it to read, so a registration that
+ * relied on a loaded config manager would register nothing and say nothing.
+ */
+const REGISTRATION_CALL = "registerConfiguredConnectors(warlockConfig.connectors ?? []);";
+
+describe("ProductionBuilder.generateEntryPoint — config-declared connector registration", () => {
+  beforeEach(() => {
+    putFileAsync.mockClear();
+  });
+
+  it("registers config connectors after the config loader and before the early phase", async () => {
+    const content = await generatedEntryContent({
+      locales: true,
+      events: true,
+      main: true,
+      routes: true,
+    });
+
+    const configLoaderIndex = content.indexOf('import "./config-loader";');
+    const registrationImportIndex = content.indexOf(
+      'import { registerConfiguredConnectors } from "@warlock.js/core";',
+    );
+    const configImportIndex = content.indexOf('import warlockConfig from "../../warlock.config";');
+    const registrationCallIndex = content.indexOf(REGISTRATION_CALL);
+    const earlyPhaseIndex = content.indexOf(
+      "await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);",
+    );
+
+    expect(configLoaderIndex).toBeGreaterThan(-1);
+    expect(registrationImportIndex).toBeGreaterThan(configLoaderIndex);
+    expect(configImportIndex).toBeGreaterThan(registrationImportIndex);
+    expect(registrationCallIndex).toBeGreaterThan(configImportIndex);
+    expect(earlyPhaseIndex).toBeGreaterThan(registrationCallIndex);
+  });
+
+  it("imports the app's warlock.config from the app root, two levels above the production dir", async () => {
+    const content = await generatedEntryContent({
+      locales: false,
+      events: false,
+      main: false,
+      routes: false,
+    });
+
+    // Same `../../` hop the generated `../../src/app/…` imports use, so the
+    // bundler resolves it from `.warlock/production/app.ts` to the config
+    // sitting beside `package.json`. A `./warlock.config` here would resolve
+    // inside the production dir and fail the build at bundle time.
+    expect(content).toContain('import warlockConfig from "../../warlock.config";');
+  });
+
+  it("passes the config array explicitly instead of leaving the callee to find one", async () => {
+    const content = await generatedEntryContent({
+      locales: false,
+      events: false,
+      main: false,
+      routes: false,
+    });
+
+    expect(content).toContain(REGISTRATION_CALL);
+    // The no-argument form is what silently registered nothing in an artifact.
+    expect(content).not.toContain("registerConfiguredConnectors();");
+  });
+
+  it("tolerates a config with no connectors key by emitting a `?? []` fallback", async () => {
+    const content = await generatedEntryContent({
+      locales: false,
+      events: false,
+      main: false,
+      routes: false,
+    });
+
+    // A warlock.config that never declares `connectors` makes the property
+    // `undefined` at runtime; the emitted fallback is what keeps that a
+    // zero-connector boot rather than a TypeError on the first line of the app.
+    expect(content).toContain("warlockConfig.connectors ?? []");
+
+    const registrationLine = content
+      .split("\n")
+      .find((line) => line.startsWith("registerConfiguredConnectors("));
+
+    expect(registrationLine).toBe(REGISTRATION_CALL);
+  });
+
+  it("emits the registration exactly once, app files or not", async () => {
+    const content = await generatedEntryContent({
+      locales: false,
+      events: false,
+      main: false,
+      routes: false,
+    });
+
+    const calls = content.split(REGISTRATION_CALL).length - 1;
+
+    expect(calls).toBe(1);
+  });
+});

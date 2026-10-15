@@ -1,0 +1,400 @@
+---
+name: define-resource
+description: 'Map model fields to wire-shape via `defineResource()` or `Resource` subclasses. Output-only — never put business logic, hydration, or reconciliation in a resource. Also covers the typed output: `ResourceOutput<typeof R>`, `defineResource<Out>()`, `Serialized<T, W>` and `ModelResourceRegistry`. Triggers: `defineResource`, `Resource`, `RegisterResource`, `toJSON`, `ResourceOutput`, `Serialized`, `ModelResourceRegistry`, `"self"`, `"localized"`, `"uploadsUrl"`; "shape an API response", "type a resource''s output", "what does the client receive", "nest related resources", "rename a field on output", "self-referential tree resource"; typical import `import { defineResource } from "@warlock.js/core"`. Skip: localized columns — the `use-localization` topic; URL casting — the `build-url` topic; controller side — the `create-controller` topic; competing libs `@nestjs/swagger` `@ApiProperty`, `class-transformer`, hand-rolled DTO mappers.'
+---
+
+# Warlock — define a resource
+
+A resource is a one-way mapper: model in, wire-shape out. Pick the fields the API exposes, cast each to a wire type, and let the framework normalize the schema at definition time. Resources do not own logic.
+
+## The shape
+
+```ts title="src/app/<module>/resources/<entity>.resource.ts"
+import { defineResource } from "@warlock.js/core";
+
+export const ProductResource = defineResource({
+  schema: {
+    id: "string",
+    name: "string",
+    price: "float",
+    created_at: "date",
+  },
+});
+```
+
+Invoke with a model or plain object and serialize:
+
+```ts
+const json = new ProductResource(product).toJSON();
+```
+
+The class returned by `defineResource` is constructed with `new`. `toJSON()` returns a plain object — pass that into a `response.<helper>()`.
+
+## Two patterns
+
+**`defineResource({...})`** — the project default. Used in every `src/app/*/resources/*.resource.ts`. Returns a `Resource` subclass with `schema` pre-normalized once at definition time.
+
+**`class extends Resource`** — only when you need to override `boot()` or `extend()` with non-trivial logic that doesn't fit the `defineResource` hooks. Decorate with `@RegisterResource()` so the schema gets normalized:
+
+```ts
+import { RegisterResource, Resource } from "@warlock.js/core";
+
+@RegisterResource()
+export class ProductResource extends Resource {
+  public static schema = {
+    id: "string",
+    name: "string",
+    price: "float",
+  };
+}
+```
+
+Default to `defineResource`. Reach for a subclass only when a hook would be uglier as an inline arrow.
+
+## Cast types
+
+| Cast        | Source                  | Output                                        |
+| ----------- | ----------------------- | --------------------------------------------- |
+| `string`    | any                     | `String(value)`                               |
+| `number`    | any                     | `Number(value)` (NaN → `undefined` or `null`) |
+| `int`       | any                     | `parseInt(value)`                             |
+| `float`     | any                     | `parseFloat(value)`                           |
+| `boolean`   | any                     | `Boolean(value)`                              |
+| `date`      | `Date` / ISO string     | configurable object (format/iso/timestamp/humanTime) |
+| `localized` | `LocalizedObject[]`     | string for the request's locale               |
+| `url`       | path                    | absolute URL via `url()` helper               |
+| `uploadsUrl`| path                    | absolute URL under the uploads prefix         |
+| `storageUrl`| path                    | absolute URL via `storage.url(...)`           |
+| `object`    | any object              | passes through if non-empty object            |
+| `array`     | any                     | passes through if array                       |
+
+### Suffix modifiers
+
+- `[]` — declares the field as an array. Each element is cast with the base type. `"string[]"` maps to `string[]`.
+- `?` — nullable. When the source value is `null`/`undefined`, the field is `null` in the output instead of being dropped.
+- Combined: `"string[]?"` — nullable array of strings. Order is fixed: `[]` first, then `?`.
+
+```ts
+schema: {
+  tags: "string[]",          // array of strings
+  bio: "string?",            // nullable string
+  scores: "number[]?",       // nullable array of numbers
+}
+```
+
+Without `?`, undefined/null values are omitted from the output entirely.
+
+## Renaming fields
+
+Use a `[inputKey, castType]` tuple to map an internal field to a different output key:
+
+```ts
+schema: {
+  displayName: ["name", "string"],
+  joinedAt: ["created_at", "date"],
+}
+```
+
+The output object will have `displayName` and `joinedAt`; the model is read by the source key on the left of the tuple.
+
+## Nested resources
+
+Reference another resource constructor directly. Works for single objects and arrays — the field's runtime shape decides:
+
+```ts
+import { defineResource } from "@warlock.js/core";
+import { OrganizationResource } from "app/organizations/resources/organization.resource";
+
+export const UserResource = defineResource({
+  schema: {
+    id: "string",
+    name: "string",
+    organization: OrganizationResource,
+  },
+});
+```
+
+If `user.organization` is a single object, you get a nested object. If it's an array, you get an array of nested objects. The framework branches on `Array.isArray` at transform time.
+
+For cyclic resource graphs (A embeds B embeds A), wrap the cross-reference in `lazy(() => ...)` from `@mongez/reinforcements`. Without it, ESM module-init order can leave one side's binding as `undefined` when the other side's schema captures it — the first `.toJSON()` then explodes.
+
+```ts title="src/app/books/resources/book.resource.ts"
+import { lazy } from "@mongez/reinforcements";
+import { defineResource } from "@warlock.js/core";
+import { AuthorResource } from "app/authors/resources/author.resource";
+
+export const BookResource = defineResource({
+  schema: {
+    id: "string",
+    title: "string",
+    author: lazy(() => AuthorResource),
+  },
+});
+```
+
+`lazy()` captures the binding without reading it; both modules finish evaluating, then the binding is read at serialize-time when both resources are fully defined. Reference implementation in the project: `src/app/examples/resources-circular/` — a working `AuthorResource` ↔ `BookResource` smoke demo with single embed, array embed, and back-reference cases.
+
+## Self-references
+
+A node that embeds itself uses the `"self"` / `"self[]"` markers:
+
+```ts
+schema: {
+  id: "string",
+  name: "string",
+  parent: "self",       // single self-reference
+  children: "self[]",   // array of self-references
+}
+```
+
+The framework tracks visited identities and caps recursion at depth 10 so cyclic data (`A.parent → B`, `B.parent → A`) doesn't infinite-loop.
+
+## Localized fields
+
+Models that store i18n as an array of `{ localeCode, value }` use the `localized` cast. The request's locale (from `useRequestStore().request.locale`) picks the right entry:
+
+```ts
+schema: {
+  title: "localized",
+}
+```
+
+If no locale is set on the request, the first entry wins as a fallback.
+
+## Date output options
+
+Default date cast emits an object — `{ format, timestamp, humanTime, iso }`. To shape output globally use the static `parsedSchema` field after defining, or override via a subclass. For most APIs, the default is fine.
+
+## Computed fields (resolver functions)
+
+Schema entries can be functions for fields the model doesn't store directly. The function receives `(value, resource)` bound to the resource instance:
+
+```ts
+schema: {
+  id: "string",
+  fullName: function (_value, resource) {
+    return `${resource.get("first_name")} ${resource.get("last_name")}`;
+  },
+}
+```
+
+Keep resolvers trivial. Anything beyond string-glue belongs in a service or a model accessor — the resource is the wrong place for logic.
+
+## Hooks (defineResource)
+
+`defineResource` accepts three hooks. Use sparingly:
+
+```ts
+export const ChatResource = defineResource({
+  schema: { id: "string", title: "string" },
+  boot(resource) {
+    // before transform
+  },
+  extend(resource) {
+    // after transform — mutate resource.data
+  },
+  transform(data, resource) {
+    // final pass — mutate `data` in place; the return value is ignored
+    data.slug = String(data.title).toLowerCase();
+
+    return data;
+  },
+});
+```
+
+`transform` runs inside `extend()` as `transform.call(this, this.data, this)` — the framework discards whatever it returns, so you must mutate the passed `data` object directly. Returning a fresh object silently drops your changes.
+
+Hooks are an escape hatch. If you find yourself running queries or reconciling state inside a hook, stop — that work belongs in a service or in a `prepare-*` step before the resource is constructed.
+
+## Typed output
+
+`defineResource()` reads the literal cast strings in `schema` and types `toJSON()` with them. Nothing is annotated by hand.
+
+```ts title="src/app/users/resources/user.resource.ts"
+import { defineResource, type ResourceOutput } from "@warlock.js/core";
+
+export const UserResource = defineResource({
+  schema: {
+    id: "number",
+    name: "string?",
+    tags: "string[]",
+    createdAt: "date",
+  },
+});
+
+export type UserJson = ResourceOutput<typeof UserResource>;
+// { id: number; name: string | null; tags: string[]; createdAt: { iso: string; format: string; timestamp: number; humanTime: string } }
+
+const json = new UserResource(user).toJSON(); // typed as UserJson
+```
+
+`ResourceOutput<R>` takes the resource class or an instance (`InstanceType<typeof UserResource>`).
+
+How each schema entry is typed:
+
+| Schema entry                                                      | Output type                                                           |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `"string"`, `"localized"`, `"url"`, `"uploadsUrl"`, `"storageUrl"` | `string`                                                              |
+| `"number"`, `"float"`, `"int"`                                    | `number`                                                              |
+| `"boolean"`                                                       | `boolean`                                                             |
+| `"date"`                                                          | `{ iso: string; format: string; timestamp: number; humanTime: string }` (the default date output) |
+| `"object"` / `"array"`                                            | `Record<string, unknown>` / `unknown[]`                               |
+| `"x[]"`                                                           | array of the base type                                                |
+| `"x?"`                                                            | `T \| null`; the key is always present, never optional               |
+| a nested resource, `lazy(() => R)`                                | that resource's output (one object, even if the model holds an array) |
+| `"self"` / `"self[]"`                                             | this resource's own output / an array of it                           |
+| `["inputKey", "cast"]` tuple                                      | the cast's type                                                       |
+| a resolver function                                               | its return type (an `any` return becomes `unknown`)                   |
+| a field builder (`this.date()...`, `new ResourceFieldBuilder(...)`) | `unknown`                                                             |
+
+The type reflects the schema only, not the data: mark a field `?` when the model may not have a value. `boot`, `extend`, `transform` and builders can change the real shape; when they do, state the output with a type argument, which replaces the inferred type:
+
+```ts title="src/app/products/resources/product.resource.ts"
+import { defineResource } from "@warlock.js/core";
+
+type ProductJson = { id: number; title: string; priceLabel: string };
+
+export const ProductResource = defineResource<ProductJson>({
+  schema: { id: "number", title: "string", price: "number" },
+  transform: (data) => {
+    data.priceLabel = `$${data.price}`;
+    delete data.price;
+
+    return data;
+  },
+});
+```
+
+`transform` still mutates `data` in place (see Hooks); the returned value is ignored at runtime, but the option type requires a return. `ProductJson` is what consumers of `ResourceOutput<typeof ProductResource>` see.
+
+### `Serialized<T, W>` — what the client receives
+
+`Serialized<T, W>` is the type of a value after Warlock serializes it. `W` is the wire: `"json"` (default) for API responses, `"devalue"` for web page loader data. It is exported from `@warlock.js/core`.
+
+```ts
+import type { Serialized } from "@warlock.js/core";
+
+type Payload = Serialized<{ createdAt: Date; note?: string }>;
+// { createdAt: string; note?: string }
+```
+
+Rules, in the order the runtime applies them:
+
+- Primitives, `Buffer` and `Uint8Array` pass through. `any` and `unknown` stay as they are.
+- On `"devalue"`, `Date`, `RegExp`, `URL`, `Map` and `Set` stay native. On `"json"`, a `Map` becomes a record and a `Set` an array.
+- A cascade model becomes its resource's output (next section); with no registry entry it becomes its serialized `data` type.
+- Anything with `toJSON()` becomes the (awaited) serialized result, which is how a `Date` becomes a `string` on `"json"`.
+- Arrays map item by item. Functions are dropped from objects.
+- On `"json"`, a key whose value can be `undefined` becomes optional, because `JSON.stringify` omits it.
+- A class with private or protected members and no `toJSON()` maps to its public data on `"json"` and to `never` on `"devalue"` (devalue throws on it at render). `Error` is `{}` on `"json"`.
+- Nesting is walked to a fixed depth (8), then the type is `unknown`.
+
+### `ModelResourceRegistry` — map a model to its resource
+
+`Model.resource` is typed loosely, so a model type cannot reveal its resource by itself. You don't write the mapping: `warlock generate.typings` and `warlock dev` generate `.warlock/typings/model-resources.d.ts` from every model that declares `static resource = SomeResource`:
+
+```ts title=".warlock/typings/model-resources.d.ts (generated)"
+declare module "@warlock.js/core" {
+  interface ModelResourceRegistry {
+    "User": { model: import("../../src/app/users/models/user.model").User; resource: typeof import("../../src/app/users/resources/user.resource").UserResource };
+  }
+}
+```
+
+`Serialized<User>` then resolves to `ResourceOutput<typeof UserResource>` instead of the raw model data (so hidden columns such as a password never appear in the type). The generator reads the model file statically and resolves the identifier through its imports (named, aliased or default, or a resource declared in the same file). It skips anything it cannot resolve statically (a computed value, `lazy(...)`, a namespace import): that model keeps its raw data type. Your `tsconfig.json` must include `.warlock/typings/*.d.ts` (new apps do). `@warlock.js/web` uses the same registry to type page loader data.
+
+## Attaching to a model
+
+Models reference their default resource via a static `resource` field. Repositories and other helpers can then serialize without importing the resource:
+
+```ts
+// src/app/products/models/product/product.model.ts
+import { Model, RegisterModel } from "@warlock.js/cascade";
+import { ProductResource } from "app/products/resources/product.resource";
+
+@RegisterModel()
+export class Product extends Model {
+  public static resource = ProductResource;
+}
+```
+
+This is convention, not a framework requirement. Controllers/services that import the resource explicitly work the same way.
+
+### `id` and Mongo `_id`
+
+The output `id` falls back to `_id` when the record has no `id`; an explicit `id` always wins. If a collection uses native ObjectIds, set `public primaryKey = "_id"` on the model so `Model.find(hex)` resolves the `id` your resource emits.
+
+## Output-only rule
+
+Resources map fields. They do not:
+
+- run database queries
+- hydrate compact stored shapes into wire shapes
+- reconcile state across records
+- emit events
+- call services
+
+If a wire field requires hydration (e.g. compact stored blocks → full wire blocks), run a `hydrate-*.service.ts` against the model before the resource is constructed. The resource stays a pure mapper.
+
+This is the single most-violated rule in the project. Don't push work into resource hooks because it's convenient — it makes resources untestable and couples wire output to side effects.
+
+## Common patterns
+
+### Flat shape
+
+```ts
+export const FaqResource = defineResource({
+  schema: {
+    id: "string",
+    question: "object",
+    answer: "object",
+    status: "string",
+    created_at: "date",
+  },
+});
+```
+
+### Belongs-to + array relations
+
+```ts
+export const ChatMessageResource = defineResource({
+  schema: {
+    id: "string",
+    content: "string",
+    user: UserResource,
+    attachments: UploadResource,
+    chat: ChatResource,
+    created_at: "date",
+  },
+});
+```
+
+`attachments` is an array on the model — the framework auto-maps each element through `UploadResource`.
+
+### Self-referential tree
+
+```ts
+export const CommentResource = defineResource({
+  schema: {
+    id: "string",
+    body: "string",
+    parent: "self",
+    replies: "self[]",
+  },
+});
+```
+
+## Gotchas
+
+- **Don't put logic in resources.** Reconciliation/hydration belongs in services. Resources break when they grow logic.
+- **`defineResource` returns a class, not a function.** Use `new XResource(model).toJSON()`. Forgetting `new` returns `undefined`.
+- **Nested resource value `undefined`/`null` is dropped** unless the parent field uses `?` suffix on a cast type. Nested resource constructors don't accept `?` directly — return `null` from a resolver if you need an explicit null.
+- **Tuple form `[inputKey, castType]` only accepts string cast types**, not nested resource constructors. For relations, key the output by the same field name as the model.
+- **`localized` reads `useRequestStore().request.locale`**. Outside a request context (jobs, CLI), the first entry wins as a fallback.
+- **Schema normalization is one-shot.** Mutating `static schema` after definition doesn't propagate. Re-run `Resource.normalizeSchema(...)` if you really need that.
+
+## See also
+
+- The `warlock-conventions` topic — the output-only rule and where logic actually lives.
+- The `build-restful` topic — wiring a resource into a CRUD pipeline.
+- The `create-controller` topic — calling `new XResource(record).toJSON()` from a controller.

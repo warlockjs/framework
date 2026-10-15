@@ -1,0 +1,295 @@
+import { colors } from "@mongez/copper";
+import events from "@mongez/events";
+import { fileExistsAsync, unlinkAsync } from "@warlock.js/fs";
+import { Application } from "../application";
+import { connectorsManager } from "../connectors/connectors-manager";
+import { ConnectorLifecyclePhase } from "../connectors/types";
+import { warlockConfigManager } from "../warlock-config";
+import { registerDevelopmentOpenApiProvider } from "../openapi/development-openapi-provider";
+import { BootPreconditionError } from "./boot-precondition-error";
+import { buildDevelopmentOpenApiDocument } from "./build-development-openapi-document";
+import { devLogInfo, devLogSection, devLogWarn, devServeLog } from "./dev-logger";
+import { filesOrchestrator } from "./files-orchestrator";
+import { MANIFEST_PATH } from "./flags";
+import type { IncomingReloadTimings } from "./layer-executor";
+import { LayerExecutor } from "./layer-executor";
+import { printReadyBlock } from "./ready-block";
+import { registerInstalledDevtools } from "./register-installed-devtools";
+import { restartDevServer } from "./restart-dev-server";
+import { collectDevelopmentApiRoutes } from "./collect-development-api-routes";
+import { publishCurrentRouteTypes } from "./route-types-publisher";
+import { devServerShortcuts } from "./shortcuts";
+import type { StartDevServerOptions } from "./start-development-server";
+import { typeGenerator } from "./type-generator";
+
+type Batch = {
+  added: string[];
+  changed: string[];
+  deleted: string[];
+  /** Non-code `watch.include` files that changed; only a restart applies them. */
+  restartTriggers?: string[];
+  timings?: IncomingReloadTimings;
+};
+
+/**
+ * Top-level coordinator for `warlock dev`. Wires the file orchestrator, the
+ * connectors, and the layer executor together, and listens for the watcher's
+ * batched events to drive HMR.
+ */
+export class DevelopmentServer {
+  private layerExecutor?: LayerExecutor;
+  private running = false;
+
+  /** Set once boot begins, so a failed boot still closes connectors that already started. */
+  private connectorsStarted = false;
+  private readonly options: StartDevServerOptions;
+
+  public constructor(options: StartDevServerOptions = {}) {
+    this.options = options;
+    devLogSection("Starting Development Server...");
+  }
+
+  public async start(): Promise<void> {
+    try {
+      this.connectorsStarted = true;
+      const startedAt = performance.now();
+
+      // Devtools reads this through the root barrel, which must not reach dev-server code.
+      registerDevelopmentOpenApiProvider(buildDevelopmentOpenApiDocument);
+
+      // --fresh deletes the manifest so reconciliation re-parses every file
+      // from disk. Transpile caching is owned by the loader hook (in-memory).
+      if (this.options.fresh && (await fileExistsAsync(MANIFEST_PATH))) {
+        await unlinkAsync(MANIFEST_PATH);
+        devServeLog(colors.cyanBright("Cleared manifest (--fresh)"));
+      }
+
+      await filesOrchestrator.init();
+      await filesOrchestrator.initializeAll();
+      await filesOrchestrator.watchFiles();
+
+      filesOrchestrator.specialFilesCollector.collect(filesOrchestrator.getFiles());
+
+      this.setupEventListeners();
+
+      // Decorator-driven registries (models, etc.) must be populated before
+      // routes/services can resolve symbols by name.
+      await this.autoDiscoverFiles();
+
+      await filesOrchestrator.moduleLoader.loadAll();
+
+      // A rejecting validator (Application.onValidateBoot) must abort boot
+      // before late-phase connectors bind a port — this is what makes the
+      // hook actually prevent serving instead of merely being defined.
+      //
+      // Wrapped and re-thrown as a BootPreconditionError: a rejected
+      // validator is, by definition, a precondition whose cause cannot
+      // change because the worker tried again — the supervisor must not
+      // restart into the same rejection. See boot-precondition-error.ts.
+      try {
+        await Application.runStartupValidators();
+      } catch (error) {
+        throw new BootPreconditionError((error as Error).message, { cause: error });
+      }
+
+      // `@warlock.js/devtools` is a dev dependency the config never names;
+      // when installed it joins the late phase here, and only here.
+      await registerInstalledDevtools();
+
+      // Late-phase connectors (http, socket) bind after app code has
+      // registered routes/listeners.
+      await connectorsManager.startPhase(ConnectorLifecyclePhase.Late);
+
+      // Web installs its page table from its late connector. Generate only
+      // after that installation so `href()` and the declaration table agree.
+      await publishCurrentRouteTypes(process.cwd(), await collectDevelopmentApiRoutes());
+
+      this.layerExecutor = new LayerExecutor(
+        filesOrchestrator.getDependencyGraph(),
+        filesOrchestrator.specialFilesCollector,
+        filesOrchestrator.moduleLoader,
+        (absolutePath) => filesOrchestrator.bumpVersion(absolutePath),
+        () => filesOrchestrator.flushVersionBumps(),
+      );
+
+      this.running = true;
+
+      const duration = performance.now() - startedAt;
+
+      // App modules are loaded and both connector phases are active — signal a
+      // complete boot so `Application.onceBooted(...)` listeners fire.
+      Application.markBooted({
+        environment: Application.environment,
+        runtimeStrategy: Application.runtimeStrategy,
+        bootDurationMs: duration,
+      });
+
+      // ONE block, AFTER the boot it summarises, replacing the scattered
+      // "N route(s) registered" / "Server ready at …" / "ready in …" lines that
+      // used to arrive in completion order. Warnings logged during boot sit
+      // above it and stay there — see `ready-block.ts`.
+      printReadyBlock(duration);
+
+      // Tell the supervisor (when there is one) that boot completed, so its
+      // healthy-uptime window counts from here rather than from spawn.
+      process.send?.("warlock:booted");
+
+      // Precedence: explicit CLI option > devServer.* config > default.
+      const devServerConfig = await warlockConfigManager.get("devServer");
+      const generateTypings =
+        this.options.generateTypings ?? devServerConfig?.generateTypings ?? true;
+      const healthCheckers = this.options.healthCheckers ?? devServerConfig?.healthCheckers ?? true;
+
+      if (generateTypings) await typeGenerator.executeGenerateAllCommand();
+
+      if (healthCheckers) {
+        filesOrchestrator.startCheckingHealth(healthCheckers === true ? undefined : healthCheckers);
+      }
+    } catch (error) {
+      devServeLog(colors.redBright(`Failed to start Development Server: ${error}`));
+      await this.shutdown();
+      throw error;
+    }
+  }
+
+  /**
+   * Eagerly import files whose decorators populate global registries so any
+   * symbol-by-name resolution later in boot finds them.
+   */
+  private async autoDiscoverFiles(): Promise<void> {
+    const discoveryTypes = ["model"] as const;
+    for (const file of filesOrchestrator.files.values()) {
+      if (file.type && (discoveryTypes as readonly string[]).includes(file.type)) {
+        await filesOrchestrator.moduleLoader.loadModule(file, file.type);
+      }
+    }
+  }
+
+  /** Tail of the batch-reload chain (see `setupEventListeners`). */
+  private reloadQueue: Promise<void> = Promise.resolve();
+
+  private setupEventListeners(): void {
+    // Reloads run one at a time: a second batch waits for the first to finish
+    // so route re-registration and connector restarts never interleave.
+    events.on("dev-server:batch-complete", (batch: Batch) => {
+      this.reloadQueue = this.reloadQueue
+        .then(() => this.handleBatchComplete(batch))
+        .catch((error) => devServeLog(colors.redBright(`Batch reload failed: ${error}`)));
+    });
+  }
+
+  private async handleBatchComplete(batch: Batch): Promise<void> {
+    if (!this.running || !this.layerExecutor) return;
+
+    // warlock.config.ts holds settings read at boot (CLI commands, build
+    // options, watch patterns, scheduled jobs) and .env feeds every config
+    // that reads it. Neither can be hot-reloaded without leaving running
+    // services configured with stale values, so the only honest response is
+    // a full restart.
+    const restartTrigger = this.findRestartTrigger(batch);
+
+    if (restartTrigger) {
+      // On success this never comes back — the process exits and the
+      // supervisor replaces it. Reaching the next line means the restart was
+      // declined by config or wasn't possible, so we fall through and still
+      // hot-reload whatever ordinary code shared the batch.
+      await this.restartForConfigChange(restartTrigger);
+    }
+
+    // No-op saves (an editor that fsyncs without a content write) are already
+    // filtered upstream by the file hash in FileEventHandler, so batch.changed
+    // only contains genuinely-changed paths by the time it reaches here.
+
+    const total = batch.added.length + batch.changed.length + batch.deleted.length;
+    if (total === 0) return;
+
+    // Boot-time files still ride along in `changed` when a restart was
+    // declined (`restartOnConfigChange: false`) or wasn't possible — they are
+    // never hot-reloaded, so keep them out of the reload set either way.
+    const codeFiles = [...batch.added, ...batch.changed].filter(
+      (p) => !isEnvPath(p) && p !== "warlock.config.ts" && !batch.restartTriggers?.includes(p),
+    );
+
+    try {
+      await this.layerExecutor.executeBatchReload(
+        codeFiles,
+        filesOrchestrator.getFiles(),
+        batch.deleted,
+        batch.changed,
+        batch.timings,
+      );
+
+      // `executeBatchReload` includes route re-imports and affected connector
+      // restarts. Publishing earlier could freeze a partial page/API view.
+      // This also refreshes deletion-only batches after their cleanup/restart.
+      await publishCurrentRouteTypes(process.cwd(), await collectDevelopmentApiRoutes());
+
+      typeGenerator.executeTypingsGenerator([...batch.added, ...batch.changed, ...batch.deleted]);
+
+      filesOrchestrator.checkHealth(batch);
+    } catch (error) {
+      devServeLog(colors.redBright(`Failed to execute batch reload: ${error}`));
+    }
+  }
+
+  /**
+   * The boot-time file in this batch that can only be applied by restarting,
+   * or `undefined` when the batch is ordinary application code.
+   */
+  private findRestartTrigger(batch: Batch): string | undefined {
+    if (batch.changed.includes("warlock.config.ts")) {
+      return "warlock.config.ts";
+    }
+
+    return [...batch.added, ...batch.changed].find(isEnvPath) ?? batch.restartTriggers?.[0];
+  }
+
+  /**
+   * Restart so a changed boot-time file actually takes effect.
+   *
+   * Opt out with `devServer.restartOnConfigChange: false` and the old
+   * behaviour returns: a warning telling you to restart yourself. If the
+   * restart can't be performed at all (no supervisor, a shutdown that threw),
+   * `restartDevServer` reports it and we fall back to the same warning rather
+   * than leaving the server running against config it isn't using.
+   */
+  private async restartForConfigChange(file: string): Promise<void> {
+    const devServerConfig = await warlockConfigManager.get("devServer");
+
+    if (devServerConfig?.restartOnConfigChange === false) {
+      devLogWarn(`${file} changed — restart the dev server to apply.`);
+      return;
+    }
+
+    devLogInfo(`${file} changed — restarting to apply.`);
+
+    const restarted = await restartDevServer(this);
+
+    if (!restarted) {
+      devLogWarn(`${file} changed — restart the dev server to apply.`);
+    }
+  }
+
+  public async shutdown(): Promise<void> {
+    // Always hand the terminal back, even on a repeat/no-op shutdown — a
+    // process that exits while stdin is still in raw mode leaves the user's
+    // shell without line editing or Ctrl+C.
+    devServerShortcuts.release();
+
+    if (!this.running && !this.connectorsStarted) return;
+    devServeLog(colors.redBright("Shutting down Development Server..."));
+    this.running = false;
+    this.connectorsStarted = false;
+    await connectorsManager.shutdown();
+    devServeLog(colors.greenBright("Development Server stopped"));
+  }
+
+  public isRunning(): boolean {
+    return this.running;
+  }
+}
+
+function isEnvPath(path: string): boolean {
+  const basename = path.split("/").pop() ?? path;
+  return basename === ".env" || basename.startsWith(".env.");
+}

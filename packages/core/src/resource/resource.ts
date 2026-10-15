@@ -1,0 +1,560 @@
+import { get, isLazy, set, type GenericObject } from "@mongez/reinforcements";
+import { Model } from "@warlock.js/cascade";
+import { useRequestStore } from "../http/context/request-context";
+import { isNullableResource } from "./nullable-resource";
+import { ResourceFieldBuilder } from "./resource-field-builder";
+import {
+  type ResourceArraySchema,
+  type ResourceFieldConfig,
+  type ResourceOutputValueCastType,
+  type ResourceSchema,
+} from "./types";
+
+/**
+ * Maximum recursion depth for self-referencing fields.
+ * Prevents runaway serialization on deep trees or circular data.
+ */
+const MAX_SELF_DEPTH = 10;
+
+/**
+ * Whether the given schema entry is an `arrayOf` item schema
+ */
+function isArrayOfSchema(value: unknown): value is ResourceArraySchema {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (value as { __type?: unknown }).__type === "arrayOf" &&
+    typeof (value as { schema?: unknown }).schema === "object" &&
+    (value as { schema?: unknown }).schema !== null
+  );
+}
+
+/**
+ * Resource contract
+ */
+export interface ResourceContract<Out = GenericObject> {
+  /**
+   * Resource data
+   */
+  resource: GenericObject;
+
+  /**
+   * Resource final output
+   */
+  data: GenericObject;
+
+  /**
+   * Original data
+   */
+  originalData: GenericObject;
+
+  /**
+   * Convert resource to JSON
+   */
+  toJSON(): Out;
+
+  /**
+   * Transform the given value with given type
+   */
+  transform(value: any, type: ResourceOutputValueCastType, locale?: string): any;
+
+  /**
+   * Get a input value for the given key
+   */
+  get(key: string, defaultValue?: any): any;
+
+  /**
+   * Set the given value for the given field
+   */
+  set(key: string, value: any): ResourceContract;
+
+  /**
+   * Create an array schema for transforming array items
+   */
+  arrayOf(schema: Record<string, ResourceFieldConfig>): ResourceArraySchema;
+
+  /**
+   * Get a string field builder
+   */
+  string(inputKey?: string): ResourceFieldBuilder;
+
+  /**
+   * Get a date field builder
+   */
+  date(inputKey?: string): ResourceFieldBuilder;
+
+  /**
+   * Get a localized field builder
+   */
+  localized(inputKey?: string): ResourceFieldBuilder;
+
+  /**
+   * Get a url field builder
+   */
+  url(inputKey?: string): ResourceFieldBuilder;
+
+  /**
+   * Get a uploadsUrl field builder
+   */
+  uploadsUrl(inputKey?: string): ResourceFieldBuilder;
+
+  /**
+   * Get a number field builder
+   */
+  number(inputKey?: string): ResourceFieldBuilder;
+
+  /**
+   * Get a boolean field builder
+   */
+  boolean(inputKey?: string): ResourceFieldBuilder;
+
+  /**
+   * Get a float field builder
+   */
+  float(inputKey?: string): ResourceFieldBuilder;
+
+  /**
+   * Get a int field builder
+   */
+  int(inputKey?: string): ResourceFieldBuilder;
+}
+
+/**
+ * Resource constructor
+ */
+export interface ResourceConstructor<Out = GenericObject> {
+  new (originalData: GenericObject | Resource | Model): ResourceContract<Out>;
+}
+
+export class Resource implements ResourceContract {
+  /**
+   * Resource data
+   */
+  public resource: GenericObject = {};
+
+  /**
+   * Resource final output
+   */
+  public data: GenericObject = {};
+
+  /**
+   * Tracks visited object identities during self-reference recursion.
+   * Prevents infinite loops on circular data (e.g. A.parent → B, B.parent → A).
+   */
+  protected _selfSeen?: Set<unknown>;
+
+  /**
+   * Raw resource schema — field declarations as written by the developer.
+   * Used by doc generators for introspection.
+   */
+  public static schema: Record<string, ResourceFieldConfig | string> = {};
+
+  /**
+   * Normalized schema — all string cast types and tuples converted to
+   * ResourceFieldBuilder instances at definition time. Used by transformOutput at runtime.
+   */
+  public static parsedSchema: Record<string, ResourceFieldConfig> = {};
+
+  /**
+   * Normalize a raw schema into parsedSchema.
+   * Converts string cast types (including suffixes) and tuples into pre-built builders.
+   * Other entry types (ResourceConstructor, resolver functions, ResourceArraySchema) are kept as-is.
+   */
+  public static normalizeSchema(schema: Record<string, ResourceFieldConfig | string>): Record<string, ResourceFieldConfig> {
+    const parsed: Record<string, ResourceFieldConfig> = {};
+
+    for (const [key, value] of Object.entries(schema)) {
+      if (value === "self" || value === "self[]") {
+        // Keep self-references as-is — resolved lazily in transformValue
+        parsed[key] = value;
+      } else if (isLazy<ResourceConstructor>(value)) {
+        // Keep Lazy<ResourceConstructor> as-is — resolved at transform
+        // time so cyclic resource refs (A embeds B embeds A) compose
+        // without import-graph cycles.
+        parsed[key] = value;
+      } else if (typeof value === "string") {
+        parsed[key] = ResourceFieldBuilder.fromCastType(value);
+      } else if (
+        Array.isArray(value) &&
+        value.length === 2 &&
+        typeof value[0] === "string" &&
+        typeof value[1] === "string"
+      ) {
+        const builder = ResourceFieldBuilder.fromCastType(value[1]);
+        builder.setInputKey(value[0]);
+        parsed[key] = builder;
+      } else if (isArrayOfSchema(value)) {
+        // arrayOf item schemas follow the same rules as the top level: cast
+        // strings and tuples become builders (nested arrayOf recurses).
+        parsed[key] = { ...value, schema: Resource.normalizeSchema(value.schema) };
+      } else {
+        parsed[key] = value;
+      }
+    }
+
+    return parsed;
+  }
+
+  /**
+   * Constructor
+   */
+  public constructor(public originalData: GenericObject | Resource | Model) {
+    if (this.originalData instanceof Model) {
+      this.resource = this.originalData.data;
+    } else if (this.originalData instanceof Resource) {
+      this.resource = this.originalData.data;
+    } else {
+      this.resource = this.originalData;
+    }
+  }
+
+  /**
+   * Convert resource to JSON
+   */
+  public toJSON() {
+    this.boot();
+    this.transformOutput();
+    this.extend();
+
+    return this.data;
+  }
+
+  /**
+   * Boot method
+   * Called before transforming the resource
+   */
+  protected boot() {
+    //
+  }
+
+  /**
+   * Transform resource to output using the pre-normalized parsedSchema.
+   * Builders handle their own array/nullable logic internally.
+   * ResourceConstructor and ResourceArraySchema handle arrays in transformValue.
+   */
+  protected transformOutput() {
+    const localeCode = useRequestStore()?.request?.locale;
+    const parsedSchema = this.resolveParsedSchema();
+    // A model is read through its accessors; anything else through the
+    // constructor's normalized input (a wrapped resource's serialized data).
+    const source = this.originalData instanceof Model ? this.originalData : this.resource;
+
+    for (const [outputKey, outputSettings] of Object.entries(parsedSchema)) {
+      const inputKey = outputSettings instanceof ResourceFieldBuilder
+        ? outputSettings.getInputKey()
+        : undefined;
+      const inputValue = this.resolveSourceValue(source, outputKey, inputKey);
+      const outputValue = this.transformValue(inputValue, outputSettings, localeCode);
+
+      if (outputValue !== undefined) {
+        this.set(outputKey, outputValue);
+      }
+    }
+  }
+
+  /**
+   * Resolve the normalized schema of THIS class.
+   * `@RegisterResource()` is optional: when the class has no own `parsedSchema`
+   * (a static field is inherited from the base as `{}`), normalize its own
+   * static `schema` (or an instance `schema` field) once and cache it on the class.
+   */
+  protected resolveParsedSchema(): Record<string, ResourceFieldConfig> {
+    const ctor = this.constructor as typeof Resource;
+
+    if (Object.hasOwn(ctor, "parsedSchema")) {
+      return ctor.parsedSchema;
+    }
+
+    const instanceSchema = (this as unknown as { schema?: Record<string, ResourceFieldConfig | string> }).schema;
+    const schema = instanceSchema ?? ctor.schema;
+
+    if (!schema || Object.keys(schema).length === 0) {
+      throw new Error(
+        `Resource "${ctor.name}" has no schema. Declare \`static schema = { ... }\` on the class.`,
+      );
+    }
+
+    const parsed = Resource.normalizeSchema(schema);
+
+    // Instance schemas are per-class by convention, so caching on the class is safe
+    ctor.parsedSchema = parsed;
+
+    return parsed;
+  }
+
+  /**
+   * Transform the given value with given type
+   */
+  public transform(value: any, type: ResourceOutputValueCastType, locale?: string) {
+    return new ResourceFieldBuilder(type).transform(value, locale);
+  }
+
+  /**
+   * Transform the given value for the given output setting.
+   * After normalization, string cast types no longer reach here — they are pre-converted to builders.
+   */
+  protected transformValue(value: any, outputSettings: ResourceFieldConfig, locale?: string): any {
+    let outputValue: any;
+
+    if (isLazy<ResourceConstructor>(outputSettings)) {
+      // Resolve the lazy ref now (cyclic resource imports are fully loaded
+      // by serialization time) and recurse — the resolved constructor is
+      // handled by the ResourceConstructor branch below.
+      return this.transformValue(value, outputSettings.resolve(), locale);
+    }
+
+    if (isNullableResource(outputSettings)) {
+      // nullable(Resource) — always present: null for a missing input, the resource output otherwise
+      if (value === null || value === undefined) return null;
+
+      return this.transformValue(value, outputSettings.resource, locale) ?? null;
+    }
+
+    if (Array.isArray(outputSettings) && outputSettings.length === 1) {
+      // [Resource] — a list field. [] stays [], a missing/null input omits the field.
+      if (!Array.isArray(value)) return;
+
+      return value
+        .map((item) => this.transformValue(item, outputSettings[0], locale))
+        .filter((v) => v !== undefined);
+    }
+
+    if (outputSettings === "self" || outputSettings === "self[]") {
+      // Self-reference — resolve using the same resource class with cycle detection
+      outputValue = this.transformSelfReference(value, outputSettings === "self[]");
+    } else if (
+      typeof outputSettings === "function" &&
+      outputSettings.prototype instanceof Resource
+    ) {
+      if (!value) return;
+      // Nested resource — handle both single and array values
+      if (Array.isArray(value)) {
+        // An empty list stays an empty list ([] is the honest output); only a
+        // missing/null input omits the field.
+        outputValue = value
+          .map((item) => new (outputSettings as typeof Resource)(item).toJSON())
+          .filter((v) => v !== undefined);
+      } else {
+        outputValue = new (outputSettings as typeof Resource)(value).toJSON();
+      }
+    } else if (typeof outputSettings === "function") {
+      // Resolver function - bind to Resource instance for access to this.get(), etc.
+      outputValue = (outputSettings as Function).call(this, value, this);
+    } else if (outputSettings instanceof ResourceFieldBuilder) {
+      // Builder — handles array mapping and nullable internally via isArrayField
+      outputValue = outputSettings.transform(value, locale);
+    } else if (
+      typeof outputSettings === "object" &&
+      outputSettings !== null &&
+      "__type" in outputSettings &&
+      outputSettings.__type === "arrayOf"
+    ) {
+      // ResourceArraySchema — structured array items with their own sub-schema
+      if (Array.isArray(value)) {
+        outputValue = value
+          .map((item) => this.transformArrayItem(item, outputSettings.schema, locale))
+          .filter((v) => v !== undefined);
+      } else {
+        outputValue = this.transformArrayItem(value, outputSettings.schema, locale);
+      }
+    }
+
+    return outputValue;
+  }
+
+  /**
+   * Extend the resource output
+   */
+  protected extend() {
+    //
+  }
+
+  /**
+   * Transform a self-referencing field value.
+   *
+   * @example
+   * // Single: parent: "self"
+   * // Array:  children: "self[]"
+   */
+  protected transformSelfReference(value: any, isArray: boolean): any {
+    if (isArray) {
+      return Array.isArray(value)
+        ? value.map((item) => this.resolveSelf(item)).filter((v) => v !== undefined)
+        : undefined;
+    }
+
+    return this.resolveSelf(value);
+  }
+
+  /**
+   * Resolve a single self-reference value.
+   * Uses identity-based cycle detection (id/_id) and a max depth guard.
+   */
+  protected resolveSelf(value: any): any {
+    if (!value) return undefined;
+
+    const identity = value.id ?? value._id ?? value;
+    // Ancestors of the current path only: siblings never see each other,
+    // so the set size is the depth.
+    const ancestors = this._selfSeen ?? new Set();
+
+    // Circular reference or depth limit reached — stop recursion
+    if (ancestors.has(identity) || ancestors.size >= MAX_SELF_DEPTH) {
+      return undefined;
+    }
+
+    const SelfConstructor = this.constructor as typeof Resource;
+    const child = new SelfConstructor(value);
+    child._selfSeen = new Set(ancestors).add(identity);
+
+    return child.toJSON();
+  }
+
+  /**
+   * Transform a single array item according to the given schema
+   */
+  protected transformArrayItem(
+    item: any,
+    schema: Record<string, ResourceFieldConfig>,
+    locale?: string,
+  ) {
+    const transformedItem: GenericObject = {};
+
+    for (const [outputKey, outputSettings] of Object.entries(schema)) {
+      let fieldKey = outputKey;
+      let valueTransformType = outputSettings as ResourceFieldConfig;
+
+      if (Array.isArray(outputSettings) && outputSettings.length === 2) {
+        fieldKey = outputSettings[0] as string;
+        valueTransformType = outputSettings[1] as ResourceFieldConfig;
+      }
+
+      const inputKey = valueTransformType instanceof ResourceFieldBuilder
+        ? valueTransformType.getInputKey()
+        : undefined;
+      const inputValue = this.resolveSourceValue(item, outputKey, inputKey ?? fieldKey);
+      const outputValue = this.transformValue(inputValue, valueTransformType, locale);
+
+      if (outputValue !== undefined) {
+        set(transformedItem, outputKey, outputValue);
+      }
+    }
+
+    return transformedItem;
+  }
+
+  /**
+   * Resolve one schema field from a model or plain object. Mongo records use `_id`
+   * internally, while resources expose `id` by convention.
+   */
+  protected resolveSourceValue(source: GenericObject | Resource | Model, outputKey: string, inputKey?: string) {
+    const key = inputKey ?? outputKey;
+    const read = (field: string) => source instanceof Model ? source.get(field) : get(source, field);
+    const value = read(key);
+
+    return outputKey === "id" && key === "id" && value === undefined ? read("_id") : value;
+  }
+
+  /**
+   * Get a input value for the given key
+   */
+  public get(key: string, defaultValue?: any) {
+    return get(this.resource, key, defaultValue);
+  }
+
+  /**
+   * Set the given value for the given field
+   */
+  public set(key: string, value: any): ResourceContract {
+    set(this.data, key, value);
+
+    return this;
+  }
+
+  /**
+   * Create an array schema for transforming array items
+   */
+  public arrayOf(schema: Record<string, ResourceFieldConfig>): ResourceArraySchema {
+    return {
+      __type: "arrayOf",
+      schema,
+    };
+  }
+
+  /**
+   * Get a string field builder
+   */
+  public string(inputKey?: string) {
+    return this.fieldBuilder("string", inputKey);
+  }
+
+  /**
+   * Get a date field builder
+   */
+  public date(inputKey?: string) {
+    return this.fieldBuilder("date", inputKey);
+  }
+
+  /**
+   * Get a localized field builder
+   */
+  public localized(inputKey?: string) {
+    return this.fieldBuilder("localized", inputKey);
+  }
+
+  /**
+   * Get a url field builder
+   */
+  public url(inputKey?: string) {
+    return this.fieldBuilder("url", inputKey);
+  }
+
+  /**
+   * Get a uploadsUrl field builder
+   */
+  public uploadsUrl(inputKey?: string) {
+    return this.fieldBuilder("uploadsUrl", inputKey);
+  }
+
+  /**
+   * Get a number field builder
+   */
+  public number(inputKey?: string) {
+    return this.fieldBuilder("number", inputKey);
+  }
+
+  /**
+   * Get a boolean field builder
+   */
+  public boolean(inputKey?: string) {
+    return this.fieldBuilder("boolean", inputKey);
+  }
+
+  /**
+   * Get a float field builder
+   */
+  public float(inputKey?: string) {
+    return this.fieldBuilder("float", inputKey);
+  }
+
+  /**
+   * Get a int field builder
+   */
+  public int(inputKey?: string) {
+    return this.fieldBuilder("int", inputKey);
+  }
+
+  /**
+   * New field builder
+   */
+  protected fieldBuilder(type: ResourceOutputValueCastType, inputKey?: string) {
+    const builder = new ResourceFieldBuilder(type);
+
+    if (inputKey) {
+      builder.setInputKey(inputKey);
+    }
+
+    return builder;
+  }
+}
