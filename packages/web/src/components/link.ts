@@ -218,6 +218,17 @@ export type LinkProps = AnchorProps &
     locale?: false | string;
   };
 
+/**
+ * `Omit` that distributes over a union instead of collapsing it. A plain
+ * `Omit<LinkProps, K>` maps over the union's common keys only, so a wrapper
+ * component loses the route-name/literal-URL/`email`/`tel` destination forms
+ * and accepts combinations `<Link>` itself refuses.
+ */
+export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+/** {@link LinkProps} without `K`, every destination form kept: `LinkPropsWithout<"className">`. */
+export type LinkPropsWithout<K extends PropertyKey> = DistributiveOmit<LinkProps, K>;
+
 const DESTINATION_PROPS = ["to", "href", "email", "tel"] as const;
 
 export class AmbiguousLinkDestinationError extends Error {

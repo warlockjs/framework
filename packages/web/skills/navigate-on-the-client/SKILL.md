@@ -37,6 +37,11 @@ export function NavigationItem(props: LinkProps) {
 }
 ```
 
+To drop props in a wrapper, use `LinkPropsWithout<"className">`, never
+`Omit<LinkProps, "className">`: `LinkProps` is a union and a plain `Omit`
+collapses it, losing the required-params check. `DistributiveOmit<T, K>` is
+exported for other unions.
+
 ## Link destinations
 
 Pass exactly one destination prop:
@@ -322,7 +327,9 @@ separate maps, not a compatibility map for applications without Web.
 `href()` and `<Link>` therefore retain each named route's parameter shape:
 optional path parameters stay optional. A path grammar that cannot be expressed
 precisely gets broad params rather than an invented type. Use
-`runtimeRoute(name)` only for a genuinely runtime-discovered name.
+`runtimeRoute(name)` only for a genuinely runtime-discovered name, or narrow a
+data-driven string with `isRouteName(name)`, which also checks it against the
+published route table (`false` before the table is published).
 
 `navigateTo` also accepts a named object, so the name and params stay
 correlated:

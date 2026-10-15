@@ -10,7 +10,6 @@
  * build, which is why production always registers its own source first.
  */
 import type { DiscoverPagesOptions } from "../build/discover-pages";
-import { listRoutablePages } from "../build/list-routable-pages";
 import {
   expandLocaleEntries,
   localeInvariantEntry,
@@ -83,8 +82,16 @@ function toPageUrl(routePath: string, options: SitemapPageOptions): SitemapPageU
 async function readSitemapPages(
   options: CollectSitemapEntriesOptions,
 ): Promise<Awaited<ReturnType<SitemapPageSource>>> {
+  // The page walk is the development fallback: production reads the build's
+  // page manifest. It reaches `@babel/parser`, so it is imported only here.
   const pageSource =
-    options.pageSource ?? getProductionSitemapPageSource() ?? (() => listRoutablePages(options));
+    options.pageSource ??
+    getProductionSitemapPageSource() ??
+    (async () => {
+      const { listRoutablePages } = await import("../build/list-routable-pages");
+
+      return listRoutablePages(options);
+    });
 
   return pageSource();
 }

@@ -22,6 +22,7 @@ vi.mock("./write-deferred-ndjson-response", async () => {
 });
 
 import { buildHydrationPayload } from "./build-hydration-payload";
+import { ClientDisconnectedError } from "./client-disconnected-error";
 import { createPageRouteHandler, type PageRouteHandlerOptions } from "./create-page-route-handler";
 import { markNonHydrating } from "./page-render-bundle";
 import type { RenderPageRequestOptions } from "./render-page";
@@ -201,6 +202,29 @@ describe("createPageRouteHandler — universal registration", () => {
     expect(result).toBe(terminal);
     expect(requestContext.response.headers).not.toHaveBeenCalled();
     expect(requestContext.response.html).not.toHaveBeenCalled();
+  });
+
+  // WR-016: a request the client abandoned is neither reported nor answered.
+  it("stops quietly when the pipeline reports a disconnected client", async () => {
+    const requestContext = context();
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const handler = createPageRouteHandler(
+      handlerOptions({
+        "app.tsx": {},
+        "composed-layout.tsx": {},
+        "account.page.tsx": { default: MockPage },
+      }),
+    );
+
+    renderPageRequest.mockRejectedValue(new ClientDisconnectedError());
+
+    await expect(handler(requestContext as never)).resolves.toBeUndefined();
+
+    expect(renderPageFailure).not.toHaveBeenCalled();
+    expect(requestContext.response.send).not.toHaveBeenCalled();
+    expect(requestContext.response.html).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+    error.mockRestore();
   });
 
   it("registers App, real layouts outermost-first, and page before render", async () => {

@@ -59,8 +59,10 @@ import {
   router,
 } from "@warlock.js/core";
 import { resolveWebPackageRoot } from "../build/contribution";
-import { createHydrationClientEntry, invalidateClientPageRegistry } from "../vite";
-import { createWebConnectorViteConfig } from "../vite/dev-server-config";
+// Light: no `vite` and no Babel. The Vite dev server, its config and the page
+// registry plugin are imported where development uses them, so a production
+// start never loads Vite or Rollup.
+import { createHydrationClientEntry } from "../vite/hydration-entries";
 import { CLIENT_ASSET_URL_PREFIX } from "./client-asset-url-prefix";
 import { devErrorTransportPlugin, sendCapturedDevError } from "./dev-error-transport";
 import {
@@ -96,10 +98,9 @@ import {
   refreshSitemapModelSubscriptions,
   shutdownSitemapRuntime,
 } from "../sitemap/sitemap-lifecycle";
-import {
-  createUnregisteredPageReporter,
-  type UnregisteredPageReporter,
-} from "./unregistered-pages";
+// Type-only: the reporter walks pages with `../build/discover-pages`, which
+// reaches `@babel/parser`; development imports it where it boots.
+import type { UnregisteredPageReporter } from "./unregistered-pages";
 import { flushPendingServerErrorReports } from "./report-server-error";
 import { WEB_CONNECTOR_PRIORITY } from "./web-connector-factory";
 
@@ -559,7 +560,9 @@ export class WebConnector extends BaseConnector {
       if (this.vite) this.attachDevHooks(next);
     });
 
-    this.reportUnregisteredPages =createUnregisteredPageReporter({
+    const { createUnregisteredPageReporter } = await import("./unregistered-pages");
+
+    this.reportUnregisteredPages = createUnregisteredPageReporter({
       appRoot: paths.appRoot,
       appSrcRoot: paths.appSrcRoot,
       registeredPageFiles: () => registeredPageFiles(router.list(), paths.appSrcRoot),
@@ -870,6 +873,8 @@ export class WebConnector extends BaseConnector {
         // Advance observable state only after the router transaction commits.
         // A rejected install keeps both the old route table and browser live.
         this.installedPages = nextInstalledPages;
+        const { invalidateClientPageRegistry } = await import("../vite/page-registry-plugin");
+
         invalidateClientPageRegistry(vite);
         for (const site of Object.keys(config.get("web", {}).sites ?? {})) {
           invalidateClientPageRegistry(vite, site);
@@ -996,6 +1001,7 @@ export class WebConnector extends BaseConnector {
     paths: Awaited<ReturnType<WebConnector["resolvePaths"]>>,
   ): Promise<ViteDevServer> {
     const { createServer, buildErrorMessage, searchForWorkspaceRoot } = await import("vite");
+    const { createWebConnectorViteConfig } = await import("../vite/dev-server-config");
 
     // Vite's own default for `server.fs.allow`, reproduced rather than dropped:
     // naming the key at all REPLACES the default, and an application that

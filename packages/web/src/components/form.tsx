@@ -1,8 +1,10 @@
 import { createElement, useContext, useEffect, useRef } from "react";
 import type { FormHTMLAttributes, SubmitEvent as ReactSubmitEvent, ReactElement } from "react";
-import { submitAction } from "../client/navigation/action-submitter";
+import { hasActionSubmitter, submitAction } from "../client/navigation/action-submitter";
 import type { ActionSubmitOutcome } from "../client/navigation/action-submitter";
 import { hrefByName } from "../routing/href-by-name";
+import { queryStringOf } from "../routing/query-string";
+import type { RouteQuery } from "../routing/route-table";
 import { DocumentContext } from "./document-context";
 import { fieldErrorId } from "./field-error";
 
@@ -12,13 +14,50 @@ export type FormProps = Omit<FormHTMLAttributes<HTMLFormElement>, "action" | "me
   /** Another page's route name; its action is resolved with `href()`. */
   to?: string;
   params?: Record<string, string | number>;
+  /**
+   * Query string for the URL the form posts to, on `to`'s page or (without
+   * `to`) the current one, which loses its own query. It names where the
+   * submission goes, never what it carries: the body stays the form's fields,
+   * and `action` stays the page action's name.
+   */
+  query?: RouteQuery;
+  /**
+   * Submit alongside whatever is already in flight instead of sharing or
+   * superseding it, such as a Cancel next to a pending Start. Neither
+   * submission aborts the other; a double submit of THIS form still shares
+   * one request, and unmounting the form cancels its submission.
+   */
+  independent?: boolean;
   resetOnSuccess?: boolean;
   onSuccess?: (outcome: ActionSubmitOutcome) => void;
   onError?: (actionData: Readonly<Record<string, unknown>>) => void;
 };
 
-function currentUrl(form: HTMLFormElement): string {
+type Submitter = HTMLElement & { form?: HTMLFormElement | null };
+
+/**
+ * Where a native submission would go: the submit button's own `formaction`
+ * first (as the browser does), then the form's `action`, then this page.
+ */
+function targetUrl(form: HTMLFormElement, submitter: Submitter | null): string {
+  const override = submitter?.getAttribute("formaction");
+
+  if (override) return override;
+
   return form.getAttribute("action") ?? `${window.location.pathname}${window.location.search}`;
+}
+
+function formActionAttribute(
+  to: string | undefined,
+  params: Record<string, string | number> | undefined,
+  query: RouteQuery | undefined,
+): string | undefined {
+  const search = queryStringOf(query);
+
+  if (to !== undefined) return `${hrefByName(to, params)}${search}`;
+
+  // A query-only URL resolves against the current page's path.
+  return search === "" ? undefined : search;
 }
 
 /**
@@ -31,6 +70,8 @@ export function Form({
   action,
   to,
   params,
+  query,
+  independent,
   encType = "multipart/form-data",
   resetOnSuccess,
   onSuccess,
@@ -67,21 +108,46 @@ export function Form({
     }
   }, [errors]);
 
+  // Set only while `<Form>` hands a submission back to the browser.
+  const nativeFallback = useRef(false);
+  // An independent submission is cancelled when its form unmounts.
+  const independentController = useRef<AbortController | undefined>(undefined);
+
+  useEffect(() => () => independentController.current?.abort(), []);
+
   async function handleSubmit(event: ReactSubmitEvent<HTMLFormElement>): Promise<void> {
+    // The re-dispatched submit below: the browser performs it natively.
+    if (nativeFallback.current) return;
+
     onSubmit?.(event);
 
     if (event.defaultPrevented) return;
 
+    // No runtime (no JS yet, or never): leave the event alone, so the browser
+    // posts natively with the submit button's `formaction` and its name/value.
+    if (!hasActionSubmitter()) return;
+
     const form = event.currentTarget;
-    const submitter = event.nativeEvent.submitter;
+    const submitter = event.nativeEvent.submitter as Submitter | null;
 
     event.preventDefault();
 
-    const outcome = await submitAction(currentUrl(form), new FormData(form, submitter));
+    let signal: AbortSignal | undefined;
 
-    // No runtime connected: let the browser do what it would have done.
+    if (independent) {
+      independentController.current ??= new AbortController();
+      signal = independentController.current.signal;
+    }
+
+    const outcome = await submitAction(targetUrl(form, submitter), new FormData(form, submitter), {
+      independent: independent === true,
+      signal,
+    });
+
+    // The runtime went away mid-submit: let the browser do what it would
+    // have done, through the same submit button.
     if (outcome === undefined) {
-      form.submit();
+      submitNatively(form, submitter);
 
       return;
     }
@@ -96,6 +162,25 @@ export function Form({
     }
   }
 
+  function submitNatively(form: HTMLFormElement, submitter: Submitter | null): void {
+    if (typeof form.requestSubmit !== "function") {
+      form.submit();
+
+      return;
+    }
+
+    // `requestSubmit(submitter)` dispatches a submit event synchronously that
+    // `handleSubmit` lets through, and the browser then honours the button's
+    // `formaction`, `formmethod` and name/value, which `form.submit()` drops.
+    nativeFallback.current = true;
+
+    try {
+      form.requestSubmit(submitter?.form === form ? submitter : undefined);
+    } finally {
+      nativeFallback.current = false;
+    }
+  }
+
   return createElement(
     "form",
     {
@@ -103,7 +188,7 @@ export function Form({
       ref,
       method: "post",
       encType,
-      action: to !== undefined ? hrefByName(to, params) : undefined,
+      action: formActionAttribute(to, params, query),
       onSubmit: handleSubmit,
     },
     action !== undefined

@@ -47,7 +47,7 @@ import {
 import { hydrateScrollPositions } from "./scroll-positions";
 import { scrollToFragment } from "./scroll-to-fragment";
 import { syncDocumentLocale } from "./sync-document-locale";
-import { beginNavigationPending } from "./navigation-pending-store";
+import { beginNavigationPending, waitForNavigationIdle } from "./navigation-pending-store";
 import { stashNavigationFailure } from "../navigation-failure-stash";
 
 /**
@@ -521,7 +521,20 @@ export function NavigationRoot({
           // External destinations (an OAuth start) leave the document.
           const external = new URL(url, window.location.href).origin !== window.location.origin;
 
-          if (external || !currentNavigator()?.(url)) window.location.assign(url);
+          if (external || !currentNavigator()?.(url)) {
+            window.location.assign(url);
+
+            return;
+          }
+
+          // The navigator claimed its ticket synchronously; the submission
+          // settles once the redirected page has committed (WR-002).
+          return waitForNavigationIdle();
+        },
+        observeTicket: () => {
+          const observed = token;
+
+          return () => !disposed && observed === token;
         },
       }),
     );

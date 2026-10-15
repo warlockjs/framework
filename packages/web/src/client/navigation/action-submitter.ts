@@ -14,8 +14,36 @@ import { submitPageAction } from "./submit-page-action";
  * submit aborts an older one.
  */
 export type ActionSubmitRuntime = RefreshRuntime & {
-  /** Client navigation, used for the redirect outcome (push). */
-  navigate: (url: string) => void;
+  /**
+   * Client navigation, used for the redirect outcome (push). A returned
+   * promise is awaited before the submission settles: it resolves once the
+   * destination page is on screen (or the navigation was overtaken, or fell
+   * back to a full load). `void` settles at once.
+   */
+  navigate: (url: string) => void | Promise<void>;
+  /**
+   * Observe the race counter WITHOUT taking a ticket: the predicate answers
+   * whether no navigation, refresh or ordinary submit has claimed one since.
+   * Used by `independent` submissions, which must neither abort the operation
+   * in flight nor be aborted by it. Absent in a runtime that has no counter.
+   */
+  observeTicket?: () => () => boolean;
+};
+
+/** Per-call options for {@link ActionSubmitter}. */
+export type ActionSubmitOptions = {
+  /**
+   * Submit alongside whatever is already in flight instead of sharing or
+   * superseding it: a Cancel next to a long-running Start. The submission
+   * takes no navigation ticket, so it neither aborts the pending submit or
+   * navigation nor is aborted by it; its result is applied unless a
+   * navigation (or another ordinary operation) started after it. A double
+   * submit of the SAME independent action (same URL and `_action`) still
+   * shares one request.
+   */
+  independent?: boolean;
+  /** Cancels this submission only. An aborted submission resolves `dropped`. */
+  signal?: AbortSignal;
 };
 
 export type ActionSubmitOutcome =
@@ -26,7 +54,11 @@ export type ActionSubmitOutcome =
   /** A newer navigation or submit overtook this one; nothing was applied. */
   | { type: "dropped" };
 
-export type ActionSubmitter = (url: string, formData: FormData) => Promise<ActionSubmitOutcome>;
+export type ActionSubmitter = (
+  url: string,
+  formData: FormData,
+  options?: ActionSubmitOptions,
+) => Promise<ActionSubmitOutcome>;
 
 export function createActionSubmitter(runtime: ActionSubmitRuntime): ActionSubmitter {
   let inFlight: Promise<ActionSubmitOutcome> | undefined;
@@ -52,7 +84,17 @@ export function createActionSubmitter(runtime: ActionSubmitRuntime): ActionSubmi
 
       if (result.type === "redirect") {
         clearPrefetchCache();
-        runtime.navigate(result.url);
+        // Awaited: the submission (and `useIsSubmitting()`) ends when the
+        // redirected page's fresh loader data is on screen, not when the 204
+        // arrived. Otherwise a second submit could start against the previous
+        // page's data, such as a stale revision.
+        const settled = runtime.navigate(result.url);
+
+        // The navigation took its own ticket synchronously (replacing this
+        // one) or took none (a same-page fragment); either way this ticket is
+        // over, and leaving it open would keep the router busy forever.
+        complete?.();
+        await settled;
 
         return { type: "redirected", url: result.url };
       }
@@ -110,7 +152,99 @@ export function createActionSubmitter(runtime: ActionSubmitRuntime): ActionSubmi
     }
   }
 
-  return (url, formData) => {
+  async function runIndependent(
+    url: string,
+    formData: FormData,
+    callerSignal: AbortSignal | undefined,
+  ): Promise<ActionSubmitOutcome> {
+    const isCurrent = runtime.observeTicket?.() ?? (() => true);
+    const endSubmitting = beginSubmitting();
+
+    try {
+      const result = await submitPageAction(url, formData, callerSignal);
+
+      if (result.type === "aborted" || callerSignal?.aborted) return { type: "dropped" };
+
+      if (result.type === "hard-fail") {
+        const error = new Error(`Warlock page action failed: ${result.reason}`);
+
+        console.warn("Warlock page action failed:", result.reason);
+        routerEvents.emitNavigationError({ url, mode: "replace", error });
+
+        return { type: "failed", reason: result.reason };
+      }
+
+      if (result.type === "redirect") {
+        clearPrefetchCache();
+        await runtime.navigate(result.url);
+
+        return { type: "redirected", url: result.url };
+      }
+
+      if (!isCurrent()) return { type: "dropped" };
+
+      const previous = runtime.readCurrent();
+
+      if (result.type === "actionOnly") {
+        runtime.writeCurrent({
+          payload: { ...previous.payload, actionData: result.actionData },
+          tree: previous.tree,
+          routeSource: previous.routeSource,
+        });
+
+        return { type: "error", actionData: result.actionData };
+      }
+
+      let tree: Awaited<ReturnType<typeof runtime.buildTree>>;
+
+      try {
+        tree = await runtime.buildTree(result.payload);
+      } catch (error) {
+        console.warn("Warlock page action could not build the page tree:", error);
+        routerEvents.emitNavigationError({ url, mode: "replace", error });
+
+        return { type: "failed", reason: "tree build failed" };
+      }
+
+      if (!isCurrent() || callerSignal?.aborted) return { type: "dropped" };
+
+      hydrateShared(result.payload.shared);
+      clearPrefetchCache();
+
+      const latest = runtime.readCurrent();
+
+      runtime.writeCurrent({
+        payload: result.payload,
+        tree,
+        routeSource:
+          result.payload.name === latest.payload.name ? latest.routeSource : result.payload,
+      });
+
+      return { type: "success" };
+    } finally {
+      endSubmitting();
+    }
+  }
+
+  const independentInFlight = new Map<string, Promise<ActionSubmitOutcome>>();
+
+  return (url, formData, options) => {
+    if (options?.independent === true) {
+      const actionName = formData.get("_action");
+      const key = `${url}\u0000${typeof actionName === "string" ? actionName : ""}`;
+      const existing = independentInFlight.get(key);
+
+      if (existing) return existing;
+
+      const promise = runIndependent(url, formData, options.signal).finally(() => {
+        if (independentInFlight.get(key) === promise) independentInFlight.delete(key);
+      });
+
+      independentInFlight.set(key, promise);
+
+      return promise;
+    }
+
     // A double submit shares the request in flight instead of sending a second.
     if (inFlight) return inFlight;
 
@@ -135,10 +269,16 @@ export function connectActionSubmitter(next: ActionSubmitter | undefined): Actio
   return previous;
 }
 
+/** Whether a navigation runtime is connected to submit page actions. */
+export function hasActionSubmitter(): boolean {
+  return connected !== undefined;
+}
+
 /** What `<Form>` calls. Resolves `undefined` when no runtime is connected. */
 export async function submitAction(
   url: string,
   formData: FormData,
+  options?: ActionSubmitOptions,
 ): Promise<ActionSubmitOutcome | undefined> {
-  return connected?.(url, formData);
+  return connected?.(url, formData, options);
 }

@@ -2,6 +2,26 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.30.0
+
+### Added
+
+- `<Form query={{ … }}>` sets the query string of the URL the form posts to (the current page, or `to`'s page), without touching the body or the named `action` (WR-011).
+- `<Form independent>` submits alongside a pending submission instead of sharing it: a Cancel next to a long-running Start. Neither aborts the other, a double submit of the same independent action still shares one request, and unmounting the form cancels it (WR-013).
+- `LinkPropsWithout<K>` and `DistributiveOmit<T, K>`: omit props from `LinkProps` without collapsing its destination union, so a wrapper keeps the required-params check (WR-021).
+- `isRouteName(name)` narrows a data-driven string to a route name after checking the published route table, so it reaches `<Link to>` or `href()` without a cast (WR-021).
+
+### Changed
+
+- A page action that redirects now ends its submission once the redirected page is on screen: `useIsSubmitting()` stays `true` and `onSuccess` waits until the destination's fresh loader data has committed, so a revision-guarded form cannot resubmit stale data (WR-002).
+- `useIsSubmitting()` is `true` while any submission is in flight, including independent ones.
+- A production start no longer loads Vite, Rollup or `@babel/parser`: the web connector imports its Vite dev-server config, page-registry plugin, dev route installer, dev 404 reporter and the sitemap's page-walk fallback only on the development path, so its static graph shrinks from 185 to 67 modules (WR-027).
+
+### Fixed
+
+- `<Form>` honours the submit button's `formAction` and its `name`/`value`. The enhanced path posted to the form's URL; with no navigation runtime the fallback called `form.submit()`, which dropped both. Without a runtime the browser now submits natively, and a late fallback re-submits through the same button (WR-011).
+- A page request the client abandoned before its loaders finished no longer renders: it stops with `ClientDisconnectedError` before anything is committed, and the page handler neither reports it nor writes a response. It used to render layouts without their loader data and log a 500. A loader timeout on a connected request still renders its 504 (WR-016).
+
 ## 5.29.0 - 2026-10-01
 
 ### Fixed

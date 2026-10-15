@@ -28,6 +28,7 @@ import {
 import { shared as liveShared } from "../shared";
 import { composeLayoutModules } from "./compose-layout-modules";
 import { PageLoaderTimeoutError } from "./page-loader-timeout-error";
+import { ClientDisconnectedError } from "./client-disconnected-error";
 import { buildHydrationPayload } from "./build-hydration-payload";
 import { defer } from "../loaders/defer";
 
@@ -338,17 +339,20 @@ describe("executePageRequest ctx.signal", () => {
       },
     });
 
-    await executePageRequest({
-      url: "/account",
-      routes: [entry],
-      createHttp: () => ({ request: abortRequest, response }),
-    });
+    await expect(
+      executePageRequest({
+        url: "/account",
+        routes: [entry],
+        createHttp: () => ({ request: abortRequest, response }),
+      }),
+    ).rejects.toBeInstanceOf(ClientDisconnectedError);
 
     expect(calls).toEqual(["app"]);
   });
 
   it("discards a cookie a loader queued before the request was abandoned", async () => {
     const { request: abortRequest, response, rawRequest } = abortableHttp();
+    const setCookie = vi.spyOn(response, "cookie");
     const entry = route({
       app: ({ response: bufferedResponse }) => {
         bufferedResponse.cookie("session", "abc");
@@ -356,13 +360,61 @@ describe("executePageRequest ctx.signal", () => {
       },
     });
 
-    const result = await executePageRequest({
-      url: "/account",
-      routes: [entry],
-      createHttp: () => ({ request: abortRequest, response }),
+    await expect(
+      executePageRequest({
+        url: "/account",
+        routes: [entry],
+        createHttp: () => ({ request: abortRequest, response }),
+      }),
+    ).rejects.toBeInstanceOf(ClientDisconnectedError);
+
+    expect(setCookie).not.toHaveBeenCalled();
+  });
+
+  // WR-016: an abandoned POST used to reach `finish` (the full render) with
+  // the layout's loader data missing, and the layout's own read of it threw.
+  it("never calls finish for a request abandoned while its loaders ran", async () => {
+    const { request: abortRequest, response, rawRequest } = abortableHttp();
+    const finish = vi.fn();
+    const entry = route({
+      app: () => {
+        rawRequest.emit("aborted");
+      },
+      layout: () => ({ activePage: "inspect" }),
     });
 
-    expect((result as { commit?: { cookies: unknown[] } }).commit?.cookies).toEqual([]);
+    await expect(
+      executePageRequest({
+        url: "/account",
+        routes: [entry],
+        createHttp: () => ({ request: abortRequest, response }),
+        finish,
+      }),
+    ).rejects.toBeInstanceOf(ClientDisconnectedError);
+
+    expect(finish).not.toHaveBeenCalled();
+  });
+
+  it("never calls finish for a request abandoned after its loaders finished", async () => {
+    const { request: abortRequest, response, rawRequest } = abortableHttp();
+    const finish = vi.fn();
+    const entry = route({
+      page: () => {
+        // The last level: no later level boundary sees this abort.
+        rawRequest.emit("aborted");
+      },
+    });
+
+    await expect(
+      executePageRequest({
+        url: "/account",
+        routes: [entry],
+        createHttp: () => ({ request: abortRequest, response }),
+        finish,
+      }),
+    ).rejects.toBeInstanceOf(ClientDisconnectedError);
+
+    expect(finish).not.toHaveBeenCalled();
   });
 
   it("commits a loader's cookie unchanged when the request is never aborted", async () => {
@@ -412,6 +464,29 @@ describe("executePageRequest — web.loaderTimeout (card 904a04eb)", () => {
 
     expect(elapsedMs).toBeLessThan(1000);
 
+    const bundle = result as { error?: { error: unknown; statusCode?: number } };
+    expect(bundle.error?.error).toBeInstanceOf(PageLoaderTimeoutError);
+    expect(bundle.error?.statusCode).toBe(504);
+  }, 2000);
+
+  // WR-016: the disconnect guard must not swallow OUR OWN timeout abort — the
+  // client is still connected on a real transport and still gets the 504.
+  it("still renders the 504 for a loader timeout on a connected real transport", async () => {
+    config.set("web", { loaderTimeout: 50 });
+    const { request: connectedRequest, response } = abortableHttp();
+    const finish = vi.fn(async (bundle: unknown) => bundle);
+    const entry = route({
+      page: () => new Promise(() => undefined),
+    });
+
+    const result = await executePageRequest({
+      url: "/account",
+      routes: [entry],
+      createHttp: () => ({ request: connectedRequest, response }),
+      finish,
+    });
+
+    expect(finish).toHaveBeenCalledTimes(1);
     const bundle = result as { error?: { error: unknown; statusCode?: number } };
     expect(bundle.error?.error).toBeInstanceOf(PageLoaderTimeoutError);
     expect(bundle.error?.statusCode).toBe(504);

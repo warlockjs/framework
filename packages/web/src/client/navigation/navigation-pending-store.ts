@@ -40,3 +40,21 @@ export function beginNavigationPending(): () => void {
     notify();
   };
 }
+
+/**
+ * Resolves once no router ticket is in flight: the navigation (or refresh,
+ * locale change, submit) running now has committed its page, been overtaken
+ * by one that has, or ended without a swap. Resolves at once when idle.
+ */
+export function waitForNavigationIdle(): Promise<void> {
+  if (currentTicket === undefined) return Promise.resolve();
+
+  return new Promise((resolve) => {
+    const unsubscribe = subscribeNavigationPending(() => {
+      if (currentTicket !== undefined) return;
+
+      unsubscribe();
+      resolve();
+    });
+  });
+}

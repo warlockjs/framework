@@ -19,6 +19,8 @@ through a client navigation, `refresh()`, or a locale change, and `false` during
 SSR. A component mounted after a transition starts reads the current state
 immediately; there is no delay. When a newer transition supersedes an earlier
 one, completion of the earlier work cannot clear the newer pending state.
+A page action that redirects keeps `useIsSubmitting()` true through this same
+navigation, until the redirected page is on screen.
 
 Use it for a pending indicator, not a percent-complete claim:
 
@@ -108,3 +110,29 @@ export function NavigationItem(props: LinkProps) {
 
 This keeps generated named-route and parameter checking intact. Do not
 redeclare destination props as broad strings in a wrapper.
+
+To take props away, use `LinkPropsWithout<Keys>` rather than
+`Omit<LinkProps, Keys>`. `LinkProps` is a union (route name with its params,
+literal URL, `email`, `tel`), and a plain `Omit` collapses it to the keys the
+members share, losing the required-params check. `LinkPropsWithout` omits from
+each member (`DistributiveOmit<T, Keys>` is exported for other unions):
+
+```tsx
+import { Link, type LinkPropsWithout } from "@warlock.js/web";
+
+export function MenuLink(props: LinkPropsWithout<"className">) {
+  return <Link {...props} className="menu-link" />;
+}
+```
+
+A route name that only exists at runtime (a menu entry, a shortcut descriptor
+read from data) narrows with `isRouteName(name)`, which checks the published
+route table, so it can go to `<Link to>` or `href()` without a cast:
+
+```tsx
+import { isRouteName, Link } from "@warlock.js/web";
+
+function ShortcutLink({ route, label }: { route: string; label: string }) {
+  return isRouteName(route) ? <Link to={route}>{label}</Link> : null;
+}
+```

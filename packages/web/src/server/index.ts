@@ -16,6 +16,7 @@
  */
 export { connectSharedStore } from "../shared";
 export { resolveNamedApiRoutes } from "./named-api-routes";
+export { ClientDisconnectedError } from "./client-disconnected-error";
 export {
   escapePayload,
   PAYLOAD_SCRIPT_ID,

@@ -5,6 +5,7 @@ import {
   beginNavigationPending,
   readNavigationPending,
   subscribeNavigationPending,
+  waitForNavigationIdle,
 } from "./navigation-pending-store";
 import { useIsNavigating } from "./use-is-navigating";
 
@@ -40,5 +41,28 @@ describe("navigation pending ticket store", () => {
     expect(renderToStaticMarkup(createElement(Probe))).toBe("<span>false</span>");
 
     complete();
+  });
+});
+
+describe("waitForNavigationIdle", () => {
+  it("resolves at once when nothing is pending", async () => {
+    await expect(waitForNavigationIdle()).resolves.toBeUndefined();
+  });
+
+  it("waits through a replacement ticket and resolves when the last one completes", async () => {
+    const first = beginNavigationPending();
+    let settled = false;
+    const idle = waitForNavigationIdle().then(() => {
+      settled = true;
+    });
+    const second = beginNavigationPending();
+
+    first();
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    second();
+    await idle;
+    expect(settled).toBe(true);
   });
 });

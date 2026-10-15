@@ -6,6 +6,7 @@ import {
   UnknownRouteNameError,
   UnknownRouteParameterError,
   href,
+  isRouteName,
   prepareRouteTable,
   publishRouteTable,
   resetRouteTable,
@@ -256,5 +257,18 @@ describe("publishRouteTable", () => {
     ] as never);
 
     expect(href("main.home")).toBe("/");
+  });
+});
+
+describe("isRouteName", () => {
+  it("is false while nothing is published", () => {
+    expect(isRouteName("posts.show")).toBe(false);
+  });
+
+  it("answers from the published table", () => {
+    publishRouteTable([{ name: "posts.show", path: "/posts/:slug" }], "route-table.spec");
+
+    expect(isRouteName("posts.show")).toBe(true);
+    expect(isRouteName("posts.missing")).toBe(false);
   });
 });

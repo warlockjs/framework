@@ -137,6 +137,13 @@ export default function AccountPage() {
 
 A sign-out button that lives on another page or in a layout posts to this action with `<Form to="account" action="logout">`: `to` is the route name of the page that owns the action.
 
+## Submit buttons, query targets and concurrent forms
+
+- **A button's `formAction` and `name`/`value` are honoured** on the enhanced path and without JS, as the browser does: `<button name="purpose" value="inspect" formAction="/runs?mode=inspect">` posts there with `purpose=inspect` plus the form's fields.
+- **`query` sets the target URL's query string, not the body**: `<Form action="recover" query={{ mode: "inspect" }}>` posts to the current page as `?mode=inspect` (or to `to`'s page). `action` stays the page action's name.
+- **A redirect ends the submission when the new page is on screen.** `useIsSubmitting()` (and `onSuccess`) wait for the redirected page's loader data, so a revision-guarded form cannot resubmit stale data.
+- **Ordinary submissions are single-flight**; a second submit shares the pending one. A form that must run while another is pending (Cancel during a long Start) is `<Form action="cancel" independent>`: it neither aborts nor is aborted by the pending submission, a double submit of it still shares one request, and unmounting cancels it.
+
 - **Failure keeps the cookie writes too.** A failed sign-in that also called `response.cookie()` would still send it, so set the cookie only after the credentials check passes.
 - **The password is never echoed.** `values` omits `password` by default (`web.forms.redactValues`), so only `email` is re-filled.
 - **A response with a cookie is never cached.** It is `Cache-Control: private, no-store`, as every action response is.

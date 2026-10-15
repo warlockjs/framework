@@ -84,14 +84,131 @@ describe("<Form>", () => {
     await act(async () => finish({ type: "success" }));
   });
 
-  it("falls back to a native submit when no runtime is connected", async () => {
+  // WR-011: with no runtime the browser's own submission must keep the
+  // submit button's `formaction` and name/value, so the event is left alone.
+  it("leaves the submission to the browser when no runtime is connected", async () => {
     const { container } = mount(<Form />);
     const form = container.querySelector("form")!;
     const nativeSubmit = vi.spyOn(form, "submit").mockImplementation(() => undefined);
+    const event = new Event("submit", { bubbles: true, cancelable: true });
+
+    await act(async () => {
+      form.dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(nativeSubmit).not.toHaveBeenCalled();
+  });
+
+  it("posts to the submit button's formaction with its name and value", async () => {
+    const submitter = vi.fn(async () => ({ type: "success" as const }));
+
+    connectActionSubmitter(submitter);
+    const { container } = mount(
+      <Form>
+        <input name="retained" defaultValue="original-command" />
+        <button type="submit" name="purpose" value="inspect" formAction="/expected?mode=inspect">
+          Inspect
+        </button>
+      </Form>,
+    );
+
+    await act(async () => {
+      container.querySelector("button")!.click();
+    });
+
+    expect(submitter).toHaveBeenCalledTimes(1);
+    const [url, data] = submitter.mock.calls[0] as unknown as [string, FormData];
+
+    expect(url).toBe("/expected?mode=inspect");
+    expect(data.get("retained")).toBe("original-command");
+    expect(data.get("purpose")).toBe("inspect");
+  });
+
+  it("hands the submission back through the same button when the runtime answers nothing", async () => {
+    const submitter = vi.fn(async () => undefined as never);
+
+    connectActionSubmitter(submitter);
+    const { container } = mount(
+      <Form>
+        <button type="submit" name="purpose" value="inspect" formAction="/expected">
+          Inspect
+        </button>
+      </Form>,
+    );
+    const form = container.querySelector("form")!;
+    const button = container.querySelector("button")!;
+    const redispatched: boolean[] = [];
+    const requestSubmit = vi
+      .spyOn(form, "requestSubmit")
+      .mockImplementation(function (this: HTMLFormElement) {
+        // What the browser does: a submit event, then (unprevented) the post.
+        const event = new Event("submit", { bubbles: true, cancelable: true });
+
+        this.dispatchEvent(event);
+        redispatched.push(event.defaultPrevented);
+      });
+
+    await act(async () => {
+      button.click();
+    });
+
+    expect(requestSubmit).toHaveBeenCalledWith(button);
+    expect(redispatched).toEqual([false]);
+    expect(submitter).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders a query-only target for the current page", () => {
+    const { container } = mount(<Form query={{ mode: "inspect", skip: undefined }} />);
+
+    expect(container.querySelector("form")!.getAttribute("action")).toBe("?mode=inspect");
+  });
+
+  it("posts to the query target through the runtime", async () => {
+    const submitter = vi.fn(async () => ({ type: "success" as const }));
+
+    connectActionSubmitter(submitter);
+    const { container } = mount(<Form query={{ mode: "inspect" }} />);
 
     await submit(container);
 
-    expect(nativeSubmit).toHaveBeenCalledTimes(1);
+    expect((submitter.mock.calls[0] as unknown[])[0]).toBe("?mode=inspect");
+  });
+
+  // WR-013
+  it("submits an independent form with its own cancellation signal", async () => {
+    const submitter = vi.fn(async () => ({ type: "success" as const }));
+
+    connectActionSubmitter(submitter);
+    const { container, root } = mount(<Form action="cancel" independent />);
+
+    await submit(container);
+
+    const options = (submitter.mock.calls[0] as unknown[])[2] as {
+      independent: boolean;
+      signal: AbortSignal;
+    };
+
+    expect(options.independent).toBe(true);
+    expect(options.signal.aborted).toBe(false);
+
+    act(() => root.unmount());
+
+    expect(options.signal.aborted).toBe(true);
+  });
+
+  it("submits an ordinary form without independence", async () => {
+    const submitter = vi.fn(async () => ({ type: "success" as const }));
+
+    connectActionSubmitter(submitter);
+    const { container } = mount(<Form action="start" />);
+
+    await submit(container);
+
+    expect((submitter.mock.calls[0] as unknown[])[2]).toEqual({
+      independent: false,
+      signal: undefined,
+    });
   });
 
   it("renders field errors and wires aria-invalid / aria-describedby", () => {

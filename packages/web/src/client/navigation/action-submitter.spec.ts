@@ -32,12 +32,21 @@ function makeRuntime() {
       current = page;
     }),
     buildTree: vi.fn(async () => "new" as never),
-    claimTicket: () => {
+    claimTicket: (): {
+      isCurrent: () => boolean;
+      signal: AbortSignal;
+      complete?: () => void;
+    } => {
       const mine = ++token;
 
       return { isCurrent: () => mine === token, signal: new AbortController().signal };
     },
-    navigate: vi.fn(),
+    navigate: vi.fn<(url: string) => void | Promise<void>>(),
+    observeTicket: () => {
+      const seen = token;
+
+      return () => seen === token;
+    },
   };
 
   return { runtime, page: () => current, newerTicket: () => void runtime.claimTicket() };
@@ -124,5 +133,144 @@ describe("createActionSubmitter", () => {
       reason: "status 500",
     });
     expect(h.runtime.writeCurrent).not.toHaveBeenCalled();
+  });
+
+  // WR-002: the submission is not over until the redirected page is on screen.
+  it("stays submitting until the redirect's navigation settles", async () => {
+    const h = makeRuntime();
+    let settle: () => void = () => undefined;
+
+    h.runtime.navigate.mockReturnValue(new Promise<void>((resolve) => (settle = resolve)));
+    submitPageAction.mockResolvedValue({ type: "redirect", url: "/thanks" });
+
+    let outcome: unknown;
+    const pending = createActionSubmitter(h.runtime)("/c", new FormData()).then((value) => {
+      outcome = value;
+    });
+
+    await vi.waitFor(() => expect(h.runtime.navigate).toHaveBeenCalledWith("/thanks"));
+    expect(readSubmitting()).toBe(true);
+    expect(outcome).toBeUndefined();
+
+    settle();
+    await pending;
+
+    expect(outcome).toEqual({ type: "redirected", url: "/thanks" });
+    expect(readSubmitting()).toBe(false);
+  });
+
+  it("releases its own ticket before waiting on the redirect", async () => {
+    const h = makeRuntime();
+    const complete = vi.fn();
+    const claimTicket = h.runtime.claimTicket;
+
+    h.runtime.claimTicket = () => ({ ...claimTicket(), complete });
+    h.runtime.navigate.mockImplementation(async () => {
+      // The navigation runs after the action handed its ticket over.
+      await Promise.resolve();
+      expect(complete).toHaveBeenCalled();
+    });
+    submitPageAction.mockResolvedValue({ type: "redirect", url: "/thanks" });
+
+    await createActionSubmitter(h.runtime)("/c", new FormData());
+
+    expect(complete).toHaveBeenCalled();
+  });
+});
+
+// WR-013: a Cancel must reach the server while a Start is still pending.
+describe("createActionSubmitter — independent submissions", () => {
+  function deferred() {
+    let resolve: (value: unknown) => void = () => undefined;
+    const promise = new Promise((r) => (resolve = r));
+
+    return { promise, resolve };
+  }
+
+  function form(action: string): FormData {
+    const data = new FormData();
+
+    data.set("_action", action);
+
+    return data;
+  }
+
+  it("sends an independent submit while an ordinary one is in flight", async () => {
+    const h = makeRuntime();
+    const start = deferred();
+
+    submitPageAction.mockReturnValueOnce(start.promise);
+    submitPageAction.mockResolvedValueOnce({
+      type: "actionOnly",
+      actionData: { c: 1 },
+      status: 422,
+    });
+
+    const submit = createActionSubmitter(h.runtime);
+    const startPending = submit("/run", form("start"));
+    const cancel = submit("/run", form("cancel"), { independent: true });
+
+    expect(cancel).not.toBe(startPending);
+    expect(await cancel).toEqual({ type: "error", actionData: { c: 1 } });
+    expect(submitPageAction).toHaveBeenCalledTimes(2);
+    expect(readSubmitting()).toBe(true);
+
+    // The Start was neither aborted nor superseded by the Cancel.
+    start.resolve({ type: "payload", payload: PAYLOAD, url: "/run" });
+    expect(await startPending).toEqual({ type: "success" });
+    expect(readSubmitting()).toBe(false);
+  });
+
+  it("shares one request between a double submit of the same independent action", async () => {
+    const h = makeRuntime();
+
+    submitPageAction.mockResolvedValue({ type: "payload", payload: PAYLOAD, url: "/run" });
+
+    const submit = createActionSubmitter(h.runtime);
+    const first = submit("/run", form("cancel"), { independent: true });
+    const second = submit("/run", form("cancel"), { independent: true });
+    const other = submit("/run", form("archive"), { independent: true });
+
+    expect(second).toBe(first);
+    expect(other).not.toBe(first);
+    await Promise.all([first, other]);
+    expect(submitPageAction).toHaveBeenCalledTimes(2);
+  });
+
+  it("drops its result when a navigation started after it", async () => {
+    const h = makeRuntime();
+    const cancel = deferred();
+
+    submitPageAction.mockReturnValueOnce(cancel.promise);
+
+    const pending = createActionSubmitter(h.runtime)("/run", form("cancel"), { independent: true });
+
+    h.newerTicket();
+    cancel.resolve({ type: "payload", payload: PAYLOAD, url: "/run" });
+
+    expect(await pending).toEqual({ type: "dropped" });
+    expect(h.runtime.writeCurrent).not.toHaveBeenCalled();
+  });
+
+  it("is cancelled by its own signal only", async () => {
+    const h = makeRuntime();
+    const controller = new AbortController();
+
+    submitPageAction.mockImplementationOnce(
+      (_url: string, _data: FormData, signal: AbortSignal) =>
+        new Promise((resolve) => {
+          signal.addEventListener("abort", () => resolve({ type: "aborted" }));
+        }),
+    );
+
+    const pending = createActionSubmitter(h.runtime)("/run", form("cancel"), {
+      independent: true,
+      signal: controller.signal,
+    });
+
+    controller.abort();
+
+    expect(await pending).toEqual({ type: "dropped" });
+    expect(readSubmitting()).toBe(false);
   });
 });

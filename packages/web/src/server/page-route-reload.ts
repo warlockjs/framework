@@ -2,11 +2,11 @@ import path from "node:path";
 import { resolvePageRouteIdentity } from "../routing/route-identity";
 import type { Router } from "@warlock.js/core";
 import type { ViteDevServer } from "vite";
-import {
-  filesystemPageFileFor,
-  loadComposedModule,
-  type InstalledPageRoute,
-} from "./install-page-routes";
+// Type-only: `./install-page-routes` is the development installer and reaches
+// `@babel/parser` through `../build/read-module-config`. `web-connector.ts`
+// imports this module statically for `registeredPageFiles`, so its values are
+// loaded inside `pageRoutesNeedReplacement`, which only development calls.
+import type { InstalledPageRoute } from "./install-page-routes";
 import { normalizePageModule } from "./normalize-page-module";
 import { isNotFoundPageFile } from "./not-found-page";
 import type { PageFileChanges } from "./page-file-change";
@@ -62,6 +62,10 @@ export async function pageRoutesNeedReplacement(
   },
 ): Promise<boolean> {
   let replace = changes.added.length > 0 || changes.removed.length > 0;
+
+  if (changes.inspectionNeeded.length === 0) return replace;
+
+  const { filesystemPageFileFor, loadComposedModule } = await import("./install-page-routes");
 
   const installedByFile = new Map(
     options.installedPages.map((page) => [pathKey(page.file), page] as const),

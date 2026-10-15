@@ -140,7 +140,7 @@ export type {
 export { localeDirection } from "./text-direction";
 export type { TextDirection } from "./text-direction";
 export { useTextDirection } from "./use-text-direction";
-export { href } from "./routing/route-table";
+export { href, isRouteName } from "./routing/route-table";
 export { apiHref } from "./routing/api-href";
 export { siteUrl } from "./routing/site-url";
 export type { CurrentSite } from "./routing/site-url";
@@ -172,7 +172,7 @@ export type {
 } from "./routing/route-types";
 export { localizedPath } from "./routing/localized-path";
 export { Link } from "./components/link";
-export type { LinkProps } from "./components/link";
+export type { DistributiveOmit, LinkProps, LinkPropsWithout } from "./components/link";
 
 // The navigation verbs carry `@mongez/react-router`'s NAMES on purpose (canon
 // 9c8f878b): a developer moving between a Mongez CSR app and a Warlock SSR app

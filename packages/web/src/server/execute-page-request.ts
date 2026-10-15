@@ -13,6 +13,7 @@ import { connectRequestSearch } from "../routing/query-string";
 import type { PageRoute } from "../context";
 import { enterAdditionalSharedScope, requireRunner } from "./page-context";
 import { createRequestAbortController } from "./request-abort-signal";
+import { ClientDisconnectedError } from "./client-disconnected-error";
 import { beginLayoutLoaderCapture, endLayoutLoaderCapture } from "./layout-loader-capture";
 import { matchRoute } from "./match-page-route";
 import { resolvePageMetadata } from "./resolve-page-metadata";
@@ -484,17 +485,38 @@ export async function executePageRequest<TResult = PageDataBundle>(
   const { triple } = matched.entry;
   const { request, response } = options.createHttp(match);
   const requestAbortController = createRequestAbortController(request, response);
+  // Set when OUR loader-timeout bound aborted the controller: the client is
+  // still connected and still needs the 504 error page, so that abort is not
+  // a disconnect (see `throwIfClientDisconnected`).
+  let loaderTimedOut = false;
   const store: PipelineStore = runner.buildStore
     ? runner.buildStore({ request, response })
     : { request, response };
+
+  /**
+   * An abandoned request stops HERE, before anything is committed to the
+   * response and before `finish` renders. Rendering it would compose the
+   * layouts with loader data that was never produced (a layout reading
+   * `data.activePage` throws, and the failure is logged as a 500 for a
+   * visitor who is no longer there). `ClientDisconnectedError` is the same
+   * reason the stream abort sites use; the page handler swallows it.
+   */
+  const throwIfClientDisconnected = (): void => {
+    if (requestAbortController.signal.aborted && !loaderTimedOut) {
+      throw new ClientDisconnectedError();
+    }
+  };
 
   return runner.run(store, async () => {
     enterSharedScope(store);
     mergeResolvedSiteShared(request);
     enterAdditionalSharedScope(store);
 
-    const finish = async (bundle: PageDataBundle): Promise<TResult> =>
-      options.finish ? await options.finish(bundle) : (bundle as TResult);
+    const finish = async (bundle: PageDataBundle): Promise<TResult> => {
+      throwIfClientDisconnected();
+
+      return options.finish ? await options.finish(bundle) : (bundle as TResult);
+    };
 
     const bundle: Bundle = {
       route: {
@@ -679,6 +701,7 @@ export async function executePageRequest<TResult = PageDataBundle>(
       if (outcome.kind === "response") return outcome.response;
 
       if (outcome.kind === "stop") {
+        throwIfClientDisconnected();
         bundle.commit = commitBuffers(response, buffers, [...LEVEL_ORDER]);
 
         return finish(bundle);
@@ -702,7 +725,6 @@ export async function executePageRequest<TResult = PageDataBundle>(
     // value (its own race lives in `defer-settlement.ts`) and never the
     // render that follows this loop.
     const loaderTimeoutMs = resolveLoaderTimeoutMs();
-    let loaderTimedOut = false;
     let loaderTimeoutTimer: ReturnType<typeof setTimeout> | undefined;
     // Settles (by rejecting) AT MOST ONCE, so every await below can safely
     // race the SAME promise object as many times as the loop needs — a
@@ -914,14 +936,15 @@ export async function executePageRequest<TResult = PageDataBundle>(
     let committedLevels: PageLevelName[];
     /** Set only when a THROW escalated to the app boundary — forces 500. */
     let forcedStatusCode: number | undefined;
-    // Nothing is committed for an abandoned request — every buffered
-    // mutation (cookies, headers, the forced-status write below) is
-    // discarded, no matter which level queued it. A request WE aborted for
-    // our own loader-timeout bound is not abandoned — the client is still
-    // there and still needs the 504 error page — so that case is excluded
-    // here, deliberately, and handled entirely through the ordinary "throw"
-    // signal below instead.
-    const discarded = requestAbortController.signal.aborted && !loaderTimedOut;
+    // Nothing is committed or rendered for an abandoned request — every
+    // buffered mutation (cookies, headers, a forced status) is discarded, no
+    // matter which level queued it, and a loader that threw BECAUSE of the
+    // abort is not reported as a server failure. A request WE aborted for our
+    // own loader-timeout bound is not abandoned — the client is still there
+    // and still needs the 504 error page — so that case is excluded,
+    // deliberately, and handled entirely through the ordinary "throw" signal
+    // below instead.
+    throwIfClientDisconnected();
 
     if (!signal) {
       committedLevels = [...LEVEL_ORDER];
@@ -973,7 +996,7 @@ export async function executePageRequest<TResult = PageDataBundle>(
 
         if (boundary.boundaryLevel === "app") {
           const status = resolvedStatus ?? 500;
-          if (!discarded) response.setStatusCode(status);
+          response.setStatusCode(status);
           forcedStatusCode = status;
         }
       }
@@ -1019,14 +1042,12 @@ export async function executePageRequest<TResult = PageDataBundle>(
       } as unknown as PageDataBundle["shortCircuit"];
     }
 
-    if (discarded) committedLevels = [];
-
     bundle.commit = commitBuffers(response, buffers, committedLevels);
 
     // Forced AFTER the fold: an app-boundary escalation forces 500
     // regardless of what the surviving (rootward) buffers happened to set —
     // it is the framework's answer, not a loader's.
-    if (forcedStatusCode !== undefined && !discarded) bundle.commit.statusCode = forcedStatusCode;
+    if (forcedStatusCode !== undefined) bundle.commit.statusCode = forcedStatusCode;
 
     // Stage 8 — METADATA. Skipped entirely for a short-circuit (there is no
     // page to describe); a throw still runs it, same as before this stage 6/7

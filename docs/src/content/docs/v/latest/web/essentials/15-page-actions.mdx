@@ -191,9 +191,35 @@ The action's `response` is buffered like a loader's, so `header()` and `cookie()
 
 ## `<Form>`
 
-`<Form>` renders a real `<form method="post">` with `encType` defaulting to `multipart/form-data`. Props: `action` (an action name, not a URL), `to` and `params` (post to another page's route by name), `resetOnSuccess`, `onSuccess(outcome)`, `onError(actionData)`, and any other form attribute except `action` and `method`. If the navigation runtime is not connected, it falls back to a native submit.
+`<Form>` renders a real `<form method="post">` with `encType` defaulting to `multipart/form-data`. Props: `action` (an action name, not a URL), `to` and `params` (post to another page's route by name), `query` (the query string of the URL it posts to), `independent`, `resetOnSuccess`, `onSuccess(outcome)`, `onError(actionData)`, and any other form attribute except `action` and `method`. If the navigation runtime is not connected, `<Form>` leaves the submit to the browser, which posts natively.
 
-`<FieldError name="address[city]">` renders `<span role="alert">` when the field has a message; bracket and dotted names are the same field. `<Form>` sets `aria-invalid` and `aria-describedby` on errored inputs. `useIsSubmitting()` is `true` while any action submitted from this document is in flight.
+A submit button's own `formAction` and its `name`/`value` are honoured on both paths, as the browser does: the button below posts to `/runs?mode=inspect` with `purpose=inspect` alongside the form's fields.
+
+```tsx
+<Form action="recover">
+  <input name="command" defaultValue={command} />
+  <button type="submit" name="purpose" value="inspect" formAction="/runs?mode=inspect">
+    Inspect
+  </button>
+</Form>
+```
+
+`query` names where the submission goes, never what it carries: `<Form action="recover" query={{ mode: "inspect" }}>` posts to the current page as `?mode=inspect` (or to `to`'s page with that query) and the body is still the form's fields.
+
+`<FieldError name="address[city]">` renders `<span role="alert">` when the field has a message; bracket and dotted names are the same field. `<Form>` sets `aria-invalid` and `aria-describedby` on errored inputs. `useIsSubmitting()` is `true` while any action submitted from this document is in flight. When the action redirects, the submission ends only once the redirected page's fresh loader data is on screen, so a form disabled with `useIsSubmitting()` cannot submit again against the previous page's data (a stale revision, for example). `onSuccess` for a redirect fires at the same moment.
+
+### Concurrent submissions
+
+Ordinary submissions are single-flight: a second submit while one is pending shares the pending request, and a navigation supersedes it. Mark a form `independent` when it must run while another is pending, such as a Cancel next to a long-running Start:
+
+```tsx
+<Form action="start">…</Form>
+<Form action="cancel" independent>
+  <button type="submit">Cancel</button>
+</Form>
+```
+
+An independent submission neither aborts the pending one nor is aborted by it, and its result is applied unless a navigation started after it. A double submit of the same independent action (same URL and `_action`) still shares one request, and unmounting the form cancels its submission. A redirect from an independent action is a navigation like any other and supersedes what is pending.
 
 Using `@mongez/react-form`? `useSubmitAction({ action?, to? })` from `@warlock.js/web/form` is an `onSubmit` for its `<Form method="post">` and maps `errors` into the form. Import one of the two `Form`s under an alias if both appear.
 

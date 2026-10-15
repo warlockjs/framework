@@ -55,6 +55,7 @@ import { ensureSetCookieCacheFloorHook, markPageResponse } from "./set-cookie-ca
 import { runPageMiddlewareGate } from "./execute-page-request";
 import type { BufferedCookie, PageRouteEntry, PageTripleModule } from "./execute-page-request";
 import { renderPageRequest, type RenderedPage } from "./render-page";
+import { ClientDisconnectedError } from "./client-disconnected-error";
 import { NDJSON_CONTENT_TYPE } from "./write-deferred-ndjson-response";
 import { applyCommit } from "./page-route-handler/apply-commit";
 import { resolvePageCacheHitOrMiss } from "./page-route-handler/serve-page-cache-hit";
@@ -917,6 +918,11 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
 
       await response.html(rendered.html, status);
     } catch (thrown) {
+      // The client went away while the pipeline was still loading: nothing
+      // was committed, nobody is waiting for an answer, and nothing failed on
+      // the server's side. Neither a report nor a failure page.
+      if (thrown instanceof ClientDisconnectedError) return;
+
       // Floor first, before any error page renders: this path runs outside the
       // pipeline, so `buildErrorRecord` never saw `thrown`. Without this line a
       // framework failure here (a module that fails to load, a cache driver

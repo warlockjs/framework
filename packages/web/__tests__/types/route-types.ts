@@ -2,12 +2,14 @@ import { expectTypeOf } from "vitest";
 import {
   apiHref,
   href,
+  isRouteName,
   navigateTo,
   runtimeRoute,
   type ApiResponse,
   type ApiResponses,
   type ApiRouteTarget,
   type LinkProps,
+  type LinkPropsWithout,
   type PageRouteTarget,
 } from "@warlock.js/web";
 import { useSubmitForm, type UseSubmitFormOptions } from "@warlock.js/web/form";
@@ -148,3 +150,24 @@ expectTypeOf(listForm.data).toEqualTypeOf<unknown>();
 // An explicit response type still wins for callers that provide one.
 const explicitForm = useSubmitForm<undefined, { ok: true }>({ path: "/api/x" });
 expectTypeOf(explicitForm.data).toEqualTypeOf<{ ok: true } | null>();
+
+// WR-021: a wrapper's props keep every destination form and its correlations.
+type WrapperLinkProps = LinkPropsWithout<"className">;
+const wrapperNamed: WrapperLinkProps = { to: "posts.show", params: { slug: "typed" } };
+const wrapperLiteral: WrapperLinkProps = { href: "/pricing" };
+const wrapperEmail: WrapperLinkProps = { email: "sales@example.com" };
+// @ts-expect-error Required params survive the omit (a plain `Omit` loses them).
+const wrapperMissingParams: WrapperLinkProps = { to: "posts.show" };
+// @ts-expect-error The omitted key is gone.
+const wrapperClassName: WrapperLinkProps = { href: "/pricing", className: "x" };
+
+void [wrapperNamed, wrapperLiteral, wrapperEmail, wrapperMissingParams, wrapperClassName];
+
+// WR-021: a data-driven name narrows through the runtime guard, no cast.
+declare const shortcutName: string;
+if (isRouteName(shortcutName)) {
+  const guardedLink: LinkProps = { to: shortcutName };
+  const guardedHref = href(shortcutName, { id: 1 });
+
+  void [guardedLink, guardedHref];
+}

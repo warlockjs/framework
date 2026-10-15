@@ -28,7 +28,12 @@
 import { queryStringOf, type QueryStringInput } from "./query-string";
 import { interpolateRoutePath } from "./route-path-interpolation";
 import { currentSite, siteOriginFor } from "./site-url";
-import type { HasGeneratedPageRoutes, PageRouteName, PageRouteParams } from "./route-types";
+import type {
+  HasGeneratedPageRoutes,
+  PageRouteName,
+  PageRouteParams,
+  RuntimeRouteName,
+} from "./route-types";
 
 /** The two fields `href` needs. Callers may pass richer entries; the rest is ignored. */
 export type RouteTableEntry = {
@@ -275,6 +280,16 @@ export function registerSiteRoutes(
  */
 export function resetRouteTable(): void {
   delete (globalThis as RouteTableHost)[ROUTE_TABLE_SLOT];
+}
+
+/**
+ * Whether `name` is a route the published table knows, narrowing it to a
+ * {@link RuntimeRouteName} so a data-driven name (a menu entry, a shortcut
+ * descriptor) can be handed to `href()` or `<Link to>` without a cast.
+ * `false` while nothing is published.
+ */
+export function isRouteName(name: string): name is RuntimeRouteName {
+  return readSlot()?.table.has(name) ?? false;
 }
 
 /** The published names, for diagnostics. Empty when nothing is published. */
