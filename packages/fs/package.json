@@ -1,0 +1,28 @@
+{
+  "name": "@warlock.js/fs",
+  "version": "5.29.0",
+  "description": "Filesystem primitives for Warlock.js â€” drop-in replacement for @warlock.js/fs.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "warlock": {
+    "environment": "server"
+  },
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warlockjs/fs"
+  },
+  "devDependencies": {
+    "vitest": "4.1.10",
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@11.24.0"
+}
