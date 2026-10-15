@@ -2,7 +2,9 @@ import type { ToolContract } from "@warlock.js/ai";
 import type {
   EditFileInput,
   EditFileResult,
+  ExecOptions,
   GrepResult,
+  ReadFileResult,
   RunShellResult,
   WorkspaceToolName,
 } from "./tool-io.type";
@@ -70,14 +72,15 @@ export interface Workspace {
   readonly tools: WorkspaceTools;
 
   /**
-   * Read a jailed file. `offset`/`limit` select a 1-based line window;
-   * returns the content, its SHA-256 `hash`, and the file's total line
-   * count (for read-before-edit).
+   * Read a jailed file. `offset`/`limit` select a 1-based line window and
+   * `read.maxBytes` bounds the returned bytes; returns the numbered content,
+   * the full file's SHA-256 `hash` (for read-before-edit), and the window
+   * metadata — the same shape the `read_file` tool returns.
    */
   readFile(
     path: string,
     opts?: { offset?: number; limit?: number },
-  ): Promise<{ content: string; hash: string; totalLines: number }>;
+  ): Promise<ReadFileResult>;
 
   /** Atomically write full content to a jailed path. */
   writeFile(
@@ -88,8 +91,12 @@ export interface Workspace {
   /** Apply an exact-string edit under the read-before-edit stale guard. */
   editFile(input: EditFileInput): Promise<EditFileResult>;
 
-  /** Run a policy-gated shell command and capture its outcome. */
-  exec(command: string, opts?: { timeoutMs?: number }): Promise<RunShellResult>;
+  /**
+   * Run a policy-gated shell command and capture its outcome. `signal`
+   * cancels this one call: not started when already aborted, process tree
+   * killed when it aborts mid-run, `cancelled: true` either way.
+   */
+  exec(command: string, opts?: ExecOptions): Promise<RunShellResult>;
 
   /** Search jailed file contents for a regex pattern. */
   grep(

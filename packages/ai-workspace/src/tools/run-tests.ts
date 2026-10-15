@@ -89,7 +89,8 @@ export interface MakeRunTestsToolOptions {
  * data, never a second command. Like `run_shell`, the resolved command's
  * executable is gated by the shell policy — a denial surfaces in the
  * result's `error` field — and a non-zero exit (failing tests) comes back
- * as `data` for the agent to read and fix.
+ * as `data` for the agent to read and fix. The agent run's cancellation
+ * `signal` is threaded per invocation, exactly as for `run_shell`.
  *
  * @param ops - The policy-enforced operation layer to delegate `exec` to.
  * @param options - Optional tool-name and base-command overrides.
@@ -114,13 +115,13 @@ export function makeRunTestsTool(
     action: (input) =>
       input.pattern ? `Running tests matching "${input.pattern}"` : "Running tests",
     input: runTestsInputSchema,
-    execute: (input) => {
+    execute: (input, ctx) => {
       // The pattern rides as ONE double-quoted token (quotes/newlines are
       // rejected by the schema), so it reaches the runner as a single argv
       // element and can never smuggle in additional commands or arguments.
       const command = input.pattern ? `${baseCommand} "${input.pattern}"` : baseCommand;
 
-      return ops.exec(command);
+      return ops.exec(command, ctx?.signal ? { signal: ctx.signal } : undefined);
     },
   });
 }

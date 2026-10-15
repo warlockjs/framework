@@ -3,7 +3,7 @@ import { ToolExecutionError } from "@warlock.js/ai";
 import { createMockBackend } from "../backends/mock";
 import { WorkspacePolicyError } from "../errors";
 import { createOps } from "../ops";
-import type { WorkspacePolicy } from "../contracts";
+import type { ExecOptions, RunShellResult, WorkspaceOps, WorkspacePolicy } from "../contracts";
 import { makeRunTestsTool, type MakeRunTestsToolOptions } from "./run-tests";
 import { causeOf } from "./test-support";
 
@@ -130,5 +130,42 @@ describe("makeRunTestsTool", () => {
 
     expect(data).toBeUndefined();
     expect(error).toBeDefined();
+  });
+});
+
+describe("makeRunTestsTool cancellation", () => {
+  it("passes the dispatch ctx signal to ops.exec for this invocation", async () => {
+    let received: ExecOptions | undefined;
+    const ops = {
+      exec: async (_command: string, opts?: ExecOptions): Promise<RunShellResult> => {
+        received = opts;
+
+        return {
+          exitCode: 0,
+          stdout: "",
+          stderr: "",
+          truncated: false,
+          timedOut: false,
+          cancelled: false,
+        };
+      },
+    } as unknown as WorkspaceOps;
+    const controller = new AbortController();
+
+    await makeRunTestsTool(ops).invoke({}, { artifacts: {}, signal: controller.signal });
+
+    expect(received?.signal).toBe(controller.signal);
+  });
+
+  it("returns cancelled data without running when the run is already cancelled", async () => {
+    const runTests = makeTool({ "npm test": { exitCode: 0, stdout: "12 passing" } });
+    const controller = new AbortController();
+    controller.abort();
+
+    const { data, error } = await runTests.invoke({}, { artifacts: {}, signal: controller.signal });
+
+    expect(error).toBeUndefined();
+    expect(data?.cancelled).toBe(true);
+    expect(data?.stdout).toBe("");
   });
 });

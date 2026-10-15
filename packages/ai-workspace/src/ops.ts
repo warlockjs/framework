@@ -5,8 +5,10 @@ import { buildEnv, isCommandAllowed, resolveInJail } from "./policy/policy";
 import type {
   EditFileInput,
   EditFileResult,
+  ExecOptions,
   GrepMatch,
   GrepResult,
+  ReadFileResult,
   RunShellResult,
   WorkspaceBackend,
   WorkspaceOps,
@@ -19,6 +21,12 @@ const DEFAULT_READ_LINES = 2000;
 const DEFAULT_MAX_GREP_MATCHES = 1000;
 /** Default per-command output byte cap when the policy sets none. */
 const DEFAULT_MAX_OUTPUT_BYTES = 1_000_000;
+/**
+ * Exit code reported for a command refused because its signal was already
+ * aborted (the shell convention for an interrupted command). Callers should
+ * branch on `cancelled`, not on this number.
+ */
+const CANCELLED_BEFORE_START_EXIT_CODE = 130;
 /**
  * Hard ceiling on `grep` pattern length. A model-controlled regex has no
  * legitimate reason to be this long; longer patterns are rejected outright
@@ -34,38 +42,87 @@ const MAX_GREP_PATTERN_LENGTH = 200;
  */
 const MAX_GREP_LINE_SCAN_LENGTH = 2000;
 
-/**
- * Number the lines of `content` `cat -n` style: a right-aligned line
- * number (min width 6), a tab, then the line. `startLine` is the 1-based
- * number of the first line in the window.
- */
-function numberLines(content: string, startLine: number): string {
-  const lines = content.split("\n");
-
-  return lines
-    .map((line, index) => {
-      const lineNumber = startLine + index;
-
-      return `${String(lineNumber).padStart(6, " ")}\t${line}`;
-    })
-    .join("\n");
+/** The `cat -n` prefix for a line: right-aligned number (min width 6) and a tab. */
+function linePrefix(lineNumber: number): string {
+  return `${String(lineNumber).padStart(6, " ")}\t`;
 }
 
 /**
- * Clip a captured stream at `maxBytes` (measured in UTF-8 bytes).
- * Returns the possibly-clipped string plus whether clipping occurred.
+ * Clip `value` to at most `maxBytes` UTF-8 bytes without splitting a
+ * character: the cut backs off over continuation bytes (`10xxxxxx`) to the
+ * start of the character it would have split, so the result never carries
+ * a replacement character.
  */
-function capOutput(value: string, maxBytes: number): { value: string; truncated: boolean } {
+function clipUtf8(value: string, maxBytes: number): { value: string; truncated: boolean } {
   const bytes = Buffer.from(value, "utf8");
 
   if (bytes.byteLength <= maxBytes) {
     return { value, truncated: false };
   }
 
-  // Slice on a byte boundary; `toString` tolerates a split multi-byte
-  // char at the tail by emitting the replacement character, which is
-  // acceptable for a truncated diagnostic stream.
-  return { value: bytes.subarray(0, maxBytes).toString("utf8"), truncated: true };
+  let cut = Math.max(0, maxBytes);
+
+  while (cut > 0 && (bytes[cut] & 0xc0) === 0x80) {
+    cut--;
+  }
+
+  return { value: bytes.subarray(0, cut).toString("utf8"), truncated: true };
+}
+
+/**
+ * Number a window of lines `cat -n` style, keeping the joined output within
+ * `maxBytes` UTF-8 bytes (prefixes and newlines included) when a cap is set.
+ * A line that does not fit whole is clipped on a character boundary; it is
+ * still counted as returned when its prefix and at least one character fit.
+ */
+function numberWindow(
+  lines: string[],
+  startLine: number,
+  maxBytes: number | undefined,
+): { content: string; returnedLines: number; bytesCapped: boolean } {
+  const parts: string[] = [];
+  let used = 0;
+
+  for (let index = 0; index < lines.length; index++) {
+    const prefix = linePrefix(startLine + index);
+    const numbered = prefix + lines[index];
+    const separator = parts.length > 0 ? 1 : 0;
+
+    if (maxBytes === undefined) {
+      parts.push(numbered);
+
+      continue;
+    }
+
+    const cost = separator + Buffer.byteLength(numbered, "utf8");
+
+    if (used + cost <= maxBytes) {
+      parts.push(numbered);
+      used += cost;
+
+      continue;
+    }
+
+    const room = maxBytes - used - separator - Buffer.byteLength(prefix, "utf8");
+    const clipped = room > 0 ? clipUtf8(lines[index], room).value : "";
+
+    if (clipped.length > 0) {
+      parts.push(prefix + clipped);
+    }
+
+    return { content: parts.join("\n"), returnedLines: parts.length, bytesCapped: true };
+  }
+
+  return { content: parts.join("\n"), returnedLines: parts.length, bytesCapped: false };
+}
+
+/**
+ * Clip a captured stream at `maxBytes` (measured in UTF-8 bytes), on a
+ * character boundary. Returns the possibly-clipped string plus whether
+ * clipping occurred.
+ */
+function capOutput(value: string, maxBytes: number): { value: string; truncated: boolean } {
+  return clipUtf8(value, maxBytes);
 }
 
 /**
@@ -191,14 +248,15 @@ class Ops implements WorkspaceOps {
   public async readFile(
     inputPath: string,
     opts?: { offset?: number; limit?: number },
-  ): Promise<{ content: string; hash: string; totalLines: number }> {
+  ): Promise<ReadFileResult> {
     const { absolutePath } = await resolveInJail(this.policy, inputPath);
     const raw = await this.backend.readFile(absolutePath);
 
-    // Hash the content the backend returned (SHA-256 via @warlock.js/fs),
-    // not the on-disk file — the mock backend keeps content in memory,
-    // and hashing the returned bytes is what the stale-edit guard later
-    // compares against, so it must be the SAME source of truth.
+    // Hash the full content the backend returned (SHA-256 via
+    // @warlock.js/fs), not the returned window and not the on-disk file —
+    // the mock backend keeps content in memory, and the stale-edit guard
+    // later hashes the backend's content too, so it must be the SAME
+    // source of truth whatever window or byte cap applied.
     const hash = fs.hash.string(raw);
 
     const lines = raw.split("\n");
@@ -206,12 +264,27 @@ class Ops implements WorkspaceOps {
 
     const offset = Math.max(1, opts?.offset ?? 1);
     const limit = opts?.limit ?? this.policy.read?.defaultLines ?? DEFAULT_READ_LINES;
+    const maxBytes = this.policy.read?.maxBytes;
 
     const startIndex = offset - 1;
-    const window = lines.slice(startIndex, startIndex + limit);
-    const content = numberLines(window.join("\n"), offset);
+    const window = lines.slice(startIndex, startIndex + Math.max(0, limit));
+    const { content, returnedLines, bytesCapped } = numberWindow(
+      window,
+      offset,
+      maxBytes === undefined ? undefined : Math.max(0, Math.floor(maxBytes)),
+    );
+    const endLine = offset + returnedLines - 1;
 
-    return { content, hash, totalLines };
+    return {
+      content,
+      startLine: offset,
+      endLine,
+      totalLines,
+      truncated: bytesCapped || endLine < totalLines,
+      bytesCapped,
+      totalBytes: Buffer.byteLength(raw, "utf8"),
+      hash,
+    };
   }
 
   public async writeFile(
@@ -281,15 +354,27 @@ class Ops implements WorkspaceOps {
     };
   }
 
-  public async exec(
-    command: string,
-    opts?: { timeoutMs?: number },
-  ): Promise<RunShellResult> {
+  public async exec(command: string, opts?: ExecOptions): Promise<RunShellResult> {
     if (!isCommandAllowed(this.policy, command)) {
       throw new WorkspacePolicyError(
         `Command is not permitted by the workspace shell policy: ${command}`,
         { type: "denied-command", command },
       );
+    }
+
+    const signal = opts?.signal;
+
+    // Refuse an already-cancelled invocation here, so no backend — built-in
+    // or custom — ever starts a command whose caller has given up on it.
+    if (signal?.aborted) {
+      return {
+        exitCode: CANCELLED_BEFORE_START_EXIT_CODE,
+        stdout: "",
+        stderr: "Command was not executed: the invocation was cancelled before it started.",
+        truncated: false,
+        timedOut: false,
+        cancelled: true,
+      };
     }
 
     const shell = this.policy.shell;
@@ -300,17 +385,20 @@ class Ops implements WorkspaceOps {
       cwd: this.policy.cwd,
       timeoutMs,
       env: buildEnv(this.policy),
+      ...(signal ? { signal } : {}),
     });
 
     const stdout = capOutput(result.stdout, maxOutputBytes);
     const stderr = capOutput(result.stderr, maxOutputBytes);
+    const cancelled = result.cancelled === true;
 
     return {
       exitCode: result.exitCode,
       stdout: stdout.value,
       stderr: stderr.value,
       truncated: stdout.truncated || stderr.truncated,
-      timedOut: result.timedOut,
+      timedOut: result.timedOut && !cancelled,
+      cancelled,
     };
   }
 

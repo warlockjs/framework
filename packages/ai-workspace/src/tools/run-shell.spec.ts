@@ -3,7 +3,7 @@ import { ToolExecutionError } from "@warlock.js/ai";
 import { createMockBackend } from "../backends/mock";
 import { WorkspacePolicyError } from "../errors";
 import { createOps } from "../ops";
-import type { WorkspacePolicy } from "../contracts";
+import type { ExecOptions, RunShellResult, WorkspaceOps, WorkspacePolicy } from "../contracts";
 import { makeRunShellTool } from "./run-shell";
 import { causeOf } from "./test-support";
 
@@ -46,6 +46,7 @@ describe("makeRunShellTool", () => {
       stderr: "",
       truncated: false,
       timedOut: false,
+      cancelled: false,
     });
   });
 
@@ -96,5 +97,42 @@ describe("makeRunShellTool", () => {
 
     expect(data).toBeUndefined();
     expect(error).toBeDefined();
+  });
+});
+
+describe("makeRunShellTool cancellation", () => {
+  it("passes the dispatch ctx signal to ops.exec for this invocation", async () => {
+    let received: ExecOptions | undefined;
+    const ops = {
+      exec: async (_command: string, opts?: ExecOptions): Promise<RunShellResult> => {
+        received = opts;
+
+        return { exitCode: 0, stdout: "", stderr: "", truncated: false, timedOut: false, cancelled: false };
+      },
+    } as unknown as WorkspaceOps;
+    const controller = new AbortController();
+
+    await makeRunShellTool(ops).invoke(
+      { command: "npm test", timeoutMs: 500 },
+      { artifacts: {}, signal: controller.signal },
+    );
+
+    expect(received?.signal).toBe(controller.signal);
+    expect(received?.timeoutMs).toBe(500);
+  });
+
+  it("returns cancelled data without running when the run is already cancelled", async () => {
+    const runShell = makeTool({ "npm run build": { exitCode: 0, stdout: "built ok" } });
+    const controller = new AbortController();
+    controller.abort();
+
+    const { data, error } = await runShell.invoke(
+      { command: "npm run build" },
+      { artifacts: {}, signal: controller.signal },
+    );
+
+    expect(error).toBeUndefined();
+    expect(data?.cancelled).toBe(true);
+    expect(data?.stdout).toBe("");
   });
 });

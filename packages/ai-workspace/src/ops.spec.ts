@@ -465,3 +465,202 @@ describe("createOps exists / mkdir / remove", () => {
     await expect(ops.remove("../evil")).rejects.toBeInstanceOf(WorkspacePolicyError);
   });
 });
+
+describe("createOps.readFile byte cap (read.maxBytes)", () => {
+  let backend: FakeBackend;
+
+  beforeEach(() => {
+    backend = new FakeBackend();
+  });
+
+  it("bounds a single long line to maxBytes, numbered prefix included", async () => {
+    const raw = "x".repeat(4096);
+    backend.files.set(abs("long.txt"), raw);
+    const ops = createOps(backend, policy({ read: { maxBytes: 16, defaultLines: 1 } }));
+
+    const result = await ops.readFile("long.txt");
+
+    expect(Buffer.byteLength(result.content, "utf8")).toBe(16);
+    // 6-wide number + tab = 7 bytes of prefix, 9 bytes of line content.
+    expect(result.content).toBe(`     1\t${"x".repeat(9)}`);
+    expect(result.bytesCapped).toBe(true);
+    expect(result.truncated).toBe(true);
+    expect(result.startLine).toBe(1);
+    expect(result.endLine).toBe(1);
+    expect(result.totalLines).toBe(1);
+    expect(result.totalBytes).toBe(4096);
+  });
+
+  it("hashes the full file, not the returned window", async () => {
+    const raw = "y".repeat(1000);
+    backend.files.set(abs("long.txt"), raw);
+    const ops = createOps(backend, policy({ read: { maxBytes: 32 } }));
+
+    const result = await ops.readFile("long.txt");
+
+    expect(result.hash).toBe(hashString(raw));
+  });
+
+  it("never splits a multibyte character", async () => {
+    // Each "é" is 2 bytes and each "😀" is 4 bytes in UTF-8.
+    backend.files.set(abs("utf8.txt"), "é😀".repeat(50));
+    const ops = createOps(backend, policy({ read: { maxBytes: 7 + 5 } }));
+
+    const result = await ops.readFile("utf8.txt");
+
+    // 5 bytes of room fits "é" (2) but not the following "😀" (4).
+    expect(result.content).toBe("     1\té");
+    expect(result.content).not.toContain("�");
+    expect(Buffer.byteLength(result.content, "utf8")).toBeLessThanOrEqual(12);
+    expect(result.bytesCapped).toBe(true);
+  });
+
+  it("stops at whole lines when they fit and reports the last line returned", async () => {
+    backend.files.set(abs("lines.txt"), "aaaa\nbbbb\ncccc\ndddd");
+    // Each numbered line is 7 + 4 = 11 bytes, plus 1 byte per separator.
+    const ops = createOps(backend, policy({ read: { maxBytes: 23 } }));
+
+    const result = await ops.readFile("lines.txt");
+
+    expect(result.content).toBe("     1\taaaa\n     2\tbbbb");
+    expect(Buffer.byteLength(result.content, "utf8")).toBe(23);
+    expect(result.endLine).toBe(2);
+    expect(result.bytesCapped).toBe(true);
+    expect(result.truncated).toBe(true);
+  });
+
+  it("drops a line entirely when not even its prefix and one character fit", async () => {
+    backend.files.set(abs("lines.txt"), "aaaa\nbbbb");
+    const ops = createOps(backend, policy({ read: { maxBytes: 15 } }));
+
+    const result = await ops.readFile("lines.txt");
+
+    expect(result.content).toBe("     1\taaaa");
+    expect(result.endLine).toBe(1);
+    expect(result.bytesCapped).toBe(true);
+  });
+
+  it("applies the cap to an offset window too", async () => {
+    backend.files.set(abs("lines.txt"), `a\n${"b".repeat(100)}\nc`);
+    const ops = createOps(backend, policy({ read: { maxBytes: 10 } }));
+
+    const result = await ops.readFile("lines.txt", { offset: 2 });
+
+    expect(result.content).toBe("     2\tbbb");
+    expect(result.startLine).toBe(2);
+    expect(result.endLine).toBe(2);
+  });
+
+  it("returns the whole window untouched when it fits under the cap", async () => {
+    backend.files.set(abs("small.txt"), "one\ntwo");
+    const ops = createOps(backend, policy({ read: { maxBytes: 1000 } }));
+
+    const result = await ops.readFile("small.txt");
+
+    expect(result.content).toBe("     1\tone\n     2\ttwo");
+    expect(result.bytesCapped).toBe(false);
+    expect(result.truncated).toBe(false);
+    expect(result.endLine).toBe(2);
+  });
+
+  it("does not cap when the policy sets no maxBytes", async () => {
+    backend.files.set(abs("long.txt"), "z".repeat(10_000));
+    const ops = createOps(backend, policy());
+
+    const result = await ops.readFile("long.txt");
+
+    expect(Buffer.byteLength(result.content, "utf8")).toBe(10_007);
+    expect(result.bytesCapped).toBe(false);
+  });
+
+  it("reports line-limit truncation separately from the byte cap", async () => {
+    backend.files.set(abs("lines.txt"), "a\nb\nc");
+    const ops = createOps(backend, policy({ read: { defaultLines: 2, maxBytes: 1000 } }));
+
+    const result = await ops.readFile("lines.txt");
+
+    expect(result.endLine).toBe(2);
+    expect(result.truncated).toBe(true);
+    expect(result.bytesCapped).toBe(false);
+  });
+});
+
+describe("createOps.exec cancellation", () => {
+  it("does not reach the backend when the signal is already aborted", async () => {
+    const backend = new FakeBackend();
+    const ops = createOps(backend, policy({ shell: { allow: ["npm"] } }));
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await ops.exec("npm test", { signal: controller.signal });
+
+    expect(backend.lastExec).toBeUndefined();
+    expect(result.cancelled).toBe(true);
+    expect(result.timedOut).toBe(false);
+    expect(result.exitCode).not.toBe(0);
+  });
+
+  it("still applies the command gate before the cancellation check", async () => {
+    const backend = new FakeBackend();
+    const ops = createOps(backend, policy({ shell: { allow: ["npm"] } }));
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(ops.exec("rm -rf /", { signal: controller.signal })).rejects.toMatchObject({
+      type: "denied-command",
+    });
+  });
+
+  it("threads the per-call signal to the backend", async () => {
+    const backend = new FakeBackend();
+    const ops = createOps(backend, policy({ shell: { allow: ["npm"] } }));
+    const controller = new AbortController();
+
+    await ops.exec("npm test", { signal: controller.signal });
+
+    expect(backend.lastExec?.opts?.signal).toBe(controller.signal);
+  });
+
+  it("passes no signal when the caller gave none", async () => {
+    const backend = new FakeBackend();
+    const ops = createOps(backend, policy({ shell: { allow: ["npm"] } }));
+
+    await ops.exec("npm test");
+
+    expect(backend.lastExec?.opts && "signal" in backend.lastExec.opts).toBe(false);
+  });
+
+  it("surfaces a backend cancellation and never reports it as a timeout", async () => {
+    const backend = new FakeBackend();
+    backend.execResult = { exitCode: 137, stdout: "", stderr: "", timedOut: true, cancelled: true };
+    const ops = createOps(backend, policy({ shell: { allow: ["npm"] } }));
+
+    const result = await ops.exec("npm test", { signal: new AbortController().signal });
+
+    expect(result.cancelled).toBe(true);
+    expect(result.timedOut).toBe(false);
+  });
+
+  it("reads an absent backend `cancelled` as false", async () => {
+    const backend = new FakeBackend();
+    const ops = createOps(backend, policy({ shell: { allow: ["npm"] } }));
+
+    const result = await ops.exec("npm test");
+
+    expect(result.cancelled).toBe(false);
+  });
+});
+
+describe("createOps.exec output cap", () => {
+  it("clips captured output on a character boundary", async () => {
+    const backend = new FakeBackend();
+    backend.execResult = { exitCode: 0, stdout: "€".repeat(10), stderr: "", timedOut: false };
+    const ops = createOps(backend, policy({ shell: { allow: ["npm"], maxOutputBytes: 7 } }));
+
+    const result = await ops.exec("npm test");
+
+    // "€" is 3 bytes: 7 bytes of room holds two whole characters.
+    expect(result.stdout).toBe("€€");
+    expect(result.truncated).toBe(true);
+  });
+});

@@ -18,10 +18,10 @@ const inputSchema = objectSchema<ReadFileInput>({
  *
  * The tool validates `{ path, startLine?, limit? }` against a Standard
  * Schema, then delegates to `ops.readFile`, mapping the result into the
- * agent wire shape {@link ReadFileResult} — the `hash` an agent must
- * carry into a later `edit_file` (read-before-edit), plus the `startLine`
- * / `endLine` / `truncated` window metadata derived from the requested
- * range and the file's `totalLines`.
+ * agent wire shape {@link ReadFileResult} — the full file's `hash` an
+ * agent must carry into a later `edit_file` (read-before-edit), plus the
+ * `startLine` / `endLine` / `truncated` / `bytesCapped` window metadata.
+ * The returned `content` never exceeds the policy's `read.maxBytes`.
  *
  * **Errors flow as data.** Policy violations (a jail escape) are thrown
  * by `ops`; the `tool()` wrapper catches them and surfaces them in the
@@ -46,23 +46,17 @@ export function makeReadFileTool(
       "Read a file from the workspace, returning a numbered line window plus " +
       "the file's content hash. Pass the hash to edit_file's expectHash to " +
       "guard against editing a stale version. Use startLine/limit to page " +
-      "through large files.",
+      "through large files. Output is byte-capped by the workspace policy; " +
+      "when bytesCapped is true the last returned line may be cut short.",
     input: inputSchema,
     async execute(input) {
-      const startLine = input.startLine !== undefined ? Math.max(1, input.startLine) : 1;
-      const { content, hash, totalLines } = await ops.readFile(input.path, {
-        offset: startLine,
+      // The ops layer owns the window and byte-cap arithmetic, so the tool
+      // and the direct `readFile()` return identical results for the same
+      // arguments.
+      return ops.readFile(input.path, {
+        offset: input.startLine !== undefined ? Math.max(1, input.startLine) : 1,
         limit: input.limit,
       });
-
-      // The window's last line is the start plus however many lines the
-      // ops layer actually returned (it caps at `limit` / the policy
-      // default), bounded by the file's end.
-      const returnedLines = content.length === 0 ? 0 : content.split("\n").length;
-      const endLine = Math.min(totalLines, startLine + Math.max(returnedLines, 1) - 1);
-      const truncated = endLine < totalLines;
-
-      return { content, startLine, endLine, totalLines, truncated, hash };
     },
   });
 }

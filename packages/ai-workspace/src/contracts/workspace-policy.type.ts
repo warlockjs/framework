@@ -47,9 +47,16 @@ export interface WorkspaceShellPolicy {
 
 /**
  * Read sub-policy controlling how much of a file a single read returns.
+ * Applies equally to the `read_file` tool and the `readFile()` direct method.
  */
 export interface WorkspaceReadPolicy {
-  /** Hard cap on bytes returned by a single read; larger reads truncate. */
+  /**
+   * Hard cap on the UTF-8 bytes of the `content` a single read returns,
+   * line-number prefixes and newlines included. A window that would exceed
+   * it is cut — mid-line if needed, always on a character boundary — and
+   * the result reports `bytesCapped: true`. Absent ⇒ no byte cap. The
+   * whole file is still read and hashed; this bounds what is returned.
+   */
   maxBytes?: number;
   /** Default number of lines a read returns when no explicit limit is given. */
   defaultLines?: number;

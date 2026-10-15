@@ -46,6 +46,20 @@ describe("workspace (integration over the real local backend)", () => {
     expect(read.hash).toBe(written.hash);
   });
 
+  it("should enforce read.maxBytes for both the direct read and the read_file tool", async () => {
+    const ws = workspace({ cwd: root, read: { maxBytes: 16, defaultLines: 1 } });
+    const raw = "x".repeat(4096);
+    await ws.writeFile("owned.txt", raw);
+
+    const direct = await ws.readFile("owned.txt");
+    const viaTool = await ws.tools.readFile().invoke({ path: "owned.txt" });
+
+    expect(Buffer.byteLength(direct.content, "utf8")).toBeLessThanOrEqual(16);
+    expect(direct.bytesCapped).toBe(true);
+    expect(viaTool.error).toBeUndefined();
+    expect(viaTool.data).toEqual(direct);
+  });
+
   it("should edit a file when the supplied expectHash is current", async () => {
     const ws = makeWorkspace();
     await ws.writeFile("note.txt", "alpha beta gamma");

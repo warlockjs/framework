@@ -1,7 +1,9 @@
 import type {
   EditFileInput,
   EditFileResult,
+  ExecOptions,
   GrepResult,
+  ReadFileResult,
   RunShellResult,
 } from "./tool-io.type";
 
@@ -26,14 +28,15 @@ import type {
  */
 export interface WorkspaceOps {
   /**
-   * Read a jailed file, returning its content, content hash, and total
-   * line count. `offset`/`limit` select a 1-based line window; the
-   * policy `read` caps still apply.
+   * Read a jailed file, returning a numbered line window, the full file's
+   * hash and the window metadata. `offset`/`limit` select a 1-based line
+   * window; `read.maxBytes` bounds the UTF-8 bytes of the returned
+   * `content` (see {@link ReadFileResult}).
    */
   readFile(
     path: string,
     opts?: { offset?: number; limit?: number },
-  ): Promise<{ content: string; hash: string; totalLines: number }>;
+  ): Promise<ReadFileResult>;
 
   /** Atomically write full content to a jailed path, returning size + hash. */
   writeFile(
@@ -51,12 +54,10 @@ export interface WorkspaceOps {
   /**
    * Run a shell command after gating its leading executable basename
    * against the shell allow/deny policy, with the policy environment,
-   * timeout, and output byte cap applied.
+   * timeout, and output byte cap applied. `signal` cancels this one call
+   * (see {@link ExecOptions}).
    */
-  exec(
-    command: string,
-    opts?: { timeoutMs?: number },
-  ): Promise<RunShellResult>;
+  exec(command: string, opts?: ExecOptions): Promise<RunShellResult>;
 
   /** Search jailed file contents for a regex pattern. */
   grep(

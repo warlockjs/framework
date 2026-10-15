@@ -206,8 +206,13 @@ class MockBackend implements WorkspaceBackend {
 
   public async exec(
     command: string,
-    _opts?: WorkspaceBackendExecOptions,
+    opts?: WorkspaceBackendExecOptions,
   ): Promise<WorkspaceBackendExecResult> {
+    // Honour the contract's pre-aborted rule: nothing "runs".
+    if (opts?.signal?.aborted) {
+      return { exitCode: 130, stdout: "", stderr: "", timedOut: false, cancelled: true };
+    }
+
     const scripted = this.commands.get(command);
 
     return {
@@ -215,6 +220,7 @@ class MockBackend implements WorkspaceBackend {
       stdout: scripted?.stdout ?? "",
       stderr: scripted?.stderr ?? "",
       timedOut: scripted?.timedOut ?? false,
+      cancelled: scripted?.cancelled ?? false,
     };
   }
 }

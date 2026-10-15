@@ -86,3 +86,53 @@ describe("makeReadFileTool", () => {
     expect(result.error).toBeDefined();
   });
 });
+
+describe("makeReadFileTool under read.maxBytes", () => {
+  /** Ops over a mock backend whose policy caps returned read bytes. */
+  function cappedOps(files: Record<string, string>, maxBytes: number): WorkspaceOps {
+    return createOps(createMockBackend(files), {
+      cwd: jailRoot,
+      read: { maxBytes, defaultLines: 1 },
+    });
+  }
+
+  it("bounds a single long line and flags the byte cap", async () => {
+    const raw = "x".repeat(4096);
+    const readTool = makeReadFileTool(cappedOps({ [abs("owned.txt")]: raw }, 16));
+
+    const result = await readTool.invoke({ path: "owned.txt" });
+
+    expect(result.error).toBeUndefined();
+    expect(Buffer.byteLength(result.data?.content ?? "", "utf8")).toBe(16);
+    expect(result.data?.bytesCapped).toBe(true);
+    expect(result.data?.truncated).toBe(true);
+    expect(result.data?.endLine).toBe(1);
+    expect(result.data?.totalBytes).toBe(4096);
+    expect(result.data?.hash).toBe(hashString(raw));
+  });
+
+  it("returns exactly what the direct readFile returns for the same arguments", async () => {
+    const files = { [abs("mixed.txt")]: `${"é".repeat(20)}\nsecond line\n${"😀".repeat(30)}` };
+    const ops = createOps(createMockBackend(files), { cwd: jailRoot, read: { maxBytes: 40 } });
+    const readTool = makeReadFileTool(ops);
+
+    const windows: { startLine?: number; limit?: number }[] = [
+      {},
+      { startLine: 2 },
+      { startLine: 3, limit: 1 },
+    ];
+
+    for (const args of windows) {
+      const toolResult = await readTool.invoke({ path: "mixed.txt", ...args });
+      const direct = await ops.readFile("mixed.txt", {
+        offset: args.startLine ?? 1,
+        limit: args.limit,
+      });
+
+      expect(toolResult.error).toBeUndefined();
+      expect(toolResult.data).toEqual(direct);
+      expect(Buffer.byteLength(direct.content, "utf8")).toBeLessThanOrEqual(40);
+      expect(direct.content).not.toContain("�");
+    }
+  });
+});

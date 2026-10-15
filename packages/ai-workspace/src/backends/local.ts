@@ -199,11 +199,13 @@ class LocalBackend implements WorkspaceBackend {
    * cannot be spawned shell-less) with every element individually quoted.
    * `cwd`, `env`, and the timeout are taken verbatim from the ops layer
    * (the environment is NOT merged with `process.env`). On timeout the
-   * process is SIGKILLed and `timedOut` is set. `stdout`/`stderr` are
-   * captured and byte-capped per {@link MAX_STREAM_BYTES}.
+   * process tree is SIGKILLed and `timedOut` is set. When `signal` aborts
+   * mid-run the process tree is SIGKILLed the same way and `cancelled` is
+   * set; an already-aborted `signal` resolves `cancelled` without spawning.
+   * `stdout`/`stderr` are captured and byte-capped per {@link MAX_STREAM_BYTES}.
    *
    * Never rejects for a non-zero exit, a missing executable, a refused
-   * command line, or a timeout — those are reported through the resolved
+   * command line, a timeout or a cancellation — those are reported through the resolved
    * {@link WorkspaceBackendExecResult} so the ops layer can surface them
    * as tool-error data.
    */
@@ -214,6 +216,21 @@ class LocalBackend implements WorkspaceBackend {
     return new Promise<WorkspaceBackendExecResult>((resolve) => {
       const refuse = (stderr: string): void =>
         resolve({ exitCode: 127, stdout: "", stderr, timedOut: false });
+
+      const signal = opts.signal;
+
+      // Never spawn for an invocation that was cancelled before it started.
+      if (signal?.aborted) {
+        resolve({
+          exitCode: 130,
+          stdout: "",
+          stderr: "Command was not executed: the invocation was cancelled before it started.",
+          timedOut: false,
+          cancelled: true,
+        });
+
+        return;
+      }
 
       const argv = tokenizeCommand(command);
 
@@ -266,15 +283,36 @@ class LocalBackend implements WorkspaceBackend {
       let stdoutBytes = 0;
       let stderrBytes = 0;
       let timedOut = false;
+      let cancelled = false;
       let settled = false;
 
+      // Timeout and cancellation are mutually exclusive: whichever kills the
+      // tree first owns the outcome, so a result is never both.
       const timer =
         opts.timeoutMs !== undefined && opts.timeoutMs > 0
           ? setTimeout(() => {
+              if (cancelled) {
+                return;
+              }
+
               timedOut = true;
               killTree(child.pid, child);
             }, opts.timeoutMs)
           : undefined;
+
+      const onAbort = (): void => {
+        if (settled || timedOut) {
+          return;
+        }
+
+        cancelled = true;
+        killTree(child.pid, child);
+      };
+
+      // Attached synchronously after `spawn`, so there is no window in which
+      // an abort could be missed; removed in `settle` so a long-lived signal
+      // shared across many commands does not accumulate listeners.
+      signal?.addEventListener("abort", onAbort, { once: true });
 
       const settle = (exitCode: number) => {
         if (settled) {
@@ -287,11 +325,14 @@ class LocalBackend implements WorkspaceBackend {
           clearTimeout(timer);
         }
 
+        signal?.removeEventListener("abort", onAbort);
+
         resolve({
           exitCode,
           stdout: Buffer.concat(stdoutChunks).toString("utf8"),
           stderr: Buffer.concat(stderrChunks).toString("utf8"),
           timedOut,
+          cancelled,
         });
       };
 

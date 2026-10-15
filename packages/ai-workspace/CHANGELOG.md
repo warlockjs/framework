@@ -4,6 +4,20 @@ All notable changes to `@warlock.js/ai-workspace` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.30.0
+
+### Added
+
+- `exec()` takes a per-call `signal` (`ExecOptions`); `run_shell` and `run_tests` pass the agent run's `ctx.signal`. An already-aborted signal never starts the command; an abort mid-run kills the process tree. Both resolve with the new `cancelled: true` on `RunShellResult`, never together with `timedOut` (WR-010).
+- `WorkspaceBackendExecOptions.signal` and `WorkspaceBackendExecResult.cancelled?` for custom backends; the local backend removes its abort listener when the command settles, and the mock backend honours a pre-aborted signal.
+- Read results carry `startLine`, `endLine`, `truncated`, `bytesCapped` and `totalBytes`; `readFile()` and the `read_file` tool now return the same `ReadFileResult` for the same arguments.
+
+### Fixed
+
+- `read.maxBytes` is enforced: the returned `content` (line-number prefixes and newlines included) never exceeds it, so a single long line no longer bypasses the cap. Lines are cut on a character boundary, never mid-character; `hash` remains the SHA-256 of the whole file (WR-009).
+- Command output clipped at `shell.maxOutputBytes` is cut on a character boundary instead of ending in a replacement character.
+- A read window past the end of the file returns empty `content` instead of one numbered empty line.
+
 ## 5.29.0 - 2026-10-01
 
 ### Changed

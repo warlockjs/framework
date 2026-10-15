@@ -69,6 +69,10 @@ export interface MakeRunShellToolOptions {
  * but exits non-zero is *not* an error — its `exitCode`/`stderr` come back
  * in `data` for the agent to inspect.
  *
+ * The agent run's cancellation `signal` (from the dispatch `ctx`) is passed
+ * to `ops.exec` per invocation: a cancelled run never starts the command,
+ * and one cancelled mid-command kills its process tree (`cancelled: true`).
+ *
  * @param ops - The policy-enforced operation layer to delegate `exec` to.
  * @param options - Optional tool-name override.
  *
@@ -91,6 +95,12 @@ export function makeRunShellTool(
       "returned as data, not an error.",
     action: (input) => `Running \`${input.command}\``,
     input: runShellInputSchema,
-    execute: (input) => ops.exec(input.command, { timeoutMs: input.timeoutMs }),
+    // The run's signal belongs to this one invocation: it is read from the
+    // dispatch ctx on every call and never stored on the tool or workspace.
+    execute: (input, ctx) =>
+      ops.exec(input.command, {
+        timeoutMs: input.timeoutMs,
+        ...(ctx?.signal ? { signal: ctx.signal } : {}),
+      }),
   });
 }

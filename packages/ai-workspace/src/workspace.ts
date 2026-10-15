@@ -14,7 +14,9 @@ import { makeWriteFileTool } from "./tools/write-file";
 import type {
   EditFileInput,
   EditFileResult,
+  ExecOptions,
   GrepResult,
+  ReadFileResult,
   RunShellResult,
   Workspace,
   WorkspaceBackend,
@@ -172,7 +174,7 @@ class WorkspaceImpl implements Workspace {
   public readFile(
     filePath: string,
     opts?: { offset?: number; limit?: number },
-  ): Promise<{ content: string; hash: string; totalLines: number }> {
+  ): Promise<ReadFileResult> {
     return this.ops.readFile(filePath, opts);
   }
 
@@ -191,7 +193,7 @@ class WorkspaceImpl implements Workspace {
     return this.ops.editFile(input);
   }
 
-  public async exec(command: string, opts?: { timeoutMs?: number }): Promise<RunShellResult> {
+  public async exec(command: string, opts?: ExecOptions): Promise<RunShellResult> {
     this.assertWritable("exec");
 
     return this.ops.exec(command, opts);

@@ -7,7 +7,8 @@ import {
   pathExistsAsync,
   removeDirectoryAsync,
 } from "@warlock.js/fs";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { writeFile } from "node:fs/promises";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createLocalBackend } from "./local";
 
 // `node -e ...` is the cross-platform command we exercise `exec()` with. The
@@ -235,5 +236,99 @@ describe("createLocalBackend", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("a;b|c");
+  });
+
+  describe("cancellation via signal", () => {
+    /** Let the process tree run (or not) for `ms` milliseconds. */
+    const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    it("should not spawn anything when the signal is already aborted", async () => {
+      const backend = createLocalBackend();
+      await writeFile(
+        join(root, "write.cjs"),
+        'require("node:fs").writeFileSync("ran.txt", "yes");',
+      );
+      const controller = new AbortController();
+      controller.abort();
+
+      const result = await backend.exec("node write.cjs", {
+        cwd: root,
+        env: execEnv,
+        signal: controller.signal,
+      });
+
+      expect(result.cancelled).toBe(true);
+      expect(result.timedOut).toBe(false);
+      expect(result.exitCode).toBe(130);
+      await wait(300);
+      expect(await pathExistsAsync(join(root, "ran.txt"))).toBe(false);
+    });
+
+    it("should kill the whole process tree when the signal aborts mid-run", async () => {
+      const backend = createLocalBackend();
+      // The parent spawns a grandchild that would write a marker after
+      // 800ms; killing only the direct child would leave it alive.
+      await writeFile(
+        join(root, "parent.cjs"),
+        'require("node:child_process").spawn(process.execPath, ["child.cjs"], { stdio: "ignore" });\n' +
+          "setInterval(() => {}, 1000);\n",
+      );
+      await writeFile(
+        join(root, "child.cjs"),
+        'setTimeout(() => require("node:fs").writeFileSync("marker.txt", "alive"), 800);\n' +
+          "setInterval(() => {}, 1000);\n",
+      );
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 300);
+
+      const result = await backend.exec("node parent.cjs", {
+        cwd: root,
+        env: execEnv,
+        timeoutMs: 10_000,
+        signal: controller.signal,
+      });
+
+      expect(result.cancelled).toBe(true);
+      expect(result.timedOut).toBe(false);
+      expect(result.exitCode).not.toBe(0);
+
+      await wait(1200);
+      expect(await pathExistsAsync(join(root, "marker.txt"))).toBe(false);
+    });
+
+    it("should report a timeout, not a cancellation, when the timeout fires first", async () => {
+      const backend = createLocalBackend();
+      const controller = new AbortController();
+
+      const result = await backend.exec('node -e "setTimeout(() => {}, 10000)"', {
+        cwd: root,
+        env: execEnv,
+        timeoutMs: 200,
+        signal: controller.signal,
+      });
+
+      controller.abort();
+
+      expect(result.timedOut).toBe(true);
+      expect(result.cancelled).toBe(false);
+    });
+
+    it("should remove its abort listener once the command settles", async () => {
+      const backend = createLocalBackend();
+      const controller = new AbortController();
+      const add = vi.spyOn(controller.signal, "addEventListener");
+      const remove = vi.spyOn(controller.signal, "removeEventListener");
+
+      const result = await backend.exec('node -e "process.stdout.write(\'ok\')"', {
+        cwd: root,
+        env: execEnv,
+        signal: controller.signal,
+      });
+
+      expect(result.stdout).toBe("ok");
+      expect(result.cancelled).toBe(false);
+      expect(add).toHaveBeenCalledWith("abort", expect.any(Function), { once: true });
+      expect(remove).toHaveBeenCalledWith("abort", add.mock.calls[0][1]);
+    });
   });
 });

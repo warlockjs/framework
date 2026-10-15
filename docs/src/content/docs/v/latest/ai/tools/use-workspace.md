@@ -37,8 +37,8 @@ This is least-privilege guardrails for a **trusted** agent — not a sandbox aro
 | `shell.allow` / `shell.deny` | Executable **basenames** matched against the command's leading argv token (after tokenizing — see below). **Deny wins.** An `allow` list is exhaustive (fail-closed); no `shell` block at all ⇒ nothing may run. |
 | `shell.inheritEnv` | Opt-in `process.env` keys to pass through (e.g. `["PATH"]`). **Nothing leaks in otherwise** — a command can't find `node`/`npm` without `PATH`. |
 | `shell.env` | Explicit env vars injected into every spawned process (override inherited on collision). |
-| `shell.timeoutMs` / `shell.maxOutputBytes` | Per-command wall-clock cap (SIGKILL on expiry) and stdout/stderr byte cap. |
-| `read.defaultLines` / `read.maxBytes` | Default read window + a byte ceiling. |
+| `shell.timeoutMs` / `shell.maxOutputBytes` | Per-command wall-clock cap (process tree SIGKILLed on expiry) and stdout/stderr byte cap (clipped on a character boundary). |
+| `read.defaultLines` / `read.maxBytes` | Default read window + a ceiling on the UTF-8 bytes of the returned `content` (line numbers included). See [Read windows and the byte ceiling](#read-windows-and-the-byte-ceiling). |
 | `backend` | `"local"` (default — real disk) or `"mock"` (in-memory, for tests). |
 
 The effective shell environment is `{ ...pick(process.env, inheritEnv), ...shell.env }` — `process.env` is never inherited wholesale.
@@ -94,16 +94,50 @@ await dev.execute("`npm test` fails on the cart-total suite. Make it green.");
 The same policy seam, callable from code (no LLM):
 
 ```ts
-const { content, hash, totalLines } = await ws.readFile("src/index.ts", { offset: 1, limit: 200 });
+const { content, hash, totalLines, endLine, truncated, bytesCapped } = await ws.readFile("src/index.ts", { offset: 1, limit: 200 });
 await ws.writeFile("src/new.ts", "export const x = 1;\n");
 await ws.editFile({ path: "src/index.ts", oldString: "old", newString: "new", expectHash: hash });
-const { exitCode, stdout, stderr, timedOut, truncated } = await ws.exec("npm test");
+const { exitCode, stdout, stderr, timedOut, cancelled, truncated } = await ws.exec("npm test");
 const { matches } = await ws.grep("TODO", { glob: "src/**/*.ts", ignoreCase: true });
 const paths = await ws.glob("src/models/**/*.ts");
 await ws.exists("package.json");
 await ws.mkdir("src/generated");
 await ws.remove("dist");
 ```
+
+## Read windows and the byte ceiling
+
+`readFile()` and the `read_file` tool return the same result for the same arguments: a `cat -n` numbered window plus `{ startLine, endLine, totalLines, totalBytes, truncated, bytesCapped, hash }`.
+
+- The window starts at `offset` (`startLine` on the tool) and holds at most `limit` lines (default `read.defaultLines`, else 2000).
+- `read.maxBytes` caps the UTF-8 bytes of the returned `content` itself — line-number prefixes and newlines count. Whole lines are kept while they fit; the first line that doesn't is cut on a **character boundary** (never mid-character), so a single very long line still comes back bounded. `bytesCapped` is `true` whenever the cap cut anything, and `endLine` is the last line included, possibly partially.
+- `truncated` is `true` when anything after `content` was withheld — later lines (by `limit`, the default window or the cap) or the tail of `endLine`.
+- `hash` is always the SHA-256 of the **whole file**, not the window, so it is a valid `expectHash` whatever was returned. `totalBytes` is the whole file's size.
+- No `maxBytes` ⇒ no byte cap (only the line window applies).
+
+```ts
+const ws = ai.workspace({ cwd, read: { maxBytes: 64_000, defaultLines: 400 } });
+const page = await ws.readFile("dist/bundle.js");
+if (page.bytesCapped) console.warn(`Only part of line ${page.endLine} fit in the read budget.`);
+```
+
+## Cancelling a command
+
+`exec()` accepts a per-call `signal`; `run_shell` and `run_tests` pass the agent run's signal (the dispatch `ctx.signal`) automatically, so cancelling the agent run stops the command it is waiting on.
+
+- Already aborted ⇒ the command is **not started** (`exitCode: 130`).
+- Aborted mid-run ⇒ the whole process tree is SIGKILLed, as on a timeout.
+- Either way the result says `cancelled: true` — it resolves, it doesn't throw — and `cancelled` and `timedOut` are never both `true`. Branch on those flags, not on the exit code.
+- The signal belongs to that one call; the workspace never stores it, so one workspace can serve many runs. The abort listener is removed once the command settles.
+
+```ts
+const controller = new AbortController();
+const pending = ws.exec("npm test", { signal: controller.signal, timeoutMs: 120_000 });
+controller.abort();
+const { cancelled } = await pending; // true
+```
+
+A custom `WorkspaceBackend` receives the signal as `exec(command, { signal })` and should follow the same rules, reporting `cancelled: true` in its result.
 
 ## Read-before-edit (the stale-hash guard)
 

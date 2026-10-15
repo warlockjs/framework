@@ -32,20 +32,42 @@ export interface ReadFileInput {
 /**
  * Result of a read — the requested line window plus the metadata an
  * agent needs to read-before-edit (the `hash` feeds `editFile`'s
- * `expectHash` stale-guard).
+ * `expectHash` stale-guard). The `read_file` tool and the `readFile()`
+ * direct method return the same shape for the same arguments.
+ *
+ * `content` is `cat -n` numbered and is bounded by the policy's
+ * `read.maxBytes`, measured in UTF-8 bytes of `content` itself (line-number
+ * prefixes and newlines included). When the cap cuts the window, the last
+ * returned line may be partial — clipped on a character boundary, never
+ * mid-character — and `bytesCapped` is `true`.
  */
 export interface ReadFileResult {
-  /** The returned file content for the requested window. */
+  /** The returned, line-numbered file content for the requested window. */
   content: string;
-  /** 1-based first line included in `content`. */
+  /** 1-based first line requested. */
   startLine: number;
-  /** 1-based last line included in `content`. */
+  /**
+   * 1-based last line included in `content` (possibly partially, when
+   * `bytesCapped`). Below `startLine` when the window is empty.
+   */
   endLine: number;
   /** Total line count of the underlying file. */
   totalLines: number;
-  /** True when the window stopped short of the file end (policy cap or `limit`). */
+  /**
+   * True when anything after `content` was withheld: lines past `endLine`
+   * (line `limit`, policy default window or byte cap) or the tail of
+   * `endLine` itself (byte cap).
+   */
   truncated: boolean;
-  /** SHA-256 of the full file content at read time (stale-edit guard). */
+  /** True when `read.maxBytes` cut the window short. */
+  bytesCapped: boolean;
+  /** UTF-8 byte length of the full file. */
+  totalBytes: number;
+  /**
+   * SHA-256 of the **full** file content at read time — not of the returned
+   * window — so it stays valid as an `editFile` `expectHash` whatever window
+   * or byte cap was applied.
+   */
   hash: string;
 }
 
@@ -94,6 +116,18 @@ export interface WriteFileResult {
   hash: string;
 }
 
+/** Options for the `exec()` direct method. */
+export interface ExecOptions {
+  /** Per-call wall-clock cap in ms; overrides the policy `shell.timeoutMs`. */
+  timeoutMs?: number;
+  /**
+   * Cancels this one command. Already aborted: the command is not started.
+   * Aborted mid-run: its process tree is killed. Either way the result has
+   * `cancelled: true`. The tools pass the agent run's signal here.
+   */
+  signal?: AbortSignal;
+}
+
 /** Input to the `run_shell` tool / `exec()` direct method. */
 export interface RunShellInput {
   /** The command line to run; its leading basename is policy-checked. */
@@ -114,6 +148,12 @@ export interface RunShellResult {
   truncated: boolean;
   /** True when the command was SIGKILLed for exceeding its timeout. */
   timedOut: boolean;
+  /**
+   * True when the invocation's `signal` aborted: before start (nothing ran)
+   * or mid-run (the process tree was killed). Never true together with
+   * `timedOut`.
+   */
+  cancelled: boolean;
 }
 
 /**

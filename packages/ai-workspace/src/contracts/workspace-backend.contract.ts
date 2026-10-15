@@ -13,6 +13,13 @@ export interface WorkspaceBackendExecResult {
   stderr: string;
   /** True when the command was killed for exceeding its timeout. */
   timedOut: boolean;
+  /**
+   * True when the invocation's `signal` aborted — either before the
+   * command started (nothing was spawned) or while it ran (the process
+   * tree was killed). Mutually exclusive with `timedOut`. Optional so
+   * existing custom backends keep compiling; absent reads as `false`.
+   */
+  cancelled?: boolean;
 }
 
 /**
@@ -27,6 +34,15 @@ export interface WorkspaceBackendExecOptions {
   timeoutMs?: number;
   /** Exact environment for the spawned process (NOT merged with process.env). */
   env?: Record<string, string>;
+  /**
+   * Per-invocation cancellation. A backend must not start the command when
+   * the signal is already aborted, must tear down the whole process tree
+   * when it aborts mid-run, must remove its abort listener once the command
+   * settles, and reports either case as `cancelled: true` (never a
+   * rejection). The signal belongs to ONE call — never cache it on the
+   * backend.
+   */
+  signal?: AbortSignal;
 }
 
 /**

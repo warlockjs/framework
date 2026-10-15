@@ -111,6 +111,7 @@ describe("createMockBackend", () => {
       stdout: "",
       stderr: "1 failing",
       timedOut: false,
+      cancelled: false,
     });
 
     expect(await backend.exec("echo hi")).toEqual({
@@ -118,7 +119,21 @@ describe("createMockBackend", () => {
       stdout: "",
       stderr: "",
       timedOut: false,
+      cancelled: false,
     });
+  });
+
+  it("resolves cancelled without consulting the script when the signal is already aborted", async () => {
+    const backend = createMockBackend({
+      commands: { "npm test": { exitCode: 0, stdout: "ran" } },
+    });
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await backend.exec("npm test", { signal: controller.signal });
+
+    expect(result.cancelled).toBe(true);
+    expect(result.stdout).toBe("");
   });
 
   it("supports the structured seed shape with both files and commands", async () => {

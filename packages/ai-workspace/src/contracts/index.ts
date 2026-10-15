@@ -6,6 +6,7 @@
 export type {
   EditFileInput,
   EditFileResult,
+  ExecOptions,
   GlobInput,
   GlobResult,
   GrepInput,

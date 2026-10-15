@@ -133,6 +133,12 @@ for (const file of await ws.glob("src/models/**/*.ts")) {
 - **Read-before-edit guard** — `read_file` returns a SHA-256 `hash`; `edit_file`
   requires an exact, unique `oldString` (or `replaceAll`) and rejects on an
   `expectHash` mismatch.
+- **Bounded reads** — `read.maxBytes` caps the UTF-8 bytes a read returns (line
+  numbers included), cutting on a character boundary and flagging `bytesCapped`;
+  the `hash` still covers the whole file.
+- **Cancellable commands** — `exec(cmd, { signal })`, and the agent run's signal
+  in `run_shell` / `run_tests`, stop the command (process tree killed, or never
+  started when already aborted) and report `cancelled: true`.
 
 **Deferred to later phases** (intentionally absent here): the transactional
 lifecycle (`snapshot` / `restore` / `diff` / `changes`), `on()` hooks, `dispose`,
