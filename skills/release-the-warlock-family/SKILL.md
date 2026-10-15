@@ -29,6 +29,15 @@ monorepo".
 
 ## Release from GitHub Actions (5.25+)
 
+**Move the family first.** `pnpm release:version <version>` (from the repo
+root) sets every member's `package.json` to the version, moves the exact family
+pins (peer/optional `@warlock.js/*` specs at the old version, `^`/`~` kept),
+moves any real pin in the create-warlock template (its framework deps are
+normally the `0.0.0-set-by-scaffolder` placeholder, filled from create-warlock's
+own version at scaffold time), and refreshes the lockfile. It refuses unless
+every member shares one current version and the new one is newer. Then date the
+`## <version>` CHANGELOG headings, commit, push, and dispatch.
+
 The workflows live in **`warlockjs/framework`** under `.github/workflows/`.
 Secrets live on its `release` environment: `NPM_TOKEN` (publish) and
 `BLOG_TEST_DEPLOY_KEY` (a read-only deploy key on the private `warlockjs/blog-test`). The

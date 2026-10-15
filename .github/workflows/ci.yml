@@ -82,6 +82,9 @@ jobs:
       - name: Every spec file is reachable by its package's vitest config
         run: node scripts/check-spec-coverage.mjs
 
+      - name: Workspace script tests
+        run: pnpm run test:scripts
+
   package:
     name: ${{ matrix.package.name }}
     needs: plan

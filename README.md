@@ -167,6 +167,7 @@ Packages resolve each other from this repository, never from npm, so a change in
 | Build the docs site | `pnpm docs:build` |
 | Check formatting | `pnpm format:check` |
 | List packages a branch affects | `pnpm ci:affected --base origin/main` |
+| Move the whole family to a new version | `pnpm release:version 5.30.0` |
 
 Some suites need services: `queue` and `notifications` expect Redis on port `6390`, and parts of `cascade` and `auth` start databases through Testcontainers, which needs Docker.
 
@@ -185,7 +186,13 @@ docker run -d --name warlock-redis -p 6390:6379 redis:7
 
 ## Releasing
 
-The family is released in lockstep from GitHub Actions, never from a developer machine. Every member's `package.json` is set to the target version, then the **release** workflow is dispatched with that version:
+The family is released in lockstep from GitHub Actions, never from a developer machine. Every package shares one version, so a release starts by moving all of them at once:
+
+```bash
+pnpm release:version 5.30.0   # every package, the exact family pins and the lockfile
+```
+
+Date each package's `## 5.30.0` CHANGELOG heading, commit, push, then dispatch the **release** workflow with that version:
 
 1. **Gate** — strictness, every package's typecheck and tests, build, pack, and an install of the tarballs from a local registry.
 2. **Application check** — a real application is built and exercised on the release tarballs.

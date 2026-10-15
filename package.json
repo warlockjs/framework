@@ -19,6 +19,8 @@
     "docs:build": "pnpm --filter @warlock.js/docs build",
     "check:spec-coverage": "node scripts/check-spec-coverage.mjs",
     "ci:affected": "node scripts/ci/affected-packages.mjs",
+    "release:version": "node scripts/release/set-version.mjs",
+    "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
     "format": "node node_modules/prettier/bin/prettier.cjs --ignore-path .prettierignore --write .",
     "format:check": "node node_modules/prettier/bin/prettier.cjs --ignore-path .prettierignore --check ."
   },
