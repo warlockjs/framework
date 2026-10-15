@@ -1,0 +1,50 @@
+{
+  "name": "@warlock.js/access",
+  "version": "5.29.0",
+  "type": "module",
+  "description": "Authorization (RBAC + ABAC) for Warlock.js applications",
+  "main": "./src/index.ts",
+  "warlock": {
+    "environment": "server"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "@warlock.js/auth": "*",
+    "@warlock.js/cache": "*",
+    "@warlock.js/cascade": "*",
+    "@warlock.js/core": "*",
+    "@warlock.js/logger": "*",
+    "@warlock.js/seal": "*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warlockjs/access"
+  },
+  "keywords": [
+    "nodejs",
+    "authorization",
+    "rbac",
+    "abac",
+    "permissions",
+    "roles",
+    "access-control"
+  ],
+  "author": "hassanzohdy",
+  "license": "MIT",
+  "module": "./src/index.ts",
+  "typings": "./src/index.ts",
+  "devDependencies": {
+    "@warlock.js/auth": "workspace:^",
+    "@warlock.js/cache": "workspace:^",
+    "@warlock.js/cascade": "workspace:^",
+    "@warlock.js/core": "workspace:^",
+    "@warlock.js/logger": "workspace:^",
+    "@warlock.js/seal": "workspace:^",
+    "typescript": "^5.9.3",
+    "vitest": "4.1.10"
+  },
+  "packageManager": "pnpm@11.24.0"
+}
