@@ -1,0 +1,229 @@
+﻿# Changelog — @warlock.js/seal
+
+All notable changes to `@warlock.js/seal` are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
+
+## 5.29.0 - 2026-10-01
+
+### Changed
+
+- Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after `agent-kit` copies them into an app.
+
+## 5.28.0 - 2026-10-01
+
+### Fixed
+
+- `v.object()` now emits its validated output (and reports child errors) in declared schema order instead of the order async field validators happened to finish, so output key order is deterministic; unknown keys kept by `allowUnknown()` follow the declared keys in input order.
+
+## 5.27.0 - 2026-10-01
+
+### Changed
+
+- Dependency: @mongez/supportive-is 3.0 (type-predicate checkers).
+
+## 5.26.0 - 2026-09-30
+
+### Changed
+
+- Lockstep release; package APIs are unchanged.
+
+## 5.25.0 - 2026-09-28
+
+### Fixed
+
+- `ObjectValidator` no longer recurses into its shape when the input is `null` on a `.nullable()` object (or the whole object is missing on an `.optional()` one) — it now short-circuits on the already-resolved result instead of re-running child validators against `undefined`, which previously reported spurious "required" errors for a `null` value.
+- `BaseValidator` clones preserve translated attributes, and required-rule labels now resolve at validation time regardless of `.required()` / `.transAttributes()` chain order.
+
+### Changed
+
+- **Behaviour change:** Empty and whitespace-only form values are treated as missing by non-string validators, so optional fields are omitted, nullable fields resolve to `null`, and required fields report `required`.
+
+## 5.24.0 - 2026-09-27
+
+### Changed
+
+- Lockstep release; package APIs are unchanged.
+
+## 5.23.2 - 2026-09-26
+
+### Changed
+
+- Lockstep patch release; package APIs are unchanged.
+
+## 5.23.1 - 2026-09-26
+
+### Changed
+
+- Lockstep patch release; package APIs are unchanged.
+
+## 5.23.0 - 2026-09-25
+
+### Added
+
+- Array validators take `.min(n)` / `.max(n)` for length, like strings and numbers; `.minLength()` / `.maxLength()` remain as aliases.
+
+### Fixed
+
+- An omitted optional field skips its mutators, so `v.string().trim().optional()` no longer reports a missing field as required.
+
+## 5.22.1 - 2026-09-25
+
+### Changed
+
+- Lockstep patch release; package APIs are unchanged.
+
+## 5.22.0 - 2026-09-25
+
+### Changed
+
+- Lockstep release maintenance and dependency refresh.
+
+## 5.21.0 - 2026-09-25
+
+### Changed
+
+- Lockstep release maintenance and dependency refresh.
+## 5.20.0 - 2026-09-24
+
+### Changed
+
+- Added a package-level skill index and clearer discovery descriptions for grouped agent guidance.
+
+## 5.19.1 - 2026-09-23
+
+### Fixed
+
+- Corrected the Cascade and Core links in the overview skill.
+
+## 5.19.0 - 2026-09-23
+
+### Changed
+
+- Refined package skill-discovery descriptions and regenerated the llms projections.
+
+## 5.17.0 - 2026-09-21
+
+### Added
+
+- Granular `@warlock.js/seal/object` and `@warlock.js/seal/string` entry points with the `object` and `string` factories for schemas that do not need the complete `v` factory.
+- `redactValue` option on `v.validate(schema, data, options)`: when set, the `:value` placeholder renders that string instead of the submitted input, both in the attributes handed to `translateRule` and in author `errorMessage` templates. It does not cover a custom rule that concatenates raw input into its own message text. Unset keeps the current behaviour. Per-call options replace the global config, so pass `{ ...getSealConfig(), redactValue }` to keep your translators.
+
+## 5.13.0 - 2026-09-17
+
+### Fixed
+
+- Use the package-resolved TypeScript binary for type checking.
+
+## 5.11.0 - 2026-09-14
+
+### Fixed
+
+- `v.boolean().accepted()` / `.declined()` (and their conditional variants) rejected every string form they advertised — `"yes"`, `"on"`, `"1"` — because the boolean type rule ran first. They now parse those form values into a real boolean.
+
+## 5.10.0 - 2026-09-14
+
+### Added
+
+- `.coerce()` on `v.boolean()` — opt-in query-string coercion (`"true"`/`"1"` → `true`, `"false"`/`"0"` → `false`).
+
+## 5.9.0 - 2026-09-13
+
+### Added
+
+- `.coerce()` modifier on the number validators (`int` / `number` / `float` / `numeric`): opt into parsing a numeric-shaped string (e.g. a query-string param) into a number while the type rule stays strict. `v.int()` is unchanged by default; chain `.coerce()` to accept `"2"` as `2`. The inferred output type is unaffected.
+
+## 5.7.0 - 2026-09-11
+
+### Changed
+
+- Internal type-safety hardening; no behaviour change.
+
+## 5.6.0 - 2026-09-08
+
+### Fixed
+
+- **`warlock build` and `warlock start` died inside Seal before any application code ran**, with a `ReferenceError` from `array-validator.ts` extending `BaseValidator` before `base-validator.ts` had finished evaluating. The cause was one inline `type` import: under `verbatimModuleSyntax`, `import { type ValidateOptions } from "./validators"` is emitted as a real side-effect import, which closed an import cycle that a type-only import would never have created. Written as `import type { ... }`, the module is not pulled into evaluation at all. Nothing about the validators changed — only which modules load, and when.
+
+## 5.5.0 - 2026-09-07
+
+### Fixed
+
+- Documentation shipped in this package's `skills/` told users to run `pnpm`-specific commands. `pnpm <binary>` has no npm equivalent, so those instructions failed outright for anyone not using pnpm. Commands are now package-manager neutral.
+
+## 5.2.3 - 2026-09-02
+
+### Fixed
+
+- Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3.
+
+## 5.2.2
+
+### Maintenance
+
+- Restored the Warlock family to one exact, installable lockstep version.
+
+## 5.2.0
+
+No changes to `@warlock.js/seal`. Released in lockstep with the v5.2 routing,
+production-build, security, and diagnostics changes in `@warlock.js/core` and
+`@warlock.js/web`; see those packages' changelogs.
+
+## 5.1.0
+
+No changes to `@warlock.js/seal`. Released in lockstep with the `@warlock.js/web`
+React-execution fix and the `@warlock.js/core` CLI additions — see those packages'
+changelogs.
+
+## 5.0.2 - 2026-08-25
+
+No changes to `@warlock.js/seal`. Released in lockstep with the `@warlock.js/web` SSR
+fix (`ssr.noExternal`) — see that package's changelog.
+
+## 5.0.1 - 2026-08-25
+
+No changes to `@warlock.js/seal`. Released in lockstep with the `create-warlock` vite
+resolution pin and the `@warlock.js/web` peer narrowing — see those packages'
+changelogs.
+
+## 5.0.0 - 2026-08-25
+
+### Changed
+
+- IP validation no longer imports Node's `net` module, so the same IPv4 and IPv6 rules can run in browser bundles.
+- Optional validators now skip value rules only for absent values; present empty values such as `""` are validated instead of passing through with the wrong output type.
+
+## 4.16.0 - 2026-08-18
+
+### Security
+
+- **Renamed `safeHtmlMutator`/`.safeHtml()` to `stripTagsMutator`/`.stripTags()`.** The old name implied XSS safety it never provided — the implementation is a naive `<[^>]*>` regex, not an HTML parser, and can be defeated by malformed/nested markup or content re-introduced later in a pipeline. A developer building `v.string().safeHtml()` for user-supplied rich text was liable to treat the output as pre-sanitized and skip further output encoding, opening a stored/reflected XSS path. The new names and doc comments make clear this is tag-stripping only; use a real parser-based sanitizer (DOMPurify / sanitize-html) for untrusted rich text. `safeHtmlMutator` and `.safeHtml()` remain as deprecated aliases (same behavior, `@deprecated` JSDoc pointing at the new names) so existing callers do not break.
+
+### Dependencies
+
+- Bumped `@mongez/supportive-is` to `^2.1.4` (no breaking changes) and `@mongez/reinforcements` to `^4.0.1`. The reinforcements major makes `Random.string/nanoid/id/token/uuid` CSPRNG-backed (WebCrypto) and removes `Random.seed()` support — audited this package's source and tests for `Random.seed(` and for seeded/reproducible use of `Random.*`; none found, so no code changes were needed.
+
+## 4.12.0
+
+### Changed
+
+- Declares its own test runner and pins it to an exact version (`vitest@4.1.10`). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to
+
+## 4.9.2
+
+### Fixed
+
+- `v.literal("")` could never pass. Every validator is required by default and `required` rejects anything the empty-value check calls empty — which includes `""` — so a schema demanding an exact empty string reported "is required" for a field that was present. A literal set containing an empty value now uses `present` (the key must exist) instead of `required`, leaving the literal set to judge the value. Only the empty string was affected; `v.literal(0)` and `v.literal(false)` always worked
+- `v.literal("").optional()` silently disabled the literal check rather than fixing it, accepting `""`, `null` **and** a missing key alike. The literal rule now runs on empty values (`requiresValue: false`) while treating absence as the required/present rule's question, so `.optional()` means optional again and a present value must still match
+- a **failed** validation no longer returns the input it rejected. `object` returned the raw input — including the unknown keys it had just complained about — while `discriminatedUnion` returned `undefined`; the same call shape had two contracts. Validating an outbound DTO to keep internal fields out of a response, then reading `data` without branching on `isValid`, shipped every field the schema existed to exclude. `data` is now `undefined` whenever `isValid` is `false`
+- `v.number().toFixed(n)` could never produce a valid result — the mutator returned `Number(value).toFixed(n)`, a _string_, which the validator's own `number` type rule then rejected. It now yields a number (`3.14159` → `3.14`), so the method works where it lives. No working code can have depended on the old output, since every such validation failed; for a fixed-point _string_, format at the presentation edge rather than asking a number schema to emit one
+
+## 4.2.11
+
+### Changed
+
+- Bumped `@mongez/reinforcements` to 3.3.0
+
+## 4.1.15
+
+- Baseline — per-package changelog tracking starts at this version.

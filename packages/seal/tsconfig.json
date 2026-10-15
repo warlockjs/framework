@@ -1,0 +1,37 @@
+{
+  // Inherits the workspace strictness contract (`strict`,
+  // `noUncheckedIndexedAccess`, `forceConsistentCasingInFileNames`).
+  //
+  // This matters because workspace packages are consumed as TypeScript SOURCE
+  // through the `exports` map (canon `0a3227cc`), so every consumer compiles
+  // this package's source under the CONSUMER's options. Before this line, seal
+  // graded itself with `strict` alone while its consumers compiled it with
+  // more — so seal's own green was an opinion about seal, not a statement
+  // about what its consumers would see.
+  //
+  // A package may ADD to this contract. It must never subtract: doing so hides
+  // consumer-facing diagnostics until some downstream package happens to
+  // compile the same source and discovers them.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2020",
+    // Raised from the ES2020 default because the shared source in sibling packages
+    // uses ES2022 APIs (Object.hasOwn, String.replaceAll, Array.at), and a consumer
+    // compiles that source under ITS OWN lib. DOM is listed explicitly because an
+    // UNSET lib resolves to the .full variant, which bundles DOM - so naming a lib
+    // without it would silently drop DOM types this package already relied on.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
