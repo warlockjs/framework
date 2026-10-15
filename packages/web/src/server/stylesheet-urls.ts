@@ -1,0 +1,450 @@
+/**
+ * Which stylesheets a REGISTERED HANDLER must link, in each of the two modes.
+ *
+ * WHY THIS EXISTS AT ALL. Nothing used to put CSS into the server-rendered
+ * document. A stylesheet reached the browser only because the CLIENT bundle
+ * imported it, which means JavaScript applied it after the module graph
+ * loaded — so every full page load painted unstyled first and restyled a
+ * moment later. The markup was correct the whole time, which is precisely why
+ * it was easy to miss.
+ *
+ * THE SCOPE IS PER HANDLER, NOT PER APPLICATION. Every page renders inside
+ * `[root, ...outer-to-inner matched layouts, page]` — that is the exact triple
+ * (widened to a chain) `create-page-route-handler.ts` loads per request — so a
+ * handler's CSS is the ordered, deduped union of what those specific source
+ * files pull in, and nothing else. Collecting across the WHOLE application
+ * (every page's manifest entry, every root import) is the bug this shape
+ * exists to avoid: it ships page B's stylesheet on page A's response, and it
+ * only gets worse as an application grows.
+ *
+ * The two modes learn the answer from different places, and neither can use
+ * the other's:
+ *
+ *  - PRODUCTION reads Vite's client manifest, matching each source file's own
+ *    id and walking its recorded `css` and imported chunks.
+ *  - DEV has no manifest — Vite serves modules on demand — so the URLs are
+ *    derived from each source file's own import statements.
+ */
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+import type { ModuleGraph, ModuleNode } from "vite";
+import { CLIENT_ASSET_URL_PREFIX } from "./client-asset-url-prefix";
+import { UnknownStylesheetSourceError } from "./unknown-stylesheet-source-error";
+
+/** Stylesheet extensions Vite can serve directly. Mirrors the build's list. */
+const STYLE_EXTENSIONS = [".css", ".scss", ".sass", ".less", ".styl"];
+
+/**
+ * A stylesheet Vite serves in DEV must be requested with `?direct`.
+ *
+ * Without it Vite answers the same URL with `text/javascript` — its CSS-as-JS
+ * module transform, meant for `import "./app.css"` — and a
+ * `<link rel="stylesheet">` pointing at a JavaScript response applies
+ * NOTHING, silently. No console error, no network failure, just an unstyled
+ * page. `?direct` is what makes Vite reply with real `text/css`.
+ */
+export const VITE_DIRECT_CSS_QUERY = "?direct";
+
+type StylesheetGraphNode = {
+  id: string;
+  stylesheets: string[];
+  imports: StylesheetGraphNode[];
+};
+
+/** Walk one stylesheet dependency graph, preserving each root's load order. */
+function collectStylesheetGraph(roots: readonly StylesheetGraphNode[]): string[] {
+  const stylesheets: string[] = [];
+
+  const visit = (node: StylesheetGraphNode, visited: Set<string>) => {
+    if (visited.has(node.id)) return;
+    visited.add(node.id);
+
+    for (const stylesheet of node.stylesheets) {
+      if (!stylesheets.includes(stylesheet)) stylesheets.push(stylesheet);
+    }
+
+    for (const imported of node.imports) visit(imported, visited);
+  };
+
+  for (const root of roots) visit(root, new Set());
+
+  return stylesheets;
+}
+
+/**
+ * ONE source file's own directly imported stylesheets, as dev URLs.
+ *
+ * Dev has no manifest, so the source is the file itself: whatever it imports
+ * with a stylesheet extension is what it needs. This is deliberately narrow —
+ * it answers "what CSS does THIS file set up", not "what CSS does the whole
+ * module graph this file eventually reaches end up pulling in" — because the
+ * latter would require reproducing Vite's module graph, which is precisely
+ * what dev has no manifest to shortcut.
+ *
+ * The narrowness is the honest part: production splits CSS per chunk and can
+ * follow imported chunks (`productionStylesheetUrls` below); dev can only read
+ * the ONE file handed to it. A page whose own module imports its own
+ * stylesheet still gets it in dev — Vite's client graph injects it as before —
+ * it simply is not render-blocking the way a chain member's own import is.
+ *
+ * Called once per chain member — root, then every matched layout outer to
+ * inner, then the page — by the installers below, which is what turns "one
+ * file's own imports" into a handler's whole CSS chain.
+ *
+ * Specifiers are resolved against `sourceFile` and expressed relative to
+ * `appRoot`, because that is the shape Vite's dev server serves from.
+ */
+export function devStylesheetUrls(appRoot: string, sourceFile: string): string[] {
+  let source: string;
+
+  try {
+    source = readFileSync(sourceFile, "utf-8");
+  } catch {
+    return [];
+  }
+
+  const imports: StylesheetGraphNode[] = [];
+  const pattern = /\bimport\s*(?:\(\s*)?["']([^"']+)["']/g;
+
+  let match = pattern.exec(source);
+
+  while (match !== null) {
+    const specifier = match[1];
+    if (specifier === undefined) {
+      match = pattern.exec(source);
+      continue;
+    }
+    const lowered = specifier.toLowerCase();
+
+    if (STYLE_EXTENSIONS.some((extension) => lowered.endsWith(extension))) {
+      const absolute = path.resolve(path.dirname(sourceFile), specifier);
+      const relative = path.relative(appRoot, absolute).split(path.sep).join("/");
+
+      // Outside the app root Vite would need an `/@fs/` URL and a widened
+      // `fs.allow`; a stylesheet living there is unusual enough that guessing
+      // is worse than leaving it to the client import.
+      if (!relative.startsWith("..")) {
+        const url = `/${relative}${VITE_DIRECT_CSS_QUERY}`;
+
+        imports.push({ id: url, stylesheets: [url], imports: [] });
+      }
+    }
+
+    match = pattern.exec(source);
+  }
+
+  return collectStylesheetGraph([{ id: sourceFile, stylesheets: [], imports }]);
+}
+
+/**
+ * ONE handler's whole dev CSS chain: every `sourceFiles` member's own direct
+ * stylesheet imports (`devStylesheetUrls`), in the order given — the caller
+ * passes `[root, ...outer-to-inner matched layouts, page]` — concatenated and
+ * deduped across the WHOLE chain, not just within one file.
+ *
+ * Cross-file dedup matters as much as within-file dedup: an application-wide
+ * `app.css` imported by both the root and a page must still produce one
+ * `<link>`, not two.
+ */
+export function devHandlerStylesheetUrls(
+  appRoot: string,
+  sourceFiles: readonly string[],
+  moduleGraph?: ModuleGraph,
+): string[] {
+  // Source-scan baseline: each chain member's OWN directly imported
+  // stylesheets, read from the file text. ALWAYS computed, and placed FIRST.
+  //
+  // This is the only source that works on a COLD Vite module graph — a route's
+  // very first SSR, or the moments right after `warlock dev` starts, before
+  // the client has loaded that route once. The module-graph walk below is
+  // empty until then, so relying on it alone left the first paint of every
+  // route with NO render-blocking `<link rel="stylesheet">` — a flash of
+  // unstyled content that production (which reads a complete manifest) never
+  // has. The graph walk still runs, and adds the transitive CSS the warm graph
+  // knows about; `collectStylesheetGraph` dedupes by URL across both, and the
+  // baseline coming first keeps the chain's own CSS render-blocking and in
+  // outer-to-inner order.
+  const baseline: StylesheetGraphNode[] = sourceFiles.map((sourceFile) => ({
+    id: sourceFile,
+    stylesheets: devStylesheetUrls(appRoot, sourceFile),
+    imports: [],
+  }));
+
+  if (moduleGraph === undefined) {
+    return collectStylesheetGraph(baseline);
+  }
+
+  const nodes = new Map<ModuleNode, StylesheetGraphNode>();
+
+  const adapt = (module: ModuleNode): StylesheetGraphNode => {
+    const existing = nodes.get(module);
+    if (existing !== undefined) return existing;
+
+    const node: StylesheetGraphNode = {
+      id: module.id ?? module.url,
+      stylesheets: devModuleStylesheetUrls(appRoot, module),
+      imports: [],
+    };
+    nodes.set(module, node);
+    node.imports = [...module.importedModules].map(adapt);
+    return node;
+  };
+
+  const graphRoots = sourceFiles.flatMap((sourceFile) =>
+    findDevModules(moduleGraph, sourceFile).map(adapt),
+  );
+
+  return collectStylesheetGraph([...baseline, ...graphRoots]);
+}
+
+/** Finds Vite's module node despite its normalized-path cache keys. */
+function findDevModules(moduleGraph: ModuleGraph, sourceFile: string): ModuleNode[] {
+  const direct = moduleGraph.getModulesByFile(sourceFile);
+  if (direct !== undefined) return [...direct];
+
+  const normalizedSource = path.resolve(sourceFile);
+  const nodes: ModuleNode[] = [];
+
+  for (const [file, modules] of moduleGraph.fileToModulesMap) {
+    if (path.resolve(file) === normalizedSource) nodes.push(...modules);
+  }
+
+  return nodes;
+}
+
+/** Turns a Vite CSS module into a browser stylesheet URL when it is served by the app. */
+function devModuleStylesheetUrls(appRoot: string, module: ModuleNode): string[] {
+  if (
+    module.file === null ||
+    (module.type !== "css" && !STYLE_EXTENSIONS.includes(path.extname(module.file).toLowerCase()))
+  ) {
+    return [];
+  }
+
+  const relative = path.relative(appRoot, module.file);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) return [];
+
+  const url = module.url.split("?", 1)[0] ?? "";
+  return url.startsWith("/") ? [`${url}${VITE_DIRECT_CSS_QUERY}`] : [];
+}
+
+type ManifestEntry = {
+  css?: unknown;
+  imports?: unknown;
+};
+
+/**
+ * Find the manifest key for an app-root-relative POSIX source id.
+ *
+ * VITE KEYS BY SOURCE PATH RELATIVE TO ITS OWN `root`, not to the app's
+ * `appRoot` — the client build's `root` is the framework's own package
+ * (`build-client.ts`), so a key for an app source file carries a `../`-laden
+ * prefix (`"../my-app/src/web/root.tsx"`) rather than matching `sourceFile`
+ * (`"src/web/root.tsx"`) byte for byte. The two forms always share the same
+ * TAIL, though — both are anchored at the same file — so an exact match is
+ * tried first (the case where the client build's root IS the app root, which
+ * every fixture and every test below uses) and a `/`-boundary suffix match
+ * second, rather than trying to reconstruct the build's own root here, which
+ * this runtime read has no way to independently confirm.
+ */
+function findManifestKey(
+  manifest: Record<string, ManifestEntry | undefined>,
+  sourceFile: string,
+): string | undefined {
+  if (manifest[sourceFile] !== undefined) return sourceFile;
+
+  const suffix = `/${sourceFile}`;
+
+  for (const key of Object.keys(manifest)) {
+    if (key.endsWith(suffix)) return key;
+  }
+
+  return undefined;
+}
+
+/**
+ * Every stylesheet reachable from ONE manifest entry: its own recorded `css`,
+ * plus the same walk repeated over every chunk it STATICALLY `imports`.
+ *
+ * `imports` only, never `dynamicImports`. Vite's manifest records
+ * `dynamicImports` on shared entry points (the hydration entry names every
+ * page as one) precisely because the browser must NOT download them eagerly —
+ * walking that array here would pull every other page's CSS onto this one,
+ * which is the exact "unrelated pages" leak this module exists to end.
+ * `imports`, by contrast, are chunks THIS module synchronously depends on:
+ * code Vite split out of it but that loads whenever it does, so their CSS is
+ * this handler's CSS too.
+ *
+ * `visited` guards against a chunk graph cycle; sharing one set across the
+ * whole walk from a single entry is enough; a shared chunk revisited from a
+ * SEPARATE top-level entry (root vs. a layout vs. the page) is deliberately
+ * walked again — the final merge in `productionStylesheetUrls` dedupes by URL,
+ * and a fresh `visited` set per entry is simpler to reason about than one
+ * threaded across unrelated chains.
+ */
+function manifestStylesheetGraph(
+  manifest: Record<string, ManifestEntry | undefined>,
+  key: string,
+  nodes: Map<string, StylesheetGraphNode>,
+): StylesheetGraphNode {
+  const existing = nodes.get(key);
+  if (existing !== undefined) return existing;
+
+  const entry = manifest[key];
+  const node: StylesheetGraphNode = { id: key, stylesheets: [], imports: [] };
+  nodes.set(key, node);
+
+  if (entry === undefined) return node;
+
+  node.stylesheets = Array.isArray(entry.css)
+    ? entry.css
+        .filter((file): file is string => typeof file === "string" && file !== "")
+        .map((file) => `/${file}`)
+    : [];
+  node.imports = Array.isArray(entry.imports)
+    ? entry.imports
+        .filter((id): id is string => typeof id === "string")
+        .map((importedKey) => manifestStylesheetGraph(manifest, importedKey, nodes))
+    : [];
+
+  return node;
+}
+
+/**
+ * ONE handler's whole production CSS chain.
+ *
+ * `sourceFiles` is `[root, ...outer-to-inner matched layouts, page]`, each an
+ * app-root-relative POSIX source id — the SAME id
+ * `install-page-routes-from-manifest.ts` already carries as `sourceFile` on
+ * every manifest entry, because that identity is what lets this function match
+ * EXPLICITLY rather than guess: every id is looked up on its own
+ * (`findManifestKey`), its own chunk's CSS is collected
+ * (`collectManifestCss`), and an id with no matching entry contributes
+ * nothing — it is never treated as license to fall back to scanning the whole
+ * manifest, which is what let an unrelated page's CSS leak onto this handler
+ * before.
+ *
+ * Duplicates are collapsed and order is preserved across the WHOLE chain, in
+ * the order `sourceFiles` was given — root's own CSS first, then each
+ * layout's outer to inner, then the page's — so cascade order matches the
+ * chain's own outer-to-inner rendering order.
+ *
+ * A missing or malformed manifest returns NOTHING rather than throwing. The
+ * hydration resolver already fails loudly on exactly those conditions, from
+ * exactly the same file, and it runs first — a second, worse error for the
+ * same cause helps nobody.
+ */
+export function productionStylesheetUrls(
+  clientDir: string,
+  sourceFiles: readonly string[],
+): string[] {
+  const manifest = readClientManifest(clientDir);
+
+  if (manifest === undefined) return [];
+
+  const nodes = new Map<string, StylesheetGraphNode>();
+  const roots: StylesheetGraphNode[] = [];
+
+  for (const sourceFile of sourceFiles) {
+    const key = findManifestKey(manifest, sourceFile);
+    if (key === undefined) continue;
+
+    roots.push(manifestStylesheetGraph(manifest, key, nodes));
+  }
+
+  return servableStylesheetUrls(roots);
+}
+
+type ClientManifest = Record<string, ManifestEntry | undefined>;
+
+/** Reads the client build's Vite manifest; `undefined` when missing or malformed. */
+function readClientManifest(clientDir: string): ClientManifest | undefined {
+  const manifestPath = path.join(clientDir, ".vite", "manifest.json");
+
+  try {
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as unknown;
+
+    return typeof manifest === "object" && manifest !== null
+      ? (manifest as ClientManifest)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Flattens stylesheet graphs into deduped URLs under the one served client asset prefix. */
+function servableStylesheetUrls(roots: readonly StylesheetGraphNode[]): string[] {
+  const urls: string[] = [];
+
+  for (const url of collectStylesheetGraph(roots)) {
+    // Built EXACTLY as the hydration entry's URL is built — `/${file}`, then
+    // checked against the prefix — rather than reassembled from a basename.
+    // The manifest already records `assets/root-<hash>.css`, and rebuilding
+    // that path here would be a second expression of a convention
+    // `client-asset-url-prefix.ts` owns.
+    // A stylesheet outside the directory the asset route mounts would 404.
+    // Dropped rather than emitted, because a dead <link> in <head> is a
+    // silent styling failure — the exact thing this module exists to end.
+    if (!url.startsWith(`${CLIENT_ASSET_URL_PREFIX}/`)) continue;
+
+    if (!urls.includes(url)) urls.push(url);
+  }
+
+  return urls;
+}
+
+/**
+ * PRODUCTION CSS for the source modules ONE request declared through
+ * `linkStylesheetsFor()` — typically the lazily imported theme component
+ * this request renders.
+ *
+ * Same walk as a handler chain member: the module's own `css` plus its
+ * statically imported chunks, never `dynamicImports`. Unlike the chain, an
+ * id with no manifest entry THROWS: it was named explicitly for this request,
+ * so a miss is a typo or a stale build, never "this module has no CSS".
+ */
+export function productionDeclaredStylesheetUrls(
+  clientDir: string,
+  sourceFiles: readonly string[],
+): string[] {
+  const manifest = readClientManifest(clientDir) ?? {};
+  const nodes = new Map<string, StylesheetGraphNode>();
+  const roots: StylesheetGraphNode[] = [];
+
+  for (const sourceFile of sourceFiles) {
+    const key = findManifestKey(manifest, sourceFile);
+
+    if (key === undefined) {
+      throw new UnknownStylesheetSourceError(sourceFile, "production");
+    }
+
+    roots.push(manifestStylesheetGraph(manifest, key, nodes));
+  }
+
+  return servableStylesheetUrls(roots);
+}
+
+/**
+ * DEVELOPMENT CSS for the source modules ONE request declared through
+ * `linkStylesheetsFor()`. Resolved per request, so a warm `moduleGraph`
+ * contributes transitive CSS; the file's own direct imports are always read,
+ * so a cold graph still yields render-blocking links. A declared file that
+ * does not exist throws, for the same reason as production.
+ */
+export function devDeclaredStylesheetUrls(
+  appRoot: string,
+  sourceFiles: readonly string[],
+  moduleGraph?: ModuleGraph,
+): string[] {
+  const absoluteFiles = sourceFiles.map((sourceFile) => {
+    const absolute = path.resolve(appRoot, sourceFile);
+
+    if (!existsSync(absolute)) {
+      throw new UnknownStylesheetSourceError(sourceFile, "development");
+    }
+
+    return absolute;
+  });
+
+  return devHandlerStylesheetUrls(appRoot, absoluteFiles, moduleGraph);
+}

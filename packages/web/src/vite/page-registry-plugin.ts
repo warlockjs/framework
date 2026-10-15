@@ -1,0 +1,698 @@
+/**
+ * The wire between the two halves that already existed and never met:
+ * `discoverPages` (the page graph, read off disk) and `generateClientRegistry`
+ * (the module SOURCE that carries that graph into the browser). Neither one
+ * touches Vite; this plugin is the only place they are joined, and it joins
+ * them as a VIRTUAL module so nothing is ever written to the user's tree.
+ *
+ * Identical in dev and build — no `apply`/`command` gating, matching the rest
+ * of `warlockClientBoundary`'s composition (`index.ts`), which is also
+ * mode-agnostic. A registry that differed between `vite dev` and `vite build`
+ * would make every dev-only or prod-only page bug unreproducible in the other
+ * mode.
+ */
+import { parse } from "@babel/parser";
+import MagicString from "magic-string";
+import fs from "node:fs";
+import path from "node:path";
+import type { Plugin, ViteDevServer } from "vite";
+import { discoverPages } from "../build/discover-pages";
+import { generateClientRegistry } from "../build/generate-client-registry";
+import { generateLocaleRoutingSource } from "../build/generate-locale-routing";
+import { readModuleConfig } from "../build/read-module-config";
+import { pageSetupFileFor, pageSetupOwnerFileFor } from "../build/page-setup-file";
+import { resolveClientLocaleRoutingFallback } from "../server/locale-routing/resolve-locale-routing";
+import { toPosix } from "../shared/to-posix";
+import type { SitesConfig } from "../sites/site-config.types";
+import { siteFolder } from "../sites/site-folder";
+import { siteOfHydrationEntryId } from "./hydration-entries";
+import { isProjectableFile, SERVER_EXPORT_NAMES } from "./projection";
+
+/**
+ * The specifier application code writes.
+ *
+ * Exported so the client runtime imports this constant instead of retyping the
+ * string: a constant two sides must agree on is a guard, and a guard duplicated
+ * at a second site fails open at the third — a typo'd re-spelling doesn't fail
+ * loudly, it resolves to "no such module" or, worse, to a stale real file.
+ */
+export const CLIENT_PAGE_REGISTRY_ID = "virtual:warlock/pages";
+
+/**
+ * The resolved id, `\0`-prefixed per Vite/Rollup convention so no other plugin
+ * (and no filesystem watcher) mistakes it for a real path.
+ */
+export const RESOLVED_CLIENT_PAGE_REGISTRY_ID = `\0${CLIENT_PAGE_REGISTRY_ID}`;
+
+/** `virtual:warlock/pages/<site>` — one site's registry in multi-site mode. */
+export function siteRegistryId(site: string): string {
+  return `${CLIENT_PAGE_REGISTRY_ID}/${site}`;
+}
+
+export function resolvedSiteRegistryId(site: string): string {
+  return `\0${siteRegistryId(site)}`;
+}
+
+/** The literal client flag emitted from the static root config projection. */
+export const CLIENT_STRICT_MODE_EXPORT_NAME = "strictMode";
+
+/**
+ * Evicts the client registry so its next request re-runs page discovery, then
+ * reloads the document so hydration consumes that fresh registry.
+ *
+ * Vite 7 keeps separate module graphs per environment. Pages are imported by
+ * the browser, so only the resolved virtual module in the client graph is the
+ * cache entry this operation owns.
+ */
+export function invalidateClientPageRegistry(vite: ViteDevServer, site?: string): void {
+  const moduleGraph = vite.environments.client.moduleGraph;
+  // A change inside one site's folder evicts only that site's registry.
+  const registryModule = moduleGraph.getModuleById(
+    site === undefined ? RESOLVED_CLIENT_PAGE_REGISTRY_ID : resolvedSiteRegistryId(site),
+  );
+
+  if (registryModule) moduleGraph.invalidateModule(registryModule);
+
+  vite.hot.send({ type: "full-reload", path: "*" });
+}
+
+export type ClientPageRegistryPluginOptions = {
+  /** Absolute path to the application root. Defaults to `process.cwd()`, matching Vite's own default `root` and Gate A's `appRoot` default. */
+  appRoot?: string;
+  /** Source directory name under `appRoot`; forwarded verbatim to `discoverPages`, which defaults it to `"src"`. */
+  srcDir?: string;
+  /** `web.sites`. When set, `virtual:warlock/pages/<site>` serves only that site's pages. */
+  sites?: SitesConfig;
+  /**
+   * Optional server-side barrier run before this plugin decides how the browser
+   * receives a page update. `true` means the callback already published the
+   * new route graph and sent the required reload, so this hook emits no second
+   * update for the same filesystem event.
+   */
+  beforePageHotUpdate?: (context: {
+    file: string;
+    type: "create" | "update" | "delete";
+  }) => boolean | Promise<boolean>;
+};
+
+/**
+ * The import specifiers the emitted registry names must be ABSOLUTE POSIX file
+ * paths, never relative ones.
+ *
+ * A relative specifier resolves against its IMPORTER, and the importer here is
+ * `\0virtual:warlock/pages` — a synthetic id whose `dirname` is not a real
+ * directory. `./blog.page.tsx` from that importer resolves to nonsense that
+ * fails at bundle time with a path no user authored and no user can act on.
+ *
+ * Separator normalization goes through the one shared `toPosix`
+ * (`../shared/to-posix`) — keeping the drive colon (`D:/...`) is exactly what
+ * Vite's resolver wants on Windows.
+ */
+function toImportSpecifier(absoluteFilePath: string): string {
+  return toPosix(path.resolve(absoluteFilePath));
+}
+
+function rootConfigFile(appRoot: string, srcDir: string | undefined): string {
+  return path.join(appRoot, srcDir ?? "src", "web", "root.tsx");
+}
+
+/** The site whose configured or convention folder contains `file`, if any. */
+function siteOwningFile(
+  file: string,
+  appRoot: string,
+  srcDir: string | undefined,
+  sites: SitesConfig | undefined,
+): string | undefined {
+  if (sites === undefined) return undefined;
+  const target = path.resolve(file);
+  const webRoot = path.join(appRoot, srcDir ?? "src", "web");
+  return Object.keys(sites).find((key) => {
+    const folder = path.resolve(webRoot, siteFolder(key)) + path.sep;
+    return target.startsWith(folder);
+  });
+}
+
+function siteRootFile(appRoot: string, srcDir: string | undefined, sites: SitesConfig, site: string): string {
+  return path.join(appRoot, srcDir ?? "src", "web", siteFolder(site), "root.tsx");
+}
+
+function isRootSetupFile(
+  file: string,
+  appRoot: string,
+  srcDir: string | undefined,
+  rootFile = rootConfigFile(appRoot, srcDir),
+): boolean {
+  return path.resolve(file) === pageSetupFileFor(rootFile);
+}
+
+function isSetupFile(file: string): boolean {
+  const owner = pageSetupOwnerFileFor(file);
+  // `tests/vitest.setup.ts` or `users.setup.ts` without a `users.page.tsx`
+  // is not a page setup sidecar.
+  return owner !== undefined && fs.existsSync(owner);
+}
+
+/**
+ * Reads only the root module's static config, never the root namespace.
+ *
+ * The virtual module may carry the boolean into the browser, but must not
+ * import `root.tsx`: that module can contain middleware and server-only
+ * dependencies. `readModuleConfig` parses source without evaluating it.
+ */
+function readClientStrictMode(
+  appRoot: string,
+  srcDir: string | undefined,
+  rootFile = rootConfigFile(appRoot, srcDir),
+): boolean {
+  if (!fs.existsSync(rootFile) || !fs.statSync(rootFile).isFile()) return false;
+  const setupCandidate = pageSetupFileFor(rootFile);
+  const configFile =
+    setupCandidate !== undefined && fs.existsSync(setupCandidate) && fs.statSync(setupCandidate).isFile()
+      ? setupCandidate
+      : rootFile;
+
+  return readModuleConfig(configFile, fs.readFileSync(configFile, "utf-8"), "root").strictMode === true;
+}
+
+/**
+ * Erases the generated module's TypeScript down to plain JavaScript.
+ *
+ * NOT optional, and not a style choice. Vite's `vite:esbuild` transform is
+ * gated behind `createFilter`, which refuses ANY id containing a NUL byte
+ * (`node_modules/vite/dist/node/chunks/config.js:1512` — `if
+ * (id.includes("\0")) return false`). So the one module in this build that is
+ * `\0`-prefixed by convention is precisely the one module esbuild will never
+ * transform, while `generateClientRegistry` always emits TypeScript (a
+ * type-only `ClientPageEntry` import plus the array's type annotation). Handed
+ * to Rollup verbatim, `import type { ClientPageEntry } from ...` is a
+ * JavaScript syntax error.
+ *
+ * Done with the AST rather than a regex, using the same `@babel/parser` +
+ * `MagicString` pair `projection.ts` already uses in this directory — a regex
+ * over generated source is a second grammar that drifts from the generator's
+ * silently. If the generator ever emits a TS construct outside these two
+ * shapes, the result is a Rollup parse error naming the virtual module: loud,
+ * not silent. `page-registry-plugin.spec.ts` pins that the erased output
+ * re-parses as plain JavaScript with the TypeScript plugin switched OFF.
+ */
+function eraseTypes(source: string): string {
+  const ast = parse(source, { sourceType: "module", plugins: ["typescript"] });
+  const magic = new MagicString(source);
+
+  for (const statement of ast.program.body as any[]) {
+    if (statement.type === "ImportDeclaration" && statement.importKind === "type") {
+      let end = statement.end as number;
+      if (source[end] === "\r" && source[end + 1] === "\n") end += 2;
+      else if (source[end] === "\n") end += 1;
+      magic.remove(statement.start as number, end);
+      continue;
+    }
+
+    const declaration =
+      statement.type === "ExportNamedDeclaration" ? statement.declaration : statement;
+
+    if (declaration?.type !== "VariableDeclaration") continue;
+
+    for (const declarator of declaration.declarations as any[]) {
+      const annotation = declarator.id?.typeAnnotation;
+      if (annotation) magic.remove(annotation.start as number, annotation.end as number);
+    }
+  }
+
+  return magic.toString();
+}
+
+/**
+ * The server-vs-client reload seam.
+ *
+ * A page module carries TWO halves. The CLIENT half is the projected code the
+ * browser actually runs; Fast Refresh can hot-swap it with zero reloads. The
+ * SERVER half — `metadata`, `loader`, `route`, `middleware`, `validation`, `prefix`, plus
+ * the imports/locals orphaned with them — is stripped by projection
+ * (`projection.ts:49`) and set to `undefined` on hydration
+ * (`client/hydrate-page.tsx`), so the browser never holds it and there is
+ * nothing on the client to hot-swap. Its effect is felt only when SSR re-runs
+ * and re-renders `<head>`; the honest way to apply a change to it is a full
+ * document reload.
+ *
+ * THE RULING (canon `6b240682`), stated as the invariant it is:
+ *
+ *   FAST REFRESH ONLY WHEN THE ONLY CHANGES ARE INSIDE COMPONENT BODIES.
+ *   EVERYTHING ELSE RELOADS.
+ *
+ * Concretely: any change to an import statement, to a module-level
+ * declaration, or to a server export forces a full document reload — whether
+ * or not the JSX moved in the same save.
+ *
+ * WHY AN OVER-APPROXIMATION, AND WHY NOBODY SHOULD "IMPROVE" IT BACK
+ *
+ * Two earlier cuts tried to name the server half EXACTLY and both shipped a
+ * stale `<head>`:
+ *
+ *   1. Comparing only the projected CLIENT code. A save that changed the JSX
+ *      *and* `metadata` moved the client half, which was read as proof that
+ *      only the JSX moved. Mixed saves took the Fast Refresh branch.
+ *   2. Adding the complement — the stripped server half, recovered by
+ *      subsequence diff. `projection.ts:447-448` KEEPS an import when the
+ *      client reads it, so an import read by BOTH `metadata` and the JSX
+ *      lives in the projection and appears in NEITHER half exclusively.
+ *      Change its specifier and the complement is byte-identical → Fast
+ *      Refresh, stale `<title>`. Shared module-level LOCALS have the same
+ *      shape, so extending the complement a third time is a third bug.
+ *
+ * Both failures were UNDER-approximations, and under-approximating is the
+ * unsafe direction. A precise reachability analysis over shared imports and
+ * locals is the correct answer and is a later refinement; getting it subtly
+ * wrong reproduces this bug again. Over-approximating can only err toward
+ * RELOADING. A needless reload costs component state; a missed one ships a
+ * stale `<head>` and calls it a hot update.
+ *
+ * THE ACCEPTED COST, which is not a bug to be optimised away: editing a
+ * module-level helper read only by the JSX now reloads.
+ *
+ * The skeleton has to be captured BEFORE the edit, because by the time
+ * `hotUpdate` runs Vite has already hard-invalidated the module and cleared its
+ * `transformResult` (`onFileChange` → `invalidateModule`, which runs before any
+ * `hotUpdate` hook). The `transform` spy below is that capture: it runs first in
+ * the client environment, records the skeleton, and returns nothing so
+ * projection still performs the real transform.
+ */
+type SkeletonCache = Map<string, string>;
+
+/**
+ * What replaces a refresh-safe body in the skeleton. Its content is irrelevant —
+ * only that it is CONSTANT, so two sources that differ solely inside a masked
+ * body serialise identically.
+ */
+const MASKED_REFRESH_BODY = "/*warlock:refresh-body*/";
+
+/** React's own convention, and the one `react-refresh` itself uses: components are PascalCase. */
+function isComponentName(name: string | undefined): boolean {
+  return typeof name === "string" && /^[A-Z]/.test(name);
+}
+
+/** The `body` node of a function-shaped expression/declaration, or `undefined` for anything else. */
+function functionBody(node: any): any | undefined {
+  if (!node) return undefined;
+  if (
+    node.type === "FunctionDeclaration" ||
+    node.type === "FunctionExpression" ||
+    node.type === "ArrowFunctionExpression"
+  ) {
+    return node.body;
+  }
+  return undefined;
+}
+
+/**
+ * Generic duck-typed identifier walk, the same shape `projection.ts`'s
+ * `collectIdentifierNames` uses (it is not exported, and re-deriving one
+ * OVER-collecting walk is safe here for the same reason it is safe there).
+ *
+ * Over-collecting — counting an object property key or a shadowing parameter
+ * as a "read" — can only make the reachable set BIGGER, which can only UNMASK
+ * more component bodies, which can only produce more reloads. The safe
+ * direction.
+ */
+function collectIdentifierNames(node: unknown, names: Set<string>): void {
+  if (!node || typeof node !== "object") return;
+  if (Array.isArray(node)) {
+    for (const item of node) collectIdentifierNames(item, names);
+    return;
+  }
+  const record = node as Record<string, unknown>;
+  if (typeof record.type !== "string") return;
+  if (record.type === "Identifier" || record.type === "JSXIdentifier") {
+    names.add((record as any).name);
+  }
+  for (const key of Object.keys(record)) {
+    if (key === "type" || key === "start" || key === "end" || key === "loc" || key === "range")
+      continue;
+    if (
+      key === "leadingComments" ||
+      key === "trailingComments" ||
+      key === "innerComments" ||
+      key === "extra"
+    ) {
+      continue;
+    }
+    collectIdentifierNames(record[key], names);
+  }
+}
+
+/** The module-scope names a top-level statement binds (the `export` wrapper looked through). */
+function topLevelBoundNames(stmt: any): Set<string> {
+  const names = new Set<string>();
+  const declaration = stmt.type === "ExportNamedDeclaration" ? stmt.declaration : stmt;
+  if (!declaration) return names;
+  if (declaration.type === "VariableDeclaration") {
+    for (const declarator of declaration.declarations) {
+      if (declarator.id?.type === "Identifier") names.add(declarator.id.name);
+    }
+  } else if (declaration.id?.type === "Identifier") {
+    names.add(declaration.id.name);
+  }
+  return names;
+}
+
+/**
+ * Every module-scope name reachable from one of the six server exports.
+ *
+ * Used ONLY to UNMASK: a PascalCase function that `metadata` or `loader` can
+ * reach is not a component for this purpose, it is a server-side helper that
+ * merely looks like one, and a change inside its body must reload. Seeded from
+ * any top-level statement binding a `SERVER_EXPORT_NAMES` name — deliberately
+ * looser than `projection.ts`'s own `isServerExportDeclaration` (no export
+ * requirement, no single-declarator requirement), because seeding from MORE
+ * statements can only unmask more, i.e. reload more.
+ *
+ * Fixpoint, not one pass, for the same reason projection's is: a server-only
+ * helper can be reached only through another server-only helper.
+ */
+function serverReachableNames(body: any[]): Set<string> {
+  const reached = new Set<string>();
+  const declarations = body
+    .filter((stmt) => stmt.type !== "ImportDeclaration")
+    .map((stmt) => ({ stmt, names: topLevelBoundNames(stmt) }));
+
+  for (const { stmt, names } of declarations) {
+    let isServerExport = false;
+    for (const name of names) {
+      if (SERVER_EXPORT_NAMES.has(name)) isServerExport = true;
+    }
+    if (isServerExport) collectIdentifierNames(stmt, reached);
+  }
+
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const { stmt, names } of declarations) {
+      let isReached = false;
+      for (const name of names) {
+        if (reached.has(name)) isReached = true;
+      }
+      if (!isReached) continue;
+      const before = reached.size;
+      collectIdentifierNames(stmt, reached);
+      if (reached.size !== before) changed = true;
+    }
+  }
+
+  return reached;
+}
+
+/**
+ * The body node to mask for a top-level statement, or `undefined` if this
+ * statement is neither a component declaration nor an exported `register`
+ * declaration.
+ *
+ * Recognised shapes, and only these:
+ *   - `export default function () {…}` / `export default () => …` — the page
+ *     component, whatever it is called.
+ *   - `function Name() {…}` / `const Name = () => …` (PascalCase, optionally
+ *     `export`ed) — a component declared alongside it.
+ *   - `export function register() {…}` / `export const register = () => …` —
+ *     the lifecycle hook whose replacement namespace is invoked by projection.
+ *
+ * Everything else — `memo(...)`/`forwardRef(...)` wrappers, classes,
+ * lowercase helpers, every server export — is left UNMASKED and therefore
+ * compared byte-for-byte. That costs Fast Refresh on those shapes and buys the
+ * guarantee; see this seam's header.
+ */
+function componentBodyToMask(stmt: any, serverReachable: Set<string>): any | undefined {
+  if (stmt.type === "ExportDefaultDeclaration") return functionBody(stmt.declaration);
+
+  if (stmt.type === "ExportNamedDeclaration") {
+    const exported = stmt.declaration;
+    if (exported?.type === "FunctionDeclaration" && exported.id?.name === "register") {
+      return functionBody(exported);
+    }
+    if (exported?.type === "VariableDeclaration" && exported.declarations.length === 1) {
+      const declarator = exported.declarations[0];
+      if (declarator.id?.type === "Identifier" && declarator.id.name === "register") {
+        return functionBody(declarator.init);
+      }
+    }
+  }
+
+  const declaration = stmt.type === "ExportNamedDeclaration" ? stmt.declaration : stmt;
+  if (!declaration) return undefined;
+
+  const named = (name: string | undefined, node: any) =>
+    isComponentName(name) && !serverReachable.has(name as string) ? functionBody(node) : undefined;
+
+  if (declaration.type === "FunctionDeclaration") {
+    return named(declaration.id?.name, declaration);
+  }
+  if (declaration.type === "VariableDeclaration" && declaration.declarations.length === 1) {
+    const declarator = declaration.declarations[0];
+    if (declarator.id?.type !== "Identifier") return undefined;
+    return named(declarator.id.name, declarator.init);
+  }
+  return undefined;
+}
+
+/**
+ * The module source with every component and exported `register` body replaced
+ * by a constant — the ONE value the reload decision compares across an edit.
+ *
+ * Everything outside those bodies survives verbatim: imports, signatures,
+ * module-level declarations, all six server exports, and the comments and
+ * whitespace between them. So the skeleton is unchanged iff the save touched
+ * nothing but refresh-safe bodies.
+ *
+ * Returns `undefined` when the source does not parse — a half-typed file whose
+ * error Vite is already reporting from projection's real `transform`. The
+ * caller leaves the cache holding the last GOOD skeleton, so the next
+ * successful save is still compared against the right baseline.
+ */
+function captureSkeleton(code: string): string | undefined {
+  let ast: ReturnType<typeof parse>;
+  try {
+    ast = parse(code, { sourceType: "module", plugins: ["typescript", "jsx"] });
+  } catch {
+    return undefined;
+  }
+
+  const body = ast.program.body as any[];
+  const serverReachable = serverReachableNames(body);
+  const magic = new MagicString(code);
+
+  for (const stmt of body) {
+    const bodyNode = componentBodyToMask(stmt, serverReachable);
+    if (!bodyNode) continue;
+    const start = bodyNode.start as number;
+    const end = bodyNode.end as number;
+    if (end > start) magic.overwrite(start, end, MASKED_REFRESH_BODY);
+  }
+
+  return magic.toString();
+}
+
+/**
+ * Serves the client page registry at {@link CLIENT_PAGE_REGISTRY_ID}.
+ *
+ * Discovery runs INSIDE `load`, once per `load` call, and its result is NOT
+ * cached across builds — the plugin holds no state at all. A registry cached
+ * past the moment a page file appears is a page that silently 404s until
+ * someone restarts the dev server, which is a far more expensive bug than
+ * re-walking a source tree. Rollup calls `load` once per module per build, and
+ * in dev Vite's module graph caches the transformed result until the module is
+ * invalidated, so the walk is not per-request either way. (Invalidating that
+ * dev-server cache when a page file is ADDED needs a `handleHotUpdate`/watcher
+ * hook that belongs with the dev provider slice — see the followup.)
+ *
+ * `enforce: "pre"` and placed FIRST in `warlockClientBoundary`'s array — see
+ * that function's comment in `index.ts` for why position is what it is, and
+ * `page-registry-plugin.spec.ts` for the real-build proof that the pages this
+ * module names still reach `projection()`.
+ */
+export function clientPageRegistry(options: ClientPageRegistryPluginOptions = {}): Plugin {
+  const appRoot = path.resolve(options.appRoot ?? process.cwd());
+
+  // Per-plugin-instance, so two composed pipelines never cross-contaminate.
+  // Holds the last captured SKELETON (source with refresh-safe bodies masked) of
+  // each server page module the client environment transformed — the "before"
+  // side of the comparison in `hotUpdate`. See `captureSkeleton` above.
+  const skeletonCache: SkeletonCache = new Map();
+
+  return {
+    name: "warlock:client-page-registry",
+    enforce: "pre",
+    resolveId(source, importer) {
+      if (source === CLIENT_PAGE_REGISTRY_ID) {
+        // A per-site hydration entry (`<entry>?warlock-site=<site>`) imports the
+        // unqualified specifier; it means THAT site's registry.
+        const entrySite = siteOfHydrationEntryId(importer);
+        if (options.sites !== undefined && entrySite !== undefined && entrySite in options.sites) {
+          return resolvedSiteRegistryId(entrySite);
+        }
+        return RESOLVED_CLIENT_PAGE_REGISTRY_ID;
+      }
+      const prefix = `${CLIENT_PAGE_REGISTRY_ID}/`;
+      if (options.sites !== undefined && source.startsWith(prefix)) {
+        const site = source.slice(prefix.length);
+        if (site in options.sites) return resolvedSiteRegistryId(site);
+      }
+      return undefined;
+    },
+    load(id) {
+      let site: string | undefined;
+      if (options.sites !== undefined) {
+        site = Object.keys(options.sites).find((key) => id === resolvedSiteRegistryId(key));
+      }
+      if (id !== RESOLVED_CLIENT_PAGE_REGISTRY_ID && site === undefined) return undefined;
+
+      const discovered = discoverPages({ appRoot, srcDir: options.srcDir, sites: options.sites });
+      const pages = site === undefined ? discovered : discovered.filter((page) => page.site === site);
+      // Read the SAME way the server installers will (design note §Config):
+      // `web.localeRouting.strategy`, `app.localeCodes`, `app.localeCode` —
+      // via `resolveLocaleRouting`, the one function both sides call, so a
+      // page graph and its locale routing can never be resolved from two
+      // different config reads. Safe to reach from here: this plugin is
+      // constructed and its `load` hook runs in the SAME module graph as the
+      // server installers (the process that calls `createServer`/`build`),
+      // never Vite's SSR module runner — see `routing/locale-routing.ts`'s
+      // own header for why that graph split matters at all. Under `warlock
+      // build` the app config is not loaded, so this is the client FALLBACK
+      // only; the document the server renders carries the authoritative one.
+      const localeRouting = resolveClientLocaleRoutingFallback(
+        site === undefined ? undefined : options.sites![site]!.localeRouting,
+      );
+      const strictMode =
+        site === undefined
+          ? readClientStrictMode(appRoot, options.srcDir)
+          : readClientStrictMode(
+              appRoot,
+              options.srcDir,
+              siteRootFile(appRoot, options.srcDir, options.sites!, site),
+            );
+      const source = [
+        generateClientRegistry({
+          pages,
+          routeTablePages: discovered,
+          sites: options.sites,
+          toImportSpecifier,
+        }),
+        generateLocaleRoutingSource(localeRouting),
+        `export const ${CLIENT_STRICT_MODE_EXPORT_NAME} = ${strictMode};`,
+      ].join("\n");
+
+      return eraseTypes(source);
+    },
+    /**
+     * Capture-only spy. Records the SKELETON of every server page module the
+     * CLIENT environment transforms, and returns nothing so projection's own
+     * `transform` still does the real work. SERVE-ONLY:
+     * `this.environment.mode !== "dev"` skips it during `vite build`, where
+     * there is no `hotUpdate` to feed and the extra parse would be pure cost.
+     */
+    transform(code, id) {
+      if (this.environment?.mode !== "dev") return undefined;
+      if (!isProjectableFile(id)) return undefined;
+
+      const skeleton = captureSkeleton(code);
+      if (skeleton !== undefined) skeletonCache.set(id, skeleton);
+
+      return undefined;
+    },
+    /**
+     * Applies the ruling (canon `6b240682`): Fast Refresh ONLY when the only
+     * changes are inside component or exported `register` bodies.
+     *
+     *   - Skeleton moved (an import, a module-level declaration, ANY server
+     *     export — with or without a simultaneous JSX change) → full reload.
+     *   - Skeleton unchanged → defer to Fast Refresh, zero reloads.
+     *
+     * Note what is NOT here: no attempt to name which half a shared import or
+     * local belongs to. That question is what produced the two previous stale
+     * `<head>` bugs; this seam refuses to answer it and reloads instead.
+     * `hotUpdate` exists only on the dev server, so this is serve-only by
+     * construction.
+     */
+    async hotUpdate(context) {
+      // Multi-site: a file under one site's folder concerns only that site's
+      // registry (and that site's own root), never the others'.
+      const owner = siteOwningFile(context.file, appRoot, options.srcDir, options.sites);
+      const ownerRoot =
+        owner === undefined
+          ? rootConfigFile(appRoot, options.srcDir)
+          : siteRootFile(appRoot, options.srcDir, options.sites!, owner);
+      // The root is deliberately absent from the client registry: importing it
+      // would expose its middleware and server-only dependency graph. Its
+      // static strictMode projection instead lives in this virtual module, so
+      // an edit must invalidate that module and reload even though there is no
+      // client-side root transform skeleton to compare.
+      if (
+        path.resolve(context.file) === ownerRoot ||
+        isRootSetupFile(context.file, appRoot, options.srcDir, ownerRoot)
+      ) {
+        // Vite calls this hook for every environment. SSR was invalidated by
+        // its watcher already; only the client sends the document reload.
+        if (this.environment.name !== "client") return [];
+
+        const routeGraphHandled = await options.beforePageHotUpdate?.({
+          file: context.file,
+          type: context.type,
+        });
+
+        if (routeGraphHandled) return [];
+
+        invalidateClientPageRegistry(context.server, owner);
+        return [];
+      }
+
+      if (isSetupFile(context.file)) {
+        const routeGraphHandled = await options.beforePageHotUpdate?.({
+          file: context.file,
+          type: context.type,
+        });
+
+        if (routeGraphHandled) return [];
+        if (this.environment.name === "client") invalidateClientPageRegistry(context.server, owner);
+        return [];
+      }
+
+      if (isProjectableFile(context.file) || path.basename(context.file) === "locales.json") {
+        const routeGraphHandled = await options.beforePageHotUpdate?.({
+          file: context.file,
+          type: context.type,
+        });
+
+        if (routeGraphHandled) return [];
+      }
+
+      // `create`/`delete` are page graph churn, not in-place edits — leave them
+      // to Vite's normal handling (a new/removed module reloads on its own).
+      if (context.type !== "update") return undefined;
+      if (!isProjectableFile(context.file)) return undefined;
+
+      const nextSource = await context.read();
+      const next = captureSkeleton(nextSource);
+      const prev = skeletonCache.get(context.file);
+
+      // Refresh the cache for the next edit regardless of the decision below.
+      if (next !== undefined) skeletonCache.set(context.file, next);
+
+      // Could not parse the new source (Vite is already reporting that error),
+      // or the client environment never transformed this module — which means
+      // the browser is not holding this page, so there is no stale `<head>` to
+      // ship and nothing a reload of some OTHER page would fix.
+      if (next === undefined || prev === undefined) return undefined;
+
+      // Anything outside a component body moved: the browser cannot hot-swap
+      // it, so reload the document to re-run SSR and re-render `<head>`.
+      // `path: "*"` matches Vite's own middleware-mode reload.
+      if (prev !== next) {
+        this.environment.hot.send({ type: "full-reload", path: "*" });
+
+        // Empty module list: we've issued the update ourselves, so Vite should
+        // not additionally push a Fast Refresh for the client module.
+        return [];
+      }
+
+      // Only component bodies moved: defer to Vite's Fast Refresh with zero
+      // reloads. A no-op re-save falls through the same harmless path.
+      return undefined;
+    },
+  };
+}

@@ -1,0 +1,550 @@
+---
+name: create-a-page
+description: "Create an SSR React page under `src/web/**`. Put route, cache, validation, middleware, metadata, and sitemap policy in `config`; keep `loader`, `register`, `ErrorBoundary`, and the default component as exports. Triggers: `*.page.tsx`, `PageConfig`, `config.route`, `config.cache`, `config.validation`, `config.middleware`, `config.metadata`, `config.sitemap`, `PageLoader`, `PageProps`, `error.page.tsx`, `register`, `[...slug]`."
+---
+
+# Warlock — create a page
+
+A page is any `*.page.tsx` beneath `src/web/` — the page root. Its URL is either a declared `route` or one derived from its own location; its default export renders React.
+
+## Named `ErrorBoundary`
+
+Export a named `ErrorBoundary` from an app, layout, or page module to render a failure at that level. It receives the original `error` and the resolved HTTP `status`; an error without a resolved status is `500`.
+
+```tsx
+export function ErrorBoundary({ error, status }: { error: unknown; status: number }) {
+  return <main><h1>{status}</h1><p>{String(error)}</p></main>;
+}
+```
+
+The closest authored boundary handles the failure. Keep the boundary itself defensive: if it throws, Warlock escalates to the next boundary or framework fallback.
+
+## Optional server setup module
+
+Pair `product-details.page.tsx` with `product-details.setup.ts` when the React
+component should stay UI-only. The setup file may own `config`, `loader`, and
+universal `register()`. Do not value-import it from the component; type-only
+imports preserve loader inference:
+
+```ts title="src/web/products/paired-product.setup.ts"
+import type { PageLoader } from "@warlock.js/web";
+
+export const loader = (async () => ({
+  product: { name: "Example product" },
+})) satisfies PageLoader;
+```
+
+```tsx title="src/web/products/paired-product.page.tsx"
+import type { loader } from "./paired-product.setup";
+import type { PageProps } from "@warlock.js/web";
+
+export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
+  return <h1>{data.product.name}</h1>;
+}
+```
+
+Every export has one owner. Duplicate `config`, `loader`, or `register` exports
+fail; `register()` remains browser-safe and runs on server and client. A
+type-only loader import is sufficient in development and production: it retains
+the framework-projected `register()` hook without a UI runtime import of setup.
+
+```tsx title="src/web/products/product-details.page.tsx"
+import type { PageConfig, PageLoader, PageProps } from "@warlock.js/web";
+
+export const config = {
+  route: { path: "/products/:id", name: "products.details" },
+  cache: { public: true, maxAge: 60 },
+  metadata: { title: "Product details" },
+} as const satisfies PageConfig;
+
+export const loader = (async ({ request }) => {
+  const id = request.input("id");
+
+  return {
+    product: {
+      id,
+      name: `Product ${id}`,
+    },
+  };
+}) satisfies PageLoader<undefined, typeof config.route>;
+
+export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
+  return (
+    <main>
+      <h1>{data.product.name}</h1>
+      <p>Product id: {data.product.id}</p>
+    </main>
+  );
+}
+```
+
+Use `satisfies PageLoader`, not `: PageLoader`. `satisfies` checks the context contract while retaining the loader's concrete return type, which is how `PageProps<typeof loader>` knows the shape of `data`. An annotation `: PageLoader` makes the return type `unknown`. A named `export async function loader(context: PageLoaderContext<...>)` keeps the return type as well; see the `load-page-data` topic.
+
+Declare `config` with `as const satisfies PageConfig`. `route.name` is typed `string`, so plain `satisfies` widens it, and `typeof config.route` then no longer carries the literal name that loader typing reads (a guarded page's non-null `session`, see the `protect-a-page` topic). `as const` keeps the literal and `satisfies` still checks the shape.
+
+## The minimum page
+
+```tsx title="src/web/contact.page.tsx"
+export const config = { route: "/contact" };
+
+export default function ContactPage() {
+  return (
+    <main>
+      <h1>Contact</h1>
+      <a href="mailto:support@example.com">support@example.com</a>
+    </main>
+  );
+}
+```
+
+`config.route` is optional. A page that omits it derives both its path and its name from where the file sits beneath `src/web` ([filesystem routing](#filesystem-routing), below). An explicit `config.route` wins over the derived route, for both path and optional name.
+
+### The default export is required
+
+`config.route` is optional; the default export is not. A `*.page.tsx` that exports only named bindings is a **hard discovery/build failure naming the file**:
+
+```
+The page "src/web/contact.page.tsx" has no runtime default export. Every `*.page.tsx`
+file must default-export the React component it renders. For example:
+`export default function Page() { return <main />; }`
+```
+
+Two details worth knowing:
+
+- **`export { Page as default }` satisfies the rule** — the check is for a runtime default binding, not for the `export default` keyword form specifically.
+- **`export default interface Page {}` does not.** A type-only default is erased at compile time, so there is no component at runtime; it is treated as missing.
+
+A file that cannot be parsed reports separately — `Cannot inspect the default export of "<file>": the file could not be parsed (…). Fix the syntax error and discovery will continue.` — so a syntax error never masquerades as a missing export.
+
+## Route declarations
+
+Use either a bare path or a literal object:
+
+```ts
+export const config = { route: "/products" };
+```
+
+```ts
+export const config = {
+  route: { path: "/products/:id", name: "products.details" },
+  cache: { public: true, maxAge: 60 },
+} as const satisfies PageConfig;
+```
+
+Prefer an explicit stable `name` for links. Without one, Warlock derives a name from the declared path — a global root page gets `index`, another global page gets its dotted path — the same derivation [filesystem routing](#filesystem-routing) uses when there is no `route` at all.
+
+Every segment of a page's URL is written down somewhere: `config.route.path` (or the derived filesystem path), prefixed by positional layouts' `config.prefix` (see the `use-layouts` topic).
+
+The server validates `config` at module ingress without invoking loaders or helpers. Use plain objects and literal route strings; unknown config keys and `route.cache` are refused.
+
+### Validate the page's input — `config.validation`
+
+Put validation in `config.validation`: a [Seal](https://www.npmjs.com/package/@warlock.js/seal) schema per source, `params` and `query` kept as two separate keys. A page may declare only `params`, only `query`, or both:
+
+`route.validate` and a named `validation` export are invalid. Use the config shape below.
+
+```tsx title="src/web/products/product-details.page.tsx"
+import { v } from "@warlock.js/seal";
+import type { PageConfig, PageLoader, PageProps } from "@warlock.js/web";
+
+export const config = {
+  route: { path: "/products/:id", name: "products.details" },
+  validation: {
+    params: v.object({ id: v.string().minLength(2) }),
+    query: v.object({ tab: v.string().optional() }).stripUnknown(),
+  },
+} as const satisfies PageConfig;
+
+export const loader = (async ({ request }) => {
+  const { params, query } = request.validated();
+
+  return { id: params.id, tab: query.tab };
+}) satisfies PageLoader<typeof config.validation, typeof config.route>;
+
+export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
+  return <h1>Product {data.id}</h1>;
+}
+```
+
+`request.validated()` types `params` and `query` from the schema — never a flattened merge of the two — and only includes the key(s) actually declared, so a page validating just `params` gets `{ params }` back, not `{ params, query: undefined }`. There is exactly ONE validation surface on a page; see the `load-page-data` topic for how the validated data reaches the loader.
+
+`request.params`/`request.query` arrive as strings, so a numeric `id` or `tab` needs `v.int().coerce()` (or the matching coercing primitive), not `v.int()` alone. `query` objects are strict by default — an unrecognized key such as `?utm_source=…` 400s unless the schema calls `.stripUnknown()`, the normal spelling for a public page's query.
+
+Rejected input never reaches the page loader — validation runs after the app and layout loaders and before the page's own. A full page load renders the application's `error.page.tsx` boundary at status 400, and the error it receives carries the validation issues (read them off `(error as { errors?: unknown }).errors` — see the Validation section of the `load-page-data` topic for the full shape) — a page is a document, not an API endpoint, so invalid input never gets a raw JSON body. Those issues are always the safe `{ input, type, error }` shape. In production, the `:value` placeholder in page-validation messages renders `…` instead of the submitted value. A custom rule or translation that builds its message from raw input without `:value` isn't covered, so keep submitted values out of custom message text. A client navigation to the same URL gets the same 400 status, with no document to render.
+
+### `config.middleware` — a page's own guard, run last
+
+Declare `config.middleware` as an array of `(ctx) => unknown | Promise<unknown>` guards on the page itself, alongside layout middleware above it (see the `use-layouts` topic). Layouts run outermost-first and the page's own middleware runs last.
+
+`route.middleware` and a named `middleware` export are invalid.
+
+```tsx
+export const config = {
+  route: "/account",
+  middleware: [
+    async ({ request, response }) => {
+      if (!request.header("authorization")) {
+        response.setStatusCode(401);
+        return { error: "Unauthorized" };
+      }
+    },
+  ],
+} as const satisfies PageConfig;
+```
+
+Returning anything other than `undefined` from a middleware short-circuits the request with that value, exactly as an app or layout middleware does. What that short-circuit actually produces differs by representation and by how the middleware answered:
+
+- **A client navigation** (a data request) always gets `{ status, body: <your returned value> }` as JSON — unchanged, regardless of status code.
+- **A full page load**, when the middleware already wrote the real reply itself — `response.redirect()`, `response.permanentRedirect()`, or a call that reaches `response.send()` (`.forbidden()`, `.unauthorized()`, `.notFound()`, `.send()` directly) — answers with exactly that reply. The pipeline renders nothing further; there is no document to add.
+- **A full page load**, when the middleware returns a value WITHOUT writing the reply itself (the `{ error: "Unauthorized" }` example above, after only `setStatusCode`) — a status `>= 400` renders the application's `error.page.tsx` boundary with that status, the returned value attached to the error; a status `< 200`–`399` (2xx) sends the returned value as the response body unchanged (JSON-stringified if it's an object) — **a page middleware returning 2xx content replaces the page.**
+
+Prefer calling a `response` method (`.forbidden()`, `.redirect()`, `.unauthorized()`, …) over returning a bare object when you want full control over the wire reply; a bare returned object is still safe on a full page load — it now always reaches the visitor, never silently dropped — but it renders through the error boundary for `>= 400`, and as raw content for `2xx`.
+
+## Page caching
+
+Page documents and their `x-warlock-data` representations are `no-store` by
+default. Opt a public page into shared caching with sibling `config.cache`:
+
+```tsx
+export const config = {
+  route: { path: "/products", name: "products.index" },
+  cache: { public: true, maxAge: 60 },
+} as const satisfies PageConfig;
+```
+
+`maxAge` is seconds. Both keys are required: `cache: { public: true }` is a
+boot-time `InvalidPageCacheOptInError`, because the framework will not invent
+a freshness window. Remove `cache` entirely to keep the safe `no-store`
+default.
+
+The declaration is an opt-in, not an override of request safety. A response
+that sets or clears a cookie, or a request that used authenticated state,
+emits `Cache-Control: private, no-store`. If Warlock cannot determine whether
+the request used authenticated state, it revokes the opt-in and emits
+`Cache-Control: no-store`. Only a provably unauthenticated request with no
+`Set-Cookie` can emit `public, max-age=<maxAge>`.
+
+This decision is applied once after loaders finish, to both representations.
+Setting `Cache-Control` manually in a loader cannot bypass the floor.
+
+### Server-side page cache — `serverCache`
+
+`cache.public`/`maxAge` only decide the `Cache-Control` header a downstream
+CDN/proxy should honour. `serverCache` is a second, independent opt-in on the
+SAME object: the framework itself holds the resolved bytes and serves a HIT
+without re-running the pipeline at all.
+
+```tsx
+export const config = {
+  route: { path: "/products", name: "products.index" },
+  cache: {
+    public: true,
+    maxAge: 60,
+    serverCache: true,
+    tags: ["products"],
+    // or: tags: (data) => [`product:${data.id}`],
+    ttl: 300, // optional — defaults to maxAge
+  },
+} as const satisfies PageConfig;
+```
+
+- `serverCache` requires `public: true` (like every `cache` opt-in) AND
+  `tags` — a stored entry with no tags could never be invalidated early, so
+  its absence is a boot-time `InvalidPageCacheOptInError`.
+- `tags` is a static list, or a function `(data, { shared }) => string[]` of the
+  resolved page data and the request's sealed `shared` payload, evaluated right
+  before the entry is stored — e.g. ``[`theme:${shared.theme}`]``.
+- `ttl` is the server cache's own freshness window in seconds, independent of
+  the CDN-facing `maxAge`; omit it to reuse `maxAge`.
+- `varyBy?: (request) => string` adds a request-derived component to the key,
+  for bytes that vary on something besides the host (a preview-theme cookie).
+  It runs before the lookup — before any middleware — so read the request
+  directly. A non-function is a boot-time `InvalidPageCacheOptInError`.
+
+**Cache key**: the request `Host` (lower-cased, port kept), the normalised
+pathname (lower-cased, trailing slash stripped), the sorted query string, the
+resolved `locale`, the representation — `html` for a document request, `json`
+for the `x-warlock-data` representation — and `varyBy`'s result. Two hosts
+(tenants) never share an entry. The stored document is the streamed one the
+MISS visitor received, so a lazily imported component is cached rendered, not
+as its Suspense fallback. A request for the NDJSON representation on
+a `serverCache` route never streams: the values are fully resolved and
+stored/served as the `json` variant instead, since there is nothing left to
+defer.
+
+**Bypass**: a request carrying an `Authorization` header or the configured
+auth cookie (`auth.cookie.name`, default `access_token`) never consults the
+cache — this check runs before any loader, so a credentialed visitor is
+never handed a stale guest page. Store-time eligibility (checked once
+per render) requires: `GET`, `status === 200`, no `Set-Cookie`, a provably
+unauthenticated request (the same fail-closed `authDerived` rule as
+`Cache-Control` above), and — for the document representation — not a
+detected crawler request (a crawler may still read a HIT, it just never
+writes the crawler-specific render).
+
+**Response headers**: `x-warlock-cache: hit | miss | bypass`, alongside the
+usual `Cache-Control`.
+
+**Size ceiling**: `pageCache.maxEntryBytes` (config key, default `1_048_576`
+— 1 MiB) caps one stored entry; an oversized MISS is still served to the
+visitor in full, it just isn't cached.
+
+**Where entries live**: the page cache keeps its entries and tag index in
+its own namespace, `warlock.page.<deployment>`, separate from your app's
+cache `globalPrefix`. That way a GET and the POST that invalidates it always
+see the same entries, even when your `globalPrefix` varies per request. The
+Host is part of every entry key, so two sites never share a page. The
+`<deployment>` part is:
+
+1. `pageCache.namespace` (config key), when set;
+2. otherwise your cache driver's `globalPrefix`, when it is a static string;
+3. otherwise nothing.
+
+Case 3 is fine for an in-process driver (memory/LRU/memory-extended). On a
+shared backend (redis, pg/database, file) it is a startup error the first
+time the page cache is used: two deployments sharing one Redis would
+otherwise read each other's pages. Set `pageCache.namespace` to something
+unique per deployment, such as `"shop-production"` or `"shop-staging"`. The
+app name alone is not enough to tell staging from production.
+
+**Invalidation**:
+
+```ts
+import { invalidatePageCache } from "@warlock.js/web/page-cache";
+
+await invalidatePageCache(["products"]);
+```
+
+Imported from `@warlock.js/web/page-cache`, not the root package: it is
+server-only (it reaches `@warlock.js/cache`), and keeping it off the root
+barrel keeps `@warlock.js/cache` out of the client bundle.
+
+Evicts every stored entry under any of the given tags, through
+`@warlock.js/cache`'s tag index. Cluster reach depends on the configured
+driver: a shared driver (redis/pg) removes the entry for every worker on
+their next read. An in-process driver (memory/LRU/memory-extended) only
+clears the CALLING worker's own heap — every other worker keeps serving its
+stale entry until `ttl`/`maxAge` expires. Enabling `serverCache` with an
+in-process driver in a clustered process logs a one-time startup warning;
+cross-process pub/sub invalidation is out of scope for this release.
+
+**`@warlock.js/cache` is an optional peer.** It is only loaded (via a lazy
+`await import(...)`) the first time some route with `serverCache: true`
+actually needs the store — an application that never opts in is never
+forced to install it. Enabling `serverCache` without the package installed
+fails loudly at boot/request time, naming `@warlock.js/cache`.
+
+## Filesystem routing
+
+Omit `route` and the URL comes from the page's own path beneath `src/web`:
+
+- Every directory contributes a segment, in order — `src/web/products/featured.page.tsx` derives `/products/featured`.
+- A `(group)` directory — parentheses, not braces — contributes nothing to the URL, only to organization: `src/web/(marketing)/pricing.page.tsx` derives `/pricing`. Bracket syntax inside a group name is refused at boot because it can never contribute a dynamic segment; use `(marketing)/[id]/page.page.tsx`, not `(marketing[id])/page.page.tsx`.
+- `index.page.tsx` claims its own directory rather than adding a segment: `src/web/products/index.page.tsx` derives `/products`. This is the ONLY filename with special meaning — `home.page.tsx` is not magic and derives `/home`.
+- `[id]` becomes `:id`: `src/web/products/[id].page.tsx` derives `/products/:id`.
+- A layout `config.prefix` on the page's ancestry composes in front of the derived path exactly as it does for an explicit `config.route.path` (see the `use-layouts` topic).
+
+Two pages that derive (or declare) the same effective path is a build error naming both files.
+
+### Catch-all segments are refused
+
+There is no catch-all / rest-parameter form in filesystem routing. Only
+`[name]` — a plain identifier in square brackets — is recognized as a
+dynamic segment. `src/web/docs/[...slug].page.tsx` raises
+`PageFileSegmentNotSupportedError` at boot and names both the page file and
+the rejected segment.
+
+Until a catch-all exists, use the terminal wildcard with an explicit `config.route`:
+
+```tsx
+export const config = { route: { path: "/docs/*", name: "docs.catchAll" } } as const satisfies PageConfig;
+```
+
+## Page-route grammar
+
+Page routes deliberately accept less than API routes:
+
+- Supported: `/`, static segments, whole-segment params such as `/products/:id`, the exact wildcard `*`, and a terminal wildcard such as `/docs/*`.
+- Not supported: regex params, optional params, multiple params in one segment, params mixed with text, doubled or trailing slashes, non-terminal wildcards, and catch-all/rest segments (`[...slug]`).
+
+Write two pages for an optional segment. Validate a constrained parameter in the page instead of putting a regex in its path.
+
+An unsupported declared path is a boot-time
+`PageRoutePathNotSupportedError`, never a literal or normalized route.
+Examples that fail include `/users/:id?`, `/users/:id(\\d+)`,
+`/near/:lat-:lng`, `/a//b`, and `/users/`.
+
+## Metadata
+
+`config.metadata` is a static object or a function of the resolved loader data:
+
+```tsx
+import type { PageConfig } from "@warlock.js/web";
+
+export const config = {
+  route: "/products",
+  metadata: {
+    title: "Products",
+    description: "Browse the product catalogue",
+    openGraph: { siteName: "Acme Store", images: [{ url: "/images/catalogue-card.png" }] },
+  },
+} as const satisfies PageConfig;
+```
+
+Every field (title templates, `openGraph`, `twitter`, `meta`, `links`, `canonical`, `robots`), the function form, how root, layout and page metadata merge, and per-locale metadata and `alternates` are in the `set-page-metadata` topic.
+
+## The not-found page — `404.page.tsx`
+
+`404.page.tsx` anywhere beneath `src/web` is the application's one not-found page. It is the second of the two special page filenames, next to `error.page.tsx`. Without one, Warlock answers with a built-in "404 | Page not found" document.
+
+```tsx title="src/web/404.page.tsx"
+import type { PageConfig } from "@warlock.js/web";
+
+export const config = {
+  metadata: { title: "Page not found" },
+} as const satisfies PageConfig;
+
+export default function NotFoundPage() {
+  return (
+    <main>
+      <h1>404</h1>
+      <p>We could not find that page.</p>
+      <a href="/">Back to the homepage</a>
+    </main>
+  );
+}
+```
+
+- **No `config.route`.** It has no URL of its own and answers every URL nothing else matched. Declaring a route on it is a build error, and a second `404.page.tsx` is a build error naming both files.
+- **Props.** The default component receives the usual `{ data, shared, params }`: `shared` is the sealed payload, `params` is empty, and there is no page data because its own `loader` never runs. Its `register()` and `config.middleware` still run and `config.metadata` still applies. Keep the metadata static, since there is no `data` to read.
+- **No loader.** A `loader` export on it is ignored. The `root.tsx` app loader still runs on a 404, so keep it cheap.
+- **No layouts.** It renders inside `root.tsx` only, even when a `layout.tsx` sits above it, so it cannot depend on app chrome that might itself fail.
+- **Status and indexing.** The response status is 404 and `robots` is forced to `noindex`.
+- **Only for document requests.** It renders for `GET`/`HEAD` requests that explicitly list `text/html` in `Accept`. Any other unmatched request (a `fetch()` to a mistyped `/api/...` URL) keeps the JSON 404.
+
+A loader sends the visitor to it with `response.notFound()`, from an app, layout or page loader. Return the result:
+
+```tsx
+import type { PageLoader } from "@warlock.js/web";
+import { findProduct } from "app/products/services/find-product.service";
+
+export const loader = (async ({ request, response }) => {
+  const product = await findProduct(request.input("id"));
+
+  if (!product) {
+    return response.notFound();
+  }
+
+  return { product };
+}) satisfies PageLoader;
+```
+
+Throwing a Core `HttpError` that resolves to 404, such as `ResourceNotFoundError` from `@warlock.js/core`, does the same thing. A client navigation to such a URL falls back to a full page load, which renders the same 404 page. See the `load-page-data` topic for the other response methods.
+
+## The error boundary — `error.page.tsx`
+
+`error.page.tsx` anywhere beneath `src/web` is the application's one error boundary — exactly two page filenames are special in Warlock, this and `404.page.tsx`. A second `error.page.tsx` is a build error naming both files. Like `404.page.tsx`, it declares no `route` — it has no URL of its own and is reached only when something throws.
+
+```tsx title="src/web/error.page.tsx"
+import type { ErrorPageProps } from "@warlock.js/web";
+
+export default function ErrorPage({ error, status }: ErrorPageProps) {
+  return (
+    <main>
+      <h1>Something went wrong</h1>
+      <p>Status: {status}</p>
+    </main>
+  );
+}
+```
+
+During SSR in development the component receives the real thrown value in `error`, for local debugging. In production, SSR receives the SAME sanitized shape hydration does — never the raw error — so the two never disagree: an unexpected error's own `message` never crosses the wire, in the initial HTML or after hydration. After hydration the component always receives the JSON-safe `{ name, message, stack?, errorCode? }` shape, and in production that shape is sanitized: the browser gets a stable generic message plus an opaque `errorCode` (joinable with the server's own error report line) instead of `message`, and `stack` never crosses at all. The one exception is `PublicPageError` (`@warlock.js/web`) — throw (or reject a `defer()`'d promise with) one of those when a message is meant for a real visitor, and its `message` is exposed as-is, in every environment, in both SSR and hydration. `robots: noindex` is a framework default on this path that an app-supplied `metadata` cannot remove.
+
+Every unhandled error response is also forced to
+`Cache-Control: private, no-store` at the framework's shared error funnel.
+This includes page and API-route failures.
+
+If the failure happens before any page module could even load — a module-load or `register()` throw — there is no trustworthy server composition left to hydrate against, so Warlock renders a plain framework fallback (your `error.page.tsx` if it can still be loaded, otherwise a minimal built-in boundary) with no hydration script at all rather than risk hydrating client code against markup nothing can vouch for.
+
+## The `register()` hook
+
+`root.tsx`, `layout.tsx`, and `*.page.tsx` may each export `register`: a synchronous, no-argument, side-effect hook that runs once per raw module namespace instance. It is separate from `config` and runs before middleware or loader work.
+
+```tsx
+export function register() {
+  // one-time setup for this module namespace; must not return a Promise
+}
+```
+
+Returning a Promise (or anything thenable) throws — `register()` must finish before the module is usable.
+
+## The client boundary
+
+The browser boundary is decided by the import graph, not by the file's location. A `*.page.tsx` is universal:
+
+- `config` and `loader` are server/build policy; the default component and `register` retain their defined module roles.
+- The default component and any other surviving exports form the client graph.
+- An import used only by a stripped server export is removed with it.
+- An import also used by the component survives and therefore must be browser-safe.
+
+Keep server-only repository and service reads inside `loader`. Do not read them from module-scope initializers or the default component.
+
+### `.client` does not isolate SSR
+
+A `.client.tsx` suffix is a naming convention, not an SSR-isolation boundary. A
+module statically imported by a page, layout, root, or any of their imports is
+still evaluated by the server. Top-level browser globals such as `window`
+therefore crash SSR boot. To keep browser-only UI out of the server render, use
+`<ClientOnly>` / `useIsClient()` from `@warlock.js/web` (see the `render-client-only`
+topic). They defer rendering only; for a module that touches `window` at import
+time, also load it with `React.lazy` inside `<ClientOnly>`, since an ordinary
+`import` still runs on the server.
+
+### Static assets use `public/`
+
+The production server build does not support imported non-stylesheet assets. An
+import such as `import logo from "./logo.svg"` works under Vite in development
+but `warlock build` refuses it rather than emit a server URL that disagrees with
+the client bundle. Put the file in the application's `public/` directory and
+reference it by root URL: `public/logo.svg` is `/logo.svg`. Stylesheet imports
+are the exception and remain supported.
+
+## Editing a page in development
+
+`warlock dev` decides Fast Refresh vs. a full reload by comparing the module's _skeleton_ — its source with every component body masked out — across the edit. Everything outside a component body is part of the skeleton: imports, module-level declarations, `config`, `loader`, and other exports.
+
+- **A JSX-only edit hot-updates.** The skeleton is unchanged, so Vite's Fast Refresh applies the projected client code with no reload and no lost component state.
+- **A `config.metadata` edit reloads the document.** It changes the server-rendered head policy.
+- **Any module-level change reloads.** An edited import, declaration, `config`, or `loader` changes the skeleton.
+- **A helper function used only by the JSX still reloads if it is declared at module level.** The rule does not try to prove which half of a shared declaration the edit was "really" for — it over-approximates deliberately, because a false reload only costs component state, while a missed one ships a stale `<head>` and calls it a hot update.
+- Creating, deleting, or renaming a page file, or editing its `route` export, is page-GRAPH churn, not a skeleton edit — see below, not Fast Refresh.
+
+## Route-table changes in development
+
+Creating a page, deleting one, or editing `config.route` is route-table churn rather than a component-only edit. `warlock dev` re-registers affected routes atomically with no manual restart.
+
+## Gotchas
+
+- **A page with no `config.route` is not unreachable.** It derives a real URL from its file location — see [Filesystem routing](#filesystem-routing).
+- **A page with no default export IS refused.** Named exports alone fail the build naming the file, instead of serving a blank 200.
+- **`.client.tsx` does not prevent SSR evaluation.** It is a naming convention, not an isolation boundary. Use `<ClientOnly>` (the `render-client-only` topic).
+- **Imported static assets do not build.** Put them in `public/` and reference their root URL; CSS imports remain supported.
+- **`[...slug]` is not a catch-all.** It fails boot with
+  `PageFileSegmentNotSupportedError`; use an explicit terminal `*` route
+  instead — see [Catch-all segments are refused](#catch-all-segments-are-refused).
+- **`process.env` is refused in the client/universal graph, `PUBLIC_` prefix included.** Read env values in a loader and return them as page data; see the `load-page-data` topic.
+- **Keep `config.route` literal.** A computed route is refused.
+- **Do not annotate the loader with `: PageLoader`.** That erases the return type `PageProps` needs.
+- **Components receive data, not HTTP objects.** `request` and `response` belong to loaders; the component also renders in the browser.
+- **A default component is synchronous.** Fetch in the loader, then render its result.
+- **A page can export `action` (or `actions`) to handle its own form POST.** Use `<Form>` and `useActionData`; see the `handle-a-form-action` topic. Mutations through API routes remain ordinary requests; call `refresh()` after them.
+- **Do not import the hydration entry.** `esm/hydration/index.mjs` is a framework build input, not a consumer API. The public low-level runtime subpath is `@warlock.js/web/client/runtime`.
+
+## See also
+
+- `set-page-metadata` topic: every metadata field, merge order, per-locale recipes.
+- `load-page-data` topic: validation, loader context, response short-circuits, and `shared`.
+- `use-layouts` topic: positional layouts, prefixes, and persistence.
+- `navigate-on-the-client` topic: `Link`, `href`, navigation, and `refresh()`.
+- `render-client-only` topic: `ClientOnly` and `useIsClient` for browser-only UI.
+- `serve-styles` topic: CSS imports in page and root modules.

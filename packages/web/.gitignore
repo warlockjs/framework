@@ -1,0 +1,8 @@
+node_modules
+dist
+esm
+cjs
+coverage
+*.log
+.DS_Store
+scratchpad

@@ -1,0 +1,640 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { transformSync } from "esbuild";
+import type { Plugin } from "vite";
+import { build } from "vite";
+import { describe, expect, it } from "vitest";
+import { WEB_ESBUILD_PATCH } from "../build/generate-pages-barrel";
+import { gateBSecrets } from "./gate-b-secrets";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const FIXTURE_ROOT = path.join(__dirname, "..", "..", "__tests__", "vite", "fixtures", "gate-b");
+
+/**
+ * Runs a real Vite build (JS API, not npx) for a single
+ * fixture entry, with Gate B as the only plugin. Verifies the actual
+ * emitted build failure/success, never the transform logic in isolation —
+ * same discipline as D.1-D.3.
+ */
+async function buildEntry(fileName: string) {
+  return build({
+    root: FIXTURE_ROOT,
+    // Stated, not inherited (canon a31d170c). This matches Vite's own default
+    // for `build()`, so it changes nothing today — it is here so that what the
+    // fixtures are compiled under is written down rather than assumed.
+    //
+    // NOTE: `mode` does NOT decide `import.meta.env.DEV`. That comes from
+    // Vite's `isProduction`, which reads NODE_ENV first — and vitest sets
+    // NODE_ENV=test when the shell leaves it empty. See case 8.
+    mode: "production",
+    logLevel: "silent",
+    plugins: [gateBSecrets()],
+    build: {
+      write: false,
+      minify: false,
+      lib: {
+        entry: path.join(FIXTURE_ROOT, fileName),
+        formats: ["es"],
+        fileName: () => "out.js",
+      },
+    },
+  });
+}
+
+/**
+ * Invokes the REAL `transform` hook directly, source supplied inline instead
+ * of from a fixture file on disk. Used ONLY for case 40 below: a genuinely
+ * unparseable module can't be committed as an on-disk fixture without
+ * breaking the repo's own formatting gate on that file (the whole point of
+ * the case is that no formatter can parse it either), so this mirrors
+ * `projection.spec.ts`'s `transformSource` helper instead of `buildEntry`'s
+ * real-Vite-build convention used everywhere else in this file.
+ */
+async function transformSource(code: string, baseName: string): Promise<never> {
+  const id = path.join(FIXTURE_ROOT, baseName);
+  const plugin: Plugin = gateBSecrets();
+  const hook = plugin.transform as (
+    this: { error(message: string): never },
+    code: string,
+    id: string,
+    options?: { ssr?: boolean },
+  ) => unknown;
+  hook.call(
+    {
+      error: (message: string): never => {
+        throw new Error(message);
+      },
+    },
+    code,
+    id,
+  );
+  throw new Error(`expected ${baseName} to be refused, but it transformed cleanly`);
+}
+
+function firstChunkCode(result: Awaited<ReturnType<typeof buildEntry>>): string {
+  const output = Array.isArray(result) ? result[0] : result;
+  const chunk = "output" in output ? output.output[0] : undefined;
+  if (!chunk || chunk.type !== "chunk") throw new Error("expected a JS chunk in the build output");
+  return chunk.code;
+}
+
+describe("gateBSecrets — Gate B inline-secret transform gate (real Vite builds)", () => {
+  it("case 1: process.env.SECRET_KEY (dot notation) in a component fails, correct message", async () => {
+    try {
+      await buildEntry("case1-process-env-dot.tsx");
+      expect.unreachable("expected the build to fail");
+    } catch (error) {
+      const message = (error as Error).message;
+      expect(message).toContain("Gate B refused a module");
+      expect(message).toContain("File: ");
+      expect(message).toContain("case1-process-env-dot.tsx:");
+      expect(message).toContain("Expression: process.env.SECRET_KEY");
+      expect(message).toContain("Cause:");
+      expect(message).toContain("process.env.SECRET_KEY");
+      expect(message).toContain("Fix:");
+    }
+  });
+
+  it('case 2: process.env["SECRET_KEY"] (static bracket) in a component fails', async () => {
+    try {
+      await buildEntry("case2-process-env-bracket.tsx");
+      expect.unreachable("expected the build to fail");
+    } catch (error) {
+      const message = (error as Error).message;
+      expect(message).toContain("Gate B refused a module");
+      expect(message).toContain('Expression: process.env["SECRET_KEY"]');
+      expect(message).toContain("Cause:");
+      expect(message).toContain("process.env.SECRET_KEY");
+      expect(message).toContain("Fix:");
+    }
+  });
+
+  it("case 3: import.meta.env.PUBLIC_API_URL passes (build succeeds)", async () => {
+    const result = await buildEntry("case3-import-meta-env-public.tsx");
+    const code = firstChunkCode(result);
+    expect(code).toContain("Case3Component");
+  });
+
+  it("case 4: import.meta.env.DATABASE_URL (no PUBLIC_ prefix) fails", async () => {
+    try {
+      await buildEntry("case4-import-meta-env-private.tsx");
+      expect.unreachable("expected the build to fail");
+    } catch (error) {
+      const message = (error as Error).message;
+      expect(message).toContain("Gate B refused a module");
+      expect(message).toContain("Expression: import.meta.env.DATABASE_URL");
+      expect(message).toContain("Cause:");
+      expect(message).toContain("PUBLIC_");
+      expect(message).toContain("Fix:");
+    }
+  });
+
+  it("case 5: import.meta.env[someRuntimeVariable] (computed key) fails — never-guess case", async () => {
+    try {
+      await buildEntry("case5-import-meta-env-computed.tsx");
+      expect.unreachable("expected the build to fail");
+    } catch (error) {
+      const message = (error as Error).message;
+      expect(message).toContain("Gate B refused a module");
+      expect(message).toContain("Expression: import.meta.env[someRuntimeVariable]");
+      expect(message).toContain("Cause:");
+      expect(message).toContain("computed key");
+      expect(message).toContain("Fix:");
+    }
+  });
+
+  it("case 6: the secret read is inside a HELPER file imported by a page, not the page itself — still caught", async () => {
+    try {
+      await buildEntry("case6-helper-page.page.tsx");
+      expect.unreachable("expected the build to fail");
+    } catch (error) {
+      const message = (error as Error).message;
+      expect(message).toContain("Gate B refused a module");
+      expect(message).toContain("case6-helper.ts:");
+      expect(message).toContain("Expression: process.env.SECRET_KEY");
+      expect(message).toContain("Fix:");
+    }
+  });
+
+  it("case 7: import.meta.env.MODE (Vite built-in) passes despite no PUBLIC_ prefix, and is inlined for real", async () => {
+    const result = await buildEntry("case7-import-meta-env-mode.tsx");
+    const code = firstChunkCode(result);
+    expect(code).toContain("Case7Component");
+    expect(code).toContain('"production"');
+  });
+
+  /**
+   * What this case is actually about is the GATE: `DEV` carries no `PUBLIC_`
+   * prefix, and Gate B must still let it through because it is a Vite built-in
+   * — and Vite must still inline it, so nothing reaches the browser as a
+   * runtime lookup.
+   *
+   * It used to assert the literal `false`. That is not a property of the gate;
+   * it is a property of whoever ran the suite. Vite's `isProduction` reads
+   * NODE_ENV before it reads `mode`, and vitest sets NODE_ENV=test when the
+   * shell leaves it unset — so the assertion passed under this machine's
+   * agent shells (which export NODE_ENV=production) and failed in a clean one.
+   * Green for a reason that had nothing to do with the code under test.
+   *
+   * So assert the inlining itself: a boolean literal is present and no
+   * `import.meta.env` survives into the chunk. True in either environment,
+   * and it fails if the gate ever stops inlining.
+   */
+  it("case 8: import.meta.env.DEV (Vite built-in) passes despite no PUBLIC_ prefix, and is inlined for real", async () => {
+    const result = await buildEntry("case8-import-meta-env-dev.tsx");
+    const code = firstChunkCode(result);
+    expect(code).toContain("Case8Component");
+    expect(code).toMatch(/return (true|false);/);
+    expect(code).not.toContain("import.meta.env");
+  });
+
+  it("case 9: only one of two declared PUBLIC_* vars is read anywhere in the client build — the read one is inlined, the unread one is not, verified on the emitted bundle", async () => {
+    const previousReadVar = process.env.PUBLIC_READ_VAR;
+    const previousUnreadVar = process.env.PUBLIC_UNREAD_VAR;
+    process.env.PUBLIC_READ_VAR = "read-var-value-marker";
+    process.env.PUBLIC_UNREAD_VAR = "unread-var-value-marker";
+    try {
+      const result = await buildEntry("case9-entry.tsx");
+      const code = firstChunkCode(result);
+      expect(code).toContain("read-var-value-marker");
+      expect(code).not.toContain("unread-var-value-marker");
+    } finally {
+      process.env.PUBLIC_READ_VAR = previousReadVar;
+      process.env.PUBLIC_UNREAD_VAR = previousUnreadVar;
+    }
+  });
+
+  describe("a bare `import.meta.env` value-reference fails at transform time, not only as a whole-build failure", () => {
+    it("case 10: const env = import.meta.env (aliased) fails at transform time, source-line-pointing", async () => {
+      try {
+        await buildEntry("case10-import-meta-env-aliased.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        // Same file/line/expression/cause/fix shape as every other Gate B
+        // violation (case 1-8 above) — NOT the whole-build generateBundle
+        // message ("Gate B refused a build: an unread PUBLIC_ env var...").
+        expect(message).toContain(
+          "Gate B refused a module: forbidden inline env read in the client build.",
+        );
+        expect(message).toContain("case10-import-meta-env-aliased.tsx:");
+        expect(message).toContain("Expression: import.meta.env");
+        expect(message).toContain("Cause:");
+        expect(message).toContain("whole object");
+        expect(message).toContain("Fix:");
+      }
+    });
+
+    it("case 11: fn({...import.meta.env}) (spread) fails at transform time, source-line-pointing", async () => {
+      try {
+        await buildEntry("case11-import-meta-env-spread.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain(
+          "Gate B refused a module: forbidden inline env read in the client build.",
+        );
+        expect(message).toContain("case11-import-meta-env-spread.tsx:");
+        expect(message).toContain("Expression: import.meta.env");
+        expect(message).toContain("Cause:");
+        expect(message).toContain("whole object");
+        expect(message).toContain("Fix:");
+      }
+    });
+  });
+
+  describe("process.env reached through an indirect global object", () => {
+    it("case 12: globalThis.process.env.SECRET_KEY fails", async () => {
+      try {
+        await buildEntry("case12-global-this-process-env.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain("Gate B refused a module");
+        expect(message).toContain("Expression: globalThis.process.env.SECRET_KEY");
+      }
+    });
+
+    it("case 13: window.process.env.SECRET_KEY fails", async () => {
+      try {
+        await buildEntry("case13-window-process-env.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain("Gate B refused a module");
+        expect(message).toContain("Expression: window.process.env.SECRET_KEY");
+      }
+    });
+
+    it("case 14: self.process.env.SECRET_KEY fails", async () => {
+      try {
+        await buildEntry("case14-self-process-env.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain("Gate B refused a module");
+        expect(message).toContain("Expression: self.process.env.SECRET_KEY");
+      }
+    });
+
+    it('case 15: globalThis["process"].env.SECRET_KEY fails', async () => {
+      try {
+        await buildEntry("case15-global-this-process-bracket.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain("Gate B refused a module");
+        expect(message).toContain('Expression: globalThis["process"].env.SECRET_KEY');
+      }
+    });
+
+    it("case 16: globalThis?.process?.env?.SECRET_KEY fails", async () => {
+      try {
+        await buildEntry("case16-global-this-process-optional.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain("Gate B refused a module");
+        expect(message).toContain("Expression: globalThis?.process?.env?.SECRET_KEY");
+      }
+    });
+
+    it("case 17: window?.process?.env?.SECRET_KEY fails", async () => {
+      try {
+        await buildEntry("case17-window-process-optional.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain("Gate B refused a module");
+        expect(message).toContain("Expression: window?.process?.env?.SECRET_KEY");
+      }
+    });
+
+    it("case 18: self?.process?.env?.SECRET_KEY fails", async () => {
+      try {
+        await buildEntry("case18-self-process-optional.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain("Gate B refused a module");
+        expect(message).toContain("Expression: self?.process?.env?.SECRET_KEY");
+      }
+    });
+
+    it('case 19: globalThis?.["process"]?.env?.SECRET_KEY fails', async () => {
+      try {
+        await buildEntry("case19-global-this-process-bracket-optional.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain("Gate B refused a module");
+        expect(message).toContain('Expression: globalThis?.["process"]?.env?.SECRET_KEY');
+      }
+    });
+
+    it("case 20: a process-object alias (`const p = globalThis.process`) is refused at the alias assignment", async () => {
+      try {
+        await buildEntry("case20-process-object-alias.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain("Gate B refused a module");
+        expect(message).toContain("case20-process-object-alias.tsx:");
+        expect(message).toContain("Expression: globalThis.process");
+        expect(message).toContain("Cause:");
+        expect(message).toContain("Fix:");
+      }
+    });
+  });
+
+  describe("aliased/indirect access to the `process` binding — refused at the point of obtaining it", () => {
+    it("case 28: const { env } = process (destructured off the bare binding) fails", async () => {
+      try {
+        await buildEntry("case28-process-destructure-binding.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain("Gate B refused a module");
+        expect(message).toContain("case28-process-destructure-binding.tsx:");
+        expect(message).toContain("Expression: process");
+        expect(message).toContain("Cause:");
+        expect(message).toContain("Fix:");
+      }
+    });
+
+    it("case 29: const p = window.process (aliased) fails at the alias assignment", async () => {
+      try {
+        await buildEntry("case29-window-process-alias.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain("Gate B refused a module");
+        expect(message).toContain("case29-window-process-alias.tsx:");
+        expect(message).toContain("Expression: window.process");
+        expect(message).toContain("Cause:");
+        expect(message).toContain("Fix:");
+      }
+    });
+
+    it("case 30: const p = self.process (aliased) fails at the alias assignment", async () => {
+      try {
+        await buildEntry("case30-self-process-alias.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain("Gate B refused a module");
+        expect(message).toContain("case30-self-process-alias.tsx:");
+        expect(message).toContain("Expression: self.process");
+        expect(message).toContain("Cause:");
+        expect(message).toContain("Fix:");
+      }
+    });
+
+    it("case 31: const g = globalThis; g.process.env.SECRET_KEY (globalThis itself aliased) fails", async () => {
+      try {
+        await buildEntry("case31-globalthis-alias-process.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain("Gate B refused a module");
+        expect(message).toContain("case31-globalthis-alias-process.tsx:");
+        expect(message).toContain("Expression: g.process.env.SECRET_KEY");
+        expect(message).toContain("Cause:");
+        expect(message).toContain("Fix:");
+      }
+    });
+  });
+
+  describe("innocent cases that must stay allowed", () => {
+    it("case 33: a local function parameter named `process` is not the Node global", async () => {
+      const result = await buildEntry("case33-local-process-param.tsx");
+      const code = firstChunkCode(result);
+      expect(code).toContain("Case33Component");
+    });
+
+    it("case 34: a local `const process = {...}` shadows the Node global", async () => {
+      const result = await buildEntry("case34-local-process-const.tsx");
+      const code = firstChunkCode(result);
+      expect(code).toContain("Case34Component");
+    });
+
+    it("case 35: `process` used as an object property key/member on a plain object is not the Node global", async () => {
+      const result = await buildEntry("case35-process-property-key.tsx");
+      const code = firstChunkCode(result);
+      expect(code).toContain("Case35Component");
+    });
+
+    it("case 36: `.process()` called on a non-global object (a job queue) is unrelated to the Node global", async () => {
+      const result = await buildEntry("case36-process-method-non-global.tsx");
+      const code = firstChunkCode(result);
+      expect(code).toContain("Case36Component");
+    });
+
+    it('case 37: a string literal containing "process.env" is not a code reference', async () => {
+      const result = await buildEntry("case37-string-process-env.tsx");
+      const code = firstChunkCode(result);
+      expect(code).toContain("Case37Component");
+    });
+
+    it("case 38: `process` in a type-only position (`typeof process.env` as a type annotation) is erased, not a runtime reference", async () => {
+      const result = await buildEntry("case38-type-only-process.tsx");
+      const code = firstChunkCode(result);
+      expect(code).toContain("Case38Component");
+    });
+
+    it("case 39: a decorated class parses without crashing Gate B's own parser (`4344e32a`)", async () => {
+      const result = await buildEntry("case39-decorated-class.tsx");
+      const code = firstChunkCode(result);
+      expect(code).toContain("Case39Component");
+    });
+  });
+
+  /**
+   * `4344e32a`: a page's per-page `sitemap` export commonly imports a model
+   * built with TS decorators (`@warlock.js/cascade`). Before Gate B's own
+   * parser accepted decorator syntax, that model crashed `@babel/parser`
+   * with a bare "requires enabling ... decorators-legacy" message instead of
+   * Gate B's own boundary/secrets refusal — a Babel parser crash standing in
+   * for a boundary error. Case 39 above pins the fix for the innocent shape;
+   * this describe pins the two remaining diagnostic requirements: a module
+   * that genuinely leaks a secret is still caught (not silently let through
+   * once decorators parse), and a module that still can't be parsed at all
+   * gets a message naming the file and the client graph, not a raw Babel one.
+   */
+  describe("Gate B's own parser matches the rest of the client pipeline (`4344e32a`)", () => {
+    it("case 39b: a decorated class that genuinely reads a secret is still refused by Gate B's own rule, not silently allowed once decorators parse", async () => {
+      try {
+        await buildEntry("case39b-decorated-class-with-secret.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain("Gate B refused a module");
+        expect(message).toContain("case39b-decorated-class-with-secret.tsx:");
+        expect(message).toContain("Expression: process.env.SECRET_KEY");
+      }
+    });
+
+    it("case 40: a genuinely unparseable module names the file and says it was reached from the client graph, not a bare Babel message", async () => {
+      try {
+        await transformSource(
+          "export default function Case40() {\n  return <div>{;\n}",
+          "case40-unparseable-syntax.tsx",
+        );
+        expect.unreachable("expected the transform to throw");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain("Gate B could not parse a module reached from the client graph");
+        expect(message).toContain("File: ");
+        expect(message).toContain("case40-unparseable-syntax.tsx");
+        expect(message).toContain("Cause:");
+        expect(message).toContain("Fix:");
+      }
+    });
+  });
+
+  describe("a bare `process.env` value-reference fails at transform time, mirroring the import.meta.env check", () => {
+    it("case 21: const env = process.env (aliased) fails at transform time, source-line-pointing", async () => {
+      try {
+        await buildEntry("case21-process-env-aliased.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain(
+          "Gate B refused a module: forbidden inline env read in the client build.",
+        );
+        expect(message).toContain("case21-process-env-aliased.tsx:");
+        expect(message).toContain("Expression: process.env");
+        expect(message).toContain("Cause:");
+        expect(message).toContain("whole object");
+        expect(message).toContain("Fix:");
+      }
+    });
+
+    it("case 22: fn({...process.env}) (spread) fails at transform time, source-line-pointing", async () => {
+      try {
+        await buildEntry("case22-process-env-spread.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain(
+          "Gate B refused a module: forbidden inline env read in the client build.",
+        );
+        expect(message).toContain("case22-process-env-spread.tsx:");
+        expect(message).toContain("Expression: process.env");
+        expect(message).toContain("Cause:");
+        expect(message).toContain("whole object");
+        expect(message).toContain("Fix:");
+      }
+    });
+
+    it("case 23: const { APP_SECRET } = process.env (destructured) fails at transform time", async () => {
+      try {
+        await buildEntry("case23-process-env-destructure.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain(
+          "Gate B refused a module: forbidden inline env read in the client build.",
+        );
+        expect(message).toContain("case23-process-env-destructure.tsx:");
+        expect(message).toContain("Expression: process.env");
+        expect(message).toContain("whole object");
+      }
+    });
+
+    it("case 24: Object.keys(process.env) fails at transform time", async () => {
+      try {
+        await buildEntry("case24-process-env-object-keys.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain(
+          "Gate B refused a module: forbidden inline env read in the client build.",
+        );
+        expect(message).toContain("case24-process-env-object-keys.tsx:");
+        expect(message).toContain("Expression: process.env");
+        expect(message).toContain("whole object");
+      }
+    });
+
+    it("case 25: JSON.stringify(process.env) fails at transform time", async () => {
+      try {
+        await buildEntry("case25-process-env-json-stringify.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain(
+          "Gate B refused a module: forbidden inline env read in the client build.",
+        );
+        expect(message).toContain("case25-process-env-json-stringify.tsx:");
+        expect(message).toContain("Expression: process.env");
+        expect(message).toContain("whole object");
+      }
+    });
+
+    it("case 26: process.env[someRuntimeVariable] (computed key) fails — never-guess case", async () => {
+      try {
+        await buildEntry("case26-process-env-computed-bracket.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain("Gate B refused a module");
+        expect(message).toContain("Expression: process.env[someRuntimeVariable]");
+        expect(message).toContain("Cause:");
+        expect(message).toContain("computed key");
+        expect(message).toContain("Fix:");
+      }
+    });
+
+    /**
+     * Documents ACTUAL behavior, not a request-spec claim: `process.env.X` is
+     * refused for EVERY key, "PUBLIC_"-prefixed or not — see this file's own
+     * header comment ("process.env is never readable client-side at all ...
+     * forbidden regardless of X") and the narrowed-read branch's cause
+     * message ("there is no 'public' process.env key, static or computed").
+     * That branch is pre-existing and intentionally untouched here. Unlike
+     * `import.meta.env`, `process.env` has no PUBLIC_-prefixed allowed path
+     * at all, narrowed or bare.
+     */
+    it("case 27: process.env.PUBLIC_API_URL (literal PUBLIC_ key) still fails — process.env has no allowed key, unlike import.meta.env", async () => {
+      try {
+        await buildEntry("case27-process-env-public-literal.tsx");
+        expect.unreachable("expected the build to fail");
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain("Gate B refused a module");
+        expect(message).toContain("Expression: process.env.PUBLIC_API_URL");
+      }
+    });
+  });
+});
+
+/**
+ * Not Gate B — this is `WEB_ESBUILD_PATCH.define` (build/generate-pages-barrel.ts),
+ * esbuild's own `transform()`, no Vite involved. It lives here because the claim
+ * under test is the load-bearing one behind `shared.ts`'s `import.meta.env?.DEV`
+ * comment (shared.ts:373-378), and this is the nearest executable-esbuild-behavior
+ * spec in the tree.
+ */
+describe("WEB_ESBUILD_PATCH.define — real esbuild transform, not Vite", () => {
+  it("replaces `import.meta.env?.DEV` (optional chaining) with the defined literal, whole expression gone", () => {
+    const { code } = transformSync("if (import.meta.env?.DEV) { doSomething(); }", {
+      define: WEB_ESBUILD_PATCH.define as Record<string, string>,
+      loader: "ts",
+    });
+
+    expect(code).not.toContain("import.meta");
+    expect(code).toContain("if (false)");
+  });
+
+  it("replaces plain `import.meta.env.DEV` (no optional chaining) the same way", () => {
+    const { code } = transformSync("if (import.meta.env.DEV) { doSomething(); }", {
+      define: WEB_ESBUILD_PATCH.define as Record<string, string>,
+      loader: "ts",
+    });
+
+    expect(code).not.toContain("import.meta");
+    expect(code).toContain("if (false)");
+  });
+});

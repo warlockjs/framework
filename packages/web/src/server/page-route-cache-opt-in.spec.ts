@@ -1,0 +1,259 @@
+/**
+ * Real response `Cache-Control` headers for a page route that opted in via
+ * `config.cache: { public: true, maxAge }`, proven against an actual Fastify
+ * response rather than against the function that sets it — same pattern as
+ * `set-cookie-cache-floor.spec.ts` and `auth-derived-cache-headers.spec.ts`,
+ * applied to the opt-in half of `response-cache-floor.ts`'s precedence.
+ *
+ * `renderPageRequest` is mocked so the test controls exactly what each route
+ * "commits" — cookies — without needing a real page/layout/app module graph.
+ * The `cache` option is handed to `createPageRouteHandler` directly, exactly
+ * the way `install-page-routes.ts` / `install-page-routes-from-manifest.ts`
+ * would after resolving it off the page's real `route` export
+ * (`resolvePageRouteCache`, `../routing/route-identity.ts`) — this suite is
+ * about what the seam DOES with an already-resolved opt-in, not about how it
+ * gets resolved (that is `route-identity.spec.ts`'s job).
+ *
+ * No standalone dev/production server is started here: `router.scan(server)`
+ * plus `server.inject()` exercises the real route on an in-memory Fastify
+ * instance that never binds a port.
+ */
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import Fastify, { type FastifyInstance } from "fastify";
+import { registerHttpPlugins, router, Response, type Request } from "@warlock.js/core";
+import { WARLOCK_DATA_REQUEST_HEADER, WARLOCK_DATA_REQUEST_VALUE } from "../routing/data-request";
+import type { PageCacheOptIn } from "../routing/route-identity";
+import type { BufferedCookie } from "./execute-page-request";
+import { InvalidPageModuleConfigError, normalizePageModule } from "./normalize-page-module";
+
+const { renderPageRequest } = vi.hoisted(() => ({
+  renderPageRequest: vi.fn(),
+}));
+
+vi.mock("./render-page", () => ({ renderPageRequest }));
+
+import { createPageRouteHandler } from "./create-page-route-handler";
+
+function renderedOk(
+  overrides: { headers?: Record<string, string>; cookies?: BufferedCookie[] } = {},
+) {
+  return {
+    html: "<!doctype html><html><body>ok</body></html>",
+    status: 200,
+    headers: overrides.headers ?? {},
+    cookies: overrides.cookies ?? [],
+    data: undefined,
+    bundle: undefined,
+  };
+}
+
+const moduleById: Record<string, unknown> = {
+  "app.tsx": { config: {}, default: () => null },
+  "layout.tsx": { config: {}, default: () => null },
+  "page.tsx": { config: {}, default: () => null },
+};
+
+function registerRoute(urlPath: string, httpServer: FastifyInstance, cache?: PageCacheOptIn): void {
+  router.get(
+    urlPath,
+    createPageRouteHandler({
+      path: urlPath,
+      name: urlPath,
+      appFile: "app.tsx",
+      layoutFile: "layout.tsx",
+      pageFile: "page.tsx",
+      loadModule: async (moduleId) => moduleById[moduleId],
+      httpServer,
+      cache,
+    }),
+  );
+}
+
+/** Whatever the currently running test wants done to `request` mid-render. */
+let touchAuth: (request: Request) => void = () => {};
+
+describe("page route cache opt-in", () => {
+  const server = Fastify();
+
+  beforeAll(async () => {
+    await registerHttpPlugins(server);
+
+    registerRoute("/__cache-innocent", server);
+    registerRoute("/__cache-opted-in", server, { public: true, maxAge: 120 });
+    registerRoute("/__cache-opted-in-cookie", server, { public: true, maxAge: 120 });
+    registerRoute("/__cache-opted-in-auth", server, { public: true, maxAge: 120 });
+
+    router.scan(server);
+
+    // ── 6. UNOBSERVABLE auth mark — wired directly on the raw Fastify
+    // instance, bypassing `router.get`/`router.scan` entirely. Going through
+    // the router always constructs a real core `Request`
+    // (`router.ts`'s `handleRoute`), whose `locals` is initialized to `{}` in
+    // its OWN constructor — so `request.locals` can never actually be absent
+    // that way, no matter what the request does. To prove the "the mark
+    // mechanism is not observable on this request at all" case for real, this
+    // route calls the exact same handler function returned by
+    // `createPageRouteHandler` with a hand-built context whose `request` has
+    // no `locals` property at all — the same shape several existing unit
+    // tests in `create-page-route-handler.spec.ts` already hand this handler.
+    const unobservableHandler = createPageRouteHandler({
+      path: "/__cache-opted-in-unobservable",
+      name: "/__cache-opted-in-unobservable",
+      appFile: "app.tsx",
+      layoutFile: "layout.tsx",
+      pageFile: "page.tsx",
+      loadModule: async (moduleId) => moduleById[moduleId],
+      httpServer: server,
+      cache: { public: true, maxAge: 120 },
+    });
+
+    server.get("/__cache-opted-in-unobservable", async (rawRequest, rawReply) => {
+      const response = new Response();
+      response.setResponse(rawReply);
+      // Only needed so `Response.send`'s optional-chained `this.request?.id`
+      // logging and the `finish`-event `endTime` write have somewhere to land
+      // — unrelated to the `request.locals` question this route exists to
+      // prove.
+      response.request = { id: "unobservable-test" } as never;
+
+      const request = {
+        path: rawRequest.url,
+        header: (name: string, defaultValue?: unknown) =>
+          rawRequest.headers[name.toLowerCase()] ?? defaultValue,
+        // Deliberately no `locals` property at all.
+      };
+
+      await unobservableHandler({ request, response } as never);
+    });
+  });
+
+  beforeEach(() => {
+    renderPageRequest.mockReset();
+    touchAuth = () => {};
+    renderPageRequest.mockImplementation(
+      async (_url: string, options: { createHttp: () => { request: Request } }) => {
+        const { request } = options.createHttp();
+        touchAuth(request);
+        return renderedOk();
+      },
+    );
+  });
+
+  afterAll(async () => {
+    await server.close();
+  });
+
+  it("refuses the withdrawn route.cache nesting and names the page module", () => {
+    expect(() =>
+      normalizePageModule(
+        {
+          default: () => null,
+          config: { route: { path: "/legacy-cache", cache: { public: true, maxAge: 60 } } },
+        },
+        "page",
+        "src/web/legacy-cache.page.tsx",
+      ),
+    ).toThrow(InvalidPageModuleConfigError);
+    expect(() =>
+      normalizePageModule(
+        {
+          default: () => null,
+          config: { route: { path: "/legacy-cache", cache: { public: true, maxAge: 60 } } },
+        },
+        "page",
+        "src/web/legacy-cache.page.tsx",
+      ),
+    ).toThrow("src/web/legacy-cache.page.tsx");
+  });
+
+  // ── 1. INNOCENT CASE FIRST ────────────────────────────────────────────────
+  it("innocent case: a route with no cache field is no-store on the document", async () => {
+    const response = await server.inject({ method: "GET", url: "/__cache-innocent" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+  });
+
+  it("innocent case: a route with no cache field is no-store on the data representation", async () => {
+    const response = await server.inject({
+      method: "GET",
+      url: "/__cache-innocent",
+      headers: { [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+  });
+
+  // ── 2 & 3. Opted-in route ─────────────────────────────────────────────────
+  it("emits public, max-age=<maxAge> on the document for an opted-in route", async () => {
+    const response = await server.inject({ method: "GET", url: "/__cache-opted-in" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("public, max-age=120");
+  });
+
+  it("emits public, max-age=<maxAge> on the data representation, so it cannot diverge from the document", async () => {
+    const response = await server.inject({
+      method: "GET",
+      url: "/__cache-opted-in",
+      headers: { [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("public, max-age=120");
+  });
+
+  // ── 4. THE MOST IMPORTANT TEST IN THIS SLICE ─────────────────────────────
+  it("an opted-in route whose response sets a cookie still emits private, no-store — the cookie floor beats the opt-in", async () => {
+    renderPageRequest.mockResolvedValue(
+      renderedOk({ cookies: [{ name: "session", value: "abc", options: { raw: true } }] }),
+    );
+
+    const response = await server.inject({ method: "GET", url: "/__cache-opted-in-cookie" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["set-cookie"]).toBeDefined();
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+  });
+
+  // ── 5. Auth-derived floor beats the opt-in ───────────────────────────────
+  // 5.12.0: `request.user` was removed from `@warlock.js/core`; the
+  // authenticated user now lives at `request.locals.user` (written by
+  // `@warlock.js/auth`'s middleware), which does NOT mark `authDerived` — only
+  // `decodedAccessToken` still does (see core's 5.12.0 CHANGELOG and
+  // `auth-derived-cache-headers.spec.ts`). This case is updated to touch
+  // `decodedAccessToken` so it keeps proving the auth floor, rather than a
+  // property that no longer marks it.
+  it("an opted-in route on an auth-derived request still emits private, no-store — the auth floor beats the opt-in", async () => {
+    touchAuth = (request) => {
+      request.decodedAccessToken = { userType: "member" };
+    };
+
+    const response = await server.inject({ method: "GET", url: "/__cache-opted-in-auth" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+  });
+
+  // ── 6. UNPROVEN MEANS REVOKED — the fix this suite exists to prove ───────
+  it("unproven means revoked: an opted-in route whose auth mark is unobservable emits no-store, NOT public, max-age", async () => {
+    const response = await server.inject({
+      method: "GET",
+      url: "/__cache-opted-in-unobservable",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+  });
+
+  it("unproven means revoked: the revoked opt-in does not escalate to private, no-store either — an unobservable mark is not proof of auth, just an absence of proof either way", async () => {
+    const response = await server.inject({
+      method: "GET",
+      url: "/__cache-opted-in-unobservable",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).not.toBe("private, no-store");
+  });
+});

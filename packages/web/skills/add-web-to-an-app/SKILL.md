@@ -1,0 +1,119 @@
+---
+name: add-web-to-an-app
+description: 'Install the SSR page layer with `warlock add web`: add React/Vite peers, scaffold `src/web/root.tsx` and `src/web/index.page.tsx`, register `webConnector()`, and safely relocate the stock top-level `GET "/"` JSON route to `/welcome`. Triggers: `warlock add web`, `webConnector`, `src/web/root.tsx`, `src/web/index.page.tsx`, `GET "/welcome"`; "add web to an app", "install Warlock web", "scaffold SSR", "homepage route collision". Skip: author a page — the `create-a-page` topic; customize the document — the `write-the-root` topic; dev/build/start commands — the `run-app` topic of the `warlock-js-core` skill; competing installers `create-next-app`, `vite create`, `remix init`.'
+---
+
+# Warlock — add web to an app
+
+`warlock add web` turns an existing Warlock API application into an application that can also serve SSR React pages. It installs the web and React packages, adds the Vite development peers, scaffolds the smallest page layer, and registers the late-phase web connector.
+
+## Keep Vitest setup out of development
+
+`warlock dev` (and `warlock build`) load your app's `vite.config.ts`. Anything you put there for tests runs in development too. Guard vitest-only setup:
+
+```ts
+// vite.config.ts
+if (process.env.VITEST) {
+  Object.assign(process.env, testEnv); // test database, test keys...
+}
+```
+
+## The shape
+
+```bash
+npx warlock add web
+```
+
+On the ordinary path it leaves this application-owned shape:
+
+```text
+src/
+  web/
+    root.tsx
+    index.page.tsx
+warlock.config.ts
+```
+
+The generated index page declares `export const config: PageConfig = { route: { path: "/", name: "index" }, ... }`, so the server payload and client registry consume one explicit identity. Universal localization setup is inside its synchronous `register()` hook. The generated root owns the document, renders `<Head />`, keeps `{children}` inside `#vessel`, and renders `<Scripts />`. `warlock dev` turns literal `groupedTranslations` registrations into typed `useTrans()` keys; it accepts `string` until the first generated typing file exists.
+
+Every added `@warlock.js/*` package is saved at the exact version of the Core CLI executing the command. Third-party dependency ranges stay as declared by the feature.
+
+## Connector registration
+
+The command adds `webConnector()` to `warlock.config.ts`. If the config cannot be patched safely, add the same wiring yourself:
+
+For development-only connector tuning, `webConnector({ ssrFetchTimeoutMs })` sets the Vite SSR module-fetch bound; `WARLOCK_SSR_FETCH_TIMEOUT_MS` overrides it.
+
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+import { webConnector } from "@warlock.js/web/connector";
+
+export default defineConfig({
+  connectors: [webConnector()],
+});
+```
+
+Keep the connector in `warlock.config.ts`. The build reads this same array to collect web's build contribution, while dev/start use it to boot the runtime. Registering it again from `src/app/main.ts` boots it twice and duplicates page routes.
+
+## What happens to an existing `GET "/"`
+
+The stock project template already owns `/` with a JSON welcome route. The page stub also owns `/`, and two `GET` handlers for one path fail at request time. The installer preserves both surfaces by changing the existing JSON route to `/welcome` before it writes the page.
+
+The automatic move is intentionally narrow. It only inspects:
+
+```text
+src/app/shared/routes.ts
+```
+
+and only rewrites exactly one top-level declaration shaped like this:
+
+```ts
+router.get("/", homePageController);
+```
+
+After the move:
+
+```ts
+router.get("/welcome", homePageController);
+```
+
+Indented `router.get("/", ...)` declarations inside a prefixed group are not root collisions and are not touched.
+
+## Collision outcomes
+
+- No `src/app/shared/routes.ts`, or no top-level `GET "/"`: create the root page normally.
+- Exactly one recognized top-level `GET "/"` and no top-level `GET "/welcome"`: move it to `/welcome`, then create the home page.
+- More than one top-level `GET "/"`, an existing top-level `GET "/welcome"`, an unreadable/unwritable routes file, or an unrecognized rewrite: create `root.tsx`, do not create `index.page.tsx`, set a failing exit code, and still register the connector.
+
+On the refusal path, free `/` yourself and create a page with either `export const config = { route: { path: "/", name: "index" } } as const satisfies PageConfig` or another literal `config.route`.
+
+## Re-running the command
+
+`src/web/root.tsx` is the scaffold sentinel. If it already exists, the command skips the `src/web` scaffold rather than overwriting a human-owned root. Connector registration is independently idempotent: if the config already mentions `webConnector`, it is left alone.
+
+## Verify the result
+
+Read the files rather than assuming the command could patch every application shape:
+
+```bash
+npx warlock routes --method GET --path /
+npx warlock routes --method GET --path /welcome
+```
+
+The desired result is one page route at `/` and, when the stock JSON route existed, one API route at `/welcome`.
+
+## Gotchas
+
+- **The collision scan is not codebase-wide.** A root route declared outside `src/app/shared/routes.ts` is not moved. Check `warlock routes` after installation.
+- **`/welcome` must be free before relocation.** The installer refuses to trade one duplicate route for another.
+- **A partial scaffold exits non-zero.** `root.tsx` and connector registration may still have been written; complete only the missing home page after resolving the collision.
+- **Do not register the connector twice.** Use `warlock.config.ts`, not an additional `connectorsManager.register(...)` call.
+- **Do not import the hydration entry.** The connector and build contribution own it.
+- **Run `warlock start` with the app root as cwd.** The manifest's `clientDir` (e.g. `dist/client`) resolves from `process.cwd()`, so copying `dist` elsewhere without the app root won't find client assets.
+
+## See also
+
+- The `create-a-page` topic: write the page after installation.
+- The `write-the-root` topic: customize the generated document shell.
+- The `serve-styles` topic: add global CSS from the root.
+- The `run-app` topic of the `warlock-js-core` skill: run dev, build, and production.

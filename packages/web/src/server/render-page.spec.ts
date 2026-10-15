@@ -1,0 +1,873 @@
+import config from "@mongez/config";
+import {
+  BadRequestError,
+  ForbiddenError,
+  Response,
+  ServerError,
+  setEnvironment,
+  type Request,
+} from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
+import { parse } from "devalue";
+import { createElement, isValidElement, StrictMode, type ReactNode } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { PAYLOAD_SCRIPT_ID } from "../components/document-context";
+import DefaultApp from "../components/default-app";
+import { useLocale, useTrans } from "../localization";
+import type { RouteTranslationsResolver } from "./route-translations";
+import { buildHydrationPayload } from "./build-hydration-payload";
+import type { ServerErrorPageProps } from "../props";
+
+const { resolvePageMetadata } = vi.hoisted(() => ({
+  resolvePageMetadata: vi.fn(() => ({ metadata: {} })),
+}));
+
+vi.mock("./resolve-page-metadata", async () => {
+  const actual =
+    await vi.importActual<typeof import("./resolve-page-metadata")>("./resolve-page-metadata");
+  return { ...actual, resolvePageMetadata };
+});
+vi.mock("../shared", () => ({
+  enterSharedScope: vi.fn(),
+  sealShared: vi.fn(async () => Object.freeze({})),
+}));
+
+import { useQueryString } from "@warlock.js/web";
+import { connectPageContext, type PageRouteEntry } from "./execute-page-request";
+import { isNonHydrating } from "./page-render-bundle";
+import { renderPageFailure, renderPageRequest, resolveServerErrorPageProps } from "./render-page";
+import { hydrationErrorPageProps, type ErrorPageModule } from "./error-page";
+import { PublicPageError } from "./public-page-error";
+import type { PipelineStore } from "./execute-page-request.types";
+
+beforeEach(() => {
+  resolvePageMetadata.mockClear();
+  connectPageContext({
+    buildStore: (payload) => payload as never,
+    getStore: () => undefined,
+    run: async (_store, callback) => callback(),
+  });
+});
+
+/**
+ * `renderPage.request`/`.response` mirror what `capturingCreateHttp` needs:
+ * `documentSlotsFrom` reads `.nonce`/`.locale`, and `finishRender` reads
+ * `.getHeaders`/`.header`/`.statusCode` — the same surface core's real
+ * `Response` implements, used here directly (as other server specs do)
+ * rather than re-declaring it.
+ */
+function createHttp(locale = "en") {
+  const response = new Response();
+  const request = { nonce: undefined, locale } as unknown as Request;
+
+  return { request, response };
+}
+
+describe("named ErrorBoundary status props", () => {
+  it.each([
+    [400, "page", () => new BadRequestError("bad request")],
+    [403, "layout", () => new ForbiddenError("forbidden")],
+    [500, "app", () => new ServerError("server error")],
+  ] as const)("passes status %i to the %s boundary", async (status, level, createError) => {
+    const Boundary = ({ status: receivedStatus }: { error: unknown; status: number }) =>
+      createElement("p", null, `boundary status: ${receivedStatus}`);
+    const throwingLoader = () => {
+      throw createError();
+    };
+    const entry: PageRouteEntry = {
+      path: `/${level}-boundary-status`,
+      name: `${level}-boundary-status`,
+      triple: {
+        app: {
+          default: ({ children }: { children?: ReactNode }) =>
+            createElement(DefaultApp, { children }),
+          ...(level === "app" ? { loader: throwingLoader, ErrorBoundary: Boundary } : {}),
+        },
+        layout: {
+          ...(level === "layout" ? { loader: throwingLoader, ErrorBoundary: Boundary } : {}),
+        },
+        page: {
+          ...(level === "page" ? { loader: throwingLoader, ErrorBoundary: Boundary } : {}),
+        },
+      },
+    };
+
+    const rendered = await renderPageRequest(entry.path, {
+      routes: [entry],
+      createHttp: () => createHttp(),
+    });
+
+    if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+    expect(rendered.status).toBe(status);
+    expect(rendered.html).toContain(`boundary status: ${status}`);
+  });
+});
+
+describe("root strictMode SSR composition", () => {
+  it.each([true, false, undefined])(
+    "wraps the page/layout subtree inside the document only when strictMode is %s",
+    async (strictMode) => {
+      let documentChildren: ReactNode;
+      const Layout = ({ children }: { children?: ReactNode }) =>
+        createElement("section", null, children);
+      const entry: PageRouteEntry = {
+        path: "/strict-mode",
+        name: "strict-mode",
+        triple: {
+          app: {
+            ...(strictMode === undefined ? {} : { strictMode }),
+            default: ({ children }: { children?: ReactNode }) => {
+              documentChildren = children;
+              return createElement(DefaultApp, { children });
+            },
+          },
+          layout: { default: Layout },
+          page: { default: () => createElement("p", null, "SSR content") },
+        },
+      };
+
+      const rendered = await renderPageRequest("/strict-mode", {
+        routes: [entry],
+        createHttp: () => createHttp(),
+      });
+
+      if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+      expect(rendered.html).toContain(
+        '<div id="vessel"><section><p>SSR content</p></section></div>',
+      );
+      if (!isValidElement<{ children?: ReactNode }>(documentChildren)) {
+        throw new Error("document did not receive a React subtree");
+      }
+      expect(documentChildren.type).toBe(strictMode === true ? StrictMode : Layout);
+      if (strictMode === true) {
+        const layout = documentChildren.props.children;
+        expect(isValidElement(layout) && layout.type).toBe(Layout);
+      }
+    },
+  );
+});
+
+/**
+ * ── `resolveServerErrorPageProps` — card c52d5653 ────────────────────────────
+ * Tested directly (the pipeline stage that builds error-page props), not via
+ * a real `renderToString()` under `setEnvironment("production")`: this suite
+ * transforms JSX to `react/jsx-dev-runtime` calls unconditionally (Vite's
+ * test-mode transform, independent of `NODE_ENV`), which is incompatible
+ * with react-dom-server's PRODUCTION build — any real SSR render under
+ * simulated production throws `TypeError: dispatcher.getOwner is not a
+ * function` here regardless of import order (confirmed: the dev/test-mode
+ * describes elsewhere in this file only pass because they never flip
+ * `NODE_ENV`; see `error-disclosure-inventory.spec.ts`'s TEST-HARNESS NOTE
+ * for the sibling case). `resolveServerErrorPageProps` is the exact
+ * production/hydration-parity decision `render-page.ts`'s two SSR call
+ * sites make — testing it directly proves the decision itself without
+ * needing a real production React render.
+ */
+describe("resolveServerErrorPageProps — SSR/hydration parity (c52d5653)", () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+
+  afterEach(() => {
+    if (originalNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+  });
+
+  const SECRET = "secret-xyz";
+
+  it("RED FIRST (would fail before the fix) — in production, SSR props.error is the SAME sanitized object hydration carries, not the raw thrown value", () => {
+    setEnvironment("production");
+    const thrown = new Error(SECRET);
+    const props: ServerErrorPageProps = { error: thrown, status: 500 };
+    const errorPage = hydrationErrorPageProps(props, thrown, "req-1");
+
+    const ssrProps = resolveServerErrorPageProps(props, errorPage);
+
+    expect(ssrProps.error).not.toBe(thrown);
+    expect((ssrProps.error as { message: string }).message).not.toContain(SECRET);
+    // Reference identity with the hydration payload's own error, not merely
+    // deep equality — the two channels must never be able to drift apart.
+    expect(ssrProps.error).toBe(errorPage.error);
+  });
+
+  it("PublicPageError's own message still reaches SSR props in production — the one documented exception", () => {
+    setEnvironment("production");
+    const thrown = new PublicPageError("This slug is already taken.");
+    const props: ServerErrorPageProps = { error: thrown, status: 500 };
+    const errorPage = hydrationErrorPageProps(props, thrown, "req-1");
+
+    const ssrProps = resolveServerErrorPageProps(props, errorPage);
+
+    expect((ssrProps.error as { message: string }).message).toBe("This slug is already taken.");
+  });
+
+  it("development is UNCHANGED — SSR props.error stays the raw thrown value", () => {
+    // Ambient NODE_ENV=test already exercises the non-production branch of
+    // `environment()`, same as every real-SSR describe elsewhere in this file.
+    const thrown = new Error(SECRET);
+    const props: ServerErrorPageProps = { error: thrown, status: 500 };
+    const errorPage = hydrationErrorPageProps(props, thrown, "req-1");
+
+    const ssrProps = resolveServerErrorPageProps(props, errorPage);
+
+    expect(ssrProps.error).toBe(thrown);
+  });
+});
+
+/**
+ * ── Real-SSR proof, dev mode only — card c52d5653 ────────────────────────────
+ * Companion to the pipeline-stage describe above: an actual `renderToString`
+ * render (no `setEnvironment`, so no react-dom production/jsx-dev-runtime
+ * conflict — see the note above) proving the wiring end to end for the
+ * branch this harness CAN exercise safely. Production's own HTML output is
+ * proven sanitized by construction: `resolveServerErrorPageProps` (proven
+ * above) is the ONLY thing `errorPageElement` ever renders in
+ * `render-page.ts`'s two SSR call sites.
+ */
+describe("finishRender — error.page.tsx SSR props, real render, dev mode (c52d5653)", () => {
+  it("an error.page.tsx that reads error.message renders the RAW thrown message in dev — unchanged by this fix", async () => {
+    const SECRET = "secret-xyz";
+    const entry: PageRouteEntry = {
+      path: "/boom",
+      name: "boom",
+      triple: {
+        app: {},
+        layout: {},
+        page: {
+          default: () => {
+            throw new Error(SECRET);
+          },
+        },
+      },
+    };
+    const { request, response } = createHttp();
+    const errorPageModule: ErrorPageModule = {
+      default: (props: ServerErrorPageProps) =>
+        createElement(
+          "span",
+          {},
+          props.error instanceof Error ? props.error.message : "no message",
+        ),
+    };
+
+    const rendered = await renderPageRequest("/boom", {
+      routes: [entry],
+      createHttp: () => ({ request, response }),
+      loadErrorPage: async () => errorPageModule,
+    });
+
+    if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+
+    expect(rendered.html).toContain(SECRET);
+  });
+});
+
+describe("request-bound locale provider", () => {
+  it("keeps concurrent SSR documents and their hydration payloads on their own locale", async () => {
+    let started = 0;
+    let release!: () => void;
+    let confirmBothStarted!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const bothStarted = new Promise<void>((resolve) => {
+      confirmBothStarted = resolve;
+    });
+    const entry: PageRouteEntry = {
+      path: "/locale",
+      name: "locale",
+      triple: {
+        app: {},
+        layout: {},
+        page: {
+          loader: async () => {
+            started += 1;
+            if (started === 2) confirmBothStarted();
+            await held;
+          },
+          default: () => createElement("main", { lang: useLocale() }, useLocale()),
+        },
+      },
+    };
+
+    const renderLocale = async (locale: string) => {
+      const { request, response } = createHttp(locale);
+      const rendered = await renderPageRequest("/locale", {
+        routes: [entry],
+        createHttp: () => ({ request, response }),
+      });
+
+      if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+
+      return rendered.html;
+    };
+
+    const englishRender = renderLocale("en");
+    const arabicRender = renderLocale("ar");
+
+    await bothStarted;
+    expect(started).toBe(2);
+    release();
+
+    const [english, arabic] = await Promise.all([englishRender, arabicRender]);
+
+    expect(english).toContain('<main lang="en">en</main>');
+    expect(payloadLocale(english)).toBe("en");
+    expect(arabic).toContain('<main lang="ar">ar</main>');
+    expect(payloadLocale(arabic)).toBe("ar");
+  });
+});
+
+/** devalue-decodes the embedded `#__WARLOCK_DATA__` payload and reads its `locale`. */
+function payloadLocale(html: string): unknown {
+  const match = new RegExp(`<script id="${PAYLOAD_SCRIPT_ID}"[^>]*>(.*?)<\\/script>`).exec(html);
+
+  if (match === null) throw new Error("payload script not found in rendered HTML");
+
+  return (parse(match[1]!) as { locale: unknown }).locale;
+}
+
+describe("useQueryString — package entry, SSR answer matches the request URL", () => {
+  it("resolves the query key the request's own URL carries, from the pipeline's per-request store", async () => {
+    // A real per-request ALS stand-in: `run` records the store WHILE its
+    // callback is in flight and clears it after, so `getStore()` answers
+    // truthfully for the one request currently rendering — the exact shape
+    // `connectSharedStore`/`connectPageContext`'s own resolver relies on.
+    let liveStore: PipelineStore | undefined;
+
+    connectPageContext({
+      buildStore: (payload) => payload as PipelineStore,
+      getStore: () => liveStore,
+      run: async (store, callback) => {
+        liveStore = store;
+        try {
+          return await callback();
+        } finally {
+          liveStore = undefined;
+        }
+      },
+    });
+
+    const entry: PageRouteEntry = {
+      path: "/search",
+      name: "search",
+      triple: {
+        app: {},
+        layout: {},
+        page: {
+          default: () => createElement("p", null, String(useQueryString("q") ?? "")),
+        },
+      },
+    };
+
+    const response = new Response();
+    const request = {
+      nonce: undefined,
+      locale: "en",
+      url: "/search?q=widgets",
+    } as unknown as Request;
+
+    const rendered = await renderPageRequest("/search?q=widgets", {
+      routes: [entry],
+      createHttp: () => ({ request, response }),
+    });
+
+    if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+
+    expect(rendered.html).toContain("<p>widgets</p>");
+  });
+});
+
+function throwingPageEntry(): PageRouteEntry {
+  return {
+    path: "/boom",
+    name: "boom",
+    triple: {
+      app: {},
+      layout: {},
+      page: {
+        default: () => {
+          throw new Error("page render exploded");
+        },
+      },
+    },
+  };
+}
+
+function fakeErrorPageModule(): ErrorPageModule {
+  return {
+    default: () => createElement("main", {}, "Sorry about that."),
+  };
+}
+
+describe("route-owned translation render scope", () => {
+  const resolver: RouteTranslationsResolver = (source, locale) => ({
+    locale,
+    keywords: { title: `${source}:${locale}`, [source]: "owned" },
+    revision: `${source}:${locale}`,
+  });
+  function Copy() {
+    return createElement("main", null, useTrans()("title"));
+  }
+  const scope = {
+    appFile: "root",
+    pageFile: "page",
+    errorPageFile: "error",
+    getRouteTranslations: resolver,
+  };
+
+  it("renders concurrent selected locales from the same snapshots as their payloads", async () => {
+    const results = await Promise.all(
+      ["en", "ar"].map(async (locale) => {
+        const context = createHttp(locale);
+        const entry: PageRouteEntry = {
+          path: "/copy",
+          name: "copy",
+          triple: {
+            app: {},
+            layout: {},
+            page: {
+              default: Copy,
+              loader: ({ request }) => ({ title: request.t("title") }),
+            },
+          },
+        };
+        const rendered = await renderPageRequest("/copy", {
+          ...scope,
+          routes: [entry],
+          createHttp: () => context,
+        });
+        if (rendered instanceof Response) throw new Error("unexpected terminal response");
+        expect(rendered.html).toContain(`<main>page:${locale}</main>`);
+        expect(rendered.bundle?.pageData).toEqual({ title: `page:${locale}` });
+        const payload = buildHydrationPayload(rendered.bundle!, locale);
+        expect(payload.translationMode).toBe("scoped");
+        expect(payload.translations).toEqual(resolver("page", locale).keywords);
+        return payload;
+      }),
+    );
+    expect(results[0]!.translations).not.toEqual(results[1]!.translations);
+  });
+
+  it("switches application error rendering and request helpers to the error source", async () => {
+    const context = createHttp();
+    const rendered = await renderPageRequest("/boom", {
+      ...scope,
+      routes: [throwingPageEntry()],
+      createHttp: () => context,
+      loadErrorPage: async () => ({
+        default: () => {
+          expect(context.request.t("title")).toBe("error:en");
+          return createElement(Copy);
+        },
+      }),
+    });
+    if (rendered instanceof Response) throw new Error("unexpected terminal response");
+    expect(rendered.html).toContain("<main>error:en</main>");
+    expect(buildHydrationPayload(rendered.bundle!, "en").translations).toEqual(
+      resolver("error", "en").keywords,
+    );
+  });
+
+  it.each([false, true])("uses root-only copy after error page fails=%s", async (fails) => {
+    const context = createHttp();
+    const rendered = await renderPageRequest("/boom", {
+      ...scope,
+      routes: [throwingPageEntry()],
+      createHttp: () => context,
+      ...(fails
+        ? {
+            loadErrorPage: async () => ({
+              default: () => {
+                throw new Error("boundary failed");
+              },
+            }),
+          }
+        : {}),
+    });
+    if (rendered instanceof Response) throw new Error("unexpected terminal response");
+    expect(context.request.t("title")).toBe("root:en");
+    expect(buildHydrationPayload(rendered.bundle!, "en").translations).toEqual(
+      resolver("root", "en").keywords,
+    );
+  });
+
+  it.each([false, true])(
+    "selects pre-triple failure copy when error page fails=%s",
+    async (fails) => {
+      const context = createHttp();
+      const rendered = await renderPageFailure({
+        ...scope,
+        ...context,
+        name: "boom",
+        path: "/boom",
+        thrown: new Error("module failed"),
+        loadErrorPage: async () => ({
+          default: () => {
+            if (fails) throw new Error("boundary failed");
+            return createElement(Copy);
+          },
+        }),
+      });
+      const source = fails ? "root" : "error";
+      expect(context.request.t("title")).toBe(`${source}:en`);
+      expect(buildHydrationPayload(rendered.bundle!, "en").translations).toEqual(
+        resolver(source, "en").keywords,
+      );
+      if (!fails) expect(rendered.html).toContain("<main>error:en</main>");
+    },
+  );
+});
+
+describe("renderPageFailure — pre-triple fallback", () => {
+  it("marks the bundle non-hydrating and emits neither the __WARLOCK_DATA__ payload nor its script", async () => {
+    const { request, response } = createHttp();
+
+    const rendered = await renderPageFailure({
+      name: "boom",
+      path: "/boom",
+      request,
+      response,
+      thrown: new Error("module load failed"),
+      loadErrorPage: async () => fakeErrorPageModule(),
+    });
+
+    expect(isNonHydrating(rendered.bundle)).toBe(true);
+    expect(rendered.html).not.toContain(PAYLOAD_SCRIPT_ID);
+  });
+
+  it("stays non-hydrating even when it falls all the way back to FrameworkRootBoundary (no app error page configured)", async () => {
+    const { request, response } = createHttp();
+
+    const rendered = await renderPageFailure({
+      name: "boom",
+      path: "/boom",
+      request,
+      response,
+      thrown: new Error("module load failed"),
+    });
+
+    expect(isNonHydrating(rendered.bundle)).toBe(true);
+    expect(rendered.html).not.toContain(PAYLOAD_SCRIPT_ID);
+  });
+});
+
+describe("finishRender — normal app error page path", () => {
+  it("keeps a normal app error page hydratable: bundle unmarked, __WARLOCK_DATA__ payload present", async () => {
+    const entry = throwingPageEntry();
+    const { request, response } = createHttp();
+
+    const rendered = await renderPageRequest("/boom", {
+      routes: [entry],
+      createHttp: () => ({ request, response }),
+      loadErrorPage: async () => fakeErrorPageModule(),
+    });
+
+    if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+
+    expect(isNonHydrating(rendered.bundle)).toBe(false);
+    expect(rendered.html).toContain(PAYLOAD_SCRIPT_ID);
+    expect(rendered.bundle?.errorPage).toEqual({
+      error: {
+        name: expect.any(String),
+        message: expect.any(String),
+        stack: expect.any(String),
+      },
+      status: 500,
+    });
+  });
+});
+
+describe("finishRender — render-error floor (d47f5696)", () => {
+  it("writes an SSR render throw to stderr, naming the route and passing the error", async () => {
+    const entry = throwingPageEntry();
+    const { request, response } = createHttp();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    let calls: unknown[][];
+    try {
+      const rendered = await renderPageRequest("/boom", {
+        routes: [entry],
+        createHttp: () => ({ request, response }),
+        loadErrorPage: async () => fakeErrorPageModule(),
+      });
+      if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+      calls = errorSpy.mock.calls.map((args) => [...args]);
+    } finally {
+      errorSpy.mockRestore();
+    }
+
+    // The thrown error object itself is passed (so its stack reaches the terminal).
+    expect(
+      calls.some((args) =>
+        args.some((arg) => arg instanceof Error && arg.message === "page render exploded"),
+      ),
+    ).toBe(true);
+    // And the route is named, so the developer knows WHERE it threw.
+    expect(
+      calls.some((args) => args.some((arg) => typeof arg === "string" && arg.includes("/boom"))),
+    ).toBe(true);
+  });
+});
+
+function throwingErrorPageModule(): ErrorPageModule {
+  return {
+    default: () => {
+      throw new Error("error page exploded");
+    },
+  };
+}
+
+describe("finishRender — the application error page itself throws", () => {
+  it("reports the error page's own failure to stderr, not just the original error", async () => {
+    const entry = throwingPageEntry();
+    const { request, response } = createHttp();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    let calls: unknown[][];
+    try {
+      const rendered = await renderPageRequest("/boom", {
+        routes: [entry],
+        createHttp: () => ({ request, response }),
+        loadErrorPage: async () => throwingErrorPageModule(),
+      });
+      if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+      calls = errorSpy.mock.calls.map((args) => [...args]);
+    } finally {
+      errorSpy.mockRestore();
+    }
+
+    // The original page-render throw is still reported (never swallowed).
+    expect(
+      calls.some((args) =>
+        args.some((arg) => arg instanceof Error && arg.message === "page render exploded"),
+      ),
+    ).toBe(true);
+
+    // The error page's OWN throw must also be reported — otherwise a
+    // developer whose error.page.tsx itself throws sees nothing at all.
+    expect(
+      calls.some((args) =>
+        args.some((arg) => arg instanceof Error && arg.message === "error page exploded"),
+      ),
+    ).toBe(true);
+  });
+});
+
+function createValidationHttp(
+  locale: string,
+  params: Record<string, string>,
+  query: Record<string, string>,
+) {
+  let validatedData: Record<string, unknown> = {};
+  const response = new Response();
+  const request = {
+    nonce: undefined,
+    locale,
+    params,
+    query,
+    setValidatedData(data: Record<string, unknown>) {
+      validatedData = data;
+    },
+    validated() {
+      return validatedData;
+    },
+  } as unknown as Request;
+
+  return { request, response };
+}
+
+function failingValidationEntry(): PageRouteEntry {
+  return {
+    path: "/orders/:id",
+    name: "orders.details",
+    triple: {
+      app: {},
+      layout: {},
+      page: {
+        route: { path: "/orders/:id" },
+        validation: {
+          params: v.object({ id: v.int().coerce() }),
+          query: v.object({ page: v.int().coerce() }),
+        },
+        default: () => createElement("main", {}, "page should not render"),
+        loader: () => {
+          throw new Error("loader must not run when validation fails");
+        },
+      },
+    },
+  };
+}
+
+function errorPageWithValidationDetails(): ErrorPageModule {
+  return {
+    default: (props: ServerErrorPageProps) => {
+      const error = props.error as { errors?: { input: string }[] } | undefined;
+      const paths = (error?.errors ?? []).map((issue) => issue.input).join(",");
+      return createElement("main", {}, `status:${props.status} paths:${paths}`);
+    },
+  };
+}
+
+describe("finishRender — failed page validation on a full-document request (defect fix)", () => {
+  it("renders the app error.page.tsx with status 400 and the validation errors, instead of an empty document", async () => {
+    const { request, response } = createValidationHttp(
+      "en",
+      { id: "42" },
+      { page: "not-a-number" },
+    );
+
+    const rendered = await renderPageRequest("/orders/42?page=not-a-number", {
+      routes: [failingValidationEntry()],
+      createHttp: () => ({ request, response }),
+      loadErrorPage: async () => errorPageWithValidationDetails(),
+    });
+
+    if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+
+    expect(rendered.status).toBe(400);
+    expect(rendered.html).not.toBe("");
+    expect(rendered.html).toContain("status:400");
+    expect(rendered.html).toContain("query.page");
+  });
+
+  it("keeps the DATA request contract unchanged: empty html, 400, and shortCircuit.stage === 'validation' with the errors, on the bundle", async () => {
+    const { request, response } = createValidationHttp(
+      "en",
+      { id: "42" },
+      { page: "not-a-number" },
+    );
+
+    const rendered = await renderPageRequest("/orders/42?page=not-a-number", {
+      routes: [failingValidationEntry()],
+      createHttp: () => ({ request, response }),
+      loadErrorPage: async () => errorPageWithValidationDetails(),
+      dataRequest: true,
+    });
+
+    if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+
+    expect(rendered.status).toBe(400);
+    expect(rendered.html).toBe("");
+    expect(rendered.bundle?.shortCircuit).toMatchObject({ stage: "validation", status: 400 });
+
+    const errors = (rendered.bundle?.shortCircuit as { errors: { input: string }[] }).errors;
+    expect(errors.some((issue) => issue.input.includes("page"))).toBe(true);
+  });
+});
+
+function hangingLoaderEntry(): PageRouteEntry {
+  return {
+    path: "/slow",
+    name: "slow",
+    triple: {
+      app: {},
+      layout: {},
+      page: {
+        default: () => createElement("main", {}, "should not render"),
+        loader: () => new Promise(() => undefined),
+      },
+    },
+  };
+}
+
+/**
+ * Card `904a04eb`, audit §5.1: a page whose loader never resolves used to
+ * hold the SSR request open forever. `web.loaderTimeout` bounds the whole
+ * non-deferred loader chain and fails the request with
+ * `PageLoaderTimeoutError` (504), on both the full document and the data
+ * wire — the same throw-signal/boundary machinery an ordinary loader throw
+ * already takes (`execute-page-request.ts`), so neither representation needs
+ * a second error shape.
+ */
+describe("finishRender — a hung non-deferred loader times out (card 904a04eb)", () => {
+  afterEach(() => {
+    config.set("web", {});
+  });
+
+  it("renders the app error.page.tsx with status 504 on a full-document request", async () => {
+    config.set("web", { loaderTimeout: 50 });
+    const { request, response } = createHttp();
+
+    const rendered = await renderPageRequest("/slow", {
+      routes: [hangingLoaderEntry()],
+      createHttp: () => ({ request, response }),
+      loadErrorPage: async () => fakeErrorPageModule(),
+    });
+
+    if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+
+    expect(rendered.status).toBe(504);
+    expect(rendered.html).toContain("Sorry about that.");
+  }, 2000);
+
+  it("on the data wire, answers 504 with the error record carrying statusCode 504", async () => {
+    config.set("web", { loaderTimeout: 50 });
+    const { request, response } = createHttp();
+
+    const rendered = await renderPageRequest("/slow", {
+      routes: [hangingLoaderEntry()],
+      createHttp: () => ({ request, response }),
+      loadErrorPage: async () => fakeErrorPageModule(),
+      dataRequest: true,
+    });
+
+    if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+
+    expect(rendered.status).toBe(504);
+    expect(rendered.bundle?.error?.statusCode).toBe(504);
+  }, 2000);
+});
+
+describe("finishRender ordinary page props", () => {
+  it("passes nested dynamic-route params only to the page, not its layout or root", async () => {
+    type WrapperProps = {
+      data: unknown;
+      shared: unknown;
+      children?: ReactNode;
+    };
+    type PageProps = {
+      data: unknown;
+      shared: unknown;
+      params: Readonly<Record<string, string>>;
+    };
+    let appProps: WrapperProps | undefined;
+    let layoutProps: WrapperProps | undefined;
+    let pageProps: PageProps | undefined;
+    const { request, response } = createHttp();
+    const entry: PageRouteEntry = {
+      path: "/catalog/:category/products/:productId",
+      name: "catalog.products.details",
+      triple: {
+        app: {
+          default: (props: WrapperProps) => {
+            appProps = props;
+            return props.children;
+          },
+        },
+        layout: {
+          default: (props: WrapperProps) => {
+            layoutProps = props;
+            return props.children;
+          },
+        },
+        page: {
+          default: (props: PageProps) => {
+            pageProps = props;
+            return null;
+          },
+        },
+      },
+    };
+
+    await renderPageRequest("/catalog/books/products/42", {
+      routes: [entry],
+      createHttp: () => ({ request, response }),
+    });
+
+    expect(pageProps?.params).toEqual({ category: "books", productId: "42" });
+    expect(appProps).not.toHaveProperty("params");
+    expect(layoutProps).not.toHaveProperty("params");
+  });
+});

@@ -1,0 +1,503 @@
+/**
+ * PARITY GATE — row 2 of `release/b8e6ede3-parity-surface.md`.
+ *
+ * Dev and production agree about a page's layout LEVEL, and this proves the
+ * half of that claim which is not already true by construction.
+ *
+ * The chain half needs no gate: both modes derive the chain from ONE function,
+ * `layoutChainFor` (`../build/discover-pages.ts`). Dev calls it at install time
+ * (`./install-page-routes.ts`); the BUILD calls the same function and records
+ * its result as `page.layouts`, which `./install-page-routes-from-manifest.ts`
+ * walks in order. Diffing the two chains would diff one function against
+ * itself.
+ *
+ * What is NOT shared is where each layout's module namespace is READ FROM. Dev
+ * reads a live `vite.ssrLoadModule()` result; production reads the built
+ * barrel's namespace off `page.layouts[].module`. Both then take exactly two
+ * fields from it:
+ *
+ *   renders: typeof module.default !== "undefined"
+ *   prefix:  module.prefix
+ *
+ * Those two fields decide which layout hosts the page and what URL the page
+ * answers on. A build that drops, renames or tree-shakes either one produces a
+ * page that renders and routes correctly in dev and wrongly in production —
+ * the row 12 defect shape, where a build step silently loses something the dev
+ * path still sees.
+ *
+ * So this runs ONE fixture through BOTH module-loading paths for real — a real
+ * Vite SSR build and a real Vite dev server — and diffs the `LayoutLevel` the
+ * shared rule computes from each. The shared rule is deliberately the same
+ * call on both sides: the rule is not what is under test, the two readings of
+ * the module are.
+ */
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { build, createServer } from "vite";
+import { afterEach, describe, expect, it } from "vitest";
+import { type LayoutLevel, resolveLayoutLevel } from "../routing/layout-level";
+import { toPosix } from "../shared/to-posix";
+import { composeLayoutModules } from "./compose-layout-modules";
+import { layoutPrefixesByDirectory } from "./layout-prefixes";
+import type { LayoutModuleShape } from "./page-module-shapes";
+
+const temporaryDirectories: string[] = [];
+
+/** Materialises a fixture tree: `{ "src/web/layout.ts": "..." }` under a temp root. */
+function makeTree(files: Record<string, string>): string {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "warlock-layout-level-"));
+  temporaryDirectories.push(root);
+
+  for (const [relative, contents] of Object.entries(files)) {
+    const full = path.join(root, relative);
+    fs.mkdirSync(path.dirname(full), { recursive: true });
+    fs.writeFileSync(full, contents, "utf-8");
+  }
+
+  return root;
+}
+
+/**
+ * The fixture's layout chain, outermost first, with the page it wraps.
+ *
+ * Exercises every shape the two read fields can take, because a build can lose
+ * them independently:
+ *
+ * - outer: declares a prefix, renders NOTHING — the shape where a tree-shaker
+ *   has a live reason to drop the module's only remaining export
+ * - second: declares NEITHER — proves an absent prefix survives as absent
+ *   rather than arriving as `""`, which composes differently
+ * - third: a second prefix-only layout, so composition ORDER is observable
+ *   rather than incidental
+ * - inner: renders AND declares a prefix — both fields load-bearing at once
+ *
+ * Exactly ONE layout renders, because more than one is refused outright by
+ * `resolveLayoutLevel` (`NestedLayoutsNotSupportedError`). A fixture that
+ * ignored that rule would not be a harder test, it would be an invalid app —
+ * the first draft of this file was, and the rule caught it.
+ *
+ * `outer` and `third` (the RENDERING host) each also declare a NAMED
+ * `middleware` export, and the host additionally declares a `loader` — the
+ * layout-level COMPOSITION half of parity (`composeLayoutModules`,
+ * `./compose-layout-modules.ts`) that `renders`/`prefix` alone does not
+ * exercise. Named, not anonymous, functions: a dev module and its built
+ * counterpart are never the SAME function object, so parity here is proven by
+ * comparing declaration order (function name) and observed invocation order,
+ * not by reference equality.
+ */
+const FIXTURE = {
+  "src/web/layout.ts":
+    'export const prefix = "/shop";\n' +
+    'export const middleware = [function outerGuard(ctx) { ctx.order.push("outer"); }];\n',
+  "src/web/account/layout.ts": "export const unrelated = true;\n",
+  "src/web/account/settings/layout.ts": 'export const prefix = "/settings";\n',
+  "src/web/account/settings/profile/layout.ts":
+    'export const prefix = "/profile";\n' +
+    "export default function Inner() {}\n" +
+    'export const middleware = [function profileGuard(ctx) { ctx.order.push("profile"); }];\n' +
+    'export const loader = () => ({ label: "profile-loaded" });\n',
+  "src/web/account/settings/profile/index.page.ts": "export default function Page() {}\n",
+} as const;
+
+/** The chain `layoutChainFor` produces for the fixture page, outermost first. */
+const CHAIN = [
+  "src/web/layout.ts",
+  "src/web/account/layout.ts",
+  "src/web/account/settings/layout.ts",
+  "src/web/account/settings/profile/layout.ts",
+] as const;
+
+const PAGE = "src/web/account/settings/profile/index.page.ts";
+
+/** The two fields both installers take off a layout module namespace, and nothing else. */
+type LayoutReading = {
+  renders: boolean;
+  prefix: string | undefined;
+};
+
+function readLayout(module: Record<string, unknown>): LayoutReading {
+  return {
+    renders: typeof module.default !== "undefined",
+    prefix: module.prefix as string | undefined,
+  };
+}
+
+/**
+ * The composed layout-LEVEL outcome — what `composeLayoutModules` produces
+ * once the chain's readings are folded into the one slot a page handler gets.
+ * Function references never survive across a dev module and its built
+ * counterpart, so parity is captured by declaration NAME (order/identity) and
+ * by observed INVOCATION order, not by comparing the functions themselves.
+ */
+type ComposedReading = {
+  middlewareNames: string[];
+  middlewareInvocationOrder: string[];
+  loaderDefined: boolean;
+  loaderResult: unknown;
+};
+
+/** Runs the chain's modules through the shared `composeLayoutModules` rule and observes the result. */
+async function composedReadingFor(
+  modules: readonly Record<string, unknown>[],
+  level: LayoutLevel,
+): Promise<ComposedReading> {
+  const hostIndex = CHAIN.indexOf((level.hostId ?? "") as (typeof CHAIN)[number]);
+
+  if (hostIndex === -1) {
+    throw new Error(`Fixture invariant broken: host id "${level.hostId}" not found in chain.`);
+  }
+
+  const composed = composeLayoutModules(modules as LayoutModuleShape[], hostIndex);
+  const invocationOrder: string[] = [];
+
+  for (const middleware of composed.middleware ?? []) {
+    await middleware({ order: invocationOrder } as never);
+  }
+
+  const loaderResult =
+    composed.loader === undefined ? undefined : await composed.loader({} as never);
+
+  return {
+    middlewareNames: (composed.middleware ?? []).map((middleware) => middleware.name),
+    middlewareInvocationOrder: invocationOrder,
+    loaderDefined: composed.loader !== undefined,
+    loaderResult,
+  };
+}
+
+type LayoutLevelParity = {
+  dev: {
+    level: LayoutLevel;
+    readings: LayoutReading[];
+    composed: ComposedReading;
+    prefixTable: Record<string, string>;
+  };
+  production: {
+    level: LayoutLevel;
+    readings: LayoutReading[];
+    composed: ComposedReading;
+    prefixTable: Record<string, string>;
+  };
+};
+
+/**
+ * Dev's OWN directory derivation — `install-page-routes.ts`'s
+ * `resolveLayoutLevel`: a layout's directory relative to the web root, read
+ * off its absolute filesystem path.
+ */
+function devDirectoryFor(webRoot: string, layoutFile: string): string {
+  return toPosix(path.relative(webRoot, path.dirname(layoutFile)));
+}
+
+/**
+ * Production's OWN directory derivation — `install-page-routes-from-manifest.ts`'s
+ * `layoutPrefixesOf`: a layout's directory relative to the web root, read off
+ * its manifest `sourceFile` string (`src/web/...`, two segments stripped).
+ */
+function productionDirectoryFor(sourceFile: string): string {
+  const relative = sourceFile.split("/").slice(2).join("/");
+  const slashIndex = relative.lastIndexOf("/");
+
+  return slashIndex === -1 ? "" : relative.slice(0, slashIndex);
+}
+
+/**
+ * Loads every layout in the chain through BOTH real pipelines and runs each
+ * reading through the shared rule.
+ *
+ * `corruptProductionPrefix` is the red control. For a parity check, WHICH end
+ * you disable IS the control (canon `87660e1e`), so it damages the PRODUCTION
+ * reading only and leaves dev intact — reproducing the asymmetry of the defect
+ * this gate exists to catch, rather than breaking both sides into agreement.
+ */
+async function collectFixtureLayoutLevels(
+  options: { corruptProductionPrefix?: boolean } = {},
+): Promise<LayoutLevelParity> {
+  const appRoot = makeTree(FIXTURE);
+  const outDir = path.join(appRoot, "dist", "server");
+
+  // PRODUCTION: a real Vite SSR build, then import the built namespaces — the
+  // same shape the generated pages barrel hands the manifest installer.
+  await build({
+    root: appRoot,
+    configFile: false,
+    logLevel: "silent",
+    build: {
+      ssr: true,
+      minify: false,
+      outDir,
+      rollupOptions: {
+        input: Object.fromEntries(
+          CHAIN.map((file, index) => [`layout-${index}`, path.join(appRoot, file)]),
+        ),
+        output: { format: "es", entryFileNames: "[name].mjs" },
+      },
+    },
+  });
+
+  const productionModules: Record<string, unknown>[] = [];
+
+  for (let index = 0; index < CHAIN.length; index += 1) {
+    const built = path.join(outDir, `layout-${index}.mjs`);
+    productionModules.push((await import(pathToFileURL(built).href)) as Record<string, unknown>);
+  }
+
+  // DEV: a real Vite dev server, loading the SOURCE files.
+  const vite = await createServer({
+    root: appRoot,
+    configFile: false,
+    logLevel: "silent",
+    server: { middlewareMode: true },
+  });
+
+  const devModules: Record<string, unknown>[] = [];
+
+  for (const file of CHAIN) {
+    devModules.push((await vite.ssrLoadModule(`/${file}`)) as Record<string, unknown>);
+  }
+
+  await vite.close();
+
+  const devReadings = devModules.map(readLayout);
+  const productionReadings = productionModules.map(readLayout);
+
+  if (options.corruptProductionPrefix === true) {
+    // The red control's injected defect: a build that lost ONE layout's
+    // `prefix` export. Applied to the OUTERMOST prefix-only layout — the shape
+    // a tree-shaker is likeliest to drop, and the position where losing it
+    // changes the page's whole URL rather than one segment of it.
+    //
+    // Read the entry out first: under `noUncheckedIndexedAccess` spreading an
+    // index access would widen every field to optional, which is a different
+    // (and weaker) shape than the one this corruption is meant to produce.
+    const outermost = productionReadings[0];
+
+    if (outermost === undefined) {
+      throw new Error("Fixture invariant broken: the chain produced no readings to corrupt.");
+    }
+
+    productionReadings[0] = { ...outermost, prefix: undefined };
+  }
+
+  const level = (readings: readonly LayoutReading[]): LayoutLevel =>
+    resolveLayoutLevel(
+      PAGE,
+      CHAIN.map((id, index) => {
+        const reading = readings[index];
+
+        if (reading === undefined) {
+          // Both readings arrays are built by mapping over CHAIN, so this is
+          // unreachable — but saying so out loud is what makes the compiler
+          // agree, and an invariant worth relying on is worth asserting.
+          throw new Error(`Fixture invariant broken: no reading for layout "${id}".`);
+        }
+
+        return { id, ...reading };
+      }),
+    );
+
+  const devLevel = level(devReadings);
+  const productionLevel = level(productionReadings);
+
+  const [devComposed, productionComposed] = await Promise.all([
+    composedReadingFor(devModules, devLevel),
+    composedReadingFor(productionModules, productionLevel),
+  ]);
+
+  // The layout-prefix-by-directory table (`./layout-prefixes.ts`'s
+  // `layoutPrefixesByDirectory`) both installers build from these SAME
+  // readings, each via its own directory derivation — dev's off the real
+  // absolute filesystem path, production's off the manifest `sourceFile`
+  // string. Built from `productionReadings`/`devReadings` AFTER the corruption
+  // branch above, so `corruptProductionPrefix` shows up here exactly as it
+  // would in a real build that dropped that export.
+  const webRoot = path.join(appRoot, "src", "web");
+  const devPrefixTable = layoutPrefixesByDirectory(
+    CHAIN.map((relative, index) => ({
+      directory: devDirectoryFor(webRoot, path.join(appRoot, relative)),
+      prefix: devReadings[index]?.prefix,
+    })),
+  );
+  const productionPrefixTable = layoutPrefixesByDirectory(
+    CHAIN.map((relative, index) => ({
+      directory: productionDirectoryFor(relative),
+      prefix: productionReadings[index]?.prefix,
+    })),
+  );
+
+  return {
+    dev: {
+      level: devLevel,
+      readings: devReadings,
+      composed: devComposed,
+      prefixTable: devPrefixTable,
+    },
+    production: {
+      level: productionLevel,
+      readings: productionReadings,
+      composed: productionComposed,
+      prefixTable: productionPrefixTable,
+    },
+  };
+}
+
+afterEach(() => {
+  while (temporaryDirectories.length > 0) {
+    fs.rmSync(temporaryDirectories.pop() as string, { recursive: true, force: true });
+  }
+});
+
+describe("layout level parity gate — built module vs live module", () => {
+  // This case runs a REAL Vite SSR build AND a real dev server, so it is slow
+  // by construction, and under the full suite it competes with ~87 other files
+  // for CPU. At vitest's 5s default a build-backed gate reports machine load as
+  // if it were a property of the code (canon `c9f300bb`), which is how the
+  // stylesheet gate went intermittently red. A build-backed gate states its own
+  // budget.
+  const REAL_BUILD_TIMEOUT_MS = 60_000;
+
+  it(
+    "resolves the same layout level from a built module as from a live one",
+    async () => {
+      const parity = await collectFixtureLayoutLevels();
+
+      expect(parity.production.level).toEqual(parity.dev.level);
+    },
+    REAL_BUILD_TIMEOUT_MS,
+  );
+
+  it(
+    "reads the same renders/prefix pair off every layout in the chain",
+    async () => {
+      const parity = await collectFixtureLayoutLevels();
+
+      // The level alone can agree while a reading differs — two layouts'
+      // prefixes composing to the same URL, say. Diffing the readings names
+      // WHICH layout drifted, which is the difference between a gate that
+      // fails and a gate that explains.
+      expect(parity.production.readings).toEqual(parity.dev.readings);
+    },
+    REAL_BUILD_TIMEOUT_MS,
+  );
+
+  it(
+    "builds the same layout-prefix-by-directory table from a built module as from a live one",
+    async () => {
+      // INNOCENT CASE (step 2 of the dedup card): dev's directory derivation
+      // (off the real filesystem path) and production's (off the manifest
+      // `sourceFile` string) still land on the same table today, because both
+      // feed the one shared rule, `layoutPrefixesByDirectory`.
+      const parity = await collectFixtureLayoutLevels();
+
+      expect(parity.production.prefixTable).toEqual(parity.dev.prefixTable);
+    },
+    REAL_BUILD_TIMEOUT_MS,
+  );
+
+  it(
+    "composes the same middleware order and folded loader from a built module as from a live one",
+    async () => {
+      const parity = await collectFixtureLayoutLevels();
+
+      // ORDER/IDENTITY: names (a built module and a dev module never share a
+      // function reference) and observed invocation order both agree between
+      // dev and production. This is a PARITY check, not a fixed-shape one —
+      // it must stay green even if the shared `composeLayoutModules` rule
+      // itself changes its own ordering, because both sides call that one
+      // rule; the exact expected order is pinned separately below, by the
+      // "exercises all three layout shapes" case.
+      expect(parity.production.composed.middlewareNames).toEqual(
+        parity.dev.composed.middlewareNames,
+      );
+      expect(parity.production.composed.middlewareInvocationOrder).toEqual(
+        parity.dev.composed.middlewareInvocationOrder,
+      );
+
+      // LOADER: the host layout's loader survives the fold on both sides and
+      // returns the same value.
+      expect(parity.dev.composed.loaderDefined).toBe(true);
+      expect(parity.production.composed.loaderDefined).toBe(true);
+      expect(parity.production.composed.loaderResult).toEqual(parity.dev.composed.loaderResult);
+      expect(parity.dev.composed.loaderResult).toEqual({ label: "profile-loaded" });
+    },
+    REAL_BUILD_TIMEOUT_MS,
+  );
+
+  it(
+    "asserts the fixture actually exercises all three layout shapes",
+    async () => {
+      const parity = await collectFixtureLayoutLevels();
+
+      // Without this, the gate above passes just as happily against a fixture
+      // whose exports all vanished from BOTH sides — agreement about nothing.
+      expect(parity.dev.readings).toEqual([
+        { renders: false, prefix: "/shop" },
+        { renders: false, prefix: undefined },
+        { renders: false, prefix: "/settings" },
+        { renders: true, prefix: "/profile" },
+      ]);
+      expect(parity.dev.level.prefix).toBe("/shop/settings/profile");
+      // The one rendering layout hosts the page — not the nearest one.
+      expect(parity.dev.level.hostId).toBe("src/web/account/settings/profile/layout.ts");
+      // Pins the ACTUAL expected shape of the composed middleware/loader too
+      // — without this, the parity check above passes just as happily if
+      // both sides silently dropped every guard and the loader.
+      expect(parity.dev.composed.middlewareNames).toEqual(["outerGuard", "profileGuard"]);
+      expect(parity.dev.composed.middlewareInvocationOrder).toEqual(["outer", "profile"]);
+      expect(parity.dev.composed.loaderResult).toEqual({ label: "profile-loaded" });
+      // Pins the prefix table itself, keyed by directory relative to the web
+      // root — root is `""`, and the group-less nested directories compose
+      // exactly the segments `level.prefix` above already asserts.
+      expect(parity.dev.prefixTable).toEqual({
+        "": "/shop",
+        "account/settings": "/settings",
+        "account/settings/profile": "/profile",
+      });
+    },
+    REAL_BUILD_TIMEOUT_MS,
+  );
+
+  it(
+    "goes red when the build loses one layout's prefix export",
+    async () => {
+      // The red control, kept in the suite rather than run by hand once: this
+      // is the exact failure the gate exists for — production dropping an
+      // export dev still sees — and it must be the ROUTE that changes, not
+      // merely a field.
+      const parity = await collectFixtureLayoutLevels({ corruptProductionPrefix: true });
+
+      expect(parity.production.level.prefix).toBe("/settings/profile");
+      expect(parity.dev.level.prefix).toBe("/shop/settings/profile");
+      expect(parity.production.level).not.toEqual(parity.dev.level);
+    },
+    REAL_BUILD_TIMEOUT_MS,
+  );
+
+  it(
+    "goes red on the prefix table too, and only on the corrupted (production) side",
+    async () => {
+      // TWO-SIDED CONTROL for `layoutPrefixesByDirectory` (step 2 of the dedup
+      // card): damages ONLY the production reading, same as the level control
+      // above — which end you disable IS the control for a parity check, so
+      // dev must stay intact while production loses the outermost entry.
+      const parity = await collectFixtureLayoutLevels({ corruptProductionPrefix: true });
+
+      expect(parity.dev.prefixTable).toEqual({
+        "": "/shop",
+        "account/settings": "/settings",
+        "account/settings/profile": "/profile",
+      });
+      // The outermost layout's directory (`""`) drops out of production's
+      // table entirely — `layoutPrefixesByDirectory` records no entry for a
+      // layout with no `prefix`, exactly as it does for the innocent case.
+      expect(parity.production.prefixTable).toEqual({
+        "account/settings": "/settings",
+        "account/settings/profile": "/profile",
+      });
+      expect(parity.production.prefixTable).not.toEqual(parity.dev.prefixTable);
+    },
+    REAL_BUILD_TIMEOUT_MS,
+  );
+});

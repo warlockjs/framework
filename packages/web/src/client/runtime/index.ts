@@ -1,0 +1,25 @@
+export {
+  DEFER_BOOTSTRAP_SOURCE,
+  installStreamClosedRejection,
+  prepareDeferredPageData,
+  rejectPendingDeferredKeys,
+  settleDeferredValue,
+  type DeferredSettlement,
+} from "./defer-registry";
+export { DeferredStreamClosedError } from "./deferred-stream-closed-error";
+export { DeferredValueError } from "./deferred-value-error";
+export { loadClientRouteComposition, validateClientRouteManifest } from "./manifest";
+export type { LocaleRouting, LocaleRoutingStrategy } from "../../routing/locale-routing";
+// @deprecated — see matcher.ts:221 for replacement and deletion condition
+export { matchClientRoute } from "./matcher";
+// Projected page/layout/root modules use this same guard for HMR replacement
+// namespaces, so a later route composition cannot run the replacement hook again.
+export { registerModules } from "../../register-modules";
+export type {
+  ClientPageEntry,
+  ClientProjectedModule,
+  ClientRouteComposition,
+  ClientRouteLoad,
+  ClientRouteMatch,
+  ClientRouteParams,
+} from "./types";

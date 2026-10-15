@@ -1,0 +1,193 @@
+import { describe, expect, it } from "vitest";
+import {
+  canonicalizeRouteExport,
+  InvalidPageCacheOptInError,
+  resolvePageRouteCache,
+  resolvePageRouteIdentity,
+} from "./route-identity";
+import { PageRoutePathNotSupportedError } from "./page-route-grammar";
+
+describe("canonicalizeRouteExport", () => {
+  it("canonicalizes the bare-string shorthand into { path }", () => {
+    // install-page-routes.ts:87-88 — `typeof routeExport === "string"` returns
+    // `{ path: routeExport, name: deriveRouteName(...) }`; the `path` half is
+    // the string verbatim.
+    expect(canonicalizeRouteExport("/contact-us", "src/web/contact-us.page.tsx")).toEqual({
+      path: "/contact-us",
+    });
+  });
+
+  it("canonicalizes an object route with no name into { path }, no `name` key", () => {
+    // install-page-routes.ts:91-94 — the object form's `path` passes through
+    // and `name` is `routeExport.name ?? deriveRouteName(...)`; a fallback is
+    // `resolvePageRouteName`'s concern, not canonicalizeRouteExport's.
+    expect(canonicalizeRouteExport({ path: "/settings" }, "src/web/settings.page.tsx")).toEqual({
+      path: "/settings",
+    });
+  });
+
+  it("keeps an explicit object `name` verbatim, whatever it is", () => {
+    // install-page-routes.ts:92-93 — `name: routeExport.name ?? ...` never
+    // rewrites a name that is already there. Verified against the real fixture
+    // v5/app/src/app/users/web/account/settings.page.tsx:43-46, whose declared
+    // route is `{ path: "/settings", name: "users.account.settings" }` — a name
+    // that deriveRouteName from "/settings" alone could never reproduce (it
+    // would yield "users.settings", missing the "account" layout segment),
+    // which is exactly why an explicit name must win untouched.
+    expect(
+      canonicalizeRouteExport(
+        { path: "/settings", name: "users.account.settings" },
+        "src/web/account/settings.page.tsx",
+      ),
+    ).toEqual({
+      path: "/settings",
+      name: "users.account.settings",
+    });
+  });
+
+  it("passes through every allowed page-route-grammar shape unchanged", () => {
+    // The whole grammar `page-route-grammar.ts` allows: root, static segments,
+    // whole-segment params, the bare "*", and a slash-led path whose final
+    // segment is "*".
+    expect(canonicalizeRouteExport({ path: "/" }, "src/web/home.page.tsx")).toEqual({
+      path: "/",
+    });
+    expect(canonicalizeRouteExport({ path: "/users" }, "src/web/users.page.tsx")).toEqual({
+      path: "/users",
+    });
+    expect(canonicalizeRouteExport({ path: "/users/:id" }, "src/web/users/[id].page.tsx")).toEqual({
+      path: "/users/:id",
+    });
+    expect(
+      canonicalizeRouteExport({ path: "/prefix/*" }, "src/web/prefix/[...catchAll].page.tsx"),
+    ).toEqual({ path: "/prefix/*" });
+    // Bare-string shorthand goes through the exact same canonicalization.
+    expect(canonicalizeRouteExport("/users", "src/web/users.page.tsx")).toEqual({
+      path: "/users",
+    });
+  });
+
+  it("raises PageRoutePathNotSupportedError, naming the page file, for a rejected path", () => {
+    const cases: string[] = [
+      "/users/:id?",
+      "/users/:id(\\d+)",
+      "/near/:lat-:lng",
+      "/a//b",
+      "/users/",
+    ];
+
+    for (const path of cases) {
+      expect(() => canonicalizeRouteExport({ path }, "src/web/users/[id].page.tsx")).toThrowError(
+        PageRoutePathNotSupportedError,
+      );
+
+      try {
+        canonicalizeRouteExport({ path }, "src/web/users/[id].page.tsx");
+        throw new Error("expected canonicalizeRouteExport to throw");
+      } catch (error) {
+        expect((error as Error).message).toContain("src/web/users/[id].page.tsx");
+        expect((error as Error).message).toContain(path);
+      }
+    }
+  });
+});
+
+describe("resolvePageRouteIdentity", () => {
+  it.each([
+    [undefined, "index", "landing.index"],
+    ["/welcome", "index", "landing.index"],
+    [{ path: "/welcome" }, "index", "landing.index"],
+    [{ path: "/welcome", name: "welcome" }, "welcome", "welcome"],
+  ] as const)("keeps generated names site-scoped for %o routes", (route, singleSiteName, siteName) => {
+    expect(resolvePageRouteIdentity(route, "index.page.tsx", "index.page.tsx").name).toBe(
+      singleSiteName,
+    );
+    expect(resolvePageRouteIdentity(route, "index.page.tsx", "index.page.tsx", "landing").name).toBe(
+      siteName,
+    );
+  });
+
+  it("keeps the $sites/<site> folder out of paths and names, whichever installer passes it", () => {
+    const fromSiteRoot = resolvePageRouteIdentity(undefined, "listings/[id].page.tsx", "x", "tenant");
+    const fromWebRoot = resolvePageRouteIdentity(undefined, "$sites/tenant/listings/[id].page.tsx", "x", "tenant");
+
+    expect(fromWebRoot).toEqual(fromSiteRoot);
+    expect(fromWebRoot.path).toBe("/listings/:id");
+    expect(fromWebRoot.name).not.toContain("$sites");
+  });
+});
+
+describe("resolvePageRouteCache", () => {
+  it("rejects a cache.varyBy that is not a function, naming the page file", () => {
+    expect(() =>
+      resolvePageRouteCache(
+        {
+          path: "/store",
+          cache: {
+            public: true,
+            maxAge: 60,
+            serverCache: true,
+            tags: ["store"],
+            varyBy: "theme" as never,
+          },
+        },
+        "src/web/store.page.tsx",
+      ),
+    ).toThrowError(/src\/web\/store\.page\.tsx.*varyBy/);
+  });
+
+  it("returns undefined when the route export is undefined", () => {
+    expect(resolvePageRouteCache(undefined, "src/web/home.page.tsx")).toBeUndefined();
+  });
+
+  it("returns undefined for the bare-string route shorthand — a string cannot carry a cache opt-in", () => {
+    expect(resolvePageRouteCache("/contact-us", "src/web/contact-us.page.tsx")).toBeUndefined();
+  });
+
+  it("returns undefined when the object route declares no cache key at all", () => {
+    expect(
+      resolvePageRouteCache({ path: "/settings" }, "src/web/settings.page.tsx"),
+    ).toBeUndefined();
+  });
+
+  it("returns the opt-in verbatim when both public: true and a numeric maxAge are declared", () => {
+    expect(
+      resolvePageRouteCache(
+        { path: "/products", cache: { public: true, maxAge: 60 } },
+        "src/web/products.page.tsx",
+      ),
+    ).toEqual({ public: true, maxAge: 60 });
+  });
+
+  it("throws InvalidPageCacheOptInError, naming the page file, when public: true is declared with no maxAge — this is a BOOT-TIME error, never a silent default", () => {
+    expect(() =>
+      resolvePageRouteCache(
+        // A malformed opt-in reaches this function as `unknown`-shaped data at
+        // runtime (the module's real export), even though `PageCacheOptIn`
+        // requires `maxAge` at the type level — hence the cast.
+        { path: "/products", cache: { public: true } as never },
+        "src/web/products.page.tsx",
+      ),
+    ).toThrowError(InvalidPageCacheOptInError);
+
+    try {
+      resolvePageRouteCache(
+        { path: "/products", cache: { public: true } as never },
+        "src/web/products.page.tsx",
+      );
+      throw new Error("expected resolvePageRouteCache to throw");
+    } catch (error) {
+      expect((error as Error).message).toContain("src/web/products.page.tsx");
+      expect((error as Error).message).toContain("cache: { public: true, maxAge: <seconds> }");
+    }
+  });
+
+  it("throws InvalidPageCacheOptInError when maxAge is present but not a number", () => {
+    expect(() =>
+      resolvePageRouteCache(
+        { path: "/products", cache: { public: true, maxAge: "60" } as never },
+        "src/web/products.page.tsx",
+      ),
+    ).toThrowError(InvalidPageCacheOptInError);
+  });
+});

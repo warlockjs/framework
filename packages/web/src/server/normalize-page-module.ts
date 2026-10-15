@@ -1,0 +1,545 @@
+import { BaseValidator } from "@warlock.js/seal";
+import {
+  MODULE_CONFIG_KEYS,
+  MODULE_EXPORT_NAMES,
+  type PageModuleKind,
+} from "../module-config-schema";
+import {
+  METADATA_KEYS,
+  OPEN_GRAPH_KEYS,
+  TWITTER_KEYS,
+  type MetadataInput,
+  type PageMetadata,
+} from "../metadata";
+import type { PageConfigValidation } from "../page-config";
+import type { PageCacheOptIn } from "../routing/route-identity";
+import type {
+  SitemapModelLike,
+  SitemapPageEntriesDeclaration,
+  SitemapPageExport,
+  SitemapPageOptions,
+} from "../sitemap/sitemap-page-export";
+import { readLayoutSitemapDeclaration } from "../sitemap/resolve-layout-sitemap";
+import type { PipelineLoader, PipelineMiddleware } from "./execute-page-request.types";
+
+export type { PageModuleKind } from "../module-config-schema";
+
+type PageRoute = string | { readonly path: string; readonly name?: string };
+
+type PageActionFunction = (context: any) => unknown;
+
+export type NormalizedActionConfig = {
+  validation?: BaseValidator;
+  middleware?: readonly PipelineMiddleware[];
+};
+
+export type NormalizedPageModule = {
+  default?: unknown;
+  ErrorBoundary?: unknown;
+  loader?: PipelineLoader;
+  register?: () => unknown;
+  route?: PageRoute;
+  cache?: PageCacheOptIn;
+  middleware?: readonly PipelineMiddleware[];
+  validation?: PageConfigValidation;
+  action?: PageActionFunction;
+  actions?: Readonly<Record<string, PageActionFunction>>;
+  actionConfig?: NormalizedActionConfig;
+  actionsConfig?: Readonly<Record<string, NormalizedActionConfig>>;
+  metadata?: PageMetadata<PipelineLoader> | { readonly robots?: string };
+  sitemap?: SitemapPageExport | false | SitemapPageOptions;
+  prefix?: string;
+  strictMode?: boolean;
+};
+
+const MODULE_EXPORTS = new Set<string>(MODULE_EXPORT_NAMES);
+const CACHE_KEYS = new Set(["public", "maxAge", "serverCache", "tags", "varyBy", "ttl"]);
+const ACTION_CONFIG_KEYS = new Set(["validation", "middleware"]);
+const ACTION_NAME_PATTERN = /^[a-z][a-zA-Z0-9]*$/;
+const ROUTE_KEYS = new Set(["path", "name"]);
+
+export class InvalidPageModuleConfigError extends TypeError {
+  public constructor(sourceFile: string, detail: string) {
+    super(`Invalid ${sourceFile} page module config: ${detail}`);
+    this.name = "InvalidPageModuleConfigError";
+  }
+}
+
+function plainObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function fail(sourceFile: string, detail: string): never {
+  throw new InvalidPageModuleConfigError(sourceFile, detail);
+}
+
+function assertExactKeys(
+  value: Record<string, unknown>,
+  allowed: readonly string[] | Set<string>,
+  sourceFile: string,
+  subject: string,
+): void {
+  const allowedKeys = allowed instanceof Set ? allowed : new Set(allowed);
+  const unknown = Object.keys(value).filter((key) => !allowedKeys.has(key));
+  if (unknown.length > 0) {
+    const childSpreadHint =
+      subject === "config.metadata" && (unknown.includes("kind") || unknown.includes("metadata"))
+        ? " It looks like you spread `child` — spread `child.metadata` instead: `({ child }) => ({ ...child?.metadata, … })`."
+        : "";
+    fail(sourceFile, `${subject} has unknown key(s): ${unknown.join(", ")}.${childSpreadHint}`);
+  }
+}
+
+function isReactComponentType(value: unknown): boolean {
+  if (typeof value === "function") return true;
+  if (value === null || typeof value !== "object") return false;
+  const marker = (value as { $$typeof?: unknown }).$$typeof;
+  return (
+    marker === Symbol.for("react.memo") ||
+    marker === Symbol.for("react.forward_ref") ||
+    marker === Symbol.for("react.lazy")
+  );
+}
+
+function validateRoute(value: unknown, sourceFile: string): PageRoute {
+  if (typeof value === "string") return value;
+  if (!plainObject(value))
+    return fail(sourceFile, "config.route must be a string or a plain { path, name? } object.");
+  assertExactKeys(value, ROUTE_KEYS, sourceFile, "config.route");
+  if (typeof value.path !== "string") fail(sourceFile, "config.route.path must be a string.");
+  if (value.name !== undefined && typeof value.name !== "string") {
+    fail(sourceFile, "config.route.name must be a string when defined.");
+  }
+  return value.name === undefined ? { path: value.path } : { path: value.path, name: value.name };
+}
+
+function validateCache(value: unknown, sourceFile: string): PageCacheOptIn {
+  if (!plainObject(value)) return fail(sourceFile, "config.cache must be a plain object.");
+  assertExactKeys(value, CACHE_KEYS, sourceFile, "config.cache");
+  if (value.public !== true) fail(sourceFile, "config.cache.public must be true.");
+  if (!Number.isFinite(value.maxAge) || typeof value.maxAge !== "number" || value.maxAge < 0) {
+    fail(sourceFile, "config.cache.maxAge must be a finite non-negative number.");
+  }
+  if (value.serverCache !== undefined && typeof value.serverCache !== "boolean") {
+    fail(sourceFile, "config.cache.serverCache must be a boolean when defined.");
+  }
+  if (value.varyBy !== undefined && typeof value.varyBy !== "function") {
+    fail(sourceFile, "config.cache.varyBy must be a function when defined.");
+  }
+  if (
+    value.ttl !== undefined &&
+    (!Number.isFinite(value.ttl) || typeof value.ttl !== "number" || value.ttl < 0)
+  ) {
+    fail(sourceFile, "config.cache.ttl must be a finite non-negative number when defined.");
+  }
+  if (
+    value.tags !== undefined &&
+    typeof value.tags !== "function" &&
+    (!Array.isArray(value.tags) || !value.tags.every((tag) => typeof tag === "string"))
+  ) {
+    fail(sourceFile, "config.cache.tags must be a function or an array of strings when defined.");
+  }
+  if (value.serverCache === true && value.tags === undefined) {
+    fail(sourceFile, "config.cache.serverCache requires config.cache.tags.");
+  }
+  return value as PageCacheOptIn;
+}
+
+function validator(
+  value: unknown,
+  sourceFile: string,
+  key: string,
+): asserts value is BaseValidator {
+  if (!(value instanceof BaseValidator))
+    fail(sourceFile, `config.validation.${key} must be a Seal BaseValidator.`);
+}
+
+function validateValidation(value: unknown, sourceFile: string): PageConfigValidation {
+  if (!plainObject(value)) return fail(sourceFile, "config.validation must be a plain object.");
+  assertExactKeys(
+    value,
+    ["schema", "validating", "params", "query"],
+    sourceFile,
+    "config.validation",
+  );
+  const hasSchema = value.schema !== undefined;
+  const hasParams = value.params !== undefined;
+  const hasQuery = value.query !== undefined;
+  if (hasSchema === (hasParams || hasQuery)) {
+    fail(
+      sourceFile,
+      "config.validation must declare either schema or params/query, but not both or neither.",
+    );
+  }
+  if (hasSchema) {
+    validator(value.schema, sourceFile, "schema");
+    if (
+      value.validating !== undefined &&
+      (!Array.isArray(value.validating) ||
+        !value.validating.every((entry) => typeof entry === "string"))
+    ) {
+      fail(sourceFile, "config.validation.validating must be an array of strings when defined.");
+    }
+    return value as PageConfigValidation;
+  }
+  if (value.validating !== undefined)
+    fail(sourceFile, "config.validation.validating is only valid with schema.");
+  if (hasParams) validator(value.params, sourceFile, "params");
+  if (hasQuery) validator(value.query, sourceFile, "query");
+  return value as PageConfigValidation;
+}
+
+function validateActionConfig(
+  value: unknown,
+  sourceFile: string,
+  subject: string,
+): NormalizedActionConfig {
+  if (!plainObject(value)) return fail(sourceFile, `${subject} must be a plain object.`);
+  assertExactKeys(value, ACTION_CONFIG_KEYS, sourceFile, subject);
+  const result: NormalizedActionConfig = {};
+  if (value.validation !== undefined) {
+    validator(value.validation, sourceFile, `${subject}.validation`);
+    result.validation = value.validation;
+  }
+  if (value.middleware !== undefined) {
+    if (
+      !Array.isArray(value.middleware) ||
+      !value.middleware.every((entry) => typeof entry === "function")
+    ) {
+      fail(sourceFile, `${subject}.middleware must be an array of functions.`);
+    }
+    result.middleware = value.middleware as readonly PipelineMiddleware[];
+  }
+  return result;
+}
+
+function validateMiddleware(value: unknown, sourceFile: string): readonly PipelineMiddleware[] {
+  if (!Array.isArray(value) || !value.every((entry) => typeof entry === "function")) {
+    return fail(sourceFile, "config.middleware must be an array of functions.");
+  }
+  return value as readonly PipelineMiddleware[];
+}
+
+/** A metadata image: a URL string or `{ url, width?, height?, alt?, type? }`. */
+function validateImage(value: unknown, sourceFile: string, subject: string): void {
+  if (typeof value === "string") return;
+  if (!plainObject(value) || typeof value.url !== "string") {
+    fail(sourceFile, `${subject} must be a URL string or an object with a string url.`);
+  }
+  assertExactKeys(value, ["url", "width", "height", "alt", "type"], sourceFile, subject);
+}
+
+function validateStringFields(
+  value: unknown,
+  keys: readonly string[],
+  sourceFile: string,
+  subject: string,
+  nonStringKeys: readonly string[] = [],
+): void {
+  if (!plainObject(value)) fail(sourceFile, `${subject} must be a plain object.`);
+  assertExactKeys(value, keys, sourceFile, subject);
+
+  for (const key of keys) {
+    if (nonStringKeys.includes(key)) continue;
+    if (value[key] !== undefined && typeof value[key] !== "string") {
+      fail(sourceFile, `${subject}.${key} must be a string when defined.`);
+    }
+  }
+}
+
+/** Validate author metadata before the request pipeline resolves its final output. */
+function validateMetadataInput(value: unknown, sourceFile: string): MetadataInput {
+  if (!plainObject(value)) fail(sourceFile, "config.metadata must return a plain object.");
+  assertExactKeys(value, METADATA_KEYS, sourceFile, "config.metadata");
+
+  if (value.title !== undefined) {
+    if (typeof value.title !== "string") {
+      if (!plainObject(value.title)) {
+        fail(sourceFile, "config.metadata.title must be a string or a plain title object.");
+      }
+      const hasAbsolute = Object.hasOwn(value.title, "absolute");
+      assertExactKeys(
+        value.title,
+        hasAbsolute ? ["absolute"] : ["default", "template"],
+        sourceFile,
+        "config.metadata.title",
+      );
+      if (hasAbsolute && typeof value.title.absolute !== "string") {
+        fail(sourceFile, "config.metadata.title.absolute must be a string.");
+      }
+      for (const key of ["default", "template"] as const) {
+        if (value.title[key] !== undefined && typeof value.title[key] !== "string") {
+          fail(sourceFile, `config.metadata.title.${key} must be a string when defined.`);
+        }
+      }
+    }
+  }
+
+  for (const key of ["description", "robots"] as const) {
+    if (value[key] !== undefined && typeof value[key] !== "string") {
+      fail(sourceFile, `config.metadata.${key} must be a string when defined.`);
+    }
+  }
+  if (
+    value.canonical !== undefined &&
+    value.canonical !== false &&
+    typeof value.canonical !== "string"
+  ) {
+    fail(sourceFile, "config.metadata.canonical must be a string or false when defined.");
+  }
+  if (value.image !== undefined && typeof value.image !== "string") {
+    validateImage(value.image, sourceFile, "config.metadata.image");
+  }
+  if (
+    value.authors !== undefined &&
+    typeof value.authors !== "string" &&
+    (!Array.isArray(value.authors) ||
+      !value.authors.every(
+        (author) =>
+          typeof author === "string" || (plainObject(author) && typeof author.name === "string"),
+      ))
+  ) {
+    fail(
+      sourceFile,
+      "config.metadata.authors must be a string or an array of strings / { name, url? } objects.",
+    );
+  }
+  for (const key of ["meta", "links"] as const) {
+    if (value[key] !== undefined && !(Array.isArray(value[key]) && value[key].every(plainObject))) {
+      fail(sourceFile, `config.metadata.${key} must be an array of plain objects when defined.`);
+    }
+  }
+  if (
+    value.keywords !== undefined &&
+    typeof value.keywords !== "string" &&
+    (!Array.isArray(value.keywords) ||
+      !value.keywords.every((keyword) => typeof keyword === "string"))
+  ) {
+    fail(
+      sourceFile,
+      "config.metadata.keywords must be a string or an array of strings when defined.",
+    );
+  }
+  if (value.openGraph !== undefined) {
+    validateStringFields(
+      value.openGraph,
+      OPEN_GRAPH_KEYS,
+      sourceFile,
+      "config.metadata.openGraph",
+      ["images", "alternateLocales", "article"],
+    );
+    const openGraph = value.openGraph as Record<string, unknown>;
+    if (openGraph.images !== undefined) {
+      if (!Array.isArray(openGraph.images)) {
+        fail(sourceFile, "config.metadata.openGraph.images must be an array when defined.");
+      }
+      openGraph.images.forEach((image, index) =>
+        validateImage(image, sourceFile, `config.metadata.openGraph.images[${index}]`),
+      );
+    }
+    if (
+      openGraph.alternateLocales !== undefined &&
+      !(
+        Array.isArray(openGraph.alternateLocales) &&
+        openGraph.alternateLocales.every((locale) => typeof locale === "string")
+      )
+    ) {
+      fail(sourceFile, "config.metadata.openGraph.alternateLocales must be an array of strings.");
+    }
+    if (openGraph.article !== undefined && !plainObject(openGraph.article)) {
+      fail(sourceFile, "config.metadata.openGraph.article must be a plain object when defined.");
+    }
+  }
+  if (value.twitter !== undefined) {
+    validateStringFields(value.twitter, TWITTER_KEYS, sourceFile, "config.metadata.twitter");
+  }
+
+  return value as MetadataInput;
+}
+
+function validatePageMetadata(value: unknown, sourceFile: string): PageMetadata<PipelineLoader> {
+  if (typeof value !== "function") return validateMetadataInput(value, sourceFile);
+
+  // Keep metadata evaluation in Stage 8. In particular, a loader-dependent
+  // metadata function must not run while routes are installed or modules load.
+  return function validatedPageMetadata(this: unknown, context: unknown): MetadataInput {
+    return validateMetadataInput(value.call(this, context), sourceFile);
+  } as PageMetadata<PipelineLoader>;
+}
+
+function validatePageSitemap(value: unknown, sourceFile: string): SitemapPageExport {
+  if (value === false || typeof value === "function") return value as SitemapPageExport;
+  if (!plainObject(value) || (value.entries === undefined && value.invalidateOn === undefined)) {
+    return readLayoutSitemapDeclaration(value, sourceFile) as SitemapPageOptions;
+  }
+
+  const allowedKeys = [
+    "priority",
+    "changefreq",
+    "lastmod",
+    "locales",
+    "localePaths",
+    "entries",
+    "invalidateOn",
+  ];
+  assertExactKeys(value, allowedKeys, sourceFile, "config.sitemap");
+
+  if (value.entries === undefined && value.invalidateOn !== undefined) {
+    fail(
+      sourceFile,
+      "config.sitemap.invalidateOn requires config.sitemap.entries. Add an entries supplier or remove invalidateOn.",
+    );
+  }
+  if (typeof value.entries !== "function") {
+    fail(sourceFile, "config.sitemap.entries must be a function that returns sitemap URL entries.");
+  }
+  if (
+    value.invalidateOn !== undefined &&
+    (!Array.isArray(value.invalidateOn) ||
+      !value.invalidateOn.every(
+        (model) =>
+          model !== null &&
+          (typeof model === "object" || typeof model === "function") &&
+          typeof (model as { events?: unknown }).events === "function",
+      ))
+  ) {
+    fail(sourceFile, "config.sitemap.invalidateOn must be an array of models exposing events().");
+  }
+
+  const staticOptions = Object.fromEntries(
+    ["priority", "changefreq", "lastmod", "locales", "localePaths"]
+      .filter((key) => value[key] !== undefined)
+      .map((key) => [key, value[key]]),
+  );
+  const normalizedOptions = readLayoutSitemapDeclaration(staticOptions, sourceFile) ?? {};
+
+  return {
+    ...normalizedOptions,
+    entries: value.entries,
+    ...(value.invalidateOn === undefined
+      ? {}
+      : { invalidateOn: value.invalidateOn as readonly SitemapModelLike[] }),
+  } as SitemapPageEntriesDeclaration;
+}
+
+/**
+ * Validate a raw ESM namespace and project config into the existing internal
+ * flattened shape. The result is a new object; `raw` is never written to or
+ * used as registration identity.
+ */
+export function normalizePageModule(
+  raw: unknown,
+  kind: PageModuleKind,
+  sourceFile: string,
+): NormalizedPageModule {
+  if (!plainObject(raw)) fail(sourceFile, "module namespace must be an object.");
+  assertExactKeys(raw, MODULE_EXPORTS, sourceFile, "module exports");
+
+  const hasConfig = Object.prototype.hasOwnProperty.call(raw, "config");
+  const configValue = hasConfig ? raw.config : {};
+  if (!plainObject(configValue))
+    fail(sourceFile, "config export must be a plain object when provided.");
+  assertExactKeys(configValue, MODULE_CONFIG_KEYS[kind], sourceFile, "config");
+
+  if (raw.loader !== undefined && typeof raw.loader !== "function")
+    fail(sourceFile, "loader export must be a function.");
+  if (kind !== "page" && (raw.action !== undefined || raw.actions !== undefined))
+    fail(sourceFile, "action and actions exports are only valid in page modules.");
+  if (raw.action !== undefined && raw.actions !== undefined)
+    fail(sourceFile, "action and actions exports are mutually exclusive; declare only one.");
+  if (raw.action !== undefined && typeof raw.action !== "function")
+    fail(sourceFile, "action export must be a function.");
+  if (raw.actions !== undefined) {
+    if (!plainObject(raw.actions))
+      fail(sourceFile, "actions export must be a plain object of functions.");
+    for (const [name, handler] of Object.entries(raw.actions)) {
+      if (name === "default" || !ACTION_NAME_PATTERN.test(name)) {
+        fail(
+          sourceFile,
+          `actions.${name} is not a valid action name; use /^[a-z][a-zA-Z0-9]*$/ and not "default".`,
+        );
+      }
+      if (typeof handler !== "function") fail(sourceFile, `actions.${name} must be a function.`);
+    }
+  }
+  if (raw.register !== undefined && typeof raw.register !== "function")
+    fail(sourceFile, "register export must be a function.");
+  if (raw.ErrorBoundary !== undefined && !isReactComponentType(raw.ErrorBoundary)) {
+    fail(sourceFile, "ErrorBoundary export must be a React component type.");
+  }
+  if (kind === "page" && raw.default === undefined)
+    fail(sourceFile, "page modules require a default export.");
+  if (raw.default !== undefined && !isReactComponentType(raw.default)) {
+    fail(sourceFile, "default export must be a React component type.");
+  }
+
+  const normalized: NormalizedPageModule = {
+    ...(raw.default === undefined ? {} : { default: raw.default }),
+    ...(raw.ErrorBoundary === undefined ? {} : { ErrorBoundary: raw.ErrorBoundary }),
+    ...(raw.loader === undefined ? {} : { loader: raw.loader as PipelineLoader }),
+    ...(raw.register === undefined ? {} : { register: raw.register as () => unknown }),
+  };
+
+  if (configValue.middleware !== undefined)
+    normalized.middleware = validateMiddleware(configValue.middleware, sourceFile);
+
+  if (kind === "page") {
+    if (configValue.route !== undefined)
+      normalized.route = validateRoute(configValue.route, sourceFile);
+    if (configValue.cache !== undefined)
+      normalized.cache = validateCache(configValue.cache, sourceFile);
+    if (configValue.validation !== undefined)
+      normalized.validation = validateValidation(configValue.validation, sourceFile);
+    if (raw.action !== undefined) normalized.action = raw.action as PageActionFunction;
+    if (raw.actions !== undefined)
+      normalized.actions = raw.actions as Record<string, PageActionFunction>;
+    if (configValue.action !== undefined) {
+      if (raw.action === undefined) fail(sourceFile, "config.action requires an action export.");
+      normalized.actionConfig = validateActionConfig(
+        configValue.action,
+        sourceFile,
+        "config.action",
+      );
+    }
+    if (configValue.actions !== undefined) {
+      if (raw.actions === undefined) fail(sourceFile, "config.actions requires an actions export.");
+      if (!plainObject(configValue.actions))
+        fail(sourceFile, "config.actions must be a plain object.");
+      const exported = raw.actions as Record<string, unknown>;
+      const actionsConfig: Record<string, NormalizedActionConfig> = {};
+      for (const [name, entry] of Object.entries(configValue.actions)) {
+        if (!Object.hasOwn(exported, name)) {
+          fail(sourceFile, `config.actions.${name} does not match any key of the actions export.`);
+        }
+        actionsConfig[name] = validateActionConfig(entry, sourceFile, `config.actions.${name}`);
+      }
+      normalized.actionsConfig = actionsConfig;
+    }
+    if (configValue.metadata !== undefined) {
+      normalized.metadata = validatePageMetadata(configValue.metadata, sourceFile);
+    }
+    if (configValue.sitemap !== undefined)
+      normalized.sitemap = validatePageSitemap(configValue.sitemap, sourceFile);
+  } else if (kind === "layout") {
+    if (configValue.prefix !== undefined && typeof configValue.prefix !== "string")
+      fail(sourceFile, "config.prefix must be a string.");
+    if (configValue.prefix !== undefined) normalized.prefix = configValue.prefix;
+    if (configValue.metadata !== undefined)
+      normalized.metadata = validatePageMetadata(configValue.metadata, sourceFile);
+    if (configValue.sitemap !== undefined)
+      normalized.sitemap = readLayoutSitemapDeclaration(configValue.sitemap, sourceFile);
+  } else {
+    if (configValue.metadata !== undefined)
+      normalized.metadata = validatePageMetadata(configValue.metadata, sourceFile);
+    if (configValue.strictMode !== undefined) {
+      if (typeof configValue.strictMode !== "boolean") {
+        fail(sourceFile, "config.strictMode must be a boolean.");
+      }
+      normalized.strictMode = configValue.strictMode;
+    }
+  }
+
+  return normalized;
+}

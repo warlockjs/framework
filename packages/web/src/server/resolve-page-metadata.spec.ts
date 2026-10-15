@@ -1,0 +1,202 @@
+import { describe, expect, it, vi } from "vitest";
+import type { SharedContext } from "../index";
+import type { PageMetadata } from "../metadata";
+import type { PipelineLoader } from "./execute-page-request";
+import { ERROR_PAGE_METADATA, resolvePageMetadata } from "./resolve-page-metadata";
+import { DeferredKeyInMetadataError } from "./metadata-deferred-guard";
+
+const shared = Object.freeze({}) as Readonly<SharedContext>;
+
+/**
+ * The shape every reference-app page uses today — `({ data }) => ...`, reading
+ * the loader's data with no guard, because the type says `data` is always
+ * there (`home.page.tsx:75`, `product-details.page.tsx:72`,
+ * `products.page.tsx:82`). If stage 8 ever calls it without data, this throws.
+ */
+const dataReadingMetadata = (({ data }) => ({
+  title: "Home",
+  description: `${(data as { products: unknown[] }).products.length} products in stock`,
+})) as PageMetadata<PipelineLoader>;
+
+function resolve(overrides: Partial<Parameters<typeof resolvePageMetadata>[0]> = {}) {
+  return resolvePageMetadata({
+    metadata: undefined,
+    data: undefined,
+    error: undefined,
+    failed: false,
+    shared,
+    pagePath: "/",
+    ...overrides,
+  });
+}
+
+describe("resolvePageMetadata — the success path", () => {
+  it("returns undefined when the page exports no metadata", () => {
+    expect(resolve()).toEqual({ metadata: undefined });
+  });
+
+  it("uses static layout robots when the page exports no metadata", () => {
+    expect(resolve({ layoutRobots: "noindex" })).toEqual({ metadata: { robots: "noindex" } });
+  });
+
+  it("returns the object form as-is", () => {
+    const metadata = { title: "Contact us" };
+
+    expect(resolve({ metadata })).toEqual({ metadata });
+  });
+
+  it("keeps layout robots for a static title-only page object", () => {
+    expect(resolve({ metadata: { title: "Contact us" }, layoutRobots: "noindex" })).toEqual({
+      metadata: { title: "Contact us", robots: "noindex" },
+    });
+  });
+
+  it("calls the function form with the loader's data and no error", () => {
+    const metadata = vi.fn(() => ({ title: "Home" })) as unknown as PageMetadata<PipelineLoader>;
+    const data = { products: [1, 2, 3] };
+
+    expect(resolve({ metadata, data })).toEqual({ metadata: { title: "Home" } });
+    expect(metadata).toHaveBeenCalledWith({ data, shared });
+  });
+
+  it("keeps layout robots for a title-only metadata function", () => {
+    const metadata = vi.fn(() => ({ title: "Home" })) as unknown as PageMetadata<PipelineLoader>;
+
+    expect(resolve({ metadata, data: {}, layoutRobots: "noindex" })).toEqual({
+      metadata: { title: "Home", robots: "noindex" },
+    });
+  });
+
+  it("keeps layout robots when a page explicitly leaves robots undefined", () => {
+    expect(
+      resolve({ metadata: { title: "Home", robots: undefined }, layoutRobots: "noindex" }),
+    ).toEqual({ metadata: { title: "Home", robots: "noindex" } });
+  });
+
+  it("lets a concrete page robots value override the layout default", () => {
+    expect(resolve({ metadata: { robots: "index, follow" }, layoutRobots: "noindex" })).toEqual({
+      metadata: { robots: "index, follow" },
+    });
+  });
+});
+
+describe("resolvePageMetadata — the error path", () => {
+  /*
+    The card this file closes: a loader rejected, stage 8 called `metadata`
+    anyway with `data: undefined`, and the resulting TypeError REPLACED the
+    loader's error. A `MissingDataSourceError` became "Cannot read properties
+    of undefined" pointing at a different file, in a different subsystem.
+  */
+  it("does not call the page's metadata function at all", () => {
+    const metadata = vi.fn(() => ({ title: "never" })) as unknown as PageMetadata<PipelineLoader>;
+
+    resolve({ metadata, failed: true, error: new Error("loader blew up") });
+
+    expect(metadata).not.toHaveBeenCalled();
+  });
+
+  it("does not throw when the page's metadata reads its data unguarded", () => {
+    expect(() =>
+      resolve({
+        metadata: dataReadingMetadata,
+        failed: true,
+        error: new Error("MissingDataSourceError"),
+      }),
+    ).not.toThrow();
+  });
+
+  it("emits the framework's error metadata, noindex included", () => {
+    expect(resolve({ metadata: dataReadingMetadata, failed: true, error: new Error("x") })).toEqual(
+      {
+        metadata: ERROR_PAGE_METADATA,
+      },
+    );
+
+    // The part that is not cosmetic: a 500 must never be indexed.
+    expect(ERROR_PAGE_METADATA.robots).toBe("noindex");
+  });
+
+  it("never lets inherited index robots replace error noindex", () => {
+    expect(
+      resolve({
+        metadata: { title: "Home" },
+        layoutRobots: "index, follow",
+        failed: true,
+        error: new Error("loader failed"),
+      }),
+    ).toEqual({ metadata: ERROR_PAGE_METADATA });
+  });
+
+  it("skips the object form too — a failed page is not 'Sign in'", () => {
+    expect(
+      resolve({ metadata: { title: "Sign in" }, failed: true, error: new Error("x") }),
+    ).toEqual({ metadata: ERROR_PAGE_METADATA });
+  });
+});
+
+describe("resolvePageMetadata — Stage 2 deferred keys (contract rule 11)", () => {
+  it("reads a resolved key next to a deferred one without incident", () => {
+    const metadata = (({ data }: { data: unknown }) => ({
+      title: (data as { product: { name: string } }).product.name,
+    })) as unknown as PageMetadata<PipelineLoader>;
+    const data = { product: { name: "Chair" }, reviews: Promise.resolve([]) };
+
+    expect(resolve({ metadata, data, deferredKeys: ["reviews"] })).toEqual({
+      metadata: { title: "Chair" },
+    });
+  });
+
+  it("reports DeferredKeyInMetadataError, naming the key and the page, instead of letting it escape", () => {
+    const metadata = (({ data }: { data: unknown }) => ({
+      title: (data as { reviews: unknown[] }).reviews.length.toString(),
+    })) as unknown as PageMetadata<PipelineLoader>;
+    const data = { product: { name: "Chair" }, reviews: Promise.resolve([]) };
+
+    const result = resolve({
+      metadata,
+      data,
+      deferredKeys: ["reviews"],
+      pagePath: "/products/1",
+    });
+
+    expect(result.metadata).toBe(ERROR_PAGE_METADATA);
+    expect(result.metadata?.robots).toBe("noindex");
+    expect(result.thrown).toBeInstanceOf(DeferredKeyInMetadataError);
+    expect((result.thrown as DeferredKeyInMetadataError).key).toBe("reviews");
+    expect((result.thrown as DeferredKeyInMetadataError).pagePath).toBe("/products/1");
+  });
+
+  it("leaves a page that never called defer() unaffected — no deferredKeys at all", () => {
+    const metadata = vi.fn(() => ({ title: "Home" })) as unknown as PageMetadata<PipelineLoader>;
+    const data = { products: [1, 2, 3] };
+
+    expect(resolve({ metadata, data })).toEqual({ metadata: { title: "Home" } });
+  });
+});
+
+describe("resolvePageMetadata — a metadata function that throws", () => {
+  it("reports the throw on the success path instead of letting it escape", () => {
+    const boom = new Error("metadata is broken");
+    const metadata = (() => {
+      throw boom;
+    }) as unknown as PageMetadata<PipelineLoader>;
+
+    // Reported, not thrown: the caller turns it into an error record so the
+    // boundary renders and the framework still owns the status.
+    expect(resolve({ metadata, data: {}, layoutRobots: "index, follow" })).toEqual({
+      metadata: ERROR_PAGE_METADATA,
+      thrown: boom,
+      throwingLevel: "page",
+    });
+  });
+
+  it("never reports a throw on the error path — there is nothing left to run", () => {
+    const result = resolve({
+      metadata: dataReadingMetadata,
+      failed: true,
+      error: new Error("the real one"),
+    });
+
+    expect(result.thrown).toBeUndefined();
+  });
+});

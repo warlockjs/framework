@@ -1,0 +1,115 @@
+import path from "node:path";
+import { resolvePageRouteIdentity } from "../routing/route-identity";
+import type { Router } from "@warlock.js/core";
+import type { ViteDevServer } from "vite";
+import {
+  filesystemPageFileFor,
+  loadComposedModule,
+  type InstalledPageRoute,
+} from "./install-page-routes";
+import { normalizePageModule } from "./normalize-page-module";
+import { isNotFoundPageFile } from "./not-found-page";
+import type { PageFileChanges } from "./page-file-change";
+import { isErrorPageFilePath } from "./page-file-change";
+
+function pathKey(file: string): string {
+  const normalized = path.resolve(file).replace(/\\/g, "/");
+
+  return process.platform === "win32" ? normalized.toLowerCase() : normalized;
+}
+
+/**
+ * Every real page file currently represented in the route table. This includes
+ * a custom `404.page.tsx`, which is intentionally absent from the public page
+ * table because it has no linkable URL of its own.
+ */
+export function registeredPageFiles(
+  routes: ReturnType<Router["list"]>,
+  appSrcRoot: string,
+): string[] {
+  const sourceRoot = path.dirname(appSrcRoot);
+
+  return [
+    ...new Set(
+      routes
+        .filter((route) => route.isPage && route.sourceFile && !route.sourceFile.startsWith("\0"))
+        .map((route) => path.resolve(sourceRoot, route.sourceFile)),
+    ),
+  ];
+}
+
+/** Exact route-source owners replaced by a live page-table transaction. */
+export function pageRouteSourceFiles(routes: ReturnType<Router["list"]>): string[] {
+  return [
+    ...new Set(
+      routes.filter((route) => route.isPage && route.sourceFile).map((route) => route.sourceFile),
+    ),
+  ];
+}
+
+/**
+ * Inspect only in-place page edits. Vite's SSR graph is invalidated explicitly
+ * before evaluation because core's file watcher and Vite's watcher have no
+ * ordering contract. Component-only edits compare equal and stay in Fast
+ * Refresh; route/name changes request an atomic table replacement.
+ */
+export async function pageRoutesNeedReplacement(
+  changes: PageFileChanges,
+  options: {
+    vite: ViteDevServer;
+    appSrcRoot: string;
+    installedPages: readonly InstalledPageRoute[];
+  },
+): Promise<boolean> {
+  let replace = changes.added.length > 0 || changes.removed.length > 0;
+
+  const installedByFile = new Map(
+    options.installedPages.map((page) => [pathKey(page.file), page] as const),
+  );
+
+  for (const file of changes.inspectionNeeded) {
+    // An error boundary has no installed router route to compare against. Its
+    // namespace is projected into every client composition, so any edit must
+    // replace the generated table; do not load it here just to inspect it.
+    if (isErrorPageFilePath(file)) return true;
+
+    options.vite.environments.ssr.moduleGraph.onFileChange(file);
+    // Composed with its setup file, then normalized: the declared route lives
+    // in `config.route`, and a raw `route` export is illegal.
+    const rawModule = await loadComposedModule(options.vite, file);
+    let pageModule: ReturnType<typeof normalizePageModule>;
+
+    try {
+      pageModule = normalizePageModule(rawModule, "page", file);
+    } catch {
+      // An invalid module must enter the transaction so the installer rejects
+      // it without touching live routes.
+      replace = true;
+      continue;
+    }
+
+    // A valid 404 page has no route identity. Its component body remains Vite
+    // HMR territory.
+    if (isNotFoundPageFile(file)) {
+      if (pageModule.route !== undefined) replace = true;
+      continue;
+    }
+
+    const installed = installedByFile.get(pathKey(file));
+    if (installed === undefined) {
+      replace = true;
+      continue;
+    }
+
+    const next = resolvePageRouteIdentity(
+      pageModule.route,
+      filesystemPageFileFor(file, options.appSrcRoot),
+      file,
+    );
+    if (next.path !== installed.declaredPath || next.name !== installed.name) {
+      replace = true;
+    }
+  }
+
+  return replace;
+}

@@ -1,0 +1,1509 @@
+/**
+ * The server-side page cache (`route.cache.serverCache`) — the framework
+ * itself holding resolved bytes and serving a HIT without re-running the
+ * pipeline, distinct from `route.cache`'s CDN-facing `Cache-Control` (that is
+ * `page-route-cache-opt-in.spec.ts`'s job). Same pattern as that suite and
+ * `auth-derived-cache-headers.spec.ts`: `renderPageRequest` is mocked,
+ * `server.inject()` exercises a real Fastify instance.
+ *
+ * `@warlock.js/cache` is mocked with a minimal in-memory tagged store behind a
+ * real-shaped fake driver instance installed as `cache.currentDriver` —
+ * exactly the surface the page cache actually uses: `page-cache-store-driver.ts`
+ * builds its own instance from `currentDriver`'s class and options
+ * (`new`, `setOptions`, `connect`), then `page-cache-store.ts`/
+ * `invalidate-page-cache.ts` call `get` and `tags(tags).set/get/invalidate`
+ * on it. No real cache driver is ever touched; the store sees keys and tags
+ * under the page cache namespace (`page-cache-namespace.ts`).
+ */
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { parse as devalueParse } from "devalue";
+import Fastify, { type FastifyInstance } from "fastify";
+import {
+  registerHttpPlugins,
+  requestContext,
+  router,
+  setConfig,
+  type Request,
+} from "@warlock.js/core";
+import { WARLOCK_DATA_REQUEST_HEADER, WARLOCK_DATA_REQUEST_VALUE } from "../routing/data-request";
+import { NDJSON_CONTENT_TYPE } from "./write-deferred-ndjson-response";
+import type { PageCacheOptIn } from "../routing/route-identity";
+import type { BufferedCookie } from "./execute-page-request";
+import type { RouteTranslations } from "./route-translations";
+import { connectPageContext } from "./page-context";
+import type { PageContextRunner } from "./execute-page-request.types";
+
+const { renderPageRequest, fakeCache, fakeCacheStore, fakeCacheTagIndex } = vi.hoisted(() => {
+  const store = new Map<string, unknown>();
+  const tagIndex = new Map<string, Set<string>>();
+
+  const taggedCacheFor = (tags: string[]) => ({
+    async set(key: string, value: unknown) {
+      store.set(key, value);
+      for (const tag of tags) {
+        if (!tagIndex.has(tag)) tagIndex.set(tag, new Set());
+        tagIndex.get(tag)!.add(key);
+      }
+    },
+    async get(key: string) {
+      return store.has(key) ? store.get(key) : null;
+    },
+    async invalidate() {
+      for (const tag of tags) {
+        for (const key of tagIndex.get(tag) ?? []) store.delete(key);
+        tagIndex.delete(tag);
+      }
+    },
+  });
+
+  return {
+    renderPageRequest: vi.fn(),
+    fakeCacheStore: store,
+    fakeCacheTagIndex: tagIndex,
+    fakeCache: {
+      // A fresh instance per `new` — every one reads and writes the same
+      // `store`/`tagIndex`, and `get` goes through `fakeCache.get` so a
+      // test can still swap it (see the cache-failure test).
+      currentDriver: new (class FakePageCacheDriver {
+        public name: string | undefined = "memory";
+        public options: Record<string, unknown> = {};
+
+        public setOptions(options: Record<string, unknown>) {
+          this.options = options;
+          return this;
+        }
+
+        public async connect() {}
+
+        public async disconnect() {}
+
+        public get(key: string) {
+          return fakeCache.get(key);
+        }
+
+        public tags(tags: string[]) {
+          return taggedCacheFor(tags);
+        }
+      })(),
+      async get(key: string) {
+        return store.has(key) ? store.get(key) : null;
+      },
+      tags: (tags: string[]) => taggedCacheFor(tags),
+    },
+  };
+});
+
+vi.mock("./render-page", () => ({ renderPageRequest }));
+
+// Only `cache.currentDriver` is overridden, IN PLACE, on the real
+// `CacheManager` singleton `importOriginal` returns — everything else (its
+// prototype methods, `registerDriver`, the classes core's own cache
+// connector statically imports) is untouched, so this test never has to keep
+// its own mock in sync with `@warlock.js/cache`'s full export surface, and
+// no real driver (memory, redis, pg) is ever reached: the page cache clones
+// the fake driver's class, never a real one.
+vi.mock("@warlock.js/cache", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  const realCache = actual.cache as Record<string, unknown>;
+
+  realCache.currentDriver = fakeCache.currentDriver;
+
+  return actual;
+});
+
+import { createPageRouteHandler } from "./create-page-route-handler";
+import { invalidatePageCache } from "./invalidate-page-cache";
+import { resetPageCacheFailureThrottle } from "./page-route-handler/store-page-cache-after-render";
+import { resetPageCacheDriverStateForTests } from "./page-cache-driver";
+import {
+  DEFAULT_PAGE_CACHE_MAX_ENTRY_BYTES,
+  InvalidPageCacheMaxEntryBytesError,
+  resolvePageCacheMaxEntryBytes,
+} from "./page-cache-entry-limit";
+import * as pageCacheEntryLimit from "./page-cache-entry-limit";
+
+function renderedHtml(
+  overrides: {
+    html?: string;
+    status?: number;
+    usesDefer?: boolean;
+    data?: unknown;
+    cookies?: BufferedCookie[];
+  } = {},
+) {
+  return {
+    html: overrides.html ?? "<!doctype html><html><body>ok</body></html>",
+    status: overrides.status ?? 200,
+    headers: {},
+    cookies: overrides.cookies ?? [],
+    data: overrides.data,
+    bundle: undefined,
+    usesDefer: overrides.usesDefer ?? false,
+  };
+}
+
+function renderedJson(
+  overrides: {
+    status?: number;
+    usesDefer?: boolean;
+    data?: unknown;
+    deferredKeys?: string[];
+    /**
+     * Mirrors real production output for a `serverCache` route's JSON
+     * representation: `render-page.ts`'s await-and-inline path clears
+     * `deferredKeys` but sets THIS instead, once the deferred value has been
+     * awaited and put back into `pageData` as a plain, resolved value — see
+     * `PageDataBundle.inlinedDeferredKeys`.
+     */
+    inlinedDeferredKeys?: string[];
+    routeTranslations?: RouteTranslations;
+  } = {},
+) {
+  const data = overrides.data ?? { id: 1 };
+
+  return {
+    html: "",
+    status: overrides.status ?? 200,
+    headers: {},
+    cookies: [],
+    data,
+    bundle: {
+      appData: undefined,
+      layoutData: undefined,
+      pageData: data,
+      shared: undefined,
+      route: { name: "route", params: {} },
+      deferredKeys: overrides.deferredKeys,
+      inlinedDeferredKeys: overrides.inlinedDeferredKeys,
+      routeTranslations: overrides.routeTranslations,
+    },
+    usesDefer: overrides.usesDefer ?? false,
+  };
+}
+
+/** Flipped by a test to make the guarded route's middleware refuse the request. */
+let guardBlocks = false;
+const guardCalls = vi.fn();
+
+const moduleById: Record<string, unknown> = {
+  "app.tsx": {},
+  "layout.tsx": {},
+  "page.tsx": { default: (): null => null },
+  "guarded-page.tsx": {
+    default: (): null => null,
+    config: {
+      middleware: [
+        ({ response }: { response: { send: (body: unknown, status: number) => unknown } }) => {
+          guardCalls();
+
+          if (guardBlocks) return response.send({ error: "blocked" }, 403);
+        },
+      ],
+    },
+  },
+};
+
+function registerRoute(
+  urlPath: string,
+  server: FastifyInstance,
+  cache: PageCacheOptIn,
+  options: {
+    methods?: Array<"get" | "post">;
+    getRouteTranslations?: (sourceFile: string, locale: string) => RouteTranslations;
+  } = {},
+): void {
+  const handler = createPageRouteHandler({
+    path: urlPath,
+    name: urlPath,
+    appFile: "app.tsx",
+    layoutFile: "layout.tsx",
+    pageFile: urlPath === "/__scache-guarded" ? "guarded-page.tsx" : "page.tsx",
+    loadModule: async (moduleId) => moduleById[moduleId],
+    httpServer: server,
+    cache,
+    getRouteTranslations: options.getRouteTranslations,
+  });
+
+  for (const method of options.methods ?? ["get"]) {
+    router[method](urlPath, handler);
+  }
+}
+
+/** Whatever the currently running test wants done to `request` mid-render. */
+let touchAuth: (request: Request) => void = () => {};
+
+describe("server-side page cache (route.cache.serverCache)", () => {
+  const server = Fastify();
+  let previousRunner: PageContextRunner | undefined;
+  let translationRevision = "one";
+  let englishKeyword = "English one";
+  let arabicKeyword = "Arabic one";
+  const routeTranslations = (_sourceFile: string, locale: string): RouteTranslations => ({
+    locale,
+    revision: `${locale}:${translationRevision}`,
+    keywords: { copy: { title: locale === "ar" ? arabicKeyword : englishKeyword } },
+  });
+
+  beforeAll(async () => {
+    // Production boot hands core's own request context to the pipeline; a HIT
+    // runs the middleware gate through it, so the harness must connect it too.
+    previousRunner = connectPageContext(requestContext as unknown as PageContextRunner);
+
+    await registerHttpPlugins(server);
+
+    registerRoute("/__scache-guarded", server, {
+      public: true,
+      maxAge: 60,
+      serverCache: true,
+      tags: ["guarded"],
+    });
+
+    registerRoute("/__scache-basic", server, {
+      public: true,
+      maxAge: 60,
+      serverCache: true,
+      tags: ["basic"],
+    });
+    registerRoute("/__scache-locale", server, {
+      public: true,
+      maxAge: 60,
+      serverCache: true,
+      tags: ["locale"],
+    });
+    registerRoute("/__scache-cookie", server, {
+      public: true,
+      maxAge: 60,
+      serverCache: true,
+      tags: ["cookie"],
+    });
+    registerRoute("/__scache-status", server, {
+      public: true,
+      maxAge: 60,
+      serverCache: true,
+      tags: ["status"],
+    });
+    registerRoute(
+      "/__scache-post",
+      server,
+      { public: true, maxAge: 60, serverCache: true, tags: ["post"] },
+      { methods: ["get", "post"] },
+    );
+    registerRoute("/__scache-invalidate", server, {
+      public: true,
+      maxAge: 60,
+      serverCache: true,
+      tags: ["invalidate-me"],
+    });
+    registerRoute("/__scache-fn-tags", server, {
+      public: true,
+      maxAge: 60,
+      serverCache: true,
+      tags: (data: unknown) => [`fn:${(data as { id: number }).id}`],
+    });
+    registerRoute("/__scache-plain", server, { public: true, maxAge: 60 });
+    registerRoute("/__scache-tenant", server, {
+      public: true,
+      maxAge: 60,
+      serverCache: true,
+      tags: ["tenant"],
+    });
+    registerRoute("/__scache-vary", server, {
+      public: true,
+      maxAge: 60,
+      serverCache: true,
+      tags: ["vary"],
+      varyBy: (request) => String(request.header("x-preview-theme", "")),
+    });
+    registerRoute("/__scache-shared-tags", server, {
+      public: true,
+      maxAge: 60,
+      serverCache: true,
+      tags: (_data, { shared }) => [`theme:${(shared as { theme?: string }).theme}`],
+    });
+    registerRoute("/__scache-driver-down", server, {
+      public: true,
+      maxAge: 60,
+      serverCache: true,
+      tags: ["driver-down"],
+    });
+    registerRoute("/__scache-streamed", server, {
+      public: true,
+      maxAge: 60,
+      serverCache: true,
+      tags: ["streamed"],
+    });
+    registerRoute(
+      "/__scache-translations",
+      server,
+      { public: true, maxAge: 60, serverCache: true, tags: ["translations"] },
+      { getRouteTranslations: routeTranslations },
+    );
+    registerRoute("/__scache-entry-limit", server, {
+      public: true,
+      maxAge: 60,
+      serverCache: true,
+      tags: ["entry-limit"],
+    });
+
+    router.scan(server);
+  });
+
+  beforeEach(() => {
+    renderPageRequest.mockReset();
+    guardBlocks = false;
+    guardCalls.mockClear();
+    touchAuth = () => {};
+    translationRevision = "one";
+    englishKeyword = "English one";
+    arabicKeyword = "Arabic one";
+    renderPageRequest.mockImplementation(
+      async (_url: string, options: { createHttp: () => { request: Request } }) => {
+        const { request } = options.createHttp();
+        touchAuth(request);
+        return renderedHtml();
+      },
+    );
+    fakeCacheStore.clear();
+    fakeCacheTagIndex.clear();
+    resetPageCacheDriverStateForTests();
+  });
+
+  afterEach(() => {
+    setConfig("auth.cookie.name", undefined as never);
+    setConfig("pageCache.maxEntryBytes", undefined as never);
+    setConfig("app.url", undefined as never);
+  });
+
+  afterAll(async () => {
+    connectPageContext(previousRunner);
+    await server.close();
+  });
+
+  // ── Miss then hit ──────────────────────────────────────────────────────
+  it("misses then hits: the loader runs once, the second identical request is a HIT with the same body/status", async () => {
+    const first = await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(first.statusCode).toBe(200);
+    expect(first.headers["x-warlock-cache"]).toBe("miss");
+    expect(renderPageRequest).toHaveBeenCalledTimes(1);
+
+    const second = await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(second.statusCode).toBe(200);
+    expect(second.headers["x-warlock-cache"]).toBe("hit");
+    expect(second.body).toBe(first.body);
+    expect(renderPageRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it("a route without serverCache is completely untouched: no x-warlock-cache header, cache never consulted", async () => {
+    const response = await server.inject({ method: "GET", url: "/__scache-plain" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["x-warlock-cache"]).toBeUndefined();
+    expect(fakeCacheStore.size).toBe(0);
+  });
+
+  it("a guarded middleware blocks a cache HIT exactly as it blocks a render", async () => {
+    const first = await server.inject({ method: "GET", url: "/__scache-guarded" });
+    expect(first.headers["x-warlock-cache"]).toBe("miss");
+
+    const hit = await server.inject({ method: "GET", url: "/__scache-guarded" });
+    expect(hit.headers["x-warlock-cache"]).toBe("hit");
+    expect(guardCalls).toHaveBeenCalledTimes(1); // the mocked render never runs it; only the HIT gate does
+
+    guardBlocks = true;
+
+    const blocked = await server.inject({ method: "GET", url: "/__scache-guarded" });
+    expect(blocked.statusCode).toBe(403);
+    expect(blocked.headers["x-warlock-cache"]).not.toBe("hit");
+    expect(blocked.body).not.toBe(first.body);
+    expect(renderPageRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it("stores the committed non-cookie headers and replays them on a HIT", async () => {
+    renderPageRequest.mockReset();
+    renderPageRequest.mockImplementationOnce(async () => ({
+      ...renderedHtml(),
+      headers: { "x-robots-tag": "noindex", "content-language": "en", "content-length": "9" },
+    }));
+
+    await server.inject({ method: "GET", url: "/__scache-basic" });
+
+    const [entry] = [...fakeCacheStore.values()] as Array<{ headers?: Record<string, string> }>;
+    expect(entry?.headers).toEqual({ "x-robots-tag": "noindex", "content-language": "en" });
+
+    const hit = await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(hit.headers["x-warlock-cache"]).toBe("hit");
+    expect(hit.headers["x-robots-tag"]).toBe("noindex");
+    expect(hit.headers["content-language"]).toBe("en");
+  });
+
+  it("with app.url set, a foreign Host bypasses the cache and stores nothing", async () => {
+    setConfig("app.url", "https://example.test");
+
+    await server.inject({ method: "GET", url: "/__scache-basic", headers: { host: "example.test" } });
+
+    const foreign = await server.inject({
+      method: "GET",
+      url: "/__scache-basic",
+      headers: { host: "evil.test" },
+    });
+    expect(foreign.headers["x-warlock-cache"]).toBe("bypass");
+    expect(fakeCacheStore.size).toBe(1);
+  });
+
+  it("without app.url, each request host keeps its own entry", async () => {
+    await server.inject({ method: "GET", url: "/__scache-basic", headers: { host: "a.test" } });
+
+    const other = await server.inject({
+      method: "GET",
+      url: "/__scache-basic",
+      headers: { host: "b.test" },
+    });
+    expect(other.headers["x-warlock-cache"]).toBe("miss");
+    expect(fakeCacheStore.size).toBe(2);
+  });
+
+  // ── Key discrimination ───────────────────────────────────────────────────
+  it("a different locale gets a separate entry", async () => {
+    // `request.locale` reads `header("locale")` when no `?locale=` query or
+    // locale cookie is present (`core/src/http/request.ts`'s `resolveLocale`)
+    // — a deterministic way to force two different resolved locales without
+    // any localization config.
+    const en = await server.inject({
+      method: "GET",
+      url: "/__scache-locale",
+      headers: { locale: "en" },
+    });
+    expect(en.headers["x-warlock-cache"]).toBe("miss");
+    expect(renderPageRequest).toHaveBeenCalledTimes(1);
+
+    const enHit = await server.inject({
+      method: "GET",
+      url: "/__scache-locale",
+      headers: { locale: "en" },
+    });
+    expect(enHit.headers["x-warlock-cache"]).toBe("hit");
+    expect(renderPageRequest).toHaveBeenCalledTimes(1);
+
+    const fr = await server.inject({
+      method: "GET",
+      url: "/__scache-locale",
+      headers: { locale: "fr" },
+    });
+    expect(fr.headers["x-warlock-cache"]).toBe("miss");
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it("query order is normalised: ?a=1&b=2 and ?b=2&a=1 share one entry", async () => {
+    const first = await server.inject({ method: "GET", url: "/__scache-basic?a=1&b=2" });
+    expect(first.headers["x-warlock-cache"]).toBe("miss");
+
+    const second = await server.inject({ method: "GET", url: "/__scache-basic?b=2&a=1" });
+    expect(second.headers["x-warlock-cache"]).toBe("hit");
+    expect(renderPageRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it("json and html variants are separate entries", async () => {
+    const html = await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(html.headers["x-warlock-cache"]).toBe("miss");
+
+    renderPageRequest.mockImplementation(async () => renderedJson());
+
+    const json = await server.inject({
+      method: "GET",
+      url: "/__scache-basic",
+      headers: { [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE },
+    });
+    expect(json.headers["x-warlock-cache"]).toBe("miss");
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+
+    const jsonHit = await server.inject({
+      method: "GET",
+      url: "/__scache-basic",
+      headers: { [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE },
+    });
+    expect(jsonHit.headers["x-warlock-cache"]).toBe("hit");
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses a new cache entry when the selected translation JSON revision changes", async () => {
+    renderPageRequest.mockImplementation(
+      async (_url: string, options: { routeTranslations?: RouteTranslations }) =>
+        renderedJson({ routeTranslations: options.routeTranslations }),
+    );
+    const dataHeaders = {
+      [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE,
+      locale: "en",
+    };
+
+    const first = await server.inject({
+      method: "GET",
+      url: "/__scache-translations",
+      headers: dataHeaders,
+    });
+    const firstPayload = devalueParse(first.body) as {
+      translations: unknown;
+      translationMode: unknown;
+    };
+    expect(first.headers["x-warlock-cache"]).toBe("miss");
+    expect(firstPayload).toMatchObject({
+      translations: { copy: { title: "English one" } },
+      translationMode: "scoped",
+    });
+
+    const hit = await server.inject({
+      method: "GET",
+      url: "/__scache-translations",
+      headers: dataHeaders,
+    });
+    expect(hit.headers["x-warlock-cache"]).toBe("hit");
+    expect(renderPageRequest).toHaveBeenCalledTimes(1);
+
+    translationRevision = "two";
+    englishKeyword = "English two";
+    const changed = await server.inject({
+      method: "GET",
+      url: "/__scache-translations",
+      headers: dataHeaders,
+    });
+    const changedPayload = devalueParse(changed.body) as {
+      translations: unknown;
+      translationMode: unknown;
+    };
+    expect(changed.headers["x-warlock-cache"]).toBe("miss");
+    expect(changedPayload).toMatchObject({
+      translations: { copy: { title: "English two" } },
+      translationMode: "scoped",
+    });
+
+    const changedHit = await server.inject({
+      method: "GET",
+      url: "/__scache-translations",
+      headers: dataHeaders,
+    });
+    expect(changedHit.headers["x-warlock-cache"]).toBe("hit");
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not store a response when rendering changes the request locale", async () => {
+    renderPageRequest.mockImplementation(
+      async (_url: string, options: { createHttp: () => { request: Request } }) => {
+        const { request } = options.createHttp();
+        request.locale = "ar";
+        return renderedJson({ routeTranslations: routeTranslations("page.tsx", "ar") });
+      },
+    );
+    const headers = {
+      [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE,
+      locale: "en",
+    };
+
+    const first = await server.inject({ method: "GET", url: "/__scache-translations", headers });
+    const second = await server.inject({ method: "GET", url: "/__scache-translations", headers });
+    const returned = devalueParse(first.body) as {
+      locale: unknown;
+      translations: unknown;
+      translationMode: unknown;
+    };
+
+    expect(first.headers["x-warlock-cache"]).toBe("miss");
+    expect(second.headers["x-warlock-cache"]).toBe("miss");
+    expect(returned).toMatchObject({
+      locale: "ar",
+      translations: { copy: { title: "Arabic one" } },
+      translationMode: "scoped",
+    });
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+    expect(fakeCacheStore.size).toBe(0);
+  });
+
+  it("does not store a same-locale response whose snapshot revision changed during rendering", async () => {
+    renderPageRequest.mockImplementation(
+      async (_url: string, options: { createHttp: () => { request: Request } }) => {
+        const { request } = options.createHttp();
+        translationRevision = translationRevision === "one" ? "two" : "three";
+        englishKeyword = `English ${translationRevision}`;
+        return renderedJson({ routeTranslations: routeTranslations("page.tsx", request.locale) });
+      },
+    );
+    const headers = {
+      [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE,
+      locale: "en",
+    };
+
+    const first = await server.inject({ method: "GET", url: "/__scache-translations", headers });
+    const second = await server.inject({ method: "GET", url: "/__scache-translations", headers });
+
+    expect(first.headers["x-warlock-cache"]).toBe("miss");
+    expect(second.headers["x-warlock-cache"]).toBe("miss");
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+    expect(fakeCacheStore.size).toBe(0);
+  });
+
+  // ── Auth bypass on HIT — the sharpest test in this suite ─────────────────
+  it("an Authorization header on what would otherwise be a HIT bypasses the cache entirely", async () => {
+    const miss = await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(miss.headers["x-warlock-cache"]).toBe("miss");
+
+    const guestHit = await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(guestHit.headers["x-warlock-cache"]).toBe("hit");
+    expect(renderPageRequest).toHaveBeenCalledTimes(1);
+
+    // A credential-carrying request that reaches the real pipeline would, in
+    // a real app, have its `Authorization` header verified by
+    // `@warlock.js/auth`'s middleware — simulated here the same way
+    // `auth-derived-cache-headers.spec.ts` does, by touching
+    // `decodedAccessToken` mid-render.
+    touchAuth = (request) => {
+      request.decodedAccessToken = { userType: "member" };
+    };
+
+    const bypassed = await server.inject({
+      method: "GET",
+      url: "/__scache-basic",
+      headers: { authorization: "Bearer x" },
+    });
+
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+    expect(bypassed.headers["x-warlock-cache"]).toBe("bypass");
+    expect(bypassed.headers["x-warlock-cache"]).not.toBe("hit");
+    expect(bypassed.headers["cache-control"]).toBe("private, no-store");
+  });
+
+  it("the configured auth cookie (default access_token) on what would otherwise be a HIT bypasses the cache", async () => {
+    const miss = await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(miss.headers["x-warlock-cache"]).toBe("miss");
+
+    await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(renderPageRequest).toHaveBeenCalledTimes(1);
+
+    touchAuth = (request) => {
+      request.decodedAccessToken = { userType: "member" };
+    };
+
+    const bypassed = await server.inject({
+      method: "GET",
+      url: "/__scache-basic",
+      headers: { cookie: "access_token=abc" },
+    });
+
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+    expect(bypassed.headers["x-warlock-cache"]).toBe("bypass");
+    expect(bypassed.headers["cache-control"]).toBe("private, no-store");
+  });
+
+  it("a custom configured auth.cookie.name is honoured for the HIT bypass check", async () => {
+    setConfig("auth.cookie.name", "session_token");
+
+    const miss = await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(miss.headers["x-warlock-cache"]).toBe("miss");
+
+    await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(renderPageRequest).toHaveBeenCalledTimes(1);
+
+    const bypassed = await server.inject({
+      method: "GET",
+      url: "/__scache-basic",
+      headers: { cookie: "session_token=abc" },
+    });
+
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+    expect(bypassed.headers["x-warlock-cache"]).toBe("bypass");
+  });
+
+  // ── General cookie bypass — SECURITY FIX, card ad861076 (5.17) ──────────
+  // `auth.cookie.name` never learns about a cookie named `token` (or any
+  // other app-specific session cookie name), so the checks above alone would
+  // let a signed-in render get stored and replayed to the next guest. These
+  // prove the general bypass: ANY cookie other than the locale cookie, with
+  // no dependency on `auth.cookie.name` at all.
+  it("admin GET with Cookie: token=abc bypasses before any guest entry exists; a following anonymous GET misses and never sees the admin's body", async () => {
+    renderPageRequest.mockImplementation(
+      async (_url: string, options: { createHttp: () => { request: Request } }) => {
+        const { request } = options.createHttp();
+        request.decodedAccessToken = { userType: "admin" };
+        return renderedHtml({ html: "<!doctype html><html><body>admin secret</body></html>" });
+      },
+    );
+
+    const admin = await server.inject({
+      method: "GET",
+      url: "/__scache-basic",
+      headers: { cookie: "token=abc" },
+    });
+    expect(admin.headers["x-warlock-cache"]).toBe("bypass");
+    expect(admin.headers["cache-control"]).toBe("private, no-store");
+    expect(admin.body).toContain("admin secret");
+
+    renderPageRequest.mockImplementation(async () => renderedHtml());
+
+    const guest = await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(guest.headers["x-warlock-cache"]).toBe("miss");
+    expect(guest.body).not.toContain("admin secret");
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it("guest miss then hit, then Cookie: token=abc bypasses with a fresh render body — never the stored guest entry", async () => {
+    const miss = await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(miss.headers["x-warlock-cache"]).toBe("miss");
+
+    const hit = await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(hit.headers["x-warlock-cache"]).toBe("hit");
+    expect(renderPageRequest).toHaveBeenCalledTimes(1);
+
+    renderPageRequest.mockImplementation(async () =>
+      renderedHtml({ html: "<!doctype html><html><body>fresh admin render</body></html>" }),
+    );
+
+    const bypassed = await server.inject({
+      method: "GET",
+      url: "/__scache-basic",
+      headers: { cookie: "token=abc" },
+    });
+    expect(bypassed.headers["x-warlock-cache"]).toBe("bypass");
+    expect(bypassed.headers["cache-control"]).toBe("private, no-store");
+    expect(bypassed.body).toContain("fresh admin render");
+    expect(bypassed.body).not.toBe(hit.body);
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it("a Cookie header carrying only the locale cookie stays cacheable — hit on the second request", async () => {
+    const first = await server.inject({
+      method: "GET",
+      url: "/__scache-basic",
+      headers: { cookie: "locale=en" },
+    });
+    expect(first.headers["x-warlock-cache"]).toBe("miss");
+
+    const second = await server.inject({
+      method: "GET",
+      url: "/__scache-basic",
+      headers: { cookie: "locale=en" },
+    });
+    expect(second.headers["x-warlock-cache"]).toBe("hit");
+    expect(renderPageRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it("the general cookie bypass applies to the data (x-warlock-data) representation too", async () => {
+    renderPageRequest.mockImplementation(async () => renderedJson());
+
+    const bypassed = await server.inject({
+      method: "GET",
+      url: "/__scache-basic",
+      headers: {
+        [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE,
+        cookie: "token=abc",
+      },
+    });
+
+    expect(bypassed.headers["x-warlock-cache"]).toBe("bypass");
+    expect(bypassed.headers["cache-control"]).toBe("private, no-store");
+  });
+
+  it("a locale cookie alongside another cookie still bypasses — the exemption is ONLY 'nothing but the locale cookie'", async () => {
+    const bypassed = await server.inject({
+      method: "GET",
+      url: "/__scache-basic",
+      headers: { cookie: "locale=en; token=abc" },
+    });
+
+    expect(bypassed.headers["x-warlock-cache"]).toBe("bypass");
+  });
+
+  it("cache.public without serverCache: Cookie: token=abc forces Cache-Control private, no-store, never public", async () => {
+    const response = await server.inject({
+      method: "GET",
+      url: "/__scache-plain",
+      headers: { cookie: "token=abc" },
+    });
+
+    expect(response.headers["x-warlock-cache"]).toBeUndefined();
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+  });
+
+  it.each([
+    ["empty", ""],
+    ["semicolons only", ";;;"],
+    ["no equals sign", "garbage-no-equals"],
+  ])("a malformed/empty Cookie header (%s) fails closed — bypass", async (_label, cookieHeader) => {
+    const response = await server.inject({
+      method: "GET",
+      url: "/__scache-basic",
+      headers: { cookie: cookieHeader },
+    });
+
+    expect(response.headers["x-warlock-cache"]).toBe("bypass");
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+  });
+
+  // ── Store eligibility ─────────────────────────────────────────────────
+  it("an authDerived response is never stored — a subsequent guest request still misses", async () => {
+    touchAuth = (request) => {
+      request.decodedAccessToken = { userType: "member" };
+    };
+
+    const first = await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(first.headers["cache-control"]).toBe("private, no-store");
+
+    touchAuth = () => {};
+
+    const second = await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(second.headers["x-warlock-cache"]).toBe("miss");
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it("a response that sets a cookie is never stored — a subsequent guest request still misses", async () => {
+    renderPageRequest.mockImplementation(async () =>
+      renderedHtml({ cookies: [{ name: "session", value: "abc", options: { raw: true } }] }),
+    );
+
+    const first = await server.inject({ method: "GET", url: "/__scache-cookie" });
+    expect(first.headers["set-cookie"]).toBeDefined();
+
+    renderPageRequest.mockImplementation(async () => renderedHtml());
+
+    const second = await server.inject({ method: "GET", url: "/__scache-cookie" });
+    expect(second.headers["x-warlock-cache"]).toBe("miss");
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it("a non-200 status is never stored — a subsequent guest request still misses", async () => {
+    renderPageRequest.mockImplementation(async () => renderedHtml({ status: 500 }));
+
+    const first = await server.inject({ method: "GET", url: "/__scache-status" });
+    expect(first.statusCode).toBe(500);
+
+    renderPageRequest.mockImplementation(async () => renderedHtml());
+
+    const second = await server.inject({ method: "GET", url: "/__scache-status" });
+    expect(second.headers["x-warlock-cache"]).toBe("miss");
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST is never cached; a GET to the same URL is unaffected", async () => {
+    const post = await server.inject({ method: "POST", url: "/__scache-post" });
+    expect(post.statusCode).toBe(200);
+    expect(renderPageRequest).toHaveBeenCalledTimes(1);
+
+    const get1 = await server.inject({ method: "GET", url: "/__scache-post" });
+    expect(get1.headers["x-warlock-cache"]).toBe("miss");
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+
+    const get2 = await server.inject({ method: "GET", url: "/__scache-post" });
+    expect(get2.headers["x-warlock-cache"]).toBe("hit");
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+  });
+
+  // ── Invalidation ─────────────────────────────────────────────────────────
+  it("invalidatePageCache(tags) makes the next request for a previously-hit URL miss again", async () => {
+    await server.inject({ method: "GET", url: "/__scache-invalidate" });
+    const hit = await server.inject({ method: "GET", url: "/__scache-invalidate" });
+    expect(hit.headers["x-warlock-cache"]).toBe("hit");
+    expect(renderPageRequest).toHaveBeenCalledTimes(1);
+
+    await invalidatePageCache(["invalidate-me"]);
+
+    const missAgain = await server.inject({ method: "GET", url: "/__scache-invalidate" });
+    expect(missAgain.headers["x-warlock-cache"]).toBe("miss");
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it("resolves a function-form tags to include the returned tag, invalidatable the same way", async () => {
+    renderPageRequest.mockImplementation(async () => renderedHtml({ data: { id: 42 } }));
+
+    await server.inject({ method: "GET", url: "/__scache-fn-tags" });
+    const hit = await server.inject({ method: "GET", url: "/__scache-fn-tags" });
+    expect(hit.headers["x-warlock-cache"]).toBe("hit");
+
+    await invalidatePageCache(["fn:42"]);
+
+    const missAgain = await server.inject({ method: "GET", url: "/__scache-fn-tags" });
+    expect(missAgain.headers["x-warlock-cache"]).toBe("miss");
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+  });
+
+  // ── Deferred pages are cached fully resolved ─────────────────────────────
+  it("forces full resolution on a miss: crawler:true for html, awaitDeferredForDataRequest:true for json", async () => {
+    await server.inject({ method: "GET", url: "/__scache-basic" });
+    const htmlCallOptions = renderPageRequest.mock.calls[0]![1] as { crawler?: boolean };
+    expect(htmlCallOptions.crawler).toBe(true);
+
+    renderPageRequest.mockImplementation(async () => renderedJson());
+
+    await server.inject({
+      method: "GET",
+      url: "/__scache-locale",
+      headers: {
+        [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE,
+        accept: NDJSON_CONTENT_TYPE,
+      },
+    });
+    const jsonCallOptions = renderPageRequest.mock.calls[1]![1] as {
+      awaitDeferredForDataRequest?: boolean;
+    };
+    expect(jsonCallOptions.awaitDeferredForDataRequest).toBe(true);
+  });
+
+  // RELEASE BLOCKER (5.17): a serverCache route's JSON representation never
+  // streams (docs, "page-caching.mdx"), so a deferred loader value reaches
+  // the wire already resolved — but it must still be MARKED deferred, so
+  // `fetch-page-data.ts`'s client navigation wraps it in an already-fulfilled
+  // thenable before the page's `use(data.related)` ever sees it. Before this
+  // fix, `render-page.ts`'s await-and-inline path cleared `deferredKeys`
+  // entirely, `build-hydration-payload.ts` then omitted `deferred` from the
+  // wire, and a real client navigation's `use()` threw "an unsupported type
+  // was passed to use()" (minified #438) with the deferred section never
+  // rendering — on BOTH the MISS that stored the entry and every HIT that
+  // replayed it verbatim.
+  it("a deferred key survives on the wire as `deferred` + its resolved value, on both the storing MISS and the replaying HIT", async () => {
+    renderPageRequest.mockImplementation(async () =>
+      renderedJson({
+        data: { title: "Post", related: { slug: "next-post" } },
+        inlinedDeferredKeys: ["related"],
+      }),
+    );
+
+    const miss = await server.inject({
+      method: "GET",
+      url: "/__scache-locale",
+      headers: { [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE },
+    });
+    expect(miss.headers["x-warlock-cache"]).toBe("miss");
+
+    const hit = await server.inject({
+      method: "GET",
+      url: "/__scache-locale",
+      headers: { [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE },
+    });
+    expect(hit.headers["x-warlock-cache"]).toBe("hit");
+    expect(renderPageRequest).toHaveBeenCalledTimes(1);
+
+    for (const response of [miss, hit]) {
+      const payload = devalueParse(response.body) as { deferred?: string[]; pageData: unknown };
+
+      expect(payload.deferred).toEqual(["related"]);
+      expect(payload.pageData).toEqual({ title: "Post", related: { slug: "next-post" } });
+    }
+
+    expect(hit.body).toBe(miss.body);
+  });
+
+  it("a HIT never re-invokes the render pipeline — the stored body is byte-identical to the MISS", async () => {
+    const miss = await server.inject({ method: "GET", url: "/__scache-basic" });
+    const hit = await server.inject({ method: "GET", url: "/__scache-basic" });
+
+    expect(hit.body).toBe(miss.body);
+    expect(renderPageRequest).toHaveBeenCalledTimes(1);
+  });
+
+  // ── Locale switch persists even when served from the cache ─────────────
+  it("a HIT still persists a requested locale switch: Set-Cookie and Cache-Control both reflect it", async () => {
+    renderPageRequest.mockImplementation(async () => renderedJson());
+
+    const first = await server.inject({
+      method: "GET",
+      url: "/__scache-locale?locale=ar",
+      headers: { [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE },
+    });
+    expect(first.headers["x-warlock-cache"]).toBe("miss");
+    expect(first.headers["set-cookie"]).toBeDefined();
+    expect(String(first.headers["set-cookie"])).toContain("ar");
+
+    const second = await server.inject({
+      method: "GET",
+      url: "/__scache-locale?locale=ar",
+      headers: { [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE },
+    });
+    expect(second.headers["x-warlock-cache"]).toBe("hit");
+    expect(renderPageRequest).toHaveBeenCalledTimes(1);
+
+    // The bug: a HIT returned the right (cached) body while never calling
+    // `response.setLocale()`, so no `Set-Cookie` was ever emitted and the
+    // next full load would silently revert to the old locale.
+    expect(second.headers["set-cookie"]).toBeDefined();
+    expect(String(second.headers["set-cookie"])).toContain("ar");
+
+    // A per-visitor locale cookie must never be replayed from a shared
+    // cache as publicly cacheable — the same floor a MISS gets from
+    // `applyResponseCacheFloor` (`response-cache-floor.ts`), applied here by
+    // `set-cookie-cache-floor-hook.ts`'s `onSend` hook.
+    expect(second.headers["cache-control"]).toBe("private, no-store");
+  });
+
+  it("a provisional locale switch leaves the legacy cookie untouched on both MISS and HIT", async () => {
+    renderPageRequest.mockImplementation(async () => renderedJson());
+    const headers = {
+      [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE,
+      "x-warlock-locale-provisional": "1",
+    };
+
+    const miss = await server.inject({
+      method: "GET",
+      url: "/__scache-locale?locale=ar",
+      headers,
+    });
+    const hit = await server.inject({
+      method: "GET",
+      url: "/__scache-locale?locale=ar",
+      headers,
+    });
+
+    expect(miss.headers["x-warlock-cache"]).toBe("miss");
+    expect(hit.headers["x-warlock-cache"]).toBe("hit");
+    expect(miss.headers["set-cookie"]).toBeUndefined();
+    expect(hit.headers["set-cookie"]).toBeUndefined();
+  });
+
+  it("a plain HIT with no `?locale=` on the request never persists anything: no Set-Cookie, public Cache-Control kept", async () => {
+    const first = await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(first.headers["x-warlock-cache"]).toBe("miss");
+
+    const second = await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(second.headers["x-warlock-cache"]).toBe("hit");
+    expect(second.headers["set-cookie"]).toBeUndefined();
+    expect(second.headers["cache-control"]).toBe("public, max-age=60");
+  });
+
+  // ── Vary correctness for shared caches ───────────────────────────────────
+  // A CDN in front of this framework keeps the HTML and JSON representations
+  // of a `route.cache` route apart ONLY if every response — HTML included —
+  // carries `Vary: x-warlock-data`. These three specs pin that down (a, b,
+  // c), and exercise real Fastify `reply.header()` semantics via
+  // `server.inject()` rather than a `vi.fn()` mock, because a plain mock
+  // records every call and would never reveal a second `header("Vary", ...)`
+  // call silently overwriting the first.
+  it("(a) the HTML response of a route.cache route carries Vary containing x-warlock-data, on both MISS and HIT", async () => {
+    const miss = await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(miss.headers["x-warlock-cache"]).toBe("miss");
+    expect(String(miss.headers["vary"] ?? "")).toContain(WARLOCK_DATA_REQUEST_HEADER);
+
+    const hit = await server.inject({ method: "GET", url: "/__scache-basic" });
+    expect(hit.headers["x-warlock-cache"]).toBe("hit");
+    expect(String(hit.headers["vary"] ?? "")).toContain(WARLOCK_DATA_REQUEST_HEADER);
+  });
+
+  it("(b) a deferred page HIT carries both User-Agent and x-warlock-data in Vary", async () => {
+    renderPageRequest.mockImplementation(async () => renderedJson({ usesDefer: true }));
+
+    const miss = await server.inject({
+      method: "GET",
+      url: "/__scache-basic",
+      headers: { [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE },
+    });
+    expect(miss.headers["x-warlock-cache"]).toBe("miss");
+
+    const hit = await server.inject({
+      method: "GET",
+      url: "/__scache-basic",
+      headers: { [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE },
+    });
+    expect(hit.headers["x-warlock-cache"]).toBe("hit");
+
+    const vary = String(hit.headers["vary"] ?? "");
+    expect(vary).toContain("User-Agent");
+    expect(vary).toContain(WARLOCK_DATA_REQUEST_HEADER);
+  });
+
+  it("(c) the JSON response still carries x-warlock-data in Vary", async () => {
+    renderPageRequest.mockImplementation(async () => renderedJson());
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/__scache-basic",
+      headers: { [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE },
+    });
+
+    expect(String(response.headers["vary"] ?? "")).toContain(WARLOCK_DATA_REQUEST_HEADER);
+  });
+
+  // ── Tenants and themes never share an entry ─────────────────────────────
+  it("two tenants on different hosts never share an entry for the same URL", async () => {
+    renderPageRequest.mockImplementation(
+      async (_url: string, options: { createHttp: () => { request: Request } }) => {
+        const { request } = options.createHttp();
+        return renderedHtml({
+          html: `<html><body>${String(request.header("host"))}</body></html>`,
+        });
+      },
+    );
+
+    const alpha = await server.inject({
+      method: "GET",
+      url: "/__scache-tenant",
+      headers: { host: "alpha.test" },
+    });
+    expect(alpha.headers["x-warlock-cache"]).toBe("miss");
+
+    const beta = await server.inject({
+      method: "GET",
+      url: "/__scache-tenant",
+      headers: { host: "beta.test" },
+    });
+    expect(beta.headers["x-warlock-cache"]).toBe("miss");
+    expect(beta.body).toContain("beta.test");
+    expect(beta.body).not.toContain("alpha.test");
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+
+    const alphaAgain = await server.inject({
+      method: "GET",
+      url: "/__scache-tenant",
+      headers: { host: "alpha.test" },
+    });
+    expect(alphaAgain.headers["x-warlock-cache"]).toBe("hit");
+    expect(alphaAgain.body).toContain("alpha.test");
+  });
+
+  it("route.cache.varyBy splits entries on the same host (e.g. a preview-theme header)", async () => {
+    const a = await server.inject({
+      method: "GET",
+      url: "/__scache-vary",
+      headers: { "x-preview-theme": "a" },
+    });
+    const b = await server.inject({
+      method: "GET",
+      url: "/__scache-vary",
+      headers: { "x-preview-theme": "b" },
+    });
+    const aAgain = await server.inject({
+      method: "GET",
+      url: "/__scache-vary",
+      headers: { "x-preview-theme": "a" },
+    });
+
+    expect(a.headers["x-warlock-cache"]).toBe("miss");
+    expect(b.headers["x-warlock-cache"]).toBe("miss");
+    expect(aAgain.headers["x-warlock-cache"]).toBe("hit");
+    expect(renderPageRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it("a function-form tags receives the request's shared payload, so entries can be tagged by theme", async () => {
+    renderPageRequest.mockImplementation(async () => ({
+      ...renderedHtml(),
+      bundle: { shared: { theme: "alpha" } },
+    }));
+
+    await server.inject({ method: "GET", url: "/__scache-shared-tags" });
+    const hit = await server.inject({ method: "GET", url: "/__scache-shared-tags" });
+    expect(hit.headers["x-warlock-cache"]).toBe("hit");
+
+    await invalidatePageCache(["theme:alpha"]);
+
+    const missAgain = await server.inject({ method: "GET", url: "/__scache-shared-tags" });
+    expect(missAgain.headers["x-warlock-cache"]).toBe("miss");
+  });
+
+  // ── The stored document is the one the visitor received ──────────────────
+  it("stores the streamed document, not the synchronous escalation pass (which renders Suspense fallbacks)", async () => {
+    renderPageRequest.mockImplementation(async () => ({
+      ...renderedHtml({ html: "<html><body><p>loading theme</p></body></html>" }),
+      pipeableStream: {
+        pipe<T extends NodeJS.WritableStream>(destination: T): T {
+          destination.write("<html><body><section>alpha theme</section></body></html>");
+          destination.end();
+          return destination;
+        },
+        abort() {},
+      },
+    }));
+
+    const miss = await server.inject({ method: "GET", url: "/__scache-streamed" });
+    expect(miss.headers["x-warlock-cache"]).toBe("miss");
+    expect(miss.body).toContain("alpha theme");
+
+    const hit = await server.inject({ method: "GET", url: "/__scache-streamed" });
+    expect(hit.headers["x-warlock-cache"]).toBe("hit");
+    expect(hit.body).toBe(miss.body);
+    expect(hit.body).not.toContain("loading theme");
+  });
+
+  // ── Per-entry byte ceiling (`pageCache.maxEntryBytes`) ───────────────────
+  // The cache write for a store-eligible document happens AFTER the tee'd
+  // live response has fully drained (`create-page-route-handler.ts`'s
+  // `pendingPageCacheWrite`) — `server.inject()` itself resolves the moment
+  // the underlying (mocked) HTTP response ends, which is a tick earlier than
+  // that trailing write. A microtask/timer flush closes that gap, the same
+  // way `defer-streaming.spec.ts`/`crawler-mode.spec.ts` already do for
+  // their own post-response async work.
+  async function flushPendingCacheWrite(): Promise<void> {
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+
+  // A streamed document, built out of many small chunks so the ceiling is
+  // genuinely crossed mid-stream rather than in one write.
+  function oversizedPipeableStream(totalBytes: number, chunkSize = 65_536) {
+    return {
+      pipe<T extends NodeJS.WritableStream>(destination: T): T {
+        let written = 0;
+
+        while (written < totalBytes) {
+          const size = Math.min(chunkSize, totalBytes - written);
+          destination.write("a".repeat(size));
+          written += size;
+        }
+
+        destination.end();
+        return destination;
+      },
+      abort() {},
+    };
+  }
+
+  it("an oversized document on a MISS is served in full, never cached, with one entry_too_large observation", async () => {
+    const bytes = DEFAULT_PAGE_CACHE_MAX_ENTRY_BYTES + 1024;
+    renderPageRequest.mockImplementation(async () => ({
+      ...renderedHtml(),
+      pipeableStream: oversizedPipeableStream(bytes),
+    }));
+
+    const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    try {
+      const miss = await server.inject({ method: "GET", url: "/__scache-entry-limit" });
+      expect(miss.headers["x-warlock-cache"]).toBe("miss");
+      expect(Buffer.byteLength(miss.body)).toBe(bytes);
+      await flushPendingCacheWrite();
+
+      const observations = warned.mock.calls.filter(
+        (args) => (args[1] as { reason?: string } | undefined)?.reason === "entry_too_large",
+      );
+      expect(observations).toHaveLength(1);
+      expect(observations[0]![1]).toEqual({
+        reason: "entry_too_large",
+        bytes,
+        limit: DEFAULT_PAGE_CACHE_MAX_ENTRY_BYTES,
+      });
+
+      renderPageRequest.mockImplementation(async () => renderedHtml());
+      const again = await server.inject({ method: "GET", url: "/__scache-entry-limit" });
+      expect(again.headers["x-warlock-cache"]).toBe("miss");
+      expect(renderPageRequest).toHaveBeenCalledTimes(2);
+    } finally {
+      warned.mockRestore();
+    }
+  });
+
+  it("a document under the ceiling is cached exactly as before", async () => {
+    const bytes = DEFAULT_PAGE_CACHE_MAX_ENTRY_BYTES - 1024;
+    renderPageRequest.mockImplementation(async () => ({
+      ...renderedHtml(),
+      pipeableStream: oversizedPipeableStream(bytes),
+    }));
+
+    const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    try {
+      const miss = await server.inject({ method: "GET", url: "/__scache-entry-limit" });
+      expect(miss.headers["x-warlock-cache"]).toBe("miss");
+      expect(Buffer.byteLength(miss.body)).toBe(bytes);
+      await flushPendingCacheWrite();
+
+      const hit = await server.inject({ method: "GET", url: "/__scache-entry-limit" });
+      expect(hit.headers["x-warlock-cache"]).toBe("hit");
+      expect(hit.body).toBe(miss.body);
+      expect(renderPageRequest).toHaveBeenCalledTimes(1);
+      expect(
+        warned.mock.calls.some(
+          (args) => (args[1] as { reason?: string } | undefined)?.reason === "entry_too_large",
+        ),
+      ).toBe(false);
+    } finally {
+      warned.mockRestore();
+    }
+  });
+
+  it("an explicitly non-cacheable response over the ceiling is untouched: served in full, no observation", async () => {
+    const bytes = DEFAULT_PAGE_CACHE_MAX_ENTRY_BYTES + 1024;
+    renderPageRequest.mockImplementation(async () =>
+      renderedHtml({
+        html: "a".repeat(bytes),
+        cookies: [{ name: "session", value: "abc", options: { raw: true } }],
+      }),
+    );
+
+    const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    try {
+      const response = await server.inject({ method: "GET", url: "/__scache-cookie" });
+      expect(Buffer.byteLength(response.body)).toBe(bytes);
+      expect(response.headers["set-cookie"]).toBeDefined();
+      expect(
+        warned.mock.calls.some(
+          (args) => (args[1] as { reason?: string } | undefined)?.reason === "entry_too_large",
+        ),
+      ).toBe(false);
+      expect(fakeCacheStore.size).toBe(0);
+    } finally {
+      warned.mockRestore();
+    }
+  });
+
+  it("an explicitly non-cacheable streamed page is never tapped: no buffering, no observation", async () => {
+    const bytes = DEFAULT_PAGE_CACHE_MAX_ENTRY_BYTES + 1024;
+    renderPageRequest.mockImplementation(async () => ({
+      ...renderedHtml({ cookies: [{ name: "session", value: "abc", options: { raw: true } }] }),
+      pipeableStream: oversizedPipeableStream(bytes),
+    }));
+
+    const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const tapped = vi.spyOn(pageCacheEntryLimit, "tapPipeableStreamForPageCacheLimit");
+
+    try {
+      const response = await server.inject({ method: "GET", url: "/__scache-cookie" });
+      expect(Buffer.byteLength(response.body)).toBe(bytes);
+      await flushPendingCacheWrite();
+
+      // Store-time eligibility (`isStoreEligible`) is checked BEFORE the
+      // ceiling is ever consulted, so a page the eligibility check already
+      // refused must never be wrapped for byte-counting — the live response
+      // above is the ORIGINAL stream, not a tapped copy.
+      expect(tapped).not.toHaveBeenCalled();
+      expect(
+        warned.mock.calls.some(
+          (args) => (args[1] as { reason?: string } | undefined)?.reason === "entry_too_large",
+        ),
+      ).toBe(false);
+      expect(fakeCacheStore.size).toBe(0);
+    } finally {
+      warned.mockRestore();
+      tapped.mockRestore();
+    }
+  });
+
+  it("concurrent oversized misses each serve in full and neither is cached", async () => {
+    const bytes = DEFAULT_PAGE_CACHE_MAX_ENTRY_BYTES + 1024;
+    renderPageRequest.mockImplementation(async () => ({
+      ...renderedHtml(),
+      pipeableStream: oversizedPipeableStream(bytes),
+    }));
+
+    const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    try {
+      const [first, second, third] = await Promise.all([
+        server.inject({ method: "GET", url: "/__scache-entry-limit" }),
+        server.inject({ method: "GET", url: "/__scache-entry-limit" }),
+        server.inject({ method: "GET", url: "/__scache-entry-limit" }),
+      ]);
+
+      expect(first.headers["x-warlock-cache"]).toBe("miss");
+      expect(second.headers["x-warlock-cache"]).toBe("miss");
+      expect(third.headers["x-warlock-cache"]).toBe("miss");
+      expect(Buffer.byteLength(first.body)).toBe(bytes);
+      expect(Buffer.byteLength(second.body)).toBe(bytes);
+      expect(Buffer.byteLength(third.body)).toBe(bytes);
+      expect(renderPageRequest).toHaveBeenCalledTimes(3);
+      await flushPendingCacheWrite();
+      expect(fakeCacheStore.size).toBe(0);
+
+      // Each concurrent MISS taps and reports its own oversized copy — one
+      // `entry_too_large` observation per response, never deduplicated down
+      // to one per key.
+      const observations = warned.mock.calls.filter(
+        (args) => (args[1] as { reason?: string } | undefined)?.reason === "entry_too_large",
+      );
+      expect(observations).toHaveLength(3);
+      for (const observation of observations) {
+        expect(observation[1]).toEqual({
+          reason: "entry_too_large",
+          bytes,
+          limit: DEFAULT_PAGE_CACHE_MAX_ENTRY_BYTES,
+        });
+      }
+    } finally {
+      warned.mockRestore();
+    }
+  });
+
+  it("a custom pageCache.maxEntryBytes is honoured", async () => {
+    setConfig("pageCache.maxEntryBytes", 2048);
+
+    renderPageRequest.mockImplementation(async () => ({
+      ...renderedHtml(),
+      pipeableStream: oversizedPipeableStream(4096, 512),
+    }));
+
+    const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    try {
+      const miss = await server.inject({ method: "GET", url: "/__scache-entry-limit" });
+      expect(Buffer.byteLength(miss.body)).toBe(4096);
+      await flushPendingCacheWrite();
+
+      const observations = warned.mock.calls.filter(
+        (args) => (args[1] as { reason?: string } | undefined)?.reason === "entry_too_large",
+      );
+      expect(observations).toHaveLength(1);
+      expect(observations[0]![1]).toEqual({ reason: "entry_too_large", bytes: 4096, limit: 2048 });
+    } finally {
+      warned.mockRestore();
+    }
+  });
+
+  it("rejects an invalid pageCache.maxEntryBytes at config read", () => {
+    for (const invalid of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, "1mb"]) {
+      setConfig("pageCache.maxEntryBytes", invalid as never);
+      expect(() => resolvePageCacheMaxEntryBytes()).toThrow(InvalidPageCacheMaxEntryBytesError);
+    }
+  });
+
+  // ── A cache failure must never be silent ──────────────────────────────────
+  it("logs a cache failure server-side, with the error name and message, then renders the page uncached (200)", async () => {
+    class CacheDriverNotInitializedError extends Error {
+      public constructor() {
+        super("Cache driver is not initialized");
+        this.name = "CacheDriverNotInitializedError";
+      }
+    }
+
+    const originalGet = fakeCache.get;
+    const logged = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    resetPageCacheFailureThrottle();
+    fakeCache.get = async () => {
+      throw new CacheDriverNotInitializedError();
+    };
+
+    try {
+      const response = await server.inject({ method: "GET", url: "/__scache-driver-down" });
+
+      // A cache-backend failure is a miss (W1 B3): the page renders.
+      expect(response.statusCode).toBe(200);
+      expect(renderPageRequest).toHaveBeenCalled();
+
+      const report = logged.mock.calls.find(
+        (args) => typeof args[0] === "string" && args[0].startsWith("[warlock:web] page-cache lookup failed"),
+      );
+
+      expect(report).toBeDefined();
+      expect(
+        report!.some(
+          (arg) =>
+            arg instanceof Error &&
+            arg.name === "CacheDriverNotInitializedError" &&
+            arg.message === "Cache driver is not initialized",
+        ),
+      ).toBe(true);
+    } finally {
+      fakeCache.get = originalGet;
+      logged.mockRestore();
+    }
+  });
+
+  // ── Missing @warlock.js/cache dependency ─────────────────────────────────
+  it("fails loudly, naming @warlock.js/cache, when the module cannot be loaded", async () => {
+    vi.doMock("@warlock.js/cache", () => {
+      throw new Error("Cannot find module '@warlock.js/cache'");
+    });
+    resetPageCacheDriverStateForTests();
+
+    // Re-import a fresh copy of the driver module so it picks up the
+    // rejecting mock above instead of the memoized module-level promise from
+    // this file's top-level `vi.mock`.
+    vi.resetModules();
+    const { loadPageCacheDriver } = await import("./page-cache-driver");
+
+    await expect(loadPageCacheDriver()).rejects.toThrow(/@warlock\.js\/cache/);
+
+    vi.doUnmock("@warlock.js/cache");
+    vi.resetModules();
+  });
+});

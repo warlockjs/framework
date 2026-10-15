@@ -1,0 +1,103 @@
+import { build } from "esbuild";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Regression guard for the Gate A blocker this file's header comment
+ * documents in `../index.ts` (`invalidatePageCache` moved to the
+ * server-only subpath `@warlock.js/web/page-cache`): the MAIN entry's import
+ * graph must never be able to reach `@warlock.js/cache` (a server-only
+ * `@warlock.js/*` package — `warlock: { environment: "server" }`), because
+ * this entry is imported by client code (e.g. `root.tsx`).
+ *
+ * Uses esbuild directly rather than Gate A's Vite plugin: this is a
+ * standalone check of the SOURCE GRAPH, independent of whether a consuming
+ * app's Vite config even wires Gate A up correctly. Every bare package
+ * specifier is marked external so the bundle only needs to resolve THIS
+ * package's own local files — no node_modules build is required to answer
+ * "does the graph reach page-cache-driver.ts".
+ */
+describe("main entry (index.ts) client-boundary regression", () => {
+  /**
+   * Explicit timeout, measured rather than guessed. Both cases run a REAL
+   * esbuild bundle of the package entry, which does not fit the default 5s on
+   * a loaded machine — and when it overran, the case did not fail, it
+   * ABSTAINED. A boundary guard that times out has neither passed nor failed,
+   * so nothing here could be relied on either way. Same reasoning and same
+   * number as `server/server-seam.spec.ts`.
+   */
+  const BUNDLE_TIMEOUT_MS = 30_000;
+
+  it(
+    "never bundles page-cache-driver.ts, and never imports @warlock.js/cache",
+    async () => {
+      const entry = path.join(__dirname, "index.ts");
+
+      const result = await build({
+        entryPoints: [entry],
+        bundle: true,
+        write: false,
+        metafile: true,
+        platform: "browser",
+        format: "esm",
+        logLevel: "silent",
+        packages: "external", // every bare specifier ("react", "@warlock.js/*", ...) stays external
+        outfile: path.join(__dirname, "__out__.js"), // virtual — write: false means nothing lands on disk
+      });
+
+      const inputPaths = Object.keys(result.metafile.inputs).map((p) => path.resolve(p));
+      const pageCacheDriverInputs = inputPaths.filter((p) =>
+        p.replace(/\\/g, "/").endsWith("src/server/page-cache-driver.ts"),
+      );
+      expect(pageCacheDriverInputs).toEqual([]);
+
+      const externalImports = new Set<string>();
+      for (const input of Object.values(result.metafile.inputs)) {
+        for (const imp of input.imports) {
+          if (imp.external) externalImports.add(imp.path);
+        }
+      }
+      expect(externalImports.has("@warlock.js/cache")).toBe(false);
+    },
+    BUNDLE_TIMEOUT_MS,
+  );
+
+  /**
+   * The same defect shape, one release later. `listRoutablePages` was added to
+   * the root barrel in 5.15.0; it reaches `src/build/discover-pages.ts`, which
+   * walks the filesystem and imports page files by path. Every page writing
+   * `import … from "@warlock.js/web"` inherited that module, and a generated
+   * app answered 500 on EVERY route in dev. Nothing caught it until the
+   * generator matrix booted a real app — so this is the check that would have.
+   *
+   * The build surface lives on `@warlock.js/web/build` instead.
+   */
+  it(
+    "never bundles src/build/** — the build surface is its own subpath",
+    async () => {
+      const entry = path.join(__dirname, "index.ts");
+
+      const result = await build({
+        entryPoints: [entry],
+        bundle: true,
+        write: false,
+        metafile: true,
+        platform: "browser",
+        format: "esm",
+        logLevel: "silent",
+        packages: "external",
+        outfile: path.join(__dirname, "__out__.js"),
+      });
+
+      const buildInputs = Object.keys(result.metafile.inputs)
+        .map((inputPath) => path.resolve(inputPath).split(path.sep).join("/"))
+        .filter((inputPath) => inputPath.includes("/web/src/build/"));
+
+      expect(buildInputs).toEqual([]);
+    },
+    BUNDLE_TIMEOUT_MS,
+  );
+});

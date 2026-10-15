@@ -1,0 +1,42 @@
+/**
+ * `@warlock.js/web/sitemap` — the sitemap adapter's public surface.
+ *
+ * Deliberately NOT re-exported from the package root (`../index.ts`): its
+ * graph reaches `../build/list-routable-pages`, which imports application
+ * page files by path, exactly the reason `listRoutablePages` itself lives on
+ * `@warlock.js/web/build` rather than the root barrel. A config file
+ * (`src/config/web.ts`) or a build/ops script is the caller; neither needs
+ * anything else this barrel would otherwise drag in.
+ */
+export { generateSitemap } from "./generate-sitemap";
+export type { GenerateSitemapOptions } from "./generate-sitemap";
+export { MissingPublicUrlError } from "./errors";
+export type { SitemapResult } from "./sitemap-result-types";
+export type {
+  RegeneratePolicy,
+  SitemapLocaleConfig,
+  SitemapStorageConfig,
+  WebSitemapConfig,
+} from "./sitemap-config-types";
+export type {
+  SitemapModelLike,
+  SitemapPageEntriesDeclaration,
+  SitemapPageExport,
+  SitemapPageOptions,
+  SitemapPageUrl,
+} from "./sitemap-page-export";
+export type { RobotsConfig, RobotsGroup } from "./robots-config-types";
+
+/**
+ * Regeneration lifecycle (contract Part 6) — server-only. The application
+ * calls this on an event, a schedule, or a TTL when its own dynamic data
+ * changed. Never call it from an HTTP request handler â€” that route reads a
+ * previously published result and never triggers generation.
+ */
+export { regenerateSitemap } from "./sitemap-lifecycle";
+export type {
+  SitemapArtifacts,
+  SitemapArtifactFile,
+  SitemapFailure,
+  SitemapGenerationResult,
+} from "./sitemap-lifecycle";
