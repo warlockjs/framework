@@ -1,0 +1,88 @@
+---
+name: use-cache-tags
+description: 'Tag-based invalidation — attach tags on write, then cache.tags([...]).invalidate() drops every key bound to any of those tags. Triggers: `cache.tags`, `invalidate`, `cache.set` with `tags`; "invalidate every key tagged users", "drop everything for tenant 42", "bulk cache invalidation without knowing keys", "tag a cached value"; typical import `import { cache } from "@warlock.js/cache"`. Skip: prefix-based drop — the `use-cache-namespace` topic; HOF memoization with tags — the `use-cached-hof` topic; SWR — the `use-swr` topic; competing libs `cache-manager` tags, Next.js `revalidateTag`.'
+---
+
+# Tag-based invalidation
+
+Tags let you invalidate by a label rather than by enumerating every key. Use them when the set of keys to invalidate is not known ahead of time.
+
+## Attach tags on write
+
+```ts
+// Inline — terser when you know the tags up front
+await cache.set("user:1:profile", profile, { tags: ["users", "tenant-42"] });
+await cache.set("user:1:prefs",   prefs,   { tags: ["users", "tenant-42"] });
+
+// Fluent — useful when you already have a tagged handle
+const users = cache.tags(["users"]);
+await users.set("user:1", user);
+await users.set("user:2", otherUser);
+```
+
+## Invalidate
+
+```ts
+// Drop everything tagged "users"
+await cache.tags(["users"]).invalidate();
+
+// Multi-tag — matches either tag (union)
+await cache.tags(["tenant-42"]).invalidate();
+```
+
+Multi-tag is **union** semantics: an entry is invalidated if it carries **at least one** of the listed tags.
+
+## When to reach for tags vs namespaces
+
+| Use case | Reach for |
+| --- | --- |
+| The keys share a known prefix | `cache.removeNamespace("prefix")` (the `use-cache-namespace` topic) |
+| The keys are spread across prefixes, tied by entity | Tags |
+| Both apply | Tags — more flexible; cheap on most drivers |
+
+Namespaces are cheaper (no reverse index). Tags are more powerful (any key can carry any tag).
+
+## Inline tag semantics
+
+Subsequent `set("user:1", ...)` with **no** `tags` leaves previous associations intact (the tag index still points to the key), but a `set(..., { tags: [...] })` adds to whatever index entries already exist rather than removing old tag bindings. Tag associations are additive at write-time.
+
+## Driver behavior
+
+| Driver | Tag invalidation |
+| --- | :-: |
+| `null` | noop |
+| `memory` / `memoryExtended` / `lru` | ✓ (separate index store; eviction and expiry never touch it) |
+| `file` | ✓ (serialized index) |
+| `redis` | ✓ (native SET inside the prefix) |
+| `pg` | ✓ (JSON-array merge on the index row) |
+
+The index uses driver primitives (`tagAdd` / `tagMembers` / `tagRemove`), so concurrent tagged writes never drop members. It stores un-prefixed keys, `invalidate()` deletes exactly the members it read, writes prune up to 20 dead members, and `remove()` / `pull()` detach the key. Tags are global across scopes. Across servers, use `redis` or `pg` so every server shares one index.
+
+## SWR with tags
+
+```ts
+await cache.swr(
+  `product.${id}`,
+  { freshTtl: "1m", staleTtl: "1h", tags: ["products", `tenant.${tenantId}`] },
+  () => db.products.find(id),
+);
+```
+
+Tags re-apply on every successful refresh — see the `use-swr` topic.
+
+## `cached()` HOF with tags
+
+```ts
+const getUser = cached(fn, { key: (id) => `user.${id}`, ttl: "1h", tags: ["users"] });
+const getPosts = cached(fn, { key: (u) => `posts.by.${u}`, ttl: "30m", tags: ["users", "posts"] });
+
+await cache.tags(["users"]).invalidate();   // drops both wrappers' caches
+```
+
+See the `use-cached-hof` topic.
+
+## Things NOT to do
+
+- Don't tag aggressively. A reverse index per tag is cheap but not free — pick tags that actually correspond to invalidation events.
+- Don't expect tag invalidation to fire events for each affected key. It's a bulk op; the event bus emits one `flushed` or per-key `removed` per driver implementation. Test by reading back, not by counting events.
+- Don't use tags as a query mechanism. Tags drop keys; they don't list them. If you need "give me every user", store an index list separately.

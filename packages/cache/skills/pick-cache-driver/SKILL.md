@@ -1,0 +1,129 @@
+---
+name: pick-cache-driver
+description: 'Pick a cache driver — null / memory / memoryExtended / lru / file / redis / pg / mock — and configure it. Triggers: `cache.setCacheConfigurations`, `BaseCacheDriver`, `cache.use`, `cache.load`, `cache.driver`, `globalPrefix`; "which cache driver should I use", "configure redis driver", "register custom cache driver", "multi-tenant scoping"; typical import `import { cache, BaseCacheDriver } from "@warlock.js/cache"`. Skip: cache CRUD — the `cache-basics` topic; pg setup — the `configure-pg-cache` topic; competing libs `lru-cache`, `node-cache`, `keyv`, `ioredis`; native `Map`.'
+---
+
+# Cache drivers — pick the right one
+
+Seven production drivers + a mock driver ship in-box. Pick by durability, scope, and workload.
+
+| Driver | Process scope | Persists on restart | Good for | Avoid when |
+| --- | --- | --- | --- | --- |
+| `null` | — | — | Disabling cache in tests; feature-flagging off | You actually want caching |
+| `memory` | Single process | No | Hot in-process data with default TTL; smallest latency | Multi-process / multi-node |
+| `memoryExtended` | Single process | No | Sliding-window TTL (TTL resets on every read) | Any multi-process deploy |
+| `lru` | Single process | No | Bounded in-memory caches (capacity-based eviction) | Need cross-process sharing |
+| `file` | Single host | Yes | Build artefacts, local dev persistence across restarts | Concurrency (no locks); multi-host |
+| `redis` | Shared | Yes (Redis-managed) | Anything shared across processes / nodes | Single-process-only workload — overkill |
+| `pg` | Shared | Yes (Postgres-managed) | You already run Postgres; semantic caching / RAG via pgvector | High-throughput hot reads (Redis is faster) |
+
+## Capability matrix
+
+| Capability | null | memory | memoryExt | lru | file | redis | pg |
+| --- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| `set` / `get` / `remove` / `flush` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| TTL (number or string; numeric strings = seconds) | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Sliding TTL on read | — | — | ✓ | — | — | — | — |
+| `removeNamespace` | noop | ✓ | ✓ | ✓ (prefix-scan) | ✓ | ✓ | ✓ (LIKE prefix) |
+| `onConflict: "create"` / `"update"` | noop | emulated | emulated | emulated | emulated | native `NX`/`XX` | native (INSERT ON CONFLICT) |
+| `increment` / `decrement` / `pull` | — | one process | one process | one process | one process | **cross-server** | **cross-server** |
+| `update()` / `merge()` | ✓ | one process | one process | one process | ✗ throws | **cross-server** (compare-and-set) | **cross-server** (compare-and-set) |
+| List sub-API | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (O(n) JSON blob today; native LPUSH/LRANGE in v2.1) | ✓ |
+| Tagged invalidation | noop | ✓ | ✓ | ✓ | ✓ (serialized index) | ✓ (native SET) | ✓ (JSON-array merge) |
+| `similar()` / `set({ vector })` | returns `[]` / noop | ✓ brute force | ✓ brute force | ✓ brute force | ✗ throws | ✗ throws (Phase 2 backlog) | ✓ (with `vector` config — pgvector) |
+
+## Multi-server: use redis or pg
+
+Memory, memoryExtended, lru and file caches are **per-process** (file: per host). With more than one server, use `redis` or `pg` for counters, throttles, one-time tokens (`pull`), shared `update`, `lock()` and tag invalidation; on memory each server counts and invalidates alone. `remember()`/`swr()`/`cached()` stampede protection is per process even on redis. Redis Cluster is unsupported.
+
+Driver storage notes: `memory` stores flat keys (`get("users")` after `set("users.1")` is a miss) and `maxSize` counts entries in LRU order; redis `flush()` without a `globalPrefix` runs `FLUSHDB` (whole database), so set a prefix.
+
+## Global config TTL — accepts number or string
+
+```ts
+options: {
+  redis:  { url: "...", ttl: "7d" },   // string OK
+  memory: { ttl: 3600 },                // number OK
+  lru:    { capacity: 10_000 },         // LRU has no TTL option today
+  file:   { directory: () => "/var/cache/myapp", ttl: "1h" },
+  pg:     { client: pool, ttl: "1h" },                           // KV-only
+  // pg with pgvector:
+  // pg:  { client: pool, vector: { dimensions: 1536, index: "hnsw" } },
+}
+```
+
+## Global prefix (multi-tenant scoping)
+
+Every driver accepts `globalPrefix: string | (() => string)`. The function form runs per call — pair it with request-local async context to scope every cached key to the current tenant / user / client automatically:
+
+```ts
+options: {
+  redis: {
+    url: "...",
+    globalPrefix: () => `tenant-${currentContext.tenantId}`,
+  },
+}
+```
+
+## Key & namespace safety (file / redis)
+
+Cache keys can carry untrusted input (e.g. a `cached()` auto-key derived from a request param), so every built-in driver treats a key as data, never as a path or a query fragment:
+
+- **`file`** — a key/namespace maps to exactly one on-disk directory component: `%`, `/`, and `\` are percent-encoded before the path is built, so `../../etc` becomes an inert directory name instead of a traversal. The resolved path is also asserted to stay inside the configured cache root (throws `CacheError` otherwise) — a second, encoding-independent check. `removeNamespace` clears both the namespace's own directory and every dotted child (`ns`, `ns.*`), honoring `globalPrefix`.
+- **`redis`** — `removeNamespace` escapes glob metacharacters (`*`, `?`, `[`, `\`) in the namespace before building its match pattern, and walks matches with a `SCAN` cursor (`scanIterator`) instead of the blocking `KEYS` command, so clearing a namespace on a large keyspace doesn't stall the event loop for other tenants.
+- **Errors that echo a connection string** (Redis `connect()` failures, any driver's failed op) are logged through a `safeErrorInfo()` helper that redacts `scheme://user:pass@` credentials to `scheme://[REDACTED]@` and never prints the raw `Error` object — see the `handle-cache-errors` topic.
+
+## Registering a custom driver
+
+```ts
+import { BaseCacheDriver, cache } from "@warlock.js/cache";
+
+class MemcachedCacheDriver extends BaseCacheDriver<MyClient, MyOptions> {
+  public name = "memcached";
+  // … implement set / get / remove / flush / removeNamespace / connect
+}
+
+cache.setCacheConfigurations({
+  default: "memcached",
+  drivers: { memcached: MemcachedCacheDriver },
+  options: { memcached: { host: "localhost" } },
+});
+```
+
+Extending `BaseCacheDriver` gives you free: TTL parsing, key parsing, event emission, stampede-safe `remember`, deep-clone-on-read, default `update` / `merge` / `list` implementations.
+
+## Runtime driver options — `cache.use(name, options)`
+
+Some driver options can only be built at runtime (`pg`'s `client: pg.Pool`, pre-wired clients). Pass them as the second arg to `cache.use` / `cache.load` / `cache.driver` — they merge over `setCacheConfigurations({ options })` per-key, runtime wins.
+
+```ts
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+cache.setCacheConfigurations({
+  default: "pg",
+  drivers: { pg: PgCacheDriver },
+  options: { pg: { table: "cache" } },        // static
+});
+
+await cache.use("pg", { client: pool });       // runtime — skip init() in this case
+```
+
+Constraints:
+- The driver name must be registered in `setCacheConfigurations({ drivers })` — runtime options don't bypass registration.
+- Once a driver is loaded, calling `use`/`load`/`driver` again with **non-empty** new options throws `CacheConfigurationError`. Register a second driver name if you need a different config.
+- Calling without options (or with `{}`) on an already-loaded driver returns the cached instance silently.
+
+## Per-call driver override
+
+When most writes go to the default driver but one call needs a different one:
+
+```ts
+await cache.set("audit:event", event, { driver: "redis" });
+```
+
+The manager loads (and connects) the override driver lazily on first use, then routes that single operation through it without mutating `currentDriver`.
+
+## See also
+
+- The `configure-pg-cache` topic — full pg setup (KV-only and pgvector mode)
+- The `test-cache-code` topic — `MockCacheDriver` and `NullCacheDriver` for tests
