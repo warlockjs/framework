@@ -1,0 +1,11 @@
+# Keeps the pinned GitHub Actions current. npm dependencies are updated by hand:
+# the family releases in lockstep and pins versions on purpose.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

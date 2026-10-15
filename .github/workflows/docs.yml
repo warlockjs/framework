@@ -1,0 +1,89 @@
+name: Docs
+
+# Builds the Astro/Starlight site in docs/ on every change that can alter it,
+# and publishes it to GitHub Pages (warlock.js.org) from main.
+#
+# In the monorepo the build sees every package, so the changelog page is
+# regenerated from packages/*/CHANGELOG.md on each build instead of relying on
+# a copy committed from a developer machine.
+#
+# Deployment runs only when the repository variable DEPLOY_DOCS is "true", so
+# a fork, or this repository before Pages is enabled, builds without failing.
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "packages/*/CHANGELOG.md"
+      - "packages/*/llms*.txt"
+      - "packages/*/package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/docs.yml"
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "packages/*/CHANGELOG.md"
+      - "packages/*/llms*.txt"
+      - "packages/*/package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.24.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile --filter @warlock.js/docs...
+
+      - name: Changelog generator tests
+        working-directory: docs
+        run: |
+          pnpm run test:changelog
+          pnpm run test:changelog-freshness
+
+      - name: Build site
+        working-directory: docs
+        run: pnpm run build
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/dist
+
+  deploy:
+    name: Deploy
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.DEPLOY_DOCS == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

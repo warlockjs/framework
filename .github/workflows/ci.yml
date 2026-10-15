@@ -1,0 +1,156 @@
+name: CI
+
+# Typechecks and tests every package a change can affect.
+#
+# Pull requests check the packages whose files changed plus everything that
+# depends on them (scripts/ci/affected-packages.mjs). Pushes to main, the
+# nightly run and manual runs check all of them. Each package runs the same two
+# scripts the release gate runs — `typecheck` and `test` — so a green CI is the
+# same promise the release makes.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: "24"
+  PNPM_VERSION: "11.24.0"
+
+jobs:
+  plan:
+    name: Plan
+    # Nightly runs are skipped while the repository is private: on the free
+    # plan a full matrix every night would exhaust the monthly Actions minutes.
+    if: github.event_name != 'schedule' || !github.event.repository.private
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.affected.outputs.matrix }}
+      count: ${{ steps.affected.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Select packages
+        id: affected
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            node scripts/ci/affected-packages.mjs --base "$BASE_SHA"
+          else
+            node scripts/ci/affected-packages.mjs --all
+          fi
+
+  workspace:
+    name: Workspace
+    if: github.event_name != 'schedule' || !github.event.repository.private
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      # A frozen install is itself a check: it fails when a package.json and
+      # the lockfile disagree.
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # A spec no vitest `include` glob reaches passes review and never runs.
+      - name: Every spec file is reachable by its package's vitest config
+        run: node scripts/check-spec-coverage.mjs
+
+  package:
+    name: ${{ matrix.package.name }}
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    services:
+      # The queue and notifications suites need a real Redis on 6390.
+      redis:
+        image: redis:7
+        ports:
+          - 6390:6379
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      CI: "1"
+      NO_COLOR: "1"
+      QUEUE_REDIS_HOST: 127.0.0.1
+      QUEUE_REDIS_PORT: "6390"
+    defaults:
+      run:
+        working-directory: ${{ matrix.package.dir }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install
+        working-directory: .
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.typecheck ? 0 : 1)"; then
+            pnpm run typecheck
+          else
+            echo "::notice::${{ matrix.package.name }} declares no typecheck script"
+          fi
+
+      - name: Test
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.test ? 0 : 1)"; then
+            pnpm run test
+          else
+            echo "::notice::${{ matrix.package.name }} declares no test script"
+          fi
+
+  # One stable check name for branch protection, whatever the matrix held.
+  ci:
+    name: CI result
+    needs: [plan, workspace, package]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job passed or was skipped
+        run: |
+          results='${{ toJSON(needs.*.result) }}'
+          echo "$results"
+          if echo "$results" | grep -qE '"(failure|cancelled)"'; then
+            exit 1
+          fi
