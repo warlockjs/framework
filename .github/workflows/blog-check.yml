@@ -83,11 +83,19 @@ jobs:
           path: artifacts
 
       - name: Clone the blog
+        # warlockjs/blog-test is private. A read-only deploy key scoped to that one
+        # repository; it lives only in RUNNER_TEMP for the clone and is removed after.
         env:
-          GIT_CONFIG_COUNT: "1"
-          GIT_CONFIG_KEY_0: url.https://x-access-token:${{ secrets.RELEASE_GH_TOKEN }}@github.com/.insteadOf
-          GIT_CONFIG_VALUE_0: https://github.com/
-        run: git clone --quiet --branch main https://github.com/warlockjs/blog-test.git "$BLOG_DIR"
+          BLOG_TEST_DEPLOY_KEY: ${{ secrets.BLOG_TEST_DEPLOY_KEY }}
+        run: |
+          key="$RUNNER_TEMP/blog-test-key"
+          hosts="$RUNNER_TEMP/github-known-hosts"
+          printf '%s\n' "$BLOG_TEST_DEPLOY_KEY" > "$key"
+          chmod 600 "$key"
+          curl -fsSL https://api.github.com/meta | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{for(const k of JSON.parse(d).ssh_keys)console.log('github.com '+k)})" > "$hosts"
+          GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o UserKnownHostsFile=$hosts -o StrictHostKeyChecking=yes" \
+            git clone --quiet --branch main git@github.com:warlockjs/blog-test.git "$BLOG_DIR"
+          rm -f "$key"
 
       - name: Install the browser
         run: |

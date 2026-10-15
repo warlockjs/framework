@@ -31,7 +31,7 @@ monorepo".
 
 The workflows live in **`warlockjs/framework`** under `.github/workflows/`.
 Secrets live on its `release` environment: `NPM_TOKEN` (publish) and
-`RELEASE_GH_TOKEN` (read access to the private `warlockjs/blog-test` only). The
+`BLOG_TEST_DEPLOY_KEY` (a read-only deploy key on the private `warlockjs/blog-test`). The
 release commit and tag are pushed with the job's own `GITHUB_TOKEN`
 (`permissions: contents: write` on the release job). The environment has no
 required reviewer, by owner choice: a green gate authorises the publish.
@@ -43,7 +43,8 @@ required reviewer, by owner choice: a green gate authorises the publish.
   gate's release commit, so gate, publish and confirm must share one runner.
   1. Checks out this repository (full history and tags, no persisted
      credential), clones the private `warlockjs/blog-test` beside it with
-     `RELEASE_GH_TOKEN` passed per command, sets `core.fileMode false`.
+     the `BLOG_TEST_DEPLOY_KEY` deploy key over SSH (key written to
+     `RUNNER_TEMP` and removed after), sets `core.fileMode false`.
   2. Checks every member's `package.json` is at `version`, then runs
      `pnpm install --frozen-lockfile` at the root and `npm ci` in `tools/release`.
   3. Runs `astro sync` in `docs/` (the strictness ratchet needs its types).
