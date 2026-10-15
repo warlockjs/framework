@@ -1,0 +1,34 @@
+{
+  // Inherits the workspace strictness contract (`strict`,
+  // `noUncheckedIndexedAccess`, `forceConsistentCasingInFileNames`).
+  //
+  // Workspace packages are consumed as TypeScript SOURCE through the `exports`
+  // map (canon `0a3227cc`), so every consumer compiles this source under the
+  // CONSUMER's options. Adoption is only safe once this package AND its whole
+  // dependency closure are clean — a package's own `tsc -p` compiles its
+  // dependencies' source too.
+  //
+  // A package may ADD to this contract. It must never subtract.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2020",
+    // Raised from the ES2020 default because the shared source in sibling packages
+    // uses ES2022 APIs (Object.hasOwn, String.replaceAll, Array.at), and a consumer
+    // compiles that source under ITS OWN lib. DOM is listed explicitly because an
+    // UNSET lib resolves to the .full variant, which bundles DOM - so naming a lib
+    // without it would silently drop DOM types this package already relied on.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
