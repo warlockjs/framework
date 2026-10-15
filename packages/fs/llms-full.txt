@@ -142,7 +142,7 @@ Cheaper than `cmp`-byte-comparing two large files when the result is "yes/no dif
 
 ---
 name: manage-directories
-description: 'Manage directories + files — ensureDirectory (mkdir -p), list / listFiles / listDirectories, copyFile / copyDirectory, renameFile, unlink (ENOENT-safe), removeDirectory (recursive force). Triggers: `ensureDirectoryAsync`, `listAsync`, `listFilesAsync`, `listDirectoriesAsync`, `copyFileAsync`, `copyDirectoryAsync`, `renameFileAsync`, `unlinkAsync`, `removeDirectoryAsync`; "create directory recursively", "list files in folder", "delete directory recursively", "copy or rename folder", "walk a tree"; typical import `import { ensureDirectoryAsync, listFilesAsync, removeDirectoryAsync } from "@warlock.js/fs"`. Skip: file IO — the `read-and-write-files` topic; atomic writes — the `write-atomically` topic; competing libs `fs-extra`, `mkdirp`, `rimraf`, `recursive-readdir`, `glob`; native `node:fs/promises`.'
+description: 'Manage directories + files — ensureDirectory (mkdir -p), list / listFiles / listDirectories, copyFile / copyDirectory, renameFile, unlink (ENOENT-safe), removeDirectory (recursive force). Triggers: `ensureDirectoryAsync`, `listAsync`, `listFilesAsync`, `listDirectoriesAsync`, `copyFileAsync`, `copyDirectoryAsync`, `renameFileAsync`, `moveDirectoryNoReplaceAsync`, `unlinkAsync`, `removeDirectoryAsync`; "create directory recursively", "list files in folder", "delete directory recursively", "copy or rename folder", "move a directory without replacing the destination", "walk a tree"; typical import `import { ensureDirectoryAsync, listFilesAsync, removeDirectoryAsync } from "@warlock.js/fs"`. Skip: file IO — the `read-and-write-files` topic; atomic writes — the `write-atomically` topic; competing libs `fs-extra`, `mkdirp`, `rimraf`, `recursive-readdir`, `glob`; native `node:fs/promises`.'
 ---
 
 # Manage directories and files on disk
@@ -208,6 +208,20 @@ await renameFileAsync("./tmp/foo.txt", "./final/foo.txt");
 ```
 
 Works on files and directories. Cross-device renames (e.g. `/tmp` → `/var`) may fail with `EXDEV` — the OS won't move across mounts. For cross-device, copy then delete.
+
+An ordinary rename **replaces an empty destination directory**, and a check-then-rename is racy. When a directory move must never replace anything, use `moveDirectoryNoReplaceAsync` (POSIX only; also `fs.dirs.moveNoReplace`):
+
+```ts
+import { directoryIdentityAsync, moveDirectoryNoReplaceAsync, DirectoryMoveError } from "@warlock.js/fs";
+
+const identity = await directoryIdentityAsync("./features/billing");
+await moveDirectoryNoReplaceAsync("./features/billing", "./archive/billing", {
+  expectedSource: identity,
+  syncParents: true,
+});
+```
+
+It claims the destination with an exclusive `mkdir`, then renames over that empty placeholder; an occupied destination throws `DirectoryMoveError` (`reason: "destination-exists"`, `outcome: "not-moved"`). `outcome` is `not-moved` / `moved` / `uncertain`. Never copies, refuses `cross-device`, Windows (`unsupported-platform`) and a missing destination parent. Identity checks are sequential (no descriptor-relative rename in Node): a placeholder swap after its identity is recorded is refused (`placeholder-replaced`), one in the instant right after the claim or right before the rename is not; without `syncParents` the parents are not fsynced.
 
 ## Delete
 

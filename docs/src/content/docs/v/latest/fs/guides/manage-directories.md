@@ -130,6 +130,53 @@ await fs.dirs.move("staging/build", "releases/current");
 across filesystems, so `fs.dirs.move` transparently falls back to copy-then-
 delete. You don't handle `EXDEV` yourself.
 
+### Move without ever replacing the destination
+
+`fs.dirs.move` with `overwrite: false` checks the destination and then
+renames — a window in which another directory can appear, and an ordinary
+rename silently replaces an **empty** directory. When the destination must
+never be replaced (archiving a feature, publishing a release folder), use
+`moveDirectoryNoReplaceAsync` (also `fs.dirs.moveNoReplace`):
+
+```ts
+import { directoryIdentityAsync, moveDirectoryNoReplaceAsync, DirectoryMoveError } from "@warlock.js/fs";
+
+const identity = await directoryIdentityAsync("features/billing");
+
+try {
+  await moveDirectoryNoReplaceAsync("features/billing", "archive/billing-2026", {
+    expectedSource: identity, // refuse if the source was swapped
+    syncParents: true,        // fsync both parent directories after the rename
+  });
+} catch (error) {
+  if (error instanceof DirectoryMoveError && error.outcome === "not-moved") {
+    // known: the source is still in place and nothing at the destination was touched
+  }
+  throw error;
+}
+```
+
+It claims the destination name with an exclusive `mkdir` (atomic: it fails if
+anything holds the name), then renames the source over that empty placeholder.
+A destination that exists, or that someone writes into meanwhile, is refused
+with `reason: "destination-exists"`. It never falls back to copy + delete.
+
+The error's `outcome` tells you what to rely on: `not-moved` (source in place),
+`moved` (only after a failed `syncParents` — the move happened, durability is
+unknown) or `uncertain` (inspect both paths). Without `syncParents` the move is
+atomic but not crash-durable: flushing both parent directories is the caller's
+job.
+
+Limits: Node has no `renameat2(RENAME_NOREPLACE)` or descriptor-relative
+renames, so paths are resolved by name; the empty placeholder is briefly
+visible; the source and placeholder identity checks are sequential. A swap of
+the placeholder after its identity is recorded is refused
+(`placeholder-replaced`), but a process **not** using this API that swaps it
+for its own empty directory in the instant right after the claim (before the
+identity can be read) or right before the rename would still be replaced. It refuses
+on Windows (`unsupported-platform`), across filesystems (`cross-device`) and
+when the destination's parent is missing. Existing `move` behavior is unchanged.
+
 ## Measure and fingerprint
 
 ```ts

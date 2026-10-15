@@ -120,6 +120,7 @@ Move / copy / metadata:
 ```ts
 copy(from: string, to: string, options?: CopyOptions): Promise<void>
 move(from: string, to: string, options?: MoveOptions): Promise<void>  // EXDEV-safe
+moveNoReplace(from, to, options?): Promise<MoveDirectoryNoReplaceResult>  // = moveDirectoryNoReplaceAsync
 stats(path: string): Promise<FileStats>
 hash(path: string, algorithm?: HashAlgorithm): Promise<string>        // stable tree fingerprint
 ```

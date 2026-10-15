@@ -5,6 +5,7 @@ import { ensureDirectoryAsync } from "../dirs";
 import { directoryExistsAsync, pathExistsAsync } from "../exists";
 import { hashFileAsync, type HashAlgorithm } from "../hash";
 import { listAsync, listDirectoriesAsync, listFilesAsync } from "../list";
+import { moveDirectoryNoReplaceAsync } from "../move-directory";
 import { removeDirectoryAsync } from "../remove";
 import { statsAsync } from "../stats";
 import {
@@ -181,6 +182,7 @@ export const dirs = {
   exists,
   copy,
   move,
+  moveNoReplace: moveDirectoryNoReplaceAsync,
   stats,
   size,
   count,

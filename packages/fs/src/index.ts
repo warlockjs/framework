@@ -15,6 +15,7 @@ export * from "./dirs.js";
 export * from "./exists.js";
 export * from "./hash.js";
 export * from "./list.js";
+export * from "./move-directory";
 export * from "./read.js";
 export * from "./remove.js";
 export * from "./rename.js";
