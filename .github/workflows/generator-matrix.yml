@@ -72,7 +72,7 @@ jobs:
           --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
     steps:
       - name: Checkout framework@${{ inputs.sha }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.sha }}
           fetch-depth: 0
@@ -89,7 +89,7 @@ jobs:
           git checkout -B "$DEFAULT_BRANCH" "$SHA"
           git config core.fileMode false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
 
@@ -154,7 +154,7 @@ jobs:
       # re-hashes in the row jobs. Their common parent is tools/release, which
       # is where the row jobs download them back to.
       - name: Upload staged tarballs + handoff
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: generator-matrix-artifacts-${{ inputs.sha }}
           path: |
@@ -203,7 +203,7 @@ jobs:
           - 27017:27017
     steps:
       - name: Checkout framework@${{ inputs.sha }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.sha }}
           fetch-depth: 0
@@ -218,7 +218,7 @@ jobs:
           git checkout -B "$DEFAULT_BRANCH" "$SHA"
           git config core.fileMode false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
 
@@ -241,7 +241,7 @@ jobs:
         run: node node_modules/astro/bin/astro.mjs sync
 
       - name: Download staged tarballs + handoff
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: generator-matrix-artifacts-${{ inputs.sha }}
           path: tools/release
@@ -284,7 +284,7 @@ jobs:
             fs.writeFileSync('/tmp/results/result-' + process.env.ROW + '-ubuntu.json', JSON.stringify(row, null, 2));
           "
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: row-result-${{ matrix.row }}-ubuntu
@@ -297,7 +297,7 @@ jobs:
     timeout-minutes: 240
     steps:
       - name: Checkout framework@${{ inputs.sha }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.sha }}
           fetch-depth: 0
@@ -312,7 +312,7 @@ jobs:
           git checkout -B "$DEFAULT_BRANCH" "$SHA"
           git config core.fileMode false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
 
@@ -343,7 +343,7 @@ jobs:
       # bytes. The "same artifact" here is the same SOURCE SHA, not the same
       # built bytes.
       - name: Download staged tarballs + handoff (best-effort — see note above)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: generator-matrix-artifacts-${{ inputs.sha }}
           path: tools/release
@@ -380,7 +380,7 @@ jobs:
             fs.writeFileSync('/tmp/results/result-baseline-windows.json', JSON.stringify(row, null, 2));
           "
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: row-result-baseline-windows
@@ -393,18 +393,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout framework@${{ inputs.sha }} (for the verdict script)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.sha }}
           persist-credentials: false
           sparse-checkout: .github/scripts
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
 
       - name: Download every row result
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: row-result-*
           path: /tmp/results
@@ -428,7 +428,7 @@ jobs:
           NEEDS_WINDOWS_CANARY_RESULT: ${{ needs.windows-canary.result }}
         run: node .github/scripts/matrix-verdict-cli.mjs
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: generator-matrix-verdict-${{ inputs.sha }}
