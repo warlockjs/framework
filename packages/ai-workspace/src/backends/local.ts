@@ -233,8 +233,9 @@ class LocalBackend implements WorkspaceBackend {
       }
 
       const argv = tokenizeCommand(command);
+      const executable = argv?.[0];
 
-      if (argv === null) {
+      if (argv === null || executable === undefined) {
         refuse(
           "Command was not executed: it is empty, has unbalanced quotes, or " +
             "contains unquoted shell metacharacters (;, &, |, `, $, <, >, " +
@@ -245,7 +246,7 @@ class LocalBackend implements WorkspaceBackend {
         return;
       }
 
-      let file = argv[0];
+      let file = executable;
       let args = argv.slice(1);
       let windowsVerbatimArguments = false;
 

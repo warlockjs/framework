@@ -62,7 +62,7 @@ function clipUtf8(value: string, maxBytes: number): { value: string; truncated: 
 
   let cut = Math.max(0, maxBytes);
 
-  while (cut > 0 && (bytes[cut] & 0xc0) === 0x80) {
+  while (cut > 0 && ((bytes[cut] ?? 0) & 0xc0) === 0x80) {
     cut--;
   }
 
@@ -104,7 +104,7 @@ function numberWindow(
     }
 
     const room = maxBytes - used - separator - Buffer.byteLength(prefix, "utf8");
-    const clipped = room > 0 ? clipUtf8(lines[index], room).value : "";
+    const clipped = room > 0 ? clipUtf8(lines[index] ?? "", room).value : "";
 
     if (clipped.length > 0) {
       parts.push(prefix + clipped);

@@ -328,7 +328,7 @@ describe("createLocalBackend", () => {
       expect(result.stdout).toBe("ok");
       expect(result.cancelled).toBe(false);
       expect(add).toHaveBeenCalledWith("abort", expect.any(Function), { once: true });
-      expect(remove).toHaveBeenCalledWith("abort", add.mock.calls[0][1]);
+      expect(remove).toHaveBeenCalledWith("abort", add.mock.calls[0]?.[1]);
     });
   });
 });
