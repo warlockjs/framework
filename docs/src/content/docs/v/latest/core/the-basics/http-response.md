@@ -221,7 +221,7 @@ this for you through
 
 ## Streams
 
-`response.stream(contentType?)` returns a stream controller — for large dynamic payloads where buffering would blow memory, or for progressive rendering:
+`response.stream(contentType?, options?)` returns a stream controller — for large dynamic payloads where buffering would blow memory, or for progressive rendering:
 
 ```ts
 const stream = response.stream("text/plain");
@@ -234,14 +234,21 @@ stream.end();
 
 The controller's surface:
 
-| Method                        | Effect                                          |
-| ----------------------------- | ----------------------------------------------- |
-| `stream.send(data)`           | write a chunk (string / Buffer)                 |
-| `stream.render(reactElement)` | server-render a React node and write it as HTML |
-| `stream.end()`                | finish the response                             |
-| `stream.ended`                | boolean — has `end()` been called               |
+| Method                        | Effect                                                                                                           |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `stream.send(data)`           | write a chunk (string / Buffer) without waiting; ignored once the client left, throws after `end()`              |
+| `stream.write(data)`          | write a chunk and wait until the client can take more; resolves `false` once the stream ended or the client left |
+| `stream.render(reactElement)` | server-render a React node and write it as HTML                                                                  |
+| `stream.drain()`              | wait for buffered output to reach the client; resolves `false` once the stream ended or the client left          |
+| `stream.backpressured`        | boolean — is the connection holding more than it should                                                          |
+| `stream.signal`               | `AbortSignal` aborted when the client disconnects (not on `end()`)                                               |
+| `stream.onDisconnect(fn)`     | run `fn` when the client disconnects                                                                             |
+| `stream.end()`                | finish the response                                                                                              |
+| `stream.ended`                | boolean — has the stream ended (manually or via disconnect)                                                      |
 
 Once you call `stream()`, the response is "claimed" — don't call `success(...)` or any other terminal helper afterward.
+
+`stream.send()` does not wait. For a stream that can outrun its reader, loop on `await stream.write(chunk)` and stop when it resolves `false` — the same pattern as [SSE below](#long-lived-and-high-volume-streams). Written chunks are not kept: after `end()`, `response.body` holds the last `retainChunks` chunks, none by default. Keep a short tail for logging or tests with `response.stream("text/plain", { retainChunks: 20 })`.
 
 ## Server-Sent Events
 
@@ -258,15 +265,35 @@ sse.end();
 
 The controller's surface:
 
-| Method                       | Effect                                                                                          |
-| ---------------------------- | ----------------------------------------------------------------------------------------------- |
-| `sse.send(event, data, id?)` | emit an event (data JSON-stringified). `id` is optional, used by the browser's `Last-Event-ID`. |
-| `sse.comment(text)`          | write an SSE comment (invisible to the client) — useful for keep-alive pings                    |
-| `sse.onDisconnect(handler)`  | register cleanup that runs when the client disconnects (cancel jobs, unsubscribe listeners)     |
-| `sse.end()`                  | finish the stream                                                                               |
-| `sse.ended`                  | boolean — has the stream ended (manually or via disconnect)                                     |
+| Method                        | Effect                                                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `sse.send(event, data, id?)`  | emit an event (data JSON-stringified). `id` is optional, used by the browser's `Last-Event-ID`.         |
+| `sse.write(event, data, id?)` | emit an event and wait until the client can take more; resolves `false` once the client is gone         |
+| `sse.drain()`                 | wait for buffered output to reach the client; resolves `false` once the stream ended or the client left |
+| `sse.backpressured`           | boolean — the transport is holding more than its high-water mark                                        |
+| `sse.signal`                  | `AbortSignal` aborted when the client disconnects (not on `end()`) — pass it to the producer            |
+| `sse.comment(text)`           | write an SSE comment (invisible to the client) — useful for keep-alive pings                            |
+| `sse.onDisconnect(handler)`   | register cleanup that runs when the client disconnects (cancel jobs, unsubscribe listeners)             |
+| `sse.end()`                   | finish the stream                                                                                       |
+| `sse.ended`                   | boolean — has the stream ended (manually or via disconnect)                                             |
 
 Browsers consume SSE via `new EventSource(url)`. The framework already sets `text/event-stream`, `Cache-Control: no-cache`, and disables nginx buffering for you.
+
+### Long-lived and high-volume streams
+
+`sse.send()` does not wait: if the producer is faster than the client, the output piles up in memory. For a terminal, a log tail or any stream that can outrun its reader, use `await sse.write(...)` — it resolves once the client has caught up, and resolves `false` when the client is gone, so the loop stops:
+
+```ts
+const sse = response.sse();
+
+for await (const line of tail(file, { signal: sse.signal })) {
+  if (!(await sse.write("line", { line }))) break;
+}
+
+sse.end();
+```
+
+Sent events are not kept. After `end()`, `response.body` holds the last `retainEvents` events, none by default, so a stream that runs for hours uses the same memory as one that runs for seconds. Keep a short tail for logging or tests with `response.sse({ retainEvents: 20 })`.
 
 ### Real SSE example — streaming an AI reply
 

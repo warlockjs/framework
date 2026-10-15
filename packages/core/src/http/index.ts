@@ -16,6 +16,7 @@ export * from "./uploads-types";
 export * from "./uploads";
 // errors
 export * from "./errors";
+export type { HttpErrorMapper, HttpErrorMapping } from "./error-mapper";
 // middleware
 export * from "./middleware";
 export * from "./plugins";
@@ -28,6 +29,7 @@ export * from "./ready-report";
 export * from "./server-rebuilt";
 // request exports
 export * from "./request";
+export * from "./request-log-snapshot";
 // response exports
 export * from "./response";
 export * from "./xmlable";

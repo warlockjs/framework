@@ -1,8 +1,9 @@
 import { fileExistsAsync } from "@warlock.js/fs";
 import { get } from "@mongez/reinforcements";
-import { readFile, unlink, writeFile } from "node:fs/promises";
+import { unlink, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "url";
 import { rootPath } from "../utils";
+import { bundleWarlockConfig } from "./bundle-config";
 import { type WarlockConfig } from "./types";
 import { getDeprecatedConfigWarnings } from "./warn-deprecated-config";
 
@@ -19,6 +20,22 @@ export function isUnknownTsExtensionError(error: unknown): boolean {
     (error as { code?: string })?.code === "ERR_UNKNOWN_FILE_EXTENSION" ||
     /Unknown file extension "\.tsx?"/.test(String((error as Error)?.message))
   );
+}
+
+/**
+ * True when `error` is Node failing to RESOLVE an import of the config graph:
+ * an extensionless relative import (`./src/connectors/local`), a directory
+ * import, or a tsconfig `paths` alias (`app/connectors`) — all of which only a
+ * TypeScript toolchain resolves. Native type stripping (Node ≥ 22.18) loads
+ * `warlock.config.ts` itself, then fails here.
+ *
+ * Resolution fails while linking, before any module of the graph has run, so
+ * falling back to the bundled loader never executes the config twice.
+ */
+export function isUnresolvedConfigImportError(error: unknown): boolean {
+  const code = (error as { code?: string })?.code;
+
+  return code === "ERR_MODULE_NOT_FOUND" || code === "ERR_UNSUPPORTED_DIR_IMPORT";
 }
 
 /**
@@ -93,12 +110,14 @@ export class WarlockConfigManager {
       return configModule.default;
     } catch (error) {
       // `dev` registers a TS loader hook, and Node ≥ 22.18 / 23.6 strips types
-      // natively — in both cases the direct import above works. But `build` /
-      // `start` register no hook, so on an older Node the import throws
-      // ERR_UNKNOWN_FILE_EXTENSION. Transpile the config with esbuild ourselves
-      // so config loading is Node-version-independent rather than relying on an
+      // natively — in both cases the direct import above works for a
+      // self-contained config. But `build` / `start` register no hook, so on an
+      // older Node the import throws ERR_UNKNOWN_FILE_EXTENSION, and native
+      // stripping cannot resolve extensionless or tsconfig-aliased local
+      // imports. Bundle the config's local graph with esbuild ourselves so
+      // config loading is Node-version-independent rather than relying on an
       // experimental runtime feature.
-      if (isUnknownTsExtensionError(error)) {
+      if (isUnknownTsExtensionError(error) || isUnresolvedConfigImportError(error)) {
         return await this.loadViaEsbuild(configPath);
       }
 
@@ -107,28 +126,24 @@ export class WarlockConfigManager {
   }
 
   /**
-   * Fallback config loader for runtimes without native TypeScript support.
+   * Fallback config loader for runtimes that cannot import the config as written.
    *
-   * Transpiles `warlock.config.ts` with esbuild (already a core dependency),
-   * writes the result as a sibling `.mjs` — so the config's own imports (bare
-   * `@warlock.js/*` and any relative paths) resolve exactly as they would from
-   * the original location — imports it, then removes the temp file.
+   * Bundles `warlock.config.ts` with its LOCAL import graph (relative imports,
+   * extensionless TS imports, tsconfig `paths` aliases) through esbuild, keeping
+   * every package external so `BaseConnector`, the container and other
+   * registries keep the application's identity (see `bundleWarlockConfig`).
+   * The bundle is written as a sibling `.mjs` — so its external imports resolve
+   * from the project exactly as they would from the original config — imported
+   * once, then removed whether it loaded or threw. An error thrown by the
+   * user's config propagates unchanged.
    */
   private async loadViaEsbuild(configPath: string): Promise<WarlockConfig | undefined> {
-    const { transformSync } = await import("esbuild");
-    const source = await readFile(configPath, "utf8");
-
-    const { code } = transformSync(source, {
-      loader: "ts",
-      format: "esm",
-      target: `node${process.versions.node.split(".")[0]}`,
-      sourcefile: configPath,
-    });
+    const code = await bundleWarlockConfig(configPath);
 
     // Unique sibling name so concurrent processes never clobber each other.
     const compiledPath = configPath.replace(
       /warlock\.config\.ts$/,
-      `.warlock.config.${process.pid}.mjs`,
+      `.warlock.config.${process.pid}.${Date.now()}.mjs`,
     );
 
     await writeFile(compiledPath, code, "utf8");

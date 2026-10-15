@@ -1,5 +1,6 @@
 import fastifyMultipart from "@fastify/multipart";
 import config from "@mongez/config";
+import { existsSync } from "node:fs";
 import type { FastifyRequest } from "fastify";
 import { log } from "@warlock.js/logger";
 import { router } from "../router";
@@ -62,14 +63,44 @@ export async function registerHttpPlugins(server: FastifyInstance) {
     },
   );
 
-  server.register(import("@fastify/static"), {
-    root: config.get("storage.publicRoot", rootPath("public")),
-    prefix: config.get("storage.publicPrefix", "/public/"),
-  });
+  // 👇🏻 serve the public folder. Importing `@fastify/static` is not free (its
+  // directory-listing module calls `os.cpus()` at load), so it is only loaded
+  // when there is a folder to serve: `storage.publicRoot: false` turns public
+  // serving off, and a missing folder skips it (WR-027).
+  const publicRoot = resolvePublicRoot(config.get("storage.publicRoot", rootPath("public")));
+
+  if (publicRoot !== undefined) {
+    server.register(import("@fastify/static"), {
+      root: publicRoot,
+      prefix: config.get("storage.publicPrefix", "/public/"),
+    });
+  }
 
   // 👇🏻 register cookie plugin
   server.register(import("@fastify/cookie"), {
     secret: config.get("http.cookies.secret"), // Optional: allow signed cookies
     parseOptions: config.get("http.cookies.options", {}),
   });
+}
+
+/**
+ * The public folder(s) worth handing to `@fastify/static`, or `undefined`
+ * when there is nothing to serve: `false`, or a single path that does not
+ * exist. An array is passed through unchanged; `@fastify/static` validates
+ * each entry itself.
+ */
+export function resolvePublicRoot(publicRoot: unknown): string | string[] | undefined {
+  if (publicRoot === false || publicRoot === null || publicRoot === undefined) {
+    return undefined;
+  }
+
+  if (Array.isArray(publicRoot)) {
+    return publicRoot.length > 0 ? publicRoot : undefined;
+  }
+
+  if (typeof publicRoot === "string") {
+    return existsSync(publicRoot) ? publicRoot : undefined;
+  }
+
+  return publicRoot as string;
 }

@@ -20,6 +20,7 @@ import type { Middleware, Route } from "../router";
 import { validateAll } from "../validation/validateAll";
 import { CookieJarUnavailableError } from "./errors";
 import { createRequestStore } from "./middleware/inject-request-context";
+import { buildRequestLogSnapshot, type RequestLogSnapshot } from "./request-log-snapshot";
 import { Response } from "./response";
 import { buildTracingContext, deriveTraceId, dispatchPhase, isTracingEnabled } from "./tracing";
 import type {
@@ -72,6 +73,63 @@ export class Request<RequestValidation = any> {
    * Route Object
    */
   public route!: Route;
+
+  /**
+   * Backing controller for `signal` — created on first access, so requests
+   * that never ask for it attach no listeners.
+   */
+  private disconnectController?: AbortController;
+
+  /**
+   * An `AbortSignal` that aborts when the client disconnects before the
+   * response has finished. Pass it to long-running work (`fetch`, database
+   * cursors, child processes) so that work stops when nobody is waiting:
+   *
+   * ```ts
+   * const report = await buildReport({ signal: request.signal });
+   * ```
+   *
+   * It follows the RESPONSE, not the request stream: reading the request body
+   * to the end does not abort it, and a response that finishes normally never
+   * aborts it. The abort reason is a `DOMException` named `"AbortError"`.
+   * The listener is attached on first access and removed when the response
+   * closes. Combine with a deadline via
+   * `AbortSignal.any([request.signal, AbortSignal.timeout(ms)])`.
+   *
+   * A request with no bound response (a hand-built `Request` in a test) gets
+   * a signal that never aborts.
+   */
+  public get signal(): AbortSignal {
+    if (this.disconnectController) return this.disconnectController.signal;
+
+    const controller = new AbortController();
+
+    this.disconnectController = controller;
+
+    const raw = this.response?.baseResponse?.raw;
+
+    if (!raw || typeof raw.once !== "function") return controller.signal;
+
+    const abortUnlessFinished = () => {
+      if (raw.writableFinished) return;
+
+      controller.abort(
+        new DOMException("The client disconnected before the response finished", "AbortError"),
+      );
+    };
+
+    if (raw.writableFinished) return controller.signal;
+
+    if (raw.destroyed) {
+      abortUnlessFinished();
+
+      return controller.signal;
+    }
+
+    raw.once("close", abortUnlessFinished);
+
+    return controller.signal;
+  }
 
   /**
    * Parsed Request Payload
@@ -855,8 +913,35 @@ export class Request<RequestValidation = any> {
       message,
       type: level,
       context: {
-        request: this,
+        request: this.toLogSnapshot(),
       },
+    });
+  }
+
+  /**
+   * The bounded, plain-data view of this request that log entries carry:
+   * id, method, URL (credential-bearing query values masked), route, client
+   * IP, user agent, and the query and body unless `http.logging` or the
+   * route's `logging` option omits them. Never the native request, reply or
+   * socket.
+   *
+   * Use it in your own log calls instead of passing the request itself.
+   *
+   * @example
+   * log.warn("billing", "charge", "declined", { request: request.toLogSnapshot() });
+   */
+  public toLogSnapshot(): RequestLogSnapshot {
+    const baseRequest = this.baseRequest as FastifyRequest | undefined;
+
+    return buildRequestLogSnapshot({
+      id: this.id,
+      method: baseRequest?.method ?? this.route?.method ?? "",
+      url: baseRequest?.url ?? "",
+      ip: baseRequest ? this.detectIp() : undefined,
+      userAgent: baseRequest?.headers?.["user-agent"],
+      query: this.payload?.query,
+      body: this.payload?.body,
+      route: this.route,
     });
   }
 

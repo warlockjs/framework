@@ -219,7 +219,7 @@ export class ConnectorsManager {
         // Awaited deliberately: the caller (`shutdownOnProcessKill`) calls
         // `process.exit(0)` as soon as this resolves, so an un-awaited log is
         // a log that never happens.
-        await log.error("connectors", "shutdown", error as Error, { connector: connector.name });
+        log.error("connectors", "shutdown", error as Error, { connector: connector.name });
       } catch {
         // Reporting a failure must never become a worse failure than the one
         // being reported: a channel that throws synchronously rejects this call

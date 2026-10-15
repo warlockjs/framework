@@ -55,6 +55,10 @@ For urlencoded bodies: fields decode via `URLSearchParams`. A key sent more than
 
 All three content types are held to the same `http.bodyLimit` — an over-limit urlencoded body is rejected with the same `413` a JSON body would get.
 
+### Stopping work when the client disconnects
+
+`request.signal` is an `AbortSignal` that aborts when the client disconnects before the response finished (never on normal completion, never because the body finished reading). Pass it to long-running services, composed with a deadline when you need one: `AbortSignal.any([request.signal, AbortSignal.timeout(30_000)])`. Read it per request; never cache it on a shared service.
+
 ## Returning output
 
 Pick the helper that matches the outcome. Full surface in the `send-response` topic. Quick map:

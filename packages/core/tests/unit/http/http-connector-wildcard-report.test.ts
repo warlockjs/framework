@@ -35,9 +35,9 @@ async function reportForHost(host: string) {
 
   config.set("http", { port, host });
 
-  vi.spyOn(log, "info").mockImplementation(async () => log);
-  vi.spyOn(log, "success").mockImplementation(async () => log);
-  vi.spyOn(log, "warn").mockImplementation(async () => log);
+  vi.spyOn(log, "info").mockImplementation(() => log);
+  vi.spyOn(log, "success").mockImplementation(() => log);
+  vi.spyOn(log, "warn").mockImplementation(() => log);
 
   const server = startHttpServer();
 

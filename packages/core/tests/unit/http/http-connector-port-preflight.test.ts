@@ -58,9 +58,9 @@ describe("HttpConnector.start — port preflight ordering", () => {
     // free to do actual I/O (file, Sentry) which this spec has no interest in
     // waiting on — stub them out the same way the failure spec below stubs
     // `log.fatal`/`log.flush`.
-    vi.spyOn(log, "info").mockImplementation(async () => log);
-    vi.spyOn(log, "success").mockImplementation(async () => log);
-    vi.spyOn(log, "warn").mockImplementation(async () => log);
+    vi.spyOn(log, "info").mockImplementation(() => log);
+    vi.spyOn(log, "success").mockImplementation(() => log);
+    vi.spyOn(log, "warn").mockImplementation(() => log);
 
     const server = startHttpServer();
     const callOrder: string[] = [];
@@ -97,7 +97,7 @@ describe("HttpConnector.start — port preflight ordering", () => {
     });
 
     const listenSpy = vi.spyOn(server, "listen");
-    const fatalSpy = vi.spyOn(log, "fatal").mockImplementation(async () => log);
+    const fatalSpy = vi.spyOn(log, "fatal").mockImplementation(() => log);
     const flushSpy = vi.spyOn(log, "flush").mockImplementation(async () => {});
     const exitSpy = vi
       .spyOn(process, "exit")

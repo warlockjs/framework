@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.30.0
+
+### Upgrading
+
+- **BREAKING (only for a custom log channel that reads `context.request` or `context.response`):** request log entries now carry a plain `RequestLogSnapshot` instead of the `Request`/`Response` instances. Read the fields you need from the snapshot, or call `request.toLogSnapshot()` in your own log calls.
+
+### Added
+
+- **`request.signal`**: an `AbortSignal` that aborts when the client disconnects before the response finishes (not when the request body finishes reading, never on normal completion); its listener is attached on first access and removed when the response closes (WR-012).
+- **Stream backpressure**: `response.stream()`'s controller gains `write(data)` (sends, then waits until the client can take more; `false` once it is gone), `drain()`, `backpressured`, `signal` (aborted on client disconnect, not on `end()`) and `onDisconnect(fn)`, matching `response.sse()` (WR-006).
+- **SSE backpressure**: `sse.write(event, data, id?)` sends and waits until the client can take more (`false` once it is gone), plus `sse.drain()`, `sse.backpressured` and `sse.signal` (aborted on disconnect) (WR-006).
+- **`http.serverOptions` is typed** (`HttpServerOptions`), including Node's native `http` options such as `serverOptions.http.maxHeaderSize`; it was already forwarded to Fastify but the config type could not express it (WR-005).
+- **`@warlock.js/core/errors`**: a side-effect-free subpath with `HttpError` and its subclasses (`BadRequestError`, `ResourceNotFoundError`, …). A standalone helper or worker can import it without bundling Cascade, Cache or the MongoDB driver; the classes are the same ones the root exports, so `instanceof` holds across both (WR-017).
+- **`http.errorMapper`**: map errors that are not an `HttpError` to `{ status, message?, payload? }` (or an `HttpError`), so domain errors shared with non-HTTP processes need not extend Core. A mapped 5xx stays opaque unless the mapper sets a message; a mapper that throws is logged and ignored (WR-018).
+- **Per-route request logging policy**: `logging: { body?: boolean, query?: boolean }` on a route, with app-wide defaults under `http.logging` (plus `redactQueryParams`). It is applied before any log entry is built, so a schema- or middleware-rejected body never reaches a log channel (WR-003).
+- **`request.toLogSnapshot()`**, `buildRequestLogSnapshot()` and `redactUrlCredentials()`: the bounded, plain-data view of a request that log entries now carry (WR-003).
+
+### Changed
+
+- **`response.stream()` no longer keeps rendered chunks.** `response.body` after `end()` holds the last `retainChunks` chunks written by `send()`, `write()` or `render()` (`response.stream(type, { retainChunks })`, default 0); it used to hold every `render()` chunk (WR-006).
+- `response.stream()`: after the client disconnects, `send()`/`render()` are silent no-ops and `ended` is `true` (they used to write to the closed socket); `send()` after `end()` still throws.
+- **`@fastify/static` is only loaded when there is something to serve** — at least one `router.directory()`, or an existing public folder (`storage.publicRoot`, which now also accepts `false` to turn it off). Its directory-listing module calls `os.cpus()` at load, which cost a measured ~0.4–0.5 s of cold start in an app that served neither (WR-027). With no public folder, `reply.sendFile` is no longer decorated by that plugin; `response.sendFile()` is unaffected.
+- `@warlock.js/core/errors` also resolves inside the framework repository (a root `errors/index.ts` re-export, not published), so workspace packages and tests can import it by its package name (WR-017).
+- **`response.sse()` no longer keeps every sent event.** `response.body` after `end()` holds the last `retainEvents` events (`response.sse({ retainEvents })`, default 0), so long-lived streams no longer grow with their history (WR-006).
+- **BREAKING (only for a custom log channel that reads `context.request`/`context.response`):** **request log entries carry a `RequestLogSnapshot`, not the `Request`/`Response` instances** (`context.request` is `{ id, method, url, route, name, ip, userAgent, query?, body? }`; `response.log` adds `{ statusCode }`). Native request/reply graphs no longer reach log channels, and credential-bearing query values (`secret`, `token`, `apiKey`, `signature`, `code`, `X-Amz-*`, …) are masked in the logged URL (WR-003).
+
+### Fixed
+
+- Graceful shutdown no longer waits out its timeout on keep-alive connections whose request finished during the drain: in-flight responses answer `Connection: close` and connections are closed as they go idle (default `forceCloseConnections: "idle"`), so later connectors still shut down. Active responses are never cut short (WR-014).
+- `warlock.config.ts` loads when it imports local TypeScript without an extension (`./src/connectors/local`) or through a tsconfig `paths` alias, on Node without native TypeScript and with native type stripping alike. The fallback bundles the config's local graph with esbuild, keeps packages external (one `BaseConnector`/container identity), runs the config once, rethrows its own errors unchanged, keeps each inlined module's `import.meta.url`, and removes its temp file (WR-004).
+- `v.file()` rule methods (`maxSize`, `image`, `accept`, `mimeType`, …) return `this`, so the `UploadedFile` output type survives the chain; `saveTo()` is typed as a `string` output (WR-020).
+
 ## 5.29.0 - 2026-10-01
 
 ### Added

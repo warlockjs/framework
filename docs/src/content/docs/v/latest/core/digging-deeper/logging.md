@@ -260,6 +260,45 @@ log.setRedact({
 // → context.email is "ha***@example.com" in every channel
 ```
 
+## Request logs and sensitive routes
+
+Core logs each request's lifecycle (`Starting Request` / `Completed Request`, middleware, handler) with `http.log`. Those entries never carry the `Request` or `Response` objects — only a bounded, plain-data `RequestLogSnapshot` under `context.request`:
+
+```ts
+{
+  id: "f3c1…",
+  method: "POST",
+  url: "/accounts?secret=[REDACTED]&tab=keys", // credential query values masked
+  route: "/accounts",
+  name: "accounts.store",
+  ip: "203.0.113.7",
+  userAgent: "…",
+  query: { secret: "[REDACTED]", tab: "keys" }, // key redaction still applies
+  body: { … },                                   // as received, before validation
+}
+```
+
+Query values whose names are in the logger's secret-key denylist (`secret`, `token`, `apiKey`, …) or are typical URL credentials (`signature`, `sig`, `code`, `X-Amz-Signature`, `X-Amz-Credential`, `X-Amz-Security-Token`, `X-Goog-Signature`, `X-Goog-Credential`) are masked in `url`. Add your own with `http.logging.redactQueryParams`.
+
+The body is logged **as received**, so fields a schema or middleware later rejects are part of it, and an unknown field such as `providerId` is not on any key denylist. On routes that accept secrets or arbitrary user text, leave the body (and query) out entirely:
+
+```ts
+router.post("/accounts/credentials", accountsController.store, {
+  logging: { body: false, query: false },
+});
+```
+
+The policy is applied when the snapshot is built — before any entry exists — so no channel, sink or redaction setting can expose what it omits. `query: false` also drops the query string from `url`. App-wide defaults live in `src/config/http.ts`:
+
+```ts
+logging: {
+  body: false,                      // opt routes back in with logging: { body: true }
+  redactQueryParams: ["workspaceKey"],
+},
+```
+
+Log a request yourself the same way: `log.warn("billing", "charge", "declined", { request: request.toLogSnapshot() })` instead of passing `request`.
+
 ## Per-channel filtering
 
 Each channel inherits `BasicLogConfigurations`:

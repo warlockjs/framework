@@ -70,6 +70,24 @@ const httpConfigurations: HttpConfigurations = {
 export default httpConfigurations;
 ```
 
+### `serverOptions` — native Fastify/Node server options (5.30.0)
+
+`http.serverOptions` is passed to Fastify when the server is created, and its
+`http` key goes on to Node's `http.createServer()`. It is typed as
+`HttpServerOptions`. The request header limit, for example, is
+`serverOptions.http.maxHeaderSize` (Node's default is 16KB); a top-level
+`maxHeaderSize` is not a Fastify option and is ignored:
+
+```ts
+serverOptions: {
+  http: { maxHeaderSize: 32 * 1024 },
+},
+```
+
+Framework-owned settings (`trustProxy`, `bodyLimit`,
+`gracefulShutdown.forceCloseConnections`) have their own `http.*` keys;
+setting them in `serverOptions` as well overrides those keys.
+
 ### `csp` — Content-Security-Policy (5.12.0)
 
 Opt-in (`enabled: true`) `Content-Security-Policy` header, built per-request
@@ -230,6 +248,10 @@ Same shape — TS validates the union; runtime picks the `default` key.
 - `cache.silenceSingleServerWarning`, `storage.silenceSingleServerWarning`, `socket.silenceSingleServerWarning` — silence the production warnings for in-memory cache, local storage, and adapter-less sockets.
 
 `http.modelValidationErrorStatus` sets the status for a Cascade model-write validation failure (a model failing its own schema on save). It defaults to `500` with an opaque body, because request input is already validated with a `422` before the model is touched. Set a `4xx` (e.g. `422`) to treat it as a client error instead; the response then carries `{ errors }`.
+
+`http.errorMapper(error, request)` maps errors that are not an `HttpError` to `{ status, message?, payload? }` (return `undefined` to keep the default opaque `500`). A mapped 5xx keeps the opaque message unless the mapper sets one.
+
+`http.logging` controls what request log entries carry: `{ body?: boolean, query?: boolean, redactQueryParams?: string[] }` (body/query default `true`). A route's `logging` option overrides it — use `logging: { body: false, query: false }` on routes that accept secrets or arbitrary text. Entries carry `request.toLogSnapshot()`, never the `Request` object, with credential query values masked in the URL.
 
 ## Per-env knobs
 

@@ -2,6 +2,7 @@ import type { GenericObject } from "@mongez/reinforcements";
 import type { ObjectValidator } from "@warlock.js/seal";
 import type { RouteShorthandOptions } from "fastify";
 import type { Request, Response, ReturnedResponse } from "../http";
+import type { RequestLoggingOptions } from "../http/request-log-snapshot";
 import type { ResponseSchema } from "../resource/types";
 
 /**
@@ -218,6 +219,17 @@ export interface RouteOptions {
    * router.post("/oauth/callback", handler, { csrf: false });
    */
   csrf?: false;
+  /**
+   * What this route's request log entries carry of its input, overriding
+   * `http.logging`. Applied before any entry is built, so an omitted body or
+   * query never reaches a log channel.
+   *
+   * @example
+   * router.post("/accounts/credentials", controller, {
+   *   logging: { body: false, query: false },
+   * });
+   */
+  logging?: RequestLoggingOptions;
 }
 
 export type RequestMethod =

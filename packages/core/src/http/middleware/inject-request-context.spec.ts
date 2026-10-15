@@ -136,3 +136,108 @@ describe("createRequestStore error logging", () => {
     expect((onlyEntry(errorLevel(logs))[0] as Error).stack).toBeTruthy();
   });
 });
+
+describe("http.errorMapper", () => {
+  class DomainNotFound extends Error {
+    public constructor(message: string) {
+      super(message);
+      this.name = "DomainNotFound";
+    }
+  }
+
+  function withMapper(mapper: unknown) {
+    vi.spyOn(config, "get").mockImplementation(((key: string, fallback?: unknown) =>
+      key === "http.errorMapper" ? mapper : fallback) as typeof config.get);
+  }
+
+  it("answers a mapped domain error with the mapped status and its own message", async () => {
+    withMapper((error: unknown) => (error instanceof DomainNotFound ? { status: 404 } : undefined));
+
+    const { logs, response } = await run(new DomainNotFound("No such workspace"));
+
+    expect(response.setStatusCode).toHaveBeenCalledWith(404);
+    expect(response.send).toHaveBeenCalledWith(expect.objectContaining({ error: "No such workspace" }));
+    expect(warnLevel(logs)).toEqual([["DomainNotFound: No such workspace (404)", "warn"]]);
+    expect(errorLevel(logs)).toHaveLength(0);
+  });
+
+  it("sends the mapped message and payload when given", async () => {
+    withMapper(() => ({ status: 409, message: "Revision changed", payload: { revision: 3 } }));
+
+    const { response } = await run(new Error("cas failed"));
+
+    expect(response.setStatusCode).toHaveBeenCalledWith(409);
+    expect(response.send).toHaveBeenCalledWith(
+      expect.objectContaining({ error: "Revision changed", payload: { revision: 3 } }),
+    );
+  });
+
+  it("keeps a mapped 5xx opaque unless the mapper sets a message", async () => {
+    withMapper(() => ({ status: 503 }));
+
+    const { response } = await run(new Error("db pool host=10.0.0.4 exhausted"));
+
+    expect(response.setStatusCode).toHaveBeenCalledWith(503);
+    expect(response.send).toHaveBeenCalledWith(
+      expect.objectContaining({ error: "Internal server error." }),
+    );
+  });
+
+  it("accepts an HttpError returned by the mapper", async () => {
+    withMapper(() => new ConflictError("taken"));
+
+    const { response } = await run(new Error("raw"));
+
+    expect(response.setStatusCode).toHaveBeenCalledWith(409);
+  });
+
+  it("supports a duck-typed status contract written in the mapper", async () => {
+    withMapper((error: any) =>
+      typeof error?.status === "number" ? { status: error.status } : undefined,
+    );
+
+    const error = Object.assign(new Error("gone"), { status: 410 });
+    const { response } = await run(error);
+
+    expect(response.setStatusCode).toHaveBeenCalledWith(410);
+  });
+
+  it("falls back to the opaque 500 when the mapper declines", async () => {
+    withMapper(() => undefined);
+
+    const { response } = await run(new Error("unexpected"));
+
+    expect(response.serverError).toHaveBeenCalledWith({ error: "Internal server error." });
+  });
+
+  it("is not consulted for an HttpError", async () => {
+    const mapper = vi.fn(() => ({ status: 500 }));
+    withMapper(mapper);
+
+    const { response } = await run(new ResourceNotFoundError("nope"));
+
+    expect(mapper).not.toHaveBeenCalled();
+    expect(response.setStatusCode).toHaveBeenCalledWith(404);
+  });
+
+  it("logs a throwing mapper and handles the original error", async () => {
+    withMapper(() => {
+      throw new Error("mapper bug");
+    });
+
+    const { response } = await run(new Error("unexpected"));
+
+    expect(loggerError).toHaveBeenCalledWith("http", "error-mapper", expect.any(Error), {
+      requestId: "req-1",
+    });
+    expect(response.serverError).toHaveBeenCalled();
+  });
+
+  it("ignores a mapping with a non-error status", async () => {
+    withMapper(() => ({ status: 200 }));
+
+    const { response } = await run(new Error("unexpected"));
+
+    expect(response.serverError).toHaveBeenCalled();
+  });
+});

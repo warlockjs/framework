@@ -14,6 +14,7 @@ import { environment } from "../../utils";
 import { requestContext as requestContextInstance } from "../context/request-context";
 import { applyCspHeader } from "../csp";
 import { runDefaultCsrfGuard } from "../csrf-default-guard";
+import { mapRequestError } from "../error-mapper";
 import { HttpError } from "../errors";
 import { type Request } from "../request";
 import { type Response } from "../response";
@@ -113,7 +114,9 @@ export function createRequestStore(
       request.trigger("executedAction", request.route);
 
       return output as ReturnedResponse;
-    } catch (error) {
+    } catch (thrown) {
+      const error = mapRequestError(thrown, request);
+
       logRequestError(error, request);
       return handleRequestError(error, response, request);
     }

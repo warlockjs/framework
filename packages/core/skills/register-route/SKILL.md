@@ -158,6 +158,16 @@ router.prefix("/auth", () => {
 router.get(["/health", "/healthz"], healthController);
 ```
 
+### Sensitive routes: keep input out of the logs
+
+```ts
+router.post("/accounts/credentials", accountsController.store, {
+  logging: { body: false, query: false },
+});
+```
+
+Request log entries otherwise include the body as received (before validation), so rejected fields would be logged too.
+
 ## Gotchas
 
 - **Never import `routes.ts`.** The framework auto-loads it. Importing causes a double-registration error.

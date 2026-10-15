@@ -92,6 +92,8 @@ export default httpConfigurations;
 
 `forceCloseConnections`: `"idle"` (default) closes idle keep-alive connections and lets active requests finish; `true` force-closes everything immediately; `false` waits for every connection.
 
+Under `"idle"`, a request that is still running when shutdown begins answers with `Connection: close`, and its keep-alive connection is closed as soon as the response finishes, so a browser's kept-alive connection does not hold the drain open until the timeout. Responses that had already sent their headers (streams, SSE) are closed when they end. Active responses are never cut short.
+
 ## The zero-downtime deploy flow
 
 ```

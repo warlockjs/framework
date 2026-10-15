@@ -395,6 +395,8 @@ Backed by `@fastify/static`. Every file in `root` becomes reachable under `prefi
 
 The framework collects `directory(...)` calls during route registration and replays them when the router scans (so they register against Fastify at scan time, not registration time).
 
+`@fastify/static` is loaded only when it has something to serve: when at least one `directory(...)` was declared, or when the app's public folder (`storage.publicRoot`, default `public/`, served under `storage.publicPrefix`, default `/public/`) exists. An app with neither never loads it, which keeps its start-up time down (the plugin's directory-listing module calls `os.cpus()` when it loads). Set `storage.publicRoot: false` to turn the public folder off explicitly.
+
 ### `file(path, location, cacheTime?)` — single file
 
 ```ts

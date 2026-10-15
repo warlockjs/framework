@@ -1,6 +1,8 @@
 import config from "@mongez/config";
 import Fastify, { type FastifyServerOptions } from "fastify";
+import type { Server as NodeHttpServer, ServerResponse } from "node:http";
 import { normalizeRequestPath } from "../router/normalize-request-path";
+import type { HttpServerOptions } from "./types";
 
 export type FastifyInstance = ReturnType<typeof Fastify>;
 
@@ -48,15 +50,18 @@ function normalizeRequestUrl(url: string): string {
   return normalizeRequestPath(url.slice(0, queryIndex)) + url.slice(queryIndex);
 }
 
-export function startHttpServer(options?: FastifyServerOptions): FastifyInstance {
+export function startHttpServer(options?: HttpServerOptions): FastifyInstance {
   // `config.set(key, undefined)` stores null rather than unsetting, so an app
   // that clears a key is treated the same as an app that never configured it.
   const trustProxy = resolveTrustProxy(config.get("http.trustProxy", false));
 
   const bodyLimit = config.get("http.bodyLimit") ?? undefined;
   const configuredRewriteUrl = options?.rewriteUrl;
+  const forceCloseConnections =
+    options?.forceCloseConnections ??
+    config.get("http.gracefulShutdown.forceCloseConnections", "idle");
 
-  return (server = Fastify({
+  server = Fastify({
     // `X-Forwarded-For` is client-settable and spoofable, and `request.ip` is
     // what @fastify/rate-limit keys its buckets on — so trusting it by default
     // makes rate limiting bypassable on any deployment NOT behind a proxy that
@@ -74,7 +79,7 @@ export function startHttpServer(options?: FastifyServerOptions): FastifyInstance
     // Close idle keep-alive connections on shutdown while letting in-flight
     // requests finish — the basis for graceful draining. Override via
     // `http.gracefulShutdown.forceCloseConnections`.
-    forceCloseConnections: config.get("http.gracefulShutdown.forceCloseConnections", "idle"),
+    forceCloseConnections,
     ...options,
     // Fastify calls this before route matching in both production `scan()` and
     // the development wildcard dispatcher. Compose an app-supplied rewrite
@@ -87,7 +92,18 @@ export function startHttpServer(options?: FastifyServerOptions): FastifyInstance
 
       return normalizeRequestUrl(rewritten);
     },
-  }));
+  });
+
+  // `"idle"` promises that idle keep-alive connections close on shutdown. Fastify
+  // only reaps the ones idle at the moment close starts; a connection whose
+  // request finishes DURING the drain stays open and holds `close()` until
+  // the shutdown budget expires (WR-014). Track responses so the drain can
+  // retire those connections as they go idle.
+  if (forceCloseConnections === "idle") {
+    trackConnectionsForDrain(server.server as NodeHttpServer);
+  }
+
+  return server;
 }
 
 /**
@@ -101,12 +117,107 @@ export function getHttpServer(): FastifyInstance {
  * Minimal shape needed to close a server — lets {@link closeServerWithTimeout}
  * be unit-tested with a fake instead of a real Fastify instance.
  */
-export type ClosableServer = { close: () => Promise<unknown> };
+export type ClosableServer = {
+  close: () => Promise<unknown>;
+  /** The underlying Node server, when there is one (a Fastify instance's `.server`). */
+  server?: unknown;
+};
+
+/**
+ * Per-server drain state: the responses currently in flight, and whether a
+ * graceful shutdown has begun.
+ */
+type DrainState = {
+  inFlight: Set<ServerResponse>;
+  draining: boolean;
+};
+
+const drainStates = new WeakMap<object, DrainState>();
+
+/**
+ * Mark a response so its connection closes once it is sent. Only possible
+ * before the headers go out; a response that already streams its headers is
+ * retired by {@link reapIdleConnections} after it finishes instead.
+ */
+function retireAfterResponse(response: ServerResponse): void {
+  if (response.headersSent || response.writableEnded) return;
+
+  response.setHeader("Connection", "close");
+}
+
+function reapIdleConnections(rawServer: NodeHttpServer): void {
+  if (typeof rawServer.closeIdleConnections === "function") {
+    rawServer.closeIdleConnections();
+  }
+}
+
+/**
+ * Track in-flight responses on a Node HTTP server so a graceful drain can
+ * close keep-alive connections that become idle AFTER `close()` started.
+ *
+ * Node's `server.close()` (and Fastify's `forceCloseConnections: "idle"`)
+ * closes only the connections idle at that moment. A request in flight when
+ * shutdown begins finishes its response, the client keeps the connection
+ * alive, and `close()` waits on it until the shutdown budget runs out. Active
+ * responses are never cut short: each one is told to close its connection
+ * when it is done (`Connection: close`), and every connection is reaped as
+ * soon as its response has finished.
+ */
+export function trackConnectionsForDrain(rawServer: NodeHttpServer): void {
+  if (!rawServer || typeof rawServer.on !== "function" || drainStates.has(rawServer)) return;
+
+  const state: DrainState = { inFlight: new Set(), draining: false };
+
+  drainStates.set(rawServer, state);
+
+  rawServer.on("request", (_request, response: ServerResponse) => {
+    state.inFlight.add(response);
+
+    if (state.draining) retireAfterResponse(response);
+
+    response.once("close", () => {
+      state.inFlight.delete(response);
+
+      // The socket becomes idle once Node finishes handling this response,
+      // which happens after the response's own `close` event.
+      if (state.draining) setImmediate(() => reapIdleConnections(rawServer));
+    });
+  });
+}
+
+/**
+ * Begin a graceful drain on a server tracked by {@link trackConnectionsForDrain}:
+ * every in-flight response closes its connection when it is done, and idle
+ * keep-alive connections are closed now and whenever another one goes idle.
+ * A server that is not tracked is left alone.
+ *
+ * @returns Whether the server was tracked (and is now draining).
+ */
+export function beginHttpDrain(rawServer: unknown): boolean {
+  if (!rawServer || typeof rawServer !== "object") return false;
+
+  const state = drainStates.get(rawServer);
+
+  if (!state) return false;
+
+  state.draining = true;
+
+  for (const response of state.inFlight) {
+    retireAfterResponse(response);
+  }
+
+  reapIdleConnections(rawServer as NodeHttpServer);
+
+  return true;
+}
 
 /**
  * Close a server, bounded by a timeout. Fastify's `close()` stops accepting new
  * requests (it answers 503 while closing) and drains the in-flight ones; this
- * wraps it so a single stuck request can't hang shutdown forever.
+ * wraps it so a single stuck request can't hang shutdown forever. When the
+ * server's connections are tracked (the default `"idle"` mode), keep-alive
+ * connections that go idle during the drain are closed too, so a finished
+ * request does not hold the shutdown open.
  *
  * @returns `true` if the server drained cleanly, `false` if the timeout fired first.
  */
@@ -115,6 +226,8 @@ export async function closeServerWithTimeout(
   timeoutMs: number,
 ): Promise<boolean> {
   let timer: ReturnType<typeof setTimeout> | undefined;
+
+  beginHttpDrain(server.server);
 
   const drained = server.close().then(() => true);
 

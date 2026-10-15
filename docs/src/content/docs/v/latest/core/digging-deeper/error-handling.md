@@ -40,7 +40,7 @@ No `try/catch` in the controller, no manual `response.notFound(...)`. The status
 
 ## The error classes
 
-All HTTP errors live in `@warlock.js/core`. The base is `HttpError`; the eight subclasses are thin wrappers that pre-fill the status code so you don't pass it yourself.
+All HTTP errors live in `@warlock.js/core` (and, on their own, in [`@warlock.js/core/errors`](#importing-the-errors-without-the-framework)). The base is `HttpError`; the eight subclasses are thin wrappers that pre-fill the status code so you don't pass it yourself.
 
 ```ts
 export class HttpError extends Error {
@@ -122,10 +122,13 @@ its cause is gone.
 
 ```mermaid
 flowchart TD
-  A["Handler / service / use-case throws"] --> B{"instanceof HttpError?"}
+  A["Handler / service / use-case throws"] --> M{"instanceof HttpError?"}
+  M -- "no" --> N["http.errorMapper (if configured)<br/>may turn it into an HttpError"]
+  M -- "yes" --> C
+  N --> B{"instanceof HttpError?"}
   B -- "yes" --> C["status = error.status<br/>body = { error: message }<br/>+ payload (if any)<br/>+ stack (dev only)"]
-  B -- "no (e.g. DatabaseWriterValidationError)" --> D["mapped to 400 badRequest"]
-  B -- "no, unknown error" --> E["console.log(error)<br/>400 badRequest with error.message"]
+  B -- "no, DatabaseWriterValidationError" --> D["http.modelValidationErrorStatus<br/>(default 500)"]
+  B -- "no, unknown error" --> E["logged with its stack<br/>500 { error: 'Internal server error.' }"]
   C --> F["JSON response sent"]
   D --> F
   E --> F
@@ -154,7 +157,50 @@ So a `ResourceNotFoundError("Order not found", { orderId })` produces:
 
 The payload lands under a `payload` key, not spread at the top level. In `development` the response also carries a `stack` field; in production it's omitted.
 
-**Unknown errors are mapped, not leaked as 500.** If you throw something that isn't an `HttpError` — a plain `Error`, a `TypeError` — the pipeline logs it (`console.log(error)`) and responds `400` with `{ error: error.message }`. It does **not** become a generic `500`. If you want a true server error with a `500` status, throw `ServerError` explicitly. One framework exception is wired in: `DatabaseWriterValidationError` from `@warlock.js/cascade` is mapped to `400` with an `errors` array.
+**Unknown errors are an opaque 500.** If you throw something that isn't an `HttpError` — a plain `Error`, a `TypeError` — and no [error mapper](#mapping-your-own-errors-httperrormapper) claims it, the pipeline logs it with its stack and responds `500` with `{ error: "Internal server error." }`. Its message never reaches the client. One framework exception is wired in: `DatabaseWriterValidationError` from `@warlock.js/cascade` answers with `http.modelValidationErrorStatus` (default `500`); a 4xx status there sends its `errors` array.
+
+A thrown error that resolves to a 4xx is logged once at `warn` (`Name: message (status)`, no stack); 5xx and unknown errors are logged at `error` with the stack.
+
+## Mapping your own errors: `http.errorMapper`
+
+Domain errors often have to exist outside an HTTP process too — in a worker, a CLI, a standalone helper — where extending Core's `HttpError` would drag the framework in. Give them a status at the HTTP edge instead, with `http.errorMapper` in `src/config/http.ts`:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+import { RevisionConflict, WorkspaceNotFound } from "app/workspaces/errors";
+
+const httpConfigurations: HttpConfigurations = {
+  errorMapper(error) {
+    if (error instanceof WorkspaceNotFound) return { status: 404 };
+    if (error instanceof RevisionConflict) {
+      return { status: 409, message: "Revision changed", payload: { revision: error.current } };
+    }
+
+    // a duck-typed contract, if your errors carry their own status
+    if (error instanceof Error && typeof (error as { status?: unknown }).status === "number") {
+      return { status: (error as { status: number }).status };
+    }
+  },
+};
+
+export default httpConfigurations;
+```
+
+- The mapper runs only for errors that are **not** already an `HttpError`, and only when middleware or a handler throws.
+- Return `{ status, message?, payload? }` (or an `HttpError`) to answer with it; return `undefined` to keep the default handling.
+- `message` defaults to the error's own message for a **4xx** and to `"Internal server error."` for a **5xx**, so mapping a server fault never echoes an internal message. Set `message` explicitly to override.
+- A status outside 400–599 is ignored. A mapper that throws is logged (`http` / `error-mapper`) and the original error is handled as if no mapper were configured.
+- The mapped error keeps the original's name and stack in the request log, so `WorkspaceNotFound: … (404)` shows up at `warn`.
+
+## Importing the errors without the framework
+
+`@warlock.js/core/errors` exports `HttpError`, its subclasses and `CookieJarUnavailableError` — and nothing else. The root `@warlock.js/core` entry boots the application runtime (Cascade, Cache, the MongoDB driver, the HTTP layer); this subpath imports none of it, so a small standalone program can throw `BadRequestError` and still bundle on its own:
+
+```ts
+import { BadRequestError } from "@warlock.js/core/errors";
+```
+
+They are the same classes the root exports, so `instanceof HttpError` holds whichever entry an error was created from.
 
 ## The validation-failure envelope
 
@@ -299,7 +345,7 @@ The `response` object ships matching helpers for the common statuses — `respon
 ## Gotchas
 
 - **The base-class check wins.** `handleRequestError` checks `instanceof HttpError` first, and every subclass extends it — so all framework errors render through that single branch (`{ error, payload?, stack? }` at `error.status`). The per-subclass branches further down only matter for non-`HttpError` types like `DatabaseWriterValidationError`. Don't expect a `ForbiddenError`'s payload to be spread at the top level; it lands under `payload`.
-- **Unknown throws become `400`, not `500`.** A plain `Error` or `TypeError` is logged and mapped to `400 badRequest` with its message. If you mean "server error," throw `ServerError` — only then do you get a `500`.
+- **Unknown throws become an opaque `500`.** A plain `Error` or `TypeError` is logged and answered `500` with `"Internal server error."`. Throw an `HttpError` subclass, or map the error with `http.errorMapper`, when the client should see a 4xx.
 - **Stack traces are environment-gated.** The `stack` field is included only when the environment is `development`. Don't rely on it in production responses, and don't put secrets in error messages assuming they'll be hidden.
 - **`UnAuthorizedError` has an odd capital `A`.** The class is `UnAuthorizedError`, not `UnauthorizedError`. The import will fail silently as a typo if you guess the conventional spelling.
 - **Two validation paths, two shapes.** Route schema validation returns the flat `failedSchema` envelope (`{ errors: [{ input, error }] }`, configurable). Use-case schema validation throws `BadSchemaUseCaseError`, whose detail rides in `payload.errors`. Both are `400`; the body differs.

@@ -265,6 +265,22 @@ The `header(name)` lookup is case-insensitive — pass `"X-Foo"` or `"x-foo"` in
 
 There's also `request.authorization` (the raw `Authorization` header), `request.authorizationValue` (the value after `Bearer ` or `Key `), and `request.accessToken` (just the bearer token portion, or `undefined` for non-bearer auth).
 
+## Cancellation on disconnect
+
+`request.signal` is an `AbortSignal` that aborts when the client disconnects before the response has finished. Hand it to long-running work so it stops when nobody is waiting for the answer:
+
+```ts
+export const exportReport: RequestHandler = async (request, response) => {
+  // Stop on disconnect, or after 30 seconds, whichever comes first.
+  const signal = AbortSignal.any([request.signal, AbortSignal.timeout(30_000)]);
+  const report = await reportService.build(request.input("range"), { signal });
+
+  return response.success({ report });
+};
+```
+
+It follows the response, not the request stream: reading the request body to the end does not abort it, and a response that finishes normally never aborts it. The abort reason is a `DOMException` named `"AbortError"`. The listener is attached the first time you read `request.signal` and is removed when the response closes, so requests that never ask for it pay nothing. Take the signal per request; do not keep it on a service that outlives the request.
+
 ## Identity
 
 Helpers for "who is this request":

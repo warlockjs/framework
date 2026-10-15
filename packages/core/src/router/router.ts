@@ -1,5 +1,5 @@
 import proxy, { type FastifyHttpProxyOptions } from "@fastify/http-proxy";
-import fastifyStatic, { type FastifyStaticOptions } from "@fastify/static";
+import type { FastifyStaticOptions } from "@fastify/static";
 import { ltrim, merge, toCamelCase, trim } from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
 import { log } from "@warlock.js/logger";
@@ -7,6 +7,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { container } from "../container";
 import { buildCorsOptions } from "../http/build-cors-options";
 import { Request } from "../http/request";
+import { redactUrlCredentials } from "../http/request-log-snapshot";
 import { Response } from "../http/response";
 import { type FastifyInstance } from "../http/server";
 import { buildTracingContext, dispatchPhase, isTracingEnabled } from "../http/tracing";
@@ -256,6 +257,25 @@ export class Router {
     this.staticDirectories.push(options);
 
     return this;
+  }
+
+  /**
+   * Register every `directory()` with `@fastify/static`. The plugin is
+   * imported only when at least one directory was declared: loading it is not
+   * free (its directory-listing module calls `os.cpus()` at load), and an app
+   * that serves no static folder should not pay for it (WR-027).
+   */
+  protected registerStaticDirectories(server: FastifyInstance) {
+    if (this.staticDirectories.length === 0) return;
+
+    const fastifyStatic = import("@fastify/static");
+
+    for (const directoryOptions of this.staticDirectories) {
+      server.register(fastifyStatic, {
+        ...directoryOptions,
+        decorateReply: false,
+      });
+    }
   }
 
   /**
@@ -977,12 +997,7 @@ export class Router {
       );
     });
 
-    for (const directoryOptions of this.staticDirectories) {
-      server.register(fastifyStatic, {
-        ...directoryOptions,
-        decorateReply: false,
-      });
-    }
+    this.registerStaticDirectories(server);
 
     this.eventListeners.afterScanning?.forEach((callback) => callback(this, server));
   }
@@ -1093,7 +1108,7 @@ export class Router {
       } catch (error) {
         log.error("router", "dev-dispatch", error as Error, {
           method: fastifyRequest.method,
-          url: fastifyRequest.url,
+          url: redactUrlCredentials(fastifyRequest.url),
         });
 
         throw error;
@@ -1121,13 +1136,7 @@ export class Router {
       });
     }
 
-    // Register static directories
-    for (const directoryOptions of this.staticDirectories) {
-      server.register(fastifyStatic, {
-        ...directoryOptions,
-        decorateReply: false,
-      });
-    }
+    this.registerStaticDirectories(server);
 
     this.eventListeners.afterScanning?.forEach((callback) => callback(this, server));
   }
@@ -1214,7 +1223,10 @@ export class Router {
           module: "route",
           action: describeRouteForLog(route.method, route.path),
           requestId: request.id,
-          context: { request, response },
+          // A bounded snapshot, built once with the route's logging policy
+          // applied — never the Request/Response instances, whose native
+          // request, reply and URL graphs would reach every log channel.
+          context: { request: request.toLogSnapshot() },
           request,
           // Read after the run: the status is decided during the request.
           statusCode: () => fastifyResponse.statusCode,

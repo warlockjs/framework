@@ -1,9 +1,13 @@
 import type { CookieSerializeOptions } from "@fastify/cookie";
 import type { FastifyCorsOptions } from "@fastify/cors";
+import type { FastifyHttpOptions } from "fastify";
+import type { Server as NodeHttpServer } from "node:http";
 import type React from "react";
 import type { Middleware } from "../router";
 import type { HttpRateLimitConfig } from "./build-rate-limit-options";
 import type { CspConfig } from "./csp";
+import type { HttpErrorMapper } from "./error-mapper";
+import type { HttpLoggingConfig } from "./request-log-snapshot";
 import type { Response } from "./response";
 import type { HttpTracingConfig } from "./tracing/tracing.type";
 
@@ -182,9 +186,39 @@ export interface PartialMiddleware {
 }
 
 /**
+ * Options for the underlying Fastify server, passed through by
+ * `http.serverOptions`. Includes `http`, the options Node's
+ * `http.createServer()` receives (for example `maxHeaderSize`).
+ *
+ * Framework-owned settings (`trustProxy`, `bodyLimit`,
+ * `gracefulShutdown.forceCloseConnections`) have their own `http.*` keys;
+ * setting them here as well overrides those keys.
+ */
+export type HttpServerOptions = FastifyHttpOptions<NodeHttpServer>;
+
+/**
  * Http Configurations list
  */
 export interface HttpConfigurations {
+  /**
+   * Options for the underlying Fastify server, applied when it is created.
+   *
+   * Node's own HTTP server options go under `http`. The request header size
+   * limit, for example, is `serverOptions.http.maxHeaderSize` (Node's default
+   * is 16KB); a top-level `maxHeaderSize` is not a Fastify option and is
+   * ignored.
+   *
+   * @example
+   * ```ts
+   * const httpConfigurations: HttpConfigurations = {
+   *   serverOptions: {
+   *     http: { maxHeaderSize: 32 * 1024 },
+   *     keepAliveTimeout: 10_000,
+   *   },
+   * };
+   * ```
+   */
+  serverOptions?: HttpServerOptions;
   /**
    * Status used when a Cascade model fails validation during a database write.
    * The default is 500 because request input has already been validated before
@@ -195,6 +229,13 @@ export interface HttpConfigurations {
    */
   modelValidationErrorStatus?: number;
   /**
+   * Map errors that are not an `HttpError` to an HTTP status (and optional
+   * message/payload), so domain errors shared with non-HTTP processes need not
+   * extend Core's error classes. Return `undefined` to keep the default
+   * handling. See {@link HttpErrorMapper}.
+   */
+  errorMapper?: HttpErrorMapper;
+  /**
    * Server port
    */
   port?: number;
@@ -202,6 +243,13 @@ export interface HttpConfigurations {
    * Log requests
    */
   log?: boolean;
+  /**
+   * What request log entries carry of each request's input. Entries carry a
+   * bounded `RequestLogSnapshot`, never the `Request`/`Response`
+   * instances; credential-bearing query values are masked in its URL.
+   * A route's own `logging` option overrides these defaults.
+   */
+  logging?: HttpLoggingConfig;
   /**
    * Cors configurations
    */
@@ -442,33 +490,113 @@ export interface HttpConfigurations {
   tracing?: HttpTracingConfig;
 }
 
+/**
+ * Options for `response.stream()`.
+ */
+export type ResponseStreamOptions = {
+  /**
+   * How many of the most recent chunks (from `send()`, `write()` and
+   * `render()`) to keep on `response.body` after `end()`, for logging and
+   * debugging. Written chunks are otherwise not kept, so a long-lived stream
+   * does not grow with its own history.
+   *
+   * @default 0
+   */
+  retainChunks?: number;
+};
+
 export type ResponseStreamController = {
   /**
-   * Send data to the client
+   * Send data to the client. Does not wait for the client; for long-lived or
+   * high-volume streams use `write()` (or `drain()`) so the producer slows
+   * down to the client's pace instead of buffering. A silent no-op after the
+   * client disconnected; throws after `end()`.
    */
-  send: (data: string) => void;
+  send: (data: string | Uint8Array) => void;
+  /**
+   * Send data and wait until the transport can take more. Resolves `true`
+   * when it can, `false` when the stream ended or the client disconnected —
+   * stop producing then.
+   */
+  write: (data: string | Uint8Array) => Promise<boolean>;
   /**
    * Render a view and send it to the client
    */
   render: (view: React.ReactNode) => void;
   /**
+   * Wait until output buffered for the client has been flushed. Resolves
+   * `true` immediately when nothing is backed up, `false` when the stream
+   * ended or the client disconnected.
+   */
+  drain: () => Promise<boolean>;
+  /**
    * End the stream
    */
   end: () => void;
   /**
-   * Detect whether stream is ended
+   * Register a handler to be called when the client disconnects
+   */
+  onDisconnect: (handler: () => void) => ResponseStreamController;
+  /**
+   * Aborted when the client disconnects (not when `end()` is called). Pass it
+   * to the work feeding the stream.
+   */
+  signal: AbortSignal;
+  /**
+   * Whether the transport is currently holding more than its high-water mark.
+   */
+  backpressured: boolean;
+  /**
+   * Detect whether stream is ended (by `end()` or a client disconnect)
    */
   ended: boolean;
 };
 
+/**
+ * Options for `response.sse()`.
+ */
+export type ResponseSSEOptions = {
+  /**
+   * How many of the most recent events to keep on `response.body` after
+   * `end()`, for logging and debugging. Sent events are otherwise not kept,
+   * so a long-lived stream does not grow with its own history.
+   *
+   * @default 0
+   */
+  retainEvents?: number;
+};
+
 export type ResponseSSEController = {
   /**
-   * Send an SSE event to the client
+   * Send an SSE event to the client. Does not wait for the client; for
+   * long-lived or high-volume streams use `write()` (or `drain()`) so the
+   * producer slows down to the client's pace instead of buffering.
    * @param event - Event name
    * @param data - Event data (will be JSON stringified)
    * @param id - Optional event ID for client-side Last-Event-ID tracking
    */
   send: (event: string, data: any, id?: string) => ResponseSSEController;
+  /**
+   * Send an SSE event and wait until the transport can take more.
+   * Resolves `true` when it can, `false` when the stream ended or the client
+   * disconnected — stop producing then.
+   */
+  write: (event: string, data: any, id?: string) => Promise<boolean>;
+  /**
+   * Wait until output buffered for the client has been flushed. Resolves
+   * `true` immediately when nothing is backed up, `false` when the stream
+   * ended or the client disconnected.
+   */
+  drain: () => Promise<boolean>;
+  /**
+   * Aborted when the client disconnects (not when `end()` is called). Pass it
+   * to the work feeding the stream.
+   */
+  signal: AbortSignal;
+  /**
+   * Whether the transport is currently holding more than its high-water mark.
+   */
+  backpressured: boolean;
   /**
    * Send a comment to keep the connection alive (invisible to client)
    */

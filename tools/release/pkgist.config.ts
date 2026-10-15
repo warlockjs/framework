@@ -285,6 +285,12 @@ export default defineConfig({
             // build entries and `exports` entries to remain importable at all.
             "tests/index.ts",
             "vite/index.ts",
+            // `@warlock.js/core/errors` (5.30): the HTTP error classes alone, so a
+            // standalone helper can throw `BadRequestError` without bundling the
+            // application runtime (Cascade, Cache, MongoDB) the root barrel loads.
+            // Shared with `index.ts` through a common chunk, so `instanceof` holds
+            // across both entries.
+            "errors/index.ts",
             // The build-time route registration collector runs in an isolated
             // Node child. It is a separate entry because the parent resolves
             // the compiled child by a runtime path rather than importing it.

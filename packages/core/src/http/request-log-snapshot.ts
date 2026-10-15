@@ -1,0 +1,230 @@
+import config from "@mongez/config";
+import { DEFAULT_REDACT_KEY_SET, normalizeRedactKey } from "@warlock.js/logger";
+import { UploadedFile } from "./uploaded-file";
+
+/**
+ * What a request's log entries carry of its input. Set globally under
+ * `http.logging` and per route with the route's `logging` option; the route
+ * wins key by key.
+ *
+ * @example
+ * // never log the body or the query string of this route, not even redacted
+ * router.post("/accounts/credentials", controller, {
+ *   logging: { body: false, query: false },
+ * });
+ */
+export type RequestLoggingOptions = {
+  /**
+   * Include the request body in log entries.
+   *
+   * The body is logged as RECEIVED, before validation, so fields the schema
+   * later rejects are part of it. Turn it off on routes that accept secrets
+   * or arbitrary user text.
+   *
+   * @default true
+   */
+  body?: boolean;
+  /**
+   * Include the parsed query string in log entries. The logged URL keeps its
+   * path either way; with `query: false` its query string is dropped too.
+   *
+   * @default true
+   */
+  query?: boolean;
+};
+
+/**
+ * `http.logging`: the app-wide defaults for {@link RequestLoggingOptions},
+ * plus query parameter names whose values are masked in logged URLs.
+ */
+export type HttpLoggingConfig = RequestLoggingOptions & {
+  /**
+   * Extra query parameter names to mask in logged URLs, on top of the
+   * logger's default secret-key denylist and {@link URL_CREDENTIAL_PARAMS}.
+   * Matched like the logger's keys: case, `-` and `_` are ignored.
+   */
+  redactQueryParams?: string[];
+};
+
+/**
+ * The bounded, plain-data view of a request that Core puts in log entries in
+ * place of the `Request`/`Response` instances, whose native request, reply
+ * and socket graphs reach every sink otherwise.
+ */
+export type RequestLogSnapshot = {
+  id: string;
+  method: string;
+  /** Path and query string, with credential-bearing parameter values masked. */
+  url: string;
+  /** The matched route pattern, e.g. `/users/:id`. */
+  route?: string;
+  /** The route name, when it has one. */
+  name?: string;
+  ip?: string;
+  userAgent?: string;
+  query?: Record<string, unknown>;
+  body?: Record<string, unknown>;
+};
+
+/**
+ * Query parameters that carry a credential in a URL even though their names
+ * are too generic for the logger's key denylist: signed-URL signatures,
+ * pre-signed cloud credentials and OAuth authorization codes.
+ */
+export const URL_CREDENTIAL_PARAMS: readonly string[] = [
+  "signature",
+  "sig",
+  "code",
+  "x-amz-signature",
+  "x-amz-credential",
+  "x-amz-security-token",
+  "x-goog-signature",
+  "x-goog-credential",
+];
+
+const URL_CREDENTIAL_PARAM_SET: ReadonlySet<string> = new Set(
+  URL_CREDENTIAL_PARAMS.map(normalizeRedactKey),
+);
+
+const REDACTED = "[REDACTED]";
+
+/**
+ * Mask the values of credential-bearing query parameters in a URL (absolute,
+ * or a path with a query string). A parameter is credential-bearing when its
+ * normalized name is in the logger's default secret-key denylist (`secret`,
+ * `token`, `apiKey`, …), in {@link URL_CREDENTIAL_PARAMS}, or in `extraParams`.
+ *
+ * The path and the other parameters are kept as written.
+ *
+ * @example
+ * redactUrlCredentials("/hooks?secret=abc&page=2") // "/hooks?secret=[REDACTED]&page=2"
+ */
+export function redactUrlCredentials(url: string, extraParams: readonly string[] = []): string {
+  const queryStart = url.indexOf("?");
+
+  if (queryStart === -1) return url;
+
+  const hashStart = url.indexOf("#", queryStart);
+  const queryEnd = hashStart === -1 ? url.length : hashStart;
+  const extra = new Set(extraParams.map(normalizeRedactKey));
+
+  const query = url
+    .slice(queryStart + 1, queryEnd)
+    .split("&")
+    .map((pair) => {
+      const separator = pair.indexOf("=");
+      const rawName = separator === -1 ? pair : pair.slice(0, separator);
+
+      let name = rawName;
+
+      try {
+        name = decodeURIComponent(rawName.replace(/\+/g, " "));
+      } catch {
+        // A malformed escape is logged under its raw name.
+      }
+
+      const key = normalizeRedactKey(name);
+
+      if (
+        separator !== -1 &&
+        (DEFAULT_REDACT_KEY_SET.has(key) || URL_CREDENTIAL_PARAM_SET.has(key) || extra.has(key))
+      ) {
+        return `${rawName}=${REDACTED}`;
+      }
+
+      return pair;
+    })
+    .join("&");
+
+  // A fragment never reaches the server, but a URL handed in by app code may
+  // carry one; it is dropped rather than risk logging a token in it.
+  return `${url.slice(0, queryStart)}?${query}`;
+}
+
+/**
+ * The effective logging options for a request: `http.logging` overlaid by the
+ * route's own `logging` option.
+ */
+export function resolveRequestLoggingOptions(
+  routeOptions: RequestLoggingOptions | undefined,
+): Required<RequestLoggingOptions> & { redactQueryParams: string[] } {
+  const global = (config.get("http.logging") ?? {}) as HttpLoggingConfig;
+
+  return {
+    body: routeOptions?.body ?? global.body ?? true,
+    query: routeOptions?.query ?? global.query ?? true,
+    redactQueryParams: global.redactQueryParams ?? [],
+  };
+}
+
+/**
+ * The fields of a request the snapshot reads. Structural, so the snapshot can
+ * be built (and tested) without a live Fastify request.
+ */
+export type RequestLogSource = {
+  id: string;
+  method: string;
+  url: string;
+  ip?: string;
+  userAgent?: string;
+  query?: Record<string, unknown>;
+  body?: Record<string, unknown>;
+  route?: { path?: string; name?: string; logging?: RequestLoggingOptions };
+};
+
+/**
+ * Build the {@link RequestLogSnapshot} for a request, applying the route's
+ * logging policy BEFORE anything reaches a log entry: an omitted body or
+ * query is never copied, so no sink, channel or redaction setting can expose it.
+ *
+ * Uploaded files are summarised (`{ file, mimeType }`) rather than walked.
+ */
+export function buildRequestLogSnapshot(source: RequestLogSource): RequestLogSnapshot {
+  const options = resolveRequestLoggingOptions(source.route?.logging);
+  const url = options.query ? source.url : stripQuery(source.url);
+
+  const snapshot: RequestLogSnapshot = {
+    id: source.id,
+    method: source.method,
+    url: redactUrlCredentials(url ?? "", options.redactQueryParams),
+  };
+
+  if (source.route?.path) snapshot.route = source.route.path;
+  if (source.route?.name) snapshot.name = source.route.name;
+  if (source.ip) snapshot.ip = source.ip;
+  if (source.userAgent) snapshot.userAgent = source.userAgent;
+
+  if (options.query && source.query && Object.keys(source.query).length > 0) {
+    snapshot.query = { ...source.query };
+  }
+
+  if (options.body && source.body && Object.keys(source.body).length > 0) {
+    snapshot.body = summariseFiles(source.body);
+  }
+
+  return snapshot;
+}
+
+function stripQuery(url: string | undefined): string | undefined {
+  if (!url) return url;
+
+  const queryStart = url.indexOf("?");
+
+  return queryStart === -1 ? url : url.slice(0, queryStart);
+}
+
+function summariseFiles(body: Record<string, unknown>): Record<string, unknown> {
+  const output: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(body)) {
+    output[key] = Array.isArray(value) ? value.map(summariseFile) : summariseFile(value);
+  }
+
+  return output;
+}
+
+function summariseFile(value: unknown): unknown {
+  if (!(value instanceof UploadedFile)) return value;
+
+  return { file: value.name, mimeType: value.mimeType };
+}

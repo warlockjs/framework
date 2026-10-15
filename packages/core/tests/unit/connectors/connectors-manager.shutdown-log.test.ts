@@ -65,13 +65,17 @@ describe("ConnectorsManager — shutdown error reaches its channel", () => {
   it("has written the shutdown error before shutdown() resolves", async () => {
     let written = false;
 
-    vi.spyOn(log, "error").mockImplementation(async () => {
-      await afterIo();
-      written = true;
+    // Log calls are synchronous since 5.30; an async channel's write is only
+    // guaranteed once `flush()` settles, so "written" means error + flush.
+    let errored = false;
+
+    vi.spyOn(log, "error").mockImplementation(() => {
+      errored = true;
       return log;
     });
     vi.spyOn(log, "flush").mockImplementation(async () => {
       await afterIo();
+      written = errored;
     });
 
     const manager = new ConnectorsManager();
@@ -88,7 +92,7 @@ describe("ConnectorsManager — shutdown error reaches its channel", () => {
   it("drains the logger before shutdown() resolves", async () => {
     let drained = false;
 
-    vi.spyOn(log, "error").mockImplementation(async () => log);
+    vi.spyOn(log, "error").mockImplementation(() => log);
     vi.spyOn(log, "flush").mockImplementation(async () => {
       await afterIo();
       drained = true;
@@ -100,9 +104,9 @@ describe("ConnectorsManager — shutdown error reaches its channel", () => {
 
     await manager.shutdown();
 
-    // Awaiting `log.error()` is not sufficient on its own: `Logger.log()` does
-    // not await `channel.log()`, so a buffered or async channel still loses the
-    // entry unless the manager drains it explicitly.
+    // `log.error()` returns before an async channel has written, so a buffered
+    // or async channel still loses the entry unless the manager drains it
+    // explicitly.
     expect(drained).toBe(true);
   });
 });

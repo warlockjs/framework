@@ -1038,6 +1038,24 @@ const httpConfigurations: HttpConfigurations = {
 export default httpConfigurations;
 ```
 
+### `serverOptions` — native Fastify/Node server options (5.30.0)
+
+`http.serverOptions` is passed to Fastify when the server is created, and its
+`http` key goes on to Node's `http.createServer()`. It is typed as
+`HttpServerOptions`. The request header limit, for example, is
+`serverOptions.http.maxHeaderSize` (Node's default is 16KB); a top-level
+`maxHeaderSize` is not a Fastify option and is ignored:
+
+```ts
+serverOptions: {
+  http: { maxHeaderSize: 32 * 1024 },
+},
+```
+
+Framework-owned settings (`trustProxy`, `bodyLimit`,
+`gracefulShutdown.forceCloseConnections`) have their own `http.*` keys;
+setting them in `serverOptions` as well overrides those keys.
+
 ### `csp` — Content-Security-Policy (5.12.0)
 
 Opt-in (`enabled: true`) `Content-Security-Policy` header, built per-request
@@ -1199,6 +1217,10 @@ Same shape — TS validates the union; runtime picks the `default` key.
 
 `http.modelValidationErrorStatus` sets the status for a Cascade model-write validation failure (a model failing its own schema on save). It defaults to `500` with an opaque body, because request input is already validated with a `422` before the model is touched. Set a `4xx` (e.g. `422`) to treat it as a client error instead; the response then carries `{ errors }`.
 
+`http.errorMapper(error, request)` maps errors that are not an `HttpError` to `{ status, message?, payload? }` (return `undefined` to keep the default opaque `500`). A mapped 5xx keeps the opaque message unless the mapper sets one.
+
+`http.logging` controls what request log entries carry: `{ body?: boolean, query?: boolean, redactQueryParams?: string[] }` (body/query default `true`). A route's `logging` option overrides it — use `logging: { body: false, query: false }` on routes that accept secrets or arbitrary text. Entries carry `request.toLogSnapshot()`, never the `Request` object, with credential query values masked in the URL.
+
 ## Per-env knobs
 
 For one-off switches gated on environment, the canonical pattern is `Application.isProduction` (also `isDevelopment`, `isTest`):
@@ -1334,6 +1356,10 @@ Prefer `request.validated()` once a schema is attached — it's typed.
 For urlencoded bodies: fields decode via `URLSearchParams`. A key sent more than once (`tag=a&tag=b`) becomes an array (`request.input("tag")` → `["a", "b"]`); every other key is a plain string. Bracket-notation keys (`a[b]=1`) are **not** expanded by the urlencoded parser itself — nesting only happens through the same shared bracket-key logic every body type already goes through, so it behaves exactly like a JSON or query-string key of that shape, no differently than today.
 
 All three content types are held to the same `http.bodyLimit` — an over-limit urlencoded body is rejected with the same `413` a JSON body would get.
+
+### Stopping work when the client disconnects
+
+`request.signal` is an `AbortSignal` that aborts when the client disconnects before the response finished (never on normal completion, never because the body finished reading). Pass it to long-running services, composed with a deadline when you need one: `AbortSignal.any([request.signal, AbortSignal.timeout(30_000)])`. Read it per request; never cache it on a shared service.
 
 ## Returning output
 
@@ -2803,6 +2829,8 @@ export default httpConfigurations;
 
 `forceCloseConnections`: `"idle"` (default) closes idle keep-alive connections and lets active requests finish; `true` force-closes everything immediately; `false` waits for every connection.
 
+Under `"idle"`, a request that is still running when shutdown begins answers with `Connection: close`, and its keep-alive connection is closed as soon as the response finishes, so a browser's kept-alive connection does not hold the drain open until the timeout. Responses that had already sent their headers (streams, SSE) are closed when they end. Active responses are never cut short.
+
 ## The zero-downtime deploy flow
 
 ```
@@ -3226,6 +3254,16 @@ router.prefix("/auth", () => {
 ```ts
 router.get(["/health", "/healthz"], healthController);
 ```
+
+### Sensitive routes: keep input out of the logs
+
+```ts
+router.post("/accounts/credentials", accountsController.store, {
+  logging: { body: false, query: false },
+});
+```
+
+Request log entries otherwise include the body as received (before validation), so rejected fields would be logged too.
 
 ## Gotchas
 
@@ -4934,7 +4972,7 @@ stream.send("second chunk\n");
 stream.end();
 ```
 
-`response.stream(contentType?)` returns a controller with `.send(chunk)`, `.render(reactNode)`, `.end()`, and an `.ended` getter. Use for large dynamic payloads where buffering would blow memory. Calling `.send()` after `.end()` throws.
+`response.stream(contentType?, { retainChunks? })` returns a controller with `.send(chunk)`, `.render(reactNode)`, `.end()`, and an `.ended` getter, plus `await .write(chunk)` / `await .drain()` (wait for a slow client; `false` once it left), `.backpressured`, `.signal` (aborted on client disconnect) and `.onDisconnect(fn)`. Use for large dynamic payloads where buffering would blow memory; loop on `await stream.write(chunk)` when the producer can outrun the client. Calling `.send()` after `.end()` throws; after a client disconnect it is a silent no-op. Written chunks are not kept on `response.body` unless `retainChunks` asks for a tail.
 
 ## Throwing HTTP errors
 
@@ -4957,6 +4995,12 @@ throw new ResourceNotFoundError("product.notFound");
 throw new ForbiddenError("permission.denied", { resource: "product", id });
 throw new ConflictError("user.duplicateEmail");
 ```
+
+A program that must not load the framework (a standalone helper, a worker
+bundle) imports the same classes from `@warlock.js/core/errors`, which pulls in
+nothing else. Domain errors that cannot extend `HttpError` get a status at the
+edge through `http.errorMapper` (`(error, request) => ({ status, message?, payload? }) | undefined`);
+anything unmapped and not an `HttpError` answers an opaque `500`.
 
 Each class takes `(message, payload?)`. The framework keeps the optional
 detail nested under `payload`:
@@ -4995,6 +5039,8 @@ sse.send("tick", { count: 2 }, "msg-2"); // third arg is the SSE event id
 sse.comment("keep-alive"); // invisible to the client, prevents timeout
 sse.end();
 ```
+
+For streams that can outrun the client (terminals, log tails, big feeds), `await sse.write(event, data)` instead of `send()`: it waits until the client has caught up and resolves `false` once the client is gone. `sse.drain()` waits without sending, `sse.backpressured` reports a backed-up transport, and `sse.signal` aborts on disconnect. Sent events are not kept on `response.body`; `response.sse({ retainEvents: n })` keeps the last `n` for logging/tests (default 0).
 
 `response.sse()` returns a controller with `send(event, data, id?)`, `comment(text)`, `end()`, `onDisconnect(handler)`, and an `.ended` getter. The `send` signature is positional — `event` name first, then the `data` payload (JSON-stringified for you), then an optional event `id`. After the client disconnects, `send`/`comment` become silent no-ops and any `onDisconnect` handlers fire — register cleanup there:
 
@@ -8699,7 +8745,7 @@ const uploadAvatarSchema = v.object({
 });
 ```
 
-Full file chain: `.image()`, `.accept(extensions)`, `.mimeType(types)`, `.pdf()`, `.excel()`, `.word()`, `.minSize(n)`, `.maxSize(n)`, `.minWidth(px)`, `.maxWidth(px)`, `.minHeight(px)`, `.maxHeight(px)`. See the `upload-file` topic for the full upload flow.
+Full file chain: `.image()`, `.accept(extensions)`, `.mimeType(types)`, `.pdf()`, `.excel()`, `.word()`, `.minSize(n)`, `.maxSize(n)`, `.minWidth(px)`, `.maxWidth(px)`, `.minHeight(px)`, `.maxHeight(px)`. Every rule returns `this`, so the field's output type stays `UploadedFile` through the chain; `.saveTo(dir)` switches it to `string` (the saved path). See the `upload-file` topic for the full upload flow.
 
 ### Optional file field
 

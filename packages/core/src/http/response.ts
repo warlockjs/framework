@@ -28,7 +28,14 @@ import type { Request } from "./request";
 import { matchesIfNoneMatch } from "./uploads/matches-if-none-match";
 import { flushPendingCookies } from "./flush-pending-cookies";
 import { streamReactResponse, type PipeableReactStream } from "./stream-react-response";
-import type { ResponseEvent, ResponseSSEController, ResponseStreamController } from "./types";
+import { createRetainedTail, createStreamTransport } from "./stream-transport";
+import type {
+  ResponseEvent,
+  ResponseSSEController,
+  ResponseSSEOptions,
+  ResponseStreamController,
+  ResponseStreamOptions,
+} from "./types";
 import type { XMLable } from "./xmlable";
 
 type CookieValue = string | number | boolean | Record<string, any> | Array<any>;
@@ -364,8 +371,8 @@ export class Response {
       message,
       type: level,
       context: {
-        request: this.request,
-        response: this,
+        request: this.request.toLogSnapshot(),
+        response: { statusCode: this.statusCode },
       },
     });
   }
@@ -639,7 +646,7 @@ export class Response {
    * Create a streaming response for progressive/chunked data sending
    *
    * This method allows you to send data in chunks and control when the response ends.
-   * Perfect for Server-Sent Events (SSE), progressive rendering, or streaming large responses.
+   * Perfect for progressive rendering or streaming large responses.
    *
    * @example
    * ```ts
@@ -649,12 +656,24 @@ export class Response {
    * stream.render(<MyComponent />);
    * stream.send("</body></html>");
    * stream.end();
+   *
+   * // Long-lived or high-volume streams: wait for the client to catch up
+   * for await (const line of output) {
+   *   if (!(await stream.write(line))) break; // client is gone
+   * }
    * ```
    *
+   * Written chunks are not kept: after `end()`, `response.body` holds only the
+   * last `retainChunks` chunks (none by default), so a stream that runs for
+   * hours costs the same memory as one that runs for seconds.
+   *
    * @param contentType - The content type for the stream (default: "text/plain")
-   * @returns Stream controller with send(), render(), and end() methods
+   * @returns Stream controller with send(), write(), render(), drain() and end() methods
    */
-  public stream(contentType = "text/plain"): ResponseStreamController {
+  public stream(
+    contentType = "text/plain",
+    options: ResponseStreamOptions = {},
+  ): ResponseStreamController {
     // Set headers using the response API
     this.setContentType(contentType);
     this.header("Transfer-Encoding", "chunked");
@@ -670,29 +689,62 @@ export class Response {
 
     this.log("Starting stream");
 
-    // Track stream state
-    let isEnded = false;
-    const chunks: any[] = [];
+    const raw = this.baseResponse.raw;
+    // Bounded: only the most recent `retainChunks` chunks, for logging/debugging.
+    const retained = createRetainedTail<any>(options.retainChunks);
+    const transport = createStreamTransport(raw, {
+      disconnectMessage: "The client disconnected from the stream",
+      onClientDisconnected: () => this.log("Stream client disconnected"),
+    });
 
     // Write headers to start the stream
     // Note: We use raw here because we need chunked encoding control
     // This is the only valid use case for bypassing Fastify's abstraction
     this.flushPendingCookies();
-    this.baseResponse.raw.writeHead(this.statusCode, this.getHeaders() as any);
+    raw.writeHead(this.statusCode, this.getHeaders() as any);
 
-    return {
+    /**
+     * `false` when nothing should be written: after a client disconnect the
+     * write is a silent no-op (the producer learns it through `signal`,
+     * `write()` or `ended`); after `end()` it is a programming error.
+     */
+    const canWrite = (action: string): boolean => {
+      if (transport.disconnected) return false;
+
+      if (transport.closed) {
+        throw new Error(`Cannot ${action}: stream has already ended`);
+      }
+
+      return true;
+    };
+
+    const writeChunk = (chunk: any): void => {
+      retained.push(chunk);
+      raw.write(chunk);
+    };
+
+    const controller: ResponseStreamController = {
       /**
-       * Send a chunk of data to the client
-       * @param data - Data to send (string, Buffer, or any serializable data)
+       * Send a chunk of data to the client. Does not wait for the client.
+       * @param data - Data to send (string or Buffer)
        */
       send: (data: any) => {
-        if (isEnded) {
-          throw new Error("Cannot send data: stream has already ended");
-        }
-
-        this.baseResponse.raw.write(data);
+        if (canWrite("send data")) writeChunk(data);
 
         return this;
+      },
+
+      /**
+       * Send a chunk and wait until the client has taken it.
+       * @returns `true` once the transport can accept more, `false` if the
+       * stream ended or the client disconnected (stop producing).
+       */
+      write: (data: any): Promise<boolean> => {
+        if (transport.closed) return Promise.resolve(false);
+
+        writeChunk(data);
+
+        return transport.waitForDrain();
       },
 
       /**
@@ -700,33 +752,32 @@ export class Response {
        * @param element - React element or component to render
        */
       render: (element: ReactNode) => {
-        if (isEnded) {
-          throw new Error("Cannot render: stream has already ended");
-        }
-
-        const html = renderReact(element);
-        chunks.push(html);
-        this.baseResponse.raw.write(html);
+        if (canWrite("render")) writeChunk(renderReact(element));
 
         return this;
       },
 
       /**
+       * Wait until buffered output has been flushed to the client.
+       */
+      drain: () => transport.waitForDrain(),
+
+      /**
        * End the stream and trigger completion events
        */
       end: () => {
-        if (isEnded) {
+        if (transport.closed) {
           return this;
         }
 
-        isEnded = true;
+        transport.finish();
 
-        // Store the streamed content for logging/debugging
-        this.currentBody = chunks;
-        this.parsedBody = chunks;
+        // Only the bounded tail is kept, for logging/debugging.
+        this.currentBody = retained.items;
+        this.parsedBody = retained.items;
 
         // End the response
-        this.baseResponse.raw.end();
+        raw.end();
 
         this.log("Stream ended");
 
@@ -750,12 +801,35 @@ export class Response {
       },
 
       /**
-       * Check if the stream has ended
+       * Register a handler to be called when the client disconnects.
+       */
+      onDisconnect: (handler: () => void) => {
+        transport.onDisconnect(handler);
+
+        return controller;
+      },
+
+      /**
+       * Aborted when the client disconnects (not when `end()` is called).
+       */
+      signal: transport.signal,
+
+      /**
+       * Whether the transport is holding more than its high-water mark.
+       */
+      get backpressured() {
+        return transport.backpressured;
+      },
+
+      /**
+       * Check if the stream has ended (either via end() or client disconnect)
        */
       get ended() {
-        return isEnded;
+        return transport.closed;
       },
     };
+
+    return controller;
   }
 
   /**
@@ -813,6 +887,11 @@ export class Response {
    * sse.send("message", { text: "Hello!" });
    * sse.send("notification", { type: "info", message: "Update available" }, "msg-123");
    *
+   * // Long-lived or high-volume streams: wait for the client to catch up
+   * for await (const line of terminalOutput) {
+   *   if (!(await sse.write("output", { line }))) break; // client is gone
+   * }
+   *
    * // Keep connection alive
    * const keepAlive = setInterval(() => sse.comment("ping"), 30000);
    *
@@ -821,9 +900,13 @@ export class Response {
    * sse.end();
    * ```
    *
-   * @returns SSE controller with send(), comment(), and end() methods
+   * Sent events are not kept: after `end()`, `response.body` holds only the
+   * last `retainEvents` events (none by default), so a stream that runs for
+   * hours costs the same memory as one that runs for seconds.
+   *
+   * @returns SSE controller with send(), write(), drain(), comment(), and end() methods
    */
-  public sse(): ResponseSSEController {
+  public sse(options: ResponseSSEOptions = {}): ResponseSSEController {
     // Set SSE-specific headers
     this.setContentType("text/event-stream");
     this.header("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -838,26 +921,34 @@ export class Response {
 
     this.log("Starting SSE stream");
 
-    // Track stream state
-    let isEnded = false;
-    const events: any[] = [];
-    const disconnectHandlers: Array<() => void> = [];
+    const raw = this.baseResponse.raw;
+
+    // Bounded: only the most recent `retainEvents` events, for logging/debugging.
+    const retained = createRetainedTail<{ event: string; data: any; id?: string }>(
+      options.retainEvents,
+    );
+    // Detects client disconnect: marks the stream ended silently, aborts
+    // `signal` and runs the `onDisconnect` handlers.
+    const transport = createStreamTransport(raw, {
+      disconnectMessage: "The client disconnected from the SSE stream",
+      onClientDisconnected: () => this.log("SSE client disconnected"),
+    });
 
     // Write headers to start the stream
     this.flushPendingCookies();
-    this.baseResponse.raw.writeHead(this.statusCode, this.getHeaders() as any);
+    raw.writeHead(this.statusCode, this.getHeaders() as any);
 
-    // Detect client disconnect â€” set isEnded silently and invoke cleanup handlers.
-    // Without this, background jobs keep writing to a dead socket after the client drops.
-    this.baseResponse.raw.on("close", () => {
-      if (!isEnded) {
-        isEnded = true;
-        this.log("SSE client disconnected");
-        for (const handler of disconnectHandlers) {
-          handler();
-        }
-      }
-    });
+    const writeMessage = (event: string, data: any, id?: string): void => {
+      let message = "";
+      if (id) message += `id: ${id}\n`;
+      message += `event: ${event}\n`;
+      message += `data: ${JSON.stringify(data)}\n\n`;
+
+      retained.push({ event, data, id });
+      raw.write(message);
+    };
+
+    const waitForDrain = () => transport.waitForDrain();
 
     const controller: ResponseSSEController = {
       /**
@@ -867,20 +958,32 @@ export class Response {
        * @param id - Optional event ID for client-side Last-Event-ID tracking (reconnect support)
        */
       send: (event: string, data: any, id?: string): ResponseSSEController => {
-        // Silent no-op after disconnect â€” background jobs should not crash when
+        // Silent no-op after disconnect — background jobs should not crash when
         // the client drops mid-stream. The onDisconnect handler handles cleanup.
-        if (isEnded) return controller;
+        if (transport.closed) return controller;
 
-        let message = "";
-        if (id) message += `id: ${id}\n`;
-        message += `event: ${event}\n`;
-        message += `data: ${JSON.stringify(data)}\n\n`;
-
-        events.push({ event, data, id });
-        this.baseResponse.raw.write(message);
+        writeMessage(event, data, id);
 
         return controller;
       },
+
+      /**
+       * Send an SSE event and wait until the client has taken it.
+       * @returns `true` once the transport can accept more, `false` if the
+       * stream ended or the client disconnected (stop producing).
+       */
+      write: (event: string, data: any, id?: string): Promise<boolean> => {
+        if (transport.closed) return Promise.resolve(false);
+
+        writeMessage(event, data, id);
+
+        return waitForDrain();
+      },
+
+      /**
+       * Wait until buffered output has been flushed to the client.
+       */
+      drain: waitForDrain,
 
       /**
        * Send a comment (keeps connection alive, invisible to client)
@@ -889,9 +992,9 @@ export class Response {
        */
       comment: (text: string): ResponseSSEController => {
         // Silent no-op after disconnect
-        if (isEnded) return controller;
+        if (transport.closed) return controller;
 
-        this.baseResponse.raw.write(`: ${text}\n\n`);
+        raw.write(`: ${text}\n\n`);
 
         return controller;
       },
@@ -900,16 +1003,16 @@ export class Response {
        * End the SSE stream and trigger completion events
        */
       end: (): ResponseSSEController => {
-        if (isEnded) return controller;
+        if (transport.closed) return controller;
 
-        isEnded = true;
+        transport.finish();
 
-        // Store the events for logging/debugging
-        this.currentBody = events;
-        this.parsedBody = events;
+        // Only the bounded tail is kept, for logging/debugging.
+        this.currentBody = retained.items;
+        this.parsedBody = retained.items;
 
         // End the response
-        this.baseResponse.raw.end();
+        raw.end();
 
         this.log("SSE stream ended");
 
@@ -940,15 +1043,27 @@ export class Response {
        * ```
        */
       onDisconnect: (handler: () => void): ResponseSSEController => {
-        disconnectHandlers.push(handler);
+        transport.onDisconnect(handler);
         return controller;
+      },
+
+      /**
+       * Aborted when the client disconnects (not when `end()` is called).
+       */
+      signal: transport.signal,
+
+      /**
+       * Whether the transport is holding more than its high-water mark.
+       */
+      get backpressured() {
+        return transport.backpressured;
       },
 
       /**
        * Check if the stream has ended (either via end() or client disconnect)
        */
       get ended() {
-        return isEnded;
+        return transport.closed;
       },
     };
 

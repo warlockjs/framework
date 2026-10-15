@@ -96,7 +96,7 @@ stream.send("second chunk\n");
 stream.end();
 ```
 
-`response.stream(contentType?)` returns a controller with `.send(chunk)`, `.render(reactNode)`, `.end()`, and an `.ended` getter. Use for large dynamic payloads where buffering would blow memory. Calling `.send()` after `.end()` throws.
+`response.stream(contentType?, { retainChunks? })` returns a controller with `.send(chunk)`, `.render(reactNode)`, `.end()`, and an `.ended` getter, plus `await .write(chunk)` / `await .drain()` (wait for a slow client; `false` once it left), `.backpressured`, `.signal` (aborted on client disconnect) and `.onDisconnect(fn)`. Use for large dynamic payloads where buffering would blow memory; loop on `await stream.write(chunk)` when the producer can outrun the client. Calling `.send()` after `.end()` throws; after a client disconnect it is a silent no-op. Written chunks are not kept on `response.body` unless `retainChunks` asks for a tail.
 
 ## Throwing HTTP errors
 
@@ -119,6 +119,12 @@ throw new ResourceNotFoundError("product.notFound");
 throw new ForbiddenError("permission.denied", { resource: "product", id });
 throw new ConflictError("user.duplicateEmail");
 ```
+
+A program that must not load the framework (a standalone helper, a worker
+bundle) imports the same classes from `@warlock.js/core/errors`, which pulls in
+nothing else. Domain errors that cannot extend `HttpError` get a status at the
+edge through `http.errorMapper` (`(error, request) => ({ status, message?, payload? }) | undefined`);
+anything unmapped and not an `HttpError` answers an opaque `500`.
 
 Each class takes `(message, payload?)`. The framework keeps the optional
 detail nested under `payload`:
@@ -157,6 +163,8 @@ sse.send("tick", { count: 2 }, "msg-2"); // third arg is the SSE event id
 sse.comment("keep-alive"); // invisible to the client, prevents timeout
 sse.end();
 ```
+
+For streams that can outrun the client (terminals, log tails, big feeds), `await sse.write(event, data)` instead of `send()`: it waits until the client has caught up and resolves `false` once the client is gone. `sse.drain()` waits without sending, `sse.backpressured` reports a backed-up transport, and `sse.signal` aborts on disconnect. Sent events are not kept on `response.body`; `response.sse({ retainEvents: n })` keeps the last `n` for logging/tests (default 0).
 
 `response.sse()` returns a controller with `send(event, data, id?)`, `comment(text)`, `end()`, `onDisconnect(handler)`, and an `.ended` getter. The `send` signature is positional — `event` name first, then the `data` payload (JSON-stringified for you), then an optional event `id`. After the client disconnects, `send`/`comment` become silent no-ops and any `onDisconnect` handlers fire — register cleanup there:
 

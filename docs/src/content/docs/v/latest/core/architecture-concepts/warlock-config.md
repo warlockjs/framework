@@ -286,6 +286,21 @@ import { User } from "src/app/users/models/user";             // ❌ app code no
 
 If you find yourself wanting one of these in `warlock.config.ts`, you've probably mixed up which config layer this is. Push the read to `src/config/*` or to module init code.
 
+### Local TypeScript imports
+
+A config may import its own local TypeScript that does not depend on app state — a custom connector, a shared constant — written the TypeScript way, without an extension or through a tsconfig `paths` alias:
+
+```ts
+import { LocalConnector } from "./src/connectors/local"; // ✅ extensionless
+import { storageRoot } from "app/shared/paths";          // ✅ tsconfig paths alias
+```
+
+`warlock dev` resolves these through its loader. Where the runtime cannot import the config as written — `build`/`start` on Node without native TypeScript, or native type stripping meeting an extensionless or aliased import — Core bundles the config with its **local** import graph through esbuild and imports that once:
+
+- packages (`@warlock.js/*`, npm, `node:*`) stay real imports, so `BaseConnector`, the container and other registries are the application's own instances;
+- each inlined module keeps its own `import.meta.url`, so `new URL("./asset.json", import.meta.url)` still points beside that module;
+- an error thrown by your config is rethrown unchanged, and the temporary `.warlock.config.*.mjs` beside it is removed either way.
+
 ## HMR reload behaviour
 
 `warlock.config.ts` is one of the watched files in the dev server. When you save it:
