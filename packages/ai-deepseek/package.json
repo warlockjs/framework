@@ -1,0 +1,40 @@
+{
+  "name": "@warlock.js/ai-deepseek",
+  "version": "5.29.0",
+  "type": "module",
+  "description": "DeepSeek adapter for @warlock.js/ai",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "typings": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "warlock",
+    "ai",
+    "deepseek"
+  ],
+  "author": "Hasan Zohdy",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warlockjs/ai-deepseek"
+  },
+  "dependencies": {
+    "@warlock.js/ai-openai": "workspace:^",
+    "@warlock.js/logger": "workspace:^"
+  },
+  "peerDependencies": {
+    "@warlock.js/ai": "*"
+  },
+  "devDependencies": {
+    "@warlock.js/ai": "workspace:^",
+    "typescript": "^5.0.0",
+    "vitest": "4.1.10"
+  },
+  "packageManager": "pnpm@11.24.0"
+}
