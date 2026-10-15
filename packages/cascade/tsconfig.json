@@ -8,7 +8,7 @@
   // source, which means every one of them reached a consumer.
   //
   // A package may ADD to this contract. It must never subtract.
-  "extends": "../tsconfig.base.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",

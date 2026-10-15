@@ -33,8 +33,8 @@ import { fileURLToPath } from "node:url";
 
 const gateFile = fileURLToPath(import.meta.url);
 const gateDir = path.dirname(gateFile);
-const workspaceRoot = path.resolve(gateDir, "../../..");
-const defaultArtifactRoot = path.join(workspaceRoot, "builder", "builds", "@warlock.js");
+const workspaceRoot = path.resolve(gateDir, "../../../..");
+const defaultArtifactRoot = path.join(workspaceRoot, "tools", "release", "builds", "@warlock.js");
 const args = parseArgs(process.argv.slice(2));
 
 if (args.help) {

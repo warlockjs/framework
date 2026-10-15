@@ -42,7 +42,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/warlockjs/seal"
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/seal"
   },
   "keywords": [
     "validation",

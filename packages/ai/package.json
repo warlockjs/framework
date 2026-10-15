@@ -12,8 +12,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "format": "node ../node_modules/prettier/bin/prettier.cjs --write src",
-    "format:check": "node ../node_modules/prettier/bin/prettier.cjs --check src",
+    "format": "node ../../node_modules/prettier/bin/prettier.cjs --write src",
+    "format:check": "node ../../node_modules/prettier/bin/prettier.cjs --check src",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -26,7 +26,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/warlockjs/ai"
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/ai"
   },
   "dependencies": {
     "@warlock.js/core": "workspace:^",

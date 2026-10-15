@@ -17,12 +17,13 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/warlockjs/context.git"
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/context"
   },
   "bugs": {
-    "url": "https://github.com/warlockjs/context/issues"
+    "url": "https://github.com/warlockjs/framework/issues"
   },
-  "homepage": "https://github.com/warlockjs/context#readme",
+  "homepage": "https://warlock.js.org",
   "engines": {
     "node": ">=18.0.0"
   },

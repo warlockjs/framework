@@ -23,7 +23,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/warlockjs/ai-google"
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/ai-google"
   },
   "devDependencies": {
     "@warlock.js/ai": "workspace:^",

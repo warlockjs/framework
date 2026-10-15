@@ -2,6 +2,11 @@
   "name": "@warlock.js/ai-live",
   "version": "5.29.0",
   "description": "Live & generative rich-media for @warlock.js/ai — ai.realtime() duplex voice sessions and ai.video() text-to-video. The heavy, demand-gated modalities, kept out of core so text/image/speech stay dependency-light.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/ai-live"
+  },
   "type": "module",
   "main": "./src/index.ts",
   "module": "./src/index.ts",

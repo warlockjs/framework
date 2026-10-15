@@ -25,7 +25,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/warlockjs/herald"
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/herald"
   },
   "peerDependencies": {
     "amqplib": "^0.10.0"

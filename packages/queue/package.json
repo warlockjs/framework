@@ -53,7 +53,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/warlockjs/queue"
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/queue"
   },
   "keywords": [
     "warlock.js",

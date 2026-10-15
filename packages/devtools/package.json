@@ -57,7 +57,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/warlockjs/devtools"
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/devtools"
   },
   "keywords": [
     "warlock.js",

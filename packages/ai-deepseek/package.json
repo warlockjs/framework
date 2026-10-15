@@ -22,7 +22,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/warlockjs/ai-deepseek"
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/ai-deepseek"
   },
   "dependencies": {
     "@warlock.js/ai-openai": "workspace:^",

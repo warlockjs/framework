@@ -23,7 +23,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/warlockjs/ai-xai"
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/ai-xai"
   },
   "dependencies": {
     "@warlock.js/ai-openai": "workspace:^",

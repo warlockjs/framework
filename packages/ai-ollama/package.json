@@ -22,7 +22,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/warlockjs/ai-ollama"
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/ai-ollama"
   },
   "devDependencies": {
     "@warlock.js/ai": "workspace:^",

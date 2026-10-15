@@ -38,7 +38,8 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/warlockjs/logger"
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/logger"
   },
   "author": "hassanzohdy",
   "license": "MIT",

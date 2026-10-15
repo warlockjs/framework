@@ -45,13 +45,13 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { assertArtifactContainsItsEntryPoints as assertEntries } from "../../../builder/scripts/artifact-entry-points.mjs";
+import { assertArtifactContainsItsEntryPoints as assertEntries } from "../../../../tools/release/scripts/artifact-entry-points.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const appDirectory = path.join(here, "pnpm-production-app");
 const coreDirectory = path.resolve(here, "../..");
 const warlockRoot = path.resolve(coreDirectory, "..");
-const builderDirectory = path.join(warlockRoot, "builder");
+const builderDirectory = path.join(warlockRoot, "..", "tools", "release");
 const coreBuildsDirectory = path.join(builderDirectory, "builds", "@warlock.js", "core");
 
 const skipFrameworkBuild = process.argv.includes(

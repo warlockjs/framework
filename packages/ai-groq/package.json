@@ -24,7 +24,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/warlockjs/ai-groq"
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/ai-groq"
   },
   "devDependencies": {
     "@warlock.js/ai": "workspace:^",

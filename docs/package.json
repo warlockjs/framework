@@ -6,7 +6,8 @@
   "description": "Warlock.js framework docs site — Starlight + Tailwind, deployed to warlock.js.org.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/warlockjs/docs"
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "docs"
   },
   "scripts": {
     "sync:changelog": "node scripts/generate-changelog.mjs",

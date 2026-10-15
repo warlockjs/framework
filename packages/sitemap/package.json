@@ -18,7 +18,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/warlockjs/sitemap"
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/sitemap"
   },
   "devDependencies": {
     "vitest": "4.1.10",

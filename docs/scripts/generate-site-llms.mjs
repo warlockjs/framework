@@ -20,12 +20,12 @@
 // it resolve at https://warlock.js.org/llms.txt and /<pkg>/llms.txt.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const docsRoot = join(here, "..");
-const packagesRoot = join(docsRoot, "..");
+const workspaceRoot = join(docsRoot, "..");
 const publicDir = join(docsRoot, "public");
 const SITE = "https://warlock.js.org";
 
@@ -66,7 +66,7 @@ const PACKAGE_ORDER = [
 
 /** Read the explicit package paths from the canonical pnpm workspace manifest. */
 function readWorkspacePackagePaths() {
-  const manifest = readFileSync(join(packagesRoot, "pnpm-workspace.yaml"), "utf8");
+  const manifest = readFileSync(join(workspaceRoot, "pnpm-workspace.yaml"), "utf8");
   const paths = [];
   let inPackages = false;
 
@@ -91,7 +91,7 @@ function readWorkspacePackagePaths() {
 
 const workspacePackages = readWorkspacePackagePaths()
   .map((workspace) => {
-    const packageDir = join(packagesRoot, workspace);
+    const packageDir = join(workspaceRoot, workspace);
     const manifestPath = join(packageDir, "package.json");
 
     if (!existsSync(manifestPath)) {
@@ -109,8 +109,11 @@ const workspacePackages = readWorkspacePackagePaths()
     return workspace;
   })
   .filter(Boolean);
+
+// Workspace entries are paths (`packages/core`); the site routes use the directory name.
+const packageDirs = new Map(workspacePackages.map((workspace) => [basename(workspace), workspace]));
 const orderIndex = new Map(PACKAGE_ORDER.map((pkg, index) => [pkg, index]));
-const PACKAGES = workspacePackages.sort((a, b) => {
+const PACKAGES = [...packageDirs.keys()].sort((a, b) => {
   const aIndex = orderIndex.get(a) ?? Number.MAX_SAFE_INTEGER;
   const bIndex = orderIndex.get(b) ?? Number.MAX_SAFE_INTEGER;
   return aIndex - bIndex || a.localeCompare(b);
@@ -152,7 +155,7 @@ const fullParts = [];
 let perPackageCount = 0;
 
 for (const pkg of PACKAGES) {
-  const pkgDir = join(packagesRoot, pkg);
+  const pkgDir = join(workspaceRoot, packageDirs.get(pkg));
   const llmsPath = join(pkgDir, "llms.txt");
   const fullPath = join(pkgDir, "llms-full.txt");
 

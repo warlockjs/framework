@@ -26,7 +26,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/warlockjs/ai-panoptic"
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/ai-panoptic"
   },
   "devDependencies": {
     "@warlock.js/ai": "workspace:^",

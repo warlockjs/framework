@@ -12,7 +12,7 @@
   // A package may ADD to this contract. It must never subtract: doing so hides
   // consumer-facing diagnostics until some downstream package happens to
   // compile the same source and discovers them.
-  "extends": "../tsconfig.base.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2020",
     // Raised from the ES2020 default because the shared source in sibling packages

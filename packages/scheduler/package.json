@@ -35,7 +35,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/warlockjs/scheduler"
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/scheduler"
   },
   "keywords": [
     "warlock.js",

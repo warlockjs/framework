@@ -29,7 +29,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/warlockjs/ai-tools"
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/ai-tools"
   },
   "devDependencies": {
     "@warlock.js/ai": "workspace:^",
