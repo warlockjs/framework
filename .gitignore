@@ -14,7 +14,7 @@ coverage/
 tools/release/builds/
 tools/release/release-artifacts/
 tools/release/release-handoffs/
-.release-logs/
+release-logs/
 
 # Scratch
 temp/

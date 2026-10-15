@@ -66,7 +66,7 @@ jobs:
       # Outside the checkout: the blog runs its own install, which must not see
       # this repository's pnpm-workspace.yaml above it.
       BLOG_DIR: ${{ github.workspace }}/../blog
-      LOGS: ${{ github.workspace }}/.release-logs
+      LOGS: ${{ github.workspace }}/release-logs
       QUEUE_REDIS_HOST: 127.0.0.1
       QUEUE_REDIS_PORT: "6390"
       CI: "1"
@@ -77,7 +77,6 @@ jobs:
           if ! [[ "$WARLOCK_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::version must be exact semver, got '$WARLOCK_VERSION'"; exit 1
           fi
-          mkdir -p "$LOGS"
 
       # Full history and tags: `confirm` checks ancestry against origin and
       # pushes the recorded release commit. No credential is persisted to
@@ -89,6 +88,11 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
+
+      # After the checkout, never before it: the checkout empties the workspace,
+      # and a missing directory fails every `tee` below even when the step passed.
+      - name: Create the logs directory
+        run: mkdir -p "$LOGS"
 
       - uses: actions/setup-node@v7
         with:
@@ -194,7 +198,7 @@ jobs:
           MODE: tarballs
           TARBALL_DIR: ${{ github.workspace }}/tools/release/release-artifacts/${{ inputs.version }}
           PLAYWRIGHT_MODULE: ${{ github.workspace }}/packages/web/node_modules/@playwright/test/index.mjs
-          EVIDENCE_PATH: ${{ github.workspace }}/.release-logs/blog-tarballs.json
+          EVIDENCE_PATH: ${{ github.workspace }}/release-logs/blog-tarballs.json
         run: |
           set -o pipefail
           node tools/release/ci/blog-check.mjs 2>&1 | tee "$LOGS/blog-tarballs.log"
@@ -232,7 +236,7 @@ jobs:
         env:
           MODE: registry
           PLAYWRIGHT_MODULE: ${{ github.workspace }}/packages/web/node_modules/@playwright/test/index.mjs
-          EVIDENCE_PATH: ${{ github.workspace }}/.release-logs/blog-registry.json
+          EVIDENCE_PATH: ${{ github.workspace }}/release-logs/blog-registry.json
         run: |
           set -o pipefail
           git -C "$BLOG_DIR" checkout -- . && git -C "$BLOG_DIR" clean -fdxq
@@ -243,6 +247,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: warlock-${{ inputs.version }}-logs
-          path: .release-logs
+          path: release-logs
           if-no-files-found: ignore
           retention-days: 30
