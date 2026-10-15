@@ -1,0 +1,146 @@
+import { exec, execSync } from "child_process";
+import { promisify } from "util";
+import detectPackageManager from "which-pm-runs";
+
+const execAsync = promisify(exec);
+
+let detectedPackageManager: string | undefined;
+let cachedSystemManagers: string[] | undefined;
+let cachedPreferredManager: string | undefined;
+
+/**
+ * The only package managers `--pm` may select. This value reaches `spawn()`
+ * as the executable to run and is spliced into the generated
+ * `package.json`'s scripts — an allow-list here is a hard security
+ * boundary, not just input hygiene, so it stays a fixed literal list
+ * rather than anything derived from user input or the running environment.
+ */
+export const ALLOWED_PACKAGE_MANAGERS = ["npm", "yarn", "pnpm", "bun"] as const;
+
+export type AllowedPackageManager = (typeof ALLOWED_PACKAGE_MANAGERS)[number];
+
+/** Whether `value` is one of the allow-listed package managers. */
+export function isValidPackageManager(
+  value: string,
+): value is AllowedPackageManager {
+  return (ALLOWED_PACKAGE_MANAGERS as readonly string[]).includes(value);
+}
+
+export function getPackageManager() {
+  if (detectedPackageManager) {
+    return detectedPackageManager;
+  }
+
+  return getPreferredPackageManager();
+}
+
+/**
+ * Check if a package manager is installed
+ */
+function isInstalled(manager: string): boolean {
+  try {
+    execSync(`${manager} --version`, { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if a package manager is installed (async)
+ */
+async function checkManager(manager: string): Promise<boolean> {
+  try {
+    await execAsync(`${manager} --version`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Every allow-listed manager that has to be PROBED. npm is excluded because
+ * it is assumed present.
+ *
+ * Both detectors read this one list. They used to hold their own literal
+ * copies, and the copies drifted: `bun` reached the allow-list and `--help`
+ * without reaching either probe, so `--pm=bun` passed the spelling check and
+ * then could never appear among the options that would honour it.
+ */
+const PROBED_PACKAGE_MANAGERS = ALLOWED_PACKAGE_MANAGERS.filter(
+  manager => manager !== "npm",
+);
+
+const PREFERRED_PACKAGE_MANAGERS = ["pnpm", "yarn", "npm"] as const;
+
+/**
+ * A running non-npm manager is already usable. Every fallback must be present
+ * in the detector's installed set, so both sync and async paths agree.
+ */
+function preferredPackageManager(
+  isAvailable: (manager: AllowedPackageManager) => boolean,
+): string {
+  const runningPm = detectPackageManager()?.name;
+  if (runningPm && runningPm !== "npm" && isValidPackageManager(runningPm)) {
+    return runningPm;
+  }
+
+  return PREFERRED_PACKAGE_MANAGERS.find(isAvailable) ?? "npm";
+}
+
+/**
+ * Detect available package managers asynchronously and cache results
+ */
+export async function detectPackageManagers() {
+  const found = await Promise.all(PROBED_PACKAGE_MANAGERS.map(checkManager));
+  const available = PROBED_PACKAGE_MANAGERS.filter((_, index) => found[index]);
+  const managers = ["npm", ...available];
+
+  cachedSystemManagers = managers;
+  cachedPreferredManager = preferredPackageManager(manager =>
+    managers.includes(manager),
+  );
+}
+
+/**
+ * Get available package managers on the system
+ */
+export function getSystemPackageManagers(): string[] {
+  if (cachedSystemManagers) return cachedSystemManagers;
+
+  // Same list the async detector probes, so the two can no longer disagree
+  // about which managers exist. npm is assumed to be always available.
+  return ["npm", ...PROBED_PACKAGE_MANAGERS.filter(isInstalled)];
+}
+
+/**
+ * Get the preferred package manager based on priority
+ */
+export function getPreferredPackageManager(): string {
+  if (cachedPreferredManager) return cachedPreferredManager;
+  return preferredPackageManager(
+    manager => manager === "npm" || isInstalled(manager),
+  );
+}
+
+export function setPackageManager(packageManager: string) {
+  detectedPackageManager = packageManager;
+}
+
+export function installCommand() {
+  return `${getPackageManager()} install`;
+}
+
+export function startCommand() {
+  if (getPackageManager() === "npm") return "npm run dev";
+
+  return `${getPackageManager()} dev`;
+}
+
+export function runPackageManagerCommand(command: string) {
+  const packageManager = getPackageManager();
+
+  if (packageManager === "npm") return `npm run ${command}`;
+
+  return `${packageManager} ${command}`;
+}

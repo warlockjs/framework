@@ -1,0 +1,9 @@
+# Warlock Create Warlock
+
+> Package: `create-warlock`
+
+> Project scaffolder for the Warlock.js framework — interactive wizard and non-interactive CLI for creating new apps.
+
+## Skills
+
+- [create-a-warlock-project](create-warlock/create-a-warlock-project/SKILL.md): Create a Warlock project with the canonical scaffold, package selection, and project conventions.

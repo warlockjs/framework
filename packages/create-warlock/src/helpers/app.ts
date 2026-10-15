@@ -1,0 +1,608 @@
+import {
+  copyDirectory,
+  copyFile,
+  fileExists,
+  getFile,
+  getJsonFile,
+  putFile,
+  putJsonFile,
+  renameFile,
+} from "@warlock.js/fs";
+import { existsSync, rmSync, unlinkSync } from "node:fs";
+import path from "path";
+import { Application, AppOptions } from "../commands/create-new-app/types";
+import { getDatabaseDriver } from "../features/database-drivers";
+import { executeCommand, runCommand } from "./exec";
+import { insertImportInSortedPosition } from "./insert-import";
+import { getPackageManager } from "./package-manager";
+import { packageRoot, Template, template } from "./paths";
+import {
+  mergePnpmBuildApprovals,
+  requiredPnpmBuildApprovals,
+} from "./pnpm-build-approvals";
+import { fallbackRange } from "./warlock-versions";
+
+/**
+ * Environment for every install the scaffolder spawns.
+ *
+ * A shell that exports `NODE_ENV=production` makes the package managers skip
+ * every devDependency — and still exit 0. The scaffolded project needs its dev
+ * toolchain (typescript, vitest, eslint) to be usable at all, so the install
+ * child is pinned to `development` regardless of the ambient environment. A
+ * silently incomplete install that reports success is the exact failure mode
+ * this file exists to prevent.
+ */
+export function installEnvironment(): NodeJS.ProcessEnv {
+  return { NODE_ENV: "development" };
+}
+
+/** True when any ancestor of `targetPath` (starting at its parent) has a pnpm-workspace.yaml. */
+export function isInsidePnpmWorkspace(targetPath: string): boolean {
+  let dir = path.dirname(path.resolve(targetPath));
+
+  while (true) {
+    if (existsSync(path.join(dir, "pnpm-workspace.yaml"))) return true;
+    const parent = path.dirname(dir);
+    if (parent === dir) return false;
+    dir = parent;
+  }
+}
+
+export class App {
+  /**
+   * Resolved files
+   */
+  protected files: Record<string, FileManager> = {};
+
+  /**
+   * Resolved JSON files
+   */
+  protected jsonFiles: Record<string, JsonFileManager> = {};
+
+  public isInstalled = false;
+
+  public constructor(protected app: Application) {}
+
+  public get options(): AppOptions {
+    return this.app.options;
+  }
+
+  public use(templateName: Template) {
+    copyDirectory(template(templateName), this.path);
+
+    if (fileExists(this.path + "/.env.example")) {
+      copyFile(this.path + "/.env.example", this.path + "/.env");
+    }
+
+    renameFile(this.path + "/_.gitignore", this.path + "/.gitignore");
+
+    // Inside an existing pnpm workspace the parent owns the policy; a per-app
+    // workspace file would nest a second workspace root.
+    if (isInsidePnpmWorkspace(this.path)) {
+      rmSync(path.join(this.path, "pnpm-workspace.yaml"), { force: true });
+    }
+
+    return this;
+  }
+
+  public init() {
+    return this;
+  }
+
+  public terminate() {
+    // No longer using outro, using showSuccessScreen instead
+  }
+
+  public install() {
+    return runCommand(getPackageManager(), ["install"], this.path, {
+      env: installEnvironment(),
+    });
+  }
+
+  /** Record native build approvals before pnpm installs selected feature dependencies. */
+  public approveSelectedFeatureBuilds(features: readonly string[]) {
+    if (getPackageManager() !== "pnpm") return this;
+    const packages = requiredPnpmBuildApprovals(features);
+    if (packages.length === 0) return this;
+    const workspacePath = path.join(this.path, "pnpm-workspace.yaml");
+    if (!fileExists(workspacePath)) return this;
+    const current = getFile(workspacePath) as string;
+    putFile(workspacePath, mergePnpmBuildApprovals(current, packages));
+    return this;
+  }
+
+  public async exec(command: string) {
+    const [commandName, ...optionsList] = command.split(" ");
+    return await executeCommand(commandName, optionsList, this.path);
+  }
+
+  public async git() {
+    const { initializeGitRepository } =
+      await import("./project-builder-helpers");
+    return await initializeGitRepository(this.path);
+  }
+
+  /**
+   * Write the project's `package.json`: the project name and the version of
+   * every `@warlock.js/*` dependency. No template script names a package
+   * manager, so nothing here depends on the one the user chose.
+   *
+   * `versions` comes from {@link resolveWarlockVersions} — versions the
+   * registry has confirmed exist. It is optional because the fluent chain is
+   * synchronous; without it every sibling gets the caret range floored to the
+   * scaffolder's major, which is always satisfiable by a published release.
+   *
+   * What it must NEVER do again is stamp the scaffolder's own version blind:
+   * the release tooling bumps that version on every build, published or not,
+   * so an unverified pin resolves to nothing and the install dies with ETARGET.
+   */
+  public updatePackageJson(versions: Record<string, string> = {}) {
+    const pkg = this.package.replace("name", this.name.replaceAll("/", "-"));
+
+    const content: any = pkg.content;
+
+    const warlockVersion: string = (
+      getJsonFile(packageRoot("package.json")) as { version: string }
+    ).version;
+    const defaultRange = fallbackRange(warlockVersion);
+
+    for (const field of ["dependencies", "devDependencies"] as const) {
+      const deps = content[field] as Record<string, string> | undefined;
+      if (!deps) continue;
+
+      for (const dependency of Object.keys(deps)) {
+        if (dependency.startsWith("@warlock.js/")) {
+          deps[dependency] = versions[dependency] ?? defaultRange;
+        }
+      }
+    }
+
+    pkg.save();
+
+    return this;
+  }
+
+  /**
+   * Configure the chosen database driver: wire `DB_DRIVER` / `DB_PORT` into
+   * `.env`, AND pin the driver's npm package (`mongodb` / `pg`) into the
+   * project's `package.json` dependencies.
+   *
+   * The dependency is written HERE — before the base `yarn install` — so the
+   * driver is pulled deterministically by the very first install. We do NOT
+   * rely on the post-copy `warlock add <driver> --no-install` + separate
+   * batched install, which can be skipped or fail and leave the driver
+   * missing (the "mongodb package is not installed" runtime error).
+   */
+  public configureDatabaseEnv(driverValue: string) {
+    const driver = getDatabaseDriver(driverValue);
+
+    if (!driver) return this;
+
+    // Pin the driver package into dependencies (idempotent — never downgrade).
+    const packageJsonPath = path.resolve(this.path, "package.json");
+    const packageJson = getJsonFile(packageJsonPath) as {
+      dependencies?: Record<string, string>;
+    };
+    packageJson.dependencies = packageJson.dependencies ?? {};
+    if (!packageJson.dependencies[driver.package]) {
+      packageJson.dependencies[driver.package] = driver.packageVersion;
+      putJsonFile(packageJsonPath, packageJson);
+    }
+
+    // Both files carry the driver defaults: `.env` is what runs, `.env.example`
+    // is what the next developer copies.
+    for (const fileName of [".env", ".env.example"]) {
+      const envPath = this.path + "/" + fileName;
+      if (!fileExists(envPath)) continue;
+
+      let envContent = getFile(envPath) as string;
+
+      envContent = envContent.replace(
+        /DB_PORT=\d+/,
+        `DB_PORT=${driver.defaultPort}`,
+      );
+
+      if (envContent.includes("DB_DRIVER=")) {
+        envContent = envContent.replace(
+          /DB_DRIVER=\w*/,
+          `DB_DRIVER=${driver.value}`,
+        );
+      } else {
+        envContent = envContent.replace(
+          /DB_PORT=\d+/,
+          `DB_PORT=${driver.defaultPort}\nDB_DRIVER=${driver.value}`,
+        );
+      }
+
+      // DB_AUTH is Mongo's authSource; no other driver reads it.
+      if (driver.value !== "mongodb") {
+        envContent = envContent.replace(/^DB_AUTH=.*\r?\n?/m, "");
+      }
+
+      putFile(envPath, envContent);
+    }
+
+    return this;
+  }
+
+  /**
+   * Write the correct `src/config/database.ts` for the chosen driver and remove
+   * every per-driver variant so the scaffold ships exactly one config file.
+   *
+   * The template ships a Mongo-shaped `database.ts` (the default) plus a
+   * `database.postgres.ts` variant. Mongo keeps the default in place; Postgres
+   * overwrites `database.ts` with the Postgres-shaped variant (typed
+   * `ConnectionOptions`, `driver: "postgres"`, port 5432, no Mongo-only keys —
+   * no `authSource`, `driverOptions`, `replicaSet`, `randomIncrement` /
+   * `initialId`). Either way the `.postgres` variant file is deleted afterwards
+   * so no leftover config ships in the generated project.
+   *
+   * For Postgres it also corrects the working `.env`: the Mongo template ships
+   * `DB_AUTH=admin`, an `authSource` value Postgres ignores and its config no
+   * longer reads, so the line is dropped to keep `.env` and the config in sync.
+   * The port is rewritten by {@link configureDatabaseEnv} (driver defaultPort),
+   * which runs alongside this in the same branch.
+   */
+  public configureDatabaseConfig(driverValue: string) {
+    const configDir = path.resolve(this.path, "src/config");
+    const databasePath = path.resolve(configDir, "database.ts");
+    const postgresVariantPath = path.resolve(configDir, "database.postgres.ts");
+
+    if (driverValue === "postgres" && fileExists(postgresVariantPath)) {
+      putFile(databasePath, getFile(postgresVariantPath) as string);
+
+      const envPath = this.path + "/.env";
+
+      if (fileExists(envPath)) {
+        const envContent = getFile(envPath) as string;
+        // Drop the Mongo-only DB_AUTH line entirely (its whole line, so no blank
+        // gap is left behind). Postgres has no authSource concept.
+        putFile(envPath, envContent.replace(/^DB_AUTH=.*\r?\n?/m, ""));
+      }
+    }
+
+    // Whatever the driver, no per-driver variant may survive into the scaffold.
+    if (fileExists(postgresVariantPath)) {
+      unlinkSync(postgresVariantPath);
+    }
+
+    return this;
+  }
+
+  /**
+   * Remove the database layer for a "no database" scaffold.
+   *
+   * Deletes `src/config/database.ts` (and a `.tsx` / per-driver variant if
+   * present) from the freshly-copied template. The framework's database
+   * connector is config-gated on that file — with it gone,
+   * `config.get("database")` is undefined and the connector no-ops, so the app
+   * boots with no database wired and no driver package pulled. The `DB_*` lines
+   * in `.env` are left in place (harmless: no config reads them) as a ready
+   * template for adding a database back later.
+   */
+  public removeDatabaseConfig() {
+    const configDir = path.resolve(this.path, "src/config");
+
+    for (const fileName of [
+      "database.ts",
+      "database.tsx",
+      "database.postgres.ts",
+    ]) {
+      const filePath = path.resolve(configDir, fileName);
+
+      if (fileExists(filePath)) {
+        unlinkSync(filePath);
+      }
+    }
+
+    return this;
+  }
+
+  /**
+   * Configure the web starter only when the web feature owns `/`.
+   *
+   * A dependency-free HTTP response is retained without web; otherwise the
+   * SSR page loader owns the route.
+   * Exactly one survives the scaffold: web projects keep the SSR page and API
+   * example; every other project keeps the dependency-free JSON controller.
+   */
+  public configureWebStarter(useWeb: boolean) {
+    const remove = (relativePath: string) => {
+      const target = path.resolve(this.path, relativePath);
+      if (existsSync(target)) rmSync(target, { recursive: true, force: true });
+    };
+
+    if (!useWeb) {
+      for (const entry of [
+        "src/web",
+        "src/app/contact",
+        "src/app/locale",
+        "src/shared/contact.schema.ts",
+        "src/shared/locale.schema.ts",
+        "src/shared/locales.ts",
+        "postcss.config.mjs",
+        "skills/web-code-standards",
+      ]) {
+        remove(entry);
+      }
+
+      const agentsPath = path.resolve(this.path, "AGENTS.md");
+      const agents = getFile(agentsPath) as string;
+      putFile(
+        agentsPath,
+        agents.replace(/^.*\*\*web-code-standards\*\*.*\r?\n/m, ""),
+      );
+
+      const tsconfigPath = path.resolve(this.path, "tsconfig.json");
+      const tsconfig = getFile(tsconfigPath) as string;
+      putFile(
+        tsconfigPath,
+        tsconfig
+          .replace('      "web/*": ["./src/web/*"],\n', "")
+          .replace('      "@shared/*": ["./src/shared/*"]\n', ""),
+      );
+
+      return this;
+    }
+
+    // The SSR page owns `/`; its loader still uses src/app/home/services.
+    remove("src/app/home/controllers/home-page.controller.ts");
+    remove("src/app/home/routes.ts");
+
+    const packageJsonPath = path.resolve(this.path, "package.json");
+    const packageJson = getJsonFile(packageJsonPath) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    packageJson.dependencies = {
+      ...packageJson.dependencies,
+      "@mongez/http": "^3.5.0",
+      "@mongez/react-form": "^4.0.0",
+    };
+    packageJson.devDependencies = {
+      ...packageJson.devDependencies,
+      "@tailwindcss/postcss": "^4.1.16",
+      tailwindcss: "^4.1.16",
+    };
+    putJsonFile(packageJsonPath, packageJson);
+
+    const configPath = path.resolve(this.path, "warlock.config.ts");
+    const config = getFile(configPath) as string;
+    if (!config.includes('"@warlock.js/web/connector"')) {
+      // Inserted in sorted position, not prepended. The generated app formats
+      // with `prettier-plugin-organize-imports`, so an import pushed to the top
+      // of a file that already imports `@warlock.js/auth` and `@warlock.js/core`
+      // is out of order the moment it is written — and the developer meets it as
+      // a `prettier/prettier` error on their first `warlock dev`, in a file they
+      // did not write.
+      const withConnector = insertImportInSortedPosition(
+        config,
+        'import { webConnector } from "@warlock.js/web/connector";',
+        "@warlock.js/web/connector",
+      );
+
+      putFile(
+        configPath,
+        withConnector.replace(
+          "export default defineConfig({",
+          "export default defineConfig({\n  connectors: [webConnector()],",
+        ),
+      );
+    }
+
+    return this;
+  }
+
+  /**
+   * Record non-default `agent-kit` targets into the generated `package.json`'s
+   * `agentKit.targets` block.
+   *
+   * The template's own `postinstall` (`agent-kit init && agent-kit sync`)
+   * already targets `claude` with no flags, so the single-target default case
+   * needs no template edit at all — this only writes when the selection is
+   * anything else, keeping the scaffold diff-free for the common path.
+   */
+  public configureAgentKitTargets(agents: string[]) {
+    const isDefault = agents.length === 1 && agents[0] === "claude";
+    if (isDefault) return this;
+
+    const packageJsonPath = path.resolve(this.path, "package.json");
+    if (!fileExists(packageJsonPath)) return this;
+
+    const packageJson = getJsonFile(packageJsonPath) as {
+      agentKit?: { targets?: string[] };
+    };
+    packageJson.agentKit = { ...packageJson.agentKit, targets: agents };
+    putJsonFile(packageJsonPath, packageJson);
+
+    return this;
+  }
+
+  /**
+   * Install the selected optional features by delegating to the project's own
+   * `warlock add`. `--no-install` records every dependency in package.json and
+   * ejects configs / scripts / setup hooks WITHOUT installing — the caller runs
+   * one batched install afterwards. Versions come from core's feature map, so
+   * the scaffolder never duplicates them.
+   *
+   * `--no-install` is passed LAST on purpose: the CLI parser treats the
+   * positional after a bare flag as that flag's value, so it must follow the
+   * feature list, not precede it.
+   */
+  public async installFeatures(features: string[]) {
+    if (features.length === 0) return true;
+
+    return this.exec(`npx warlock add ${features.join(" ")} --no-install`);
+  }
+
+  /**
+   * Force a single copy of `vite` when the project ends up with BOTH `vite`
+   * (written by the `web` feature) and `vitest` (always in the template).
+   *
+   * `vitest` depends on vite through a wide range of its own
+   * (`^6 || ^7 || ^8`), which resolves to a DIFFERENT major than the range the
+   * feature map pins. Yarn 1 then has to nest the second copy under
+   * `vitest/node_modules` and dies on its own linker invariant:
+   *
+   *     error Invariant Violation: could not find a copy of vite to link in
+   *       <project>/node_modules/vitest/node_modules
+   *
+   * It aborts BEFORE `node_modules/.bin` is written, so `warlock` is never
+   * linked and the very first `yarn dev` fails with "'warlock' is not
+   * recognized". npm and pnpm nest happily and never hit this — for them the
+   * `overrides` twin below is one copy instead of two, not a crash fix.
+   *
+   * The pin is READ BACK from whatever range the project's own package.json
+   * declares, never re-stated as a literal here: the feature map in
+   * `@warlock.js/core` owns the version, and a second copy of it would drift
+   * the moment that one moves.
+   *
+   * Returns whether a pin was written, so the caller (and its spec) can assert
+   * it instead of assuming it.
+   */
+  public pinViteResolution() {
+    const packageJsonPath = path.resolve(this.path, "package.json");
+
+    if (!fileExists(packageJsonPath)) return false;
+
+    const packageJson = getJsonFile(packageJsonPath) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+      resolutions?: Record<string, string>;
+      overrides?: Record<string, string>;
+    };
+
+    const declaredRange = (name: string) =>
+      packageJson.dependencies?.[name] ?? packageJson.devDependencies?.[name];
+
+    const viteRange = declaredRange("vite");
+
+    // No vite, or no vitest to conflict with it — nothing to pin. Writing a
+    // resolution for a package the project does not depend on would only
+    // freeze a transitive tree nobody asked us to freeze.
+    if (!viteRange || !declaredRange("vitest")) return false;
+
+    // yarn 1 / yarn berry read `resolutions`; npm 8+ and pnpm read `overrides`.
+    packageJson.resolutions = { ...packageJson.resolutions, vite: viteRange };
+    packageJson.overrides = { ...packageJson.overrides, vite: viteRange };
+
+    putJsonFile(packageJsonPath, packageJson);
+
+    return true;
+  }
+
+  /**
+   * Get package json file
+   */
+  public get package() {
+    return this.json("package.json");
+  }
+
+  public updateDotEnv() {
+    this.file(".env").replaceAll("appName", this.name).save();
+
+    return this;
+  }
+
+  /**
+   * Get env file to update
+   */
+  public get env() {
+    return this.file(".env");
+  }
+
+  public get name() {
+    return this.app.appName;
+  }
+
+  public get path() {
+    return this.app.appPath;
+  }
+
+  public file(relativePath: string) {
+    const fullPath = path.resolve(this.path, relativePath);
+
+    if (!this.files[fullPath]) {
+      this.files[fullPath] = file(fullPath);
+    }
+
+    return this.files[fullPath];
+  }
+
+  public json(relativePath: string): JsonFileManager {
+    const fullPath = path.resolve(this.path, relativePath);
+
+    if (!this.jsonFiles[fullPath]) {
+      this.jsonFiles[fullPath] = jsonFile(fullPath);
+    }
+
+    return this.jsonFiles[fullPath];
+  }
+}
+
+export function app(app: Application) {
+  return new App(app);
+}
+
+export class FileManager {
+  public content!: string;
+  public constructor(protected filePath: string) {
+    this.parseContent();
+  }
+
+  protected parseContent() {
+    this.content = getFile(this.filePath) as string;
+  }
+
+  public replace(search: string, replace: string) {
+    this.content = this.content.replace(search, replace);
+
+    return this;
+  }
+
+  public replaceAll(search: string, replace: string) {
+    this.content = this.content.replaceAll(search, replace);
+
+    return this;
+  }
+
+  public save() {
+    putFile(this.filePath, this.content);
+  }
+}
+
+export class JsonFileManager extends FileManager {
+  protected parseContent() {
+    this.content = getJsonFile(this.filePath);
+  }
+
+  public save() {
+    putJsonFile(this.filePath, this.content);
+  }
+
+  public has(key: string) {
+    return this.content[key] !== undefined;
+  }
+
+  public replace(key: string, value: any) {
+    this.content[key] = value;
+
+    return this;
+  }
+
+  public replaceAll(key: string, value: any) {
+    const contentAsString = JSON.stringify(this.content);
+
+    this.content = JSON.parse(contentAsString.replaceAll(key, value));
+
+    return this;
+  }
+}
+
+export function file(path: string) {
+  return new FileManager(path);
+}
+
+export function jsonFile(path: string) {
+  return new JsonFileManager(path);
+}

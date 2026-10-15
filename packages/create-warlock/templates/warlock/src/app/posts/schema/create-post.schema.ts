@@ -1,0 +1,9 @@
+import { type Infer, v } from "@warlock.js/seal";
+
+export const createPostSchema = v.object({
+  title: v.string(),
+  description: v.string(),
+  image: v.file().image().maxSize({ size: 2, unit: "MB" }).saveTo("posts"),
+});
+
+export type CreatePostSchema = Infer<typeof createPostSchema>;

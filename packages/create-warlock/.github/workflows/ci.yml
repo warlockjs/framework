@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  # The scaffold job installs the framework from the registry, so it can go red
+  # without anyone touching this repo — a framework release is enough. The
+  # nightly run is what turns that from "the next contributor discovers it" into
+  # "we find out the day it happens".
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  specs:
+    name: Specs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22, not 20: pnpm 11.24 loads `node:sqlite`, which does not exist
+      # before Node 22.13. On Node 20 it prints its version requirement as a WARN
+      # and then dies on ERR_UNKNOWN_BUILTIN_MODULE, which names neither pnpm nor
+      # the Node version. Move one of these two and you must move the other.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.24.0
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check resolver boundaries
+        run: node scripts/check-resolver-boundaries.mjs
+
+      # The template's own formatting, checked with the template's own config —
+      # the same config the scaffolded project receives. Without this, an
+      # unformatted template file reaches the user and their first `warlock dev`
+      # reports it as an error.
+      - name: Check template formatting
+        run: node scripts/format-check-template.mjs
+
+      # Runs `index.dev.ts`, NOT `src/index.ts`. src/index.ts only *exports*
+      # createApp — running it defines a function and calls nothing, so it
+      # printed an empty string and this step compared "" against the version.
+      # The entry that invokes createApp is what a user reaches, and it is the
+      # only thing that can catch "the CLI was never wired to its own main".
+      # specs/cli-entry.spec.ts imports createApp and calls it directly, so it
+      # is structurally blind to this; that is why the step exists at all.
+      - name: Smoke CLI version
+        run: |
+          actual="$(./node_modules/.bin/tsx index.dev.ts --version)"
+          expected="$(node -p "require('./package.json').version")"
+          # `test` alone fails with exit 1 and no output, which is how this
+          # arrived as a red X naming nothing. A check states what it saw.
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::create-warlock --version printed '$actual', package.json says '$expected'"
+            exit 1
+          fi
+
+      # This checkout is independent: the source-bound template spec requires
+      # sibling framework repositories and stays in the default `npm test` lane.
+      # The mandatory scaffold job below installs and typechecks the published
+      # framework surface a standalone consumer actually receives.
+      - name: Standalone specs
+        run: npm run test:standalone
+
+  scaffold-typecheck:
+    name: Fresh scaffold typechecks
+    runs-on: ubuntu-latest
+    # Scaffolding runs a full dependency install of the generated project on top
+    # of this repo's own install.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22, not 20: pnpm 11.24 loads `node:sqlite`, which does not exist
+      # before Node 22.13. On Node 20 it prints its version requirement as a WARN
+      # and then dies on ERR_UNKNOWN_BUILTIN_MODULE, which names neither pnpm nor
+      # the Node version. Move one of these two and you must move the other.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.24.0
+
+      - run: pnpm install --frozen-lockfile
+
+      # Scaffolds a real project into a temp dir, installs it, and runs THAT
+      # project's `tsc --noEmit`. Typechecking `templates/warlock/` in place
+      # would prove nothing: it has no node_modules, so every framework type
+      # would resolve to `any`. See the header of the script.
+      - name: Typecheck a freshly scaffolded project
+        run: npm run typecheck:scaffold

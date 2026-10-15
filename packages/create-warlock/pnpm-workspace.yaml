@@ -1,0 +1,21 @@
+# This repo is BOTH a member of the Warlock monorepo and an independently
+# CI'd repository. CI checks it out alone, so it needs its own pnpm config:
+# the root's allowBuilds does not travel with a standalone checkout.
+#
+# esbuild is a native binary and does not function without its install script.
+allowBuilds:
+  esbuild: true
+#
+# The whole @warlock.js scope is excluded from the release-age policy, BY PATTERN.
+# Do not re-pin this to an exact version. The family publishes all 28 packages at
+# once and CI installs them minutes later, so every release trips the age gate; a
+# version-pinned entry would have to be hand-edited on publish day, every time, or
+# CI goes red for a reason no source change explains. That is what happened at 5.6.0.
+# The gate guards against fresh THIRD-PARTY code; these packages are ours, published
+# by our own release, which installs and executes them from the registry origin first.
+minimumReleaseAgeExclude:
+  - '@warlock.js/*'
+  # @mongez/* is the same owner's library family (agent-kit, reinforcements,
+  # localization, ...). The family bumps it on release day, so it trips the gate
+  # exactly like @warlock.js/* did (5.20.0: @mongez/reinforcements@4.0.2).
+  - '@mongez/*'
