@@ -1,0 +1,124 @@
+---
+title: Sitemap and robots.txt
+slug: v/latest/web/guides/sitemap-and-robots
+description: Configure managed sitemap generations, storage, refreshes, HTTP caching, and robots.txt in a Warlock web app.
+sidebar:
+  order: 3
+  label: Sitemap and robots.txt
+---
+
+Warlock discovers page routes and publishes sitemap artifacts through
+`@warlock.js/web/sitemap`. Configure it under `web.sitemap`; the standalone
+`@warlock.js/sitemap` package only builds XML.
+
+```ts title="src/config/web.ts"
+import type { WebConfigurations } from "@warlock.js/web";
+
+const web: WebConfigurations = {
+  sitemap: {
+    enabled: true,
+    path: "/sitemap.xml",
+    storage: { disk: "assets", directory: "sitemaps" },
+    coordination: "shared",
+    regenerateEvery: "1d",
+    cacheControl: "public, max-age=300",
+    gzip: true,
+  },
+  robots: {
+    enabled: true,
+    groups: [{ userAgent: "*", disallow: ["/admin"] }],
+  },
+};
+
+export default web;
+```
+
+Set `app.publicUrl` to the canonical absolute origin before enabling a sitemap.
+Warlock never derives sitemap URLs from an incoming request host.
+
+## Storage and generation lifecycle
+
+`storage.directory` is a dedicated relative prefix and defaults to `sitemap`.
+Omit `storage.disk` to use the app's default storage. The legacy `outputDir`
+continues to support a local directory, but cannot be combined with `storage`.
+
+Each successful pass writes immutable artifacts and a manifest. The main route
+serves the latest valid manifest; it does not generate XML for a request. Until
+the first successful pass, `/sitemap.xml` returns `503` with
+`Retry-After: 30`. A failed refresh keeps the last good manifest available.
+
+`coordination` defaults to `"local"`. Use `"shared"` only when selected
+storage provides atomic create-if-absent and consistent reads/listings. Warlock
+does not require Redis for sitemap coordination. Other instances discover a
+newer manifest at most every `manifestPollMs` milliseconds (default
+`30_000`).
+
+`regenerateEvery` accepts a positive millisecond value or duration such as
+`"30s"`, `"6h"`, or `"1d"`. It is a safety refresh; `changefreq` is crawler
+metadata, not a scheduler.
+
+## Page entries and invalidation
+
+Since 5.21 the sitemap reads page `.setup` modules too, so `config.sitemap` and entries declared there apply.
+
+Static pages are included unless a page or layout sets `config.sitemap: false`.
+Dynamic routes need concrete entries:
+
+```ts title="src/web/products/[slug].setup.ts"
+import type { PageConfig } from "@warlock.js/web";
+import { Product } from "@/app/products/product.model";
+import { listPublishedSitemapProducts } from "@/app/products/list-published-sitemap-products";
+
+export const config: PageConfig = {
+  sitemap: {
+    entries: async function productEntries() {
+      const products = await listPublishedSitemapProducts();
+
+      return products.map(product => ({
+        path: "/products/" + encodeURIComponent(product.slug),
+        lastmod: product.updatedAt,
+        images: [{ loc: product.imageUrl }],
+      }));
+    },
+    invalidateOn: [Product],
+  },
+};
+```
+
+Keep models and data queries in server-only modules: sitemap policy is removed
+from the browser projection. `invalidateOn` subscribes to listed Cascade models
+after their transaction commits, then requests a debounced refresh. Raw SQL,
+bulk writers, and external systems do not emit those events; call
+`regenerateSitemap()` after their work commits.
+
+```ts
+import { regenerateSitemap } from "@warlock.js/web/sitemap";
+
+await regenerateSitemap();
+```
+
+## HTTP behavior
+
+A small sitemap is served at `path`. Larger or locale-split outputs publish
+an index with shards at `/sitemaps/<generationId>/<file>`. Generation URLs are
+immutable and may be cached for a year. The main endpoint uses
+`sitemap.cacheControl`, defaulting to `public, max-age=300`.
+
+Both routes send `ETag` and `Last-Modified`. `If-None-Match` takes precedence
+over `If-Modified-Since`; a matching GET or HEAD returns `304` without reading
+stored XML. Gzipped artifacts stream with `Content-Encoding: gzip`.
+
+## Images and robots.txt
+
+An entry can include up to 1,000 absolute HTTP(S) image URLs. Warlock emits the
+Google image sitemap extension only where needed. More images are dropped with
+a route diagnostic; use structured data or a product feed for product price,
+stock, and description.
+
+`web.robots.enabled` registers `/robots.txt`. `referenceSitemap` defaults
+to true and adds the configured sitemap URL when an origin is available. A
+hand-written `public/robots.txt` takes precedence.
+
+`generateSitemap()` remains the low-level one-shot artifact writer. It does
+not publish a managed manifest or change HTTP serving state; use
+`regenerateSitemap()` for a running application.

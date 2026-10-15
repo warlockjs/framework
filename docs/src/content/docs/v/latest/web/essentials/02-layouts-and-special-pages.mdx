@@ -1,0 +1,245 @@
+---
+title: Layouts and special pages
+slug: v/latest/web/essentials/layouts-and-special-pages
+description: Compose layout middleware and prefixes, then own not-found and error rendering.
+sidebar:
+  order: 2
+  label: Layouts and special pages
+---
+
+A `layout.tsx` can contribute a React wrapper, a route prefix, middleware, and a
+loader to pages below its directory.
+
+## Layout composition
+
+Every `layout.tsx` from the Web root down to the page contributes outermost
+first:
+
+- **Middleware always composes.** Every ancestor layout with
+  `config.middleware` participates, whether the layout renders a component or
+  not.
+- **Rendering is capped at one layout.** A layout counts only when it has a
+  default export. Prefix/middleware-only layouts may nest freely; two rendering
+  layouts on one page path fail the build and name every offender.
+- **A prefix replaces its directory segment for derived routes.** If
+  `src/web/products/layout.tsx` declares `prefix: "/store"`, then
+  `src/web/products/index.page.tsx` resolves to `/store`, not
+  `/store/products`.
+- **A prefix prepends an explicit page path.** The composed prefix joins the
+  literal `config.route.path`; root values do not create doubled slashes.
+
+```tsx title="src/web/products/layout.tsx"
+import type { LayoutConfig, LayoutProps } from "@warlock.js/web";
+
+export const config: LayoutConfig = { prefix: "/store" };
+
+export default function StoreLayout({ children }: LayoutProps) {
+  return <section className="store-shell">{children}</section>;
+}
+```
+
+Layouts can also provide inherited metadata (including `robots`) and
+`sitemap: false` inside this same `LayoutConfig`. They cannot set a page route,
+cache policy, validation, or a sitemap URL supplier. A root module may export
+`config: RootConfig` for application middleware, `strictMode`, and metadata;
+it owns the flag even though only the tree beneath `#vessel` hydrates in the
+browser.
+
+## Page middleware return values
+
+**Fixed in 5.12.** A layout or page `config.middleware` declaration runs as
+part of the same composed chain described above — outermost layout first, the
+page's own `config.middleware` last. What a middleware function returns
+decides what happens next:
+
+- **Returns nothing (`undefined`).** The chain continues to the next
+  middleware, then to validation and the loader — an ordinary pass-through
+  guard.
+- **Already wrote the real reply itself** — `response.redirect(...)`,
+  `response.forbidden(...)`, or any other call that reaches
+  `response.send()` — the client already has the real answer. Whatever the
+  function also `return`s is ignored; nothing re-renders on top of it.
+- **Returns a value with a status `>= 400` without writing the reply itself**
+  — for example `response.setStatusCode(403); return { error };` — renders
+  your `error.page.tsx` boundary with that status, with the returned value
+  attached to the error.
+- **Returns a value with a 2xx status without writing the reply itself** — a
+  plain `return { message }` (status stays at the default 200) — sends that
+  value as the response body, unchanged (JSON-stringified when it's an
+  object). A page middleware returning 2xx content **replaces the page**; no
+  loader or render runs.
+
+```tsx title="src/web/account/layout.tsx"
+import type { LayoutConfig } from "@warlock.js/web";
+
+export const config: LayoutConfig = {
+  middleware: [
+    ({ request, response }) => {
+      if (!request.locals.user) {
+        response.setStatusCode(403);
+        return { error: "Sign in required" }; // >= 400 → error.page.tsx boundary
+      }
+    },
+  ],
+};
+```
+
+Before this fix, a middleware that returned a value without writing the reply
+itself produced a blank document at that status — the returned value was
+recorded but never used. Client navigations (data requests) were and are
+unaffected either way: their `{ html: "", status, ... }` contract doesn't
+change.
+
+## The not-found page
+
+`404.page.tsx` is the application-owned not-found page. It has no browsable
+route of its own and must not declare `config.route`. When no application file exists,
+Warlock still answers unmatched URLs with its built-in `404` response.
+
+```tsx title="src/web/404.page.tsx"
+export default function NotFoundPage() {
+  return <main>We could not find that page.</main>;
+}
+```
+
+The 404 component renders inside `root.tsx` with no layout. Its page-level
+loader is skipped, so an unmatched URL cannot trigger page data work, redirect,
+or fail through the fallback. Its page middleware and `register()` still run,
+and the root application loader still runs; keep root work cheap and tolerant
+of an unmatched request.
+
+## The error boundary
+
+`error.page.tsx` is the one application-wide error boundary. A second copy
+beneath `src/web/` fails the build. It does not declare `config.route` and does
+not handle ordinary 404s.
+
+```tsx title="src/web/error.page.tsx"
+import type { ErrorPageProps } from "@warlock.js/web";
+
+export default function ErrorPage({ error, status }: ErrorPageProps) {
+  return (
+    <main>
+      <h1>Something went wrong</h1>
+      <p>Status: {status}</p>
+    </main>
+  );
+}
+```
+
+In development, `error` is the thrown value during SSR. After hydration it is
+a JSON-safe `{ name, message, stack?, errorCode? }` record. In **production**,
+SSR and hydration both receive the same sanitized record. The error's own
+`message` is replaced by a generic one, `stack` is never sent, and an opaque
+`errorCode` matches the line in the server's error report. Error metadata may
+improve on the framework default but cannot remove `robots: "noindex"`.
+
+When a message is meant for the visitor, throw a `PublicPageError`. Its
+`message` is shown as written in every environment, during SSR and after
+hydration:
+
+```ts
+import { PublicPageError } from "@warlock.js/web";
+
+throw new PublicPageError("This listing has expired.");
+```
+
+If a root or page module cannot load, or `register()` throws, Warlock tries the
+application boundary and then falls back to a minimal framework document when
+application code is no longer trustworthy. That fallback omits hydration so
+the browser never hydrates a tree the server could not establish.
+
+There is no `500.page.tsx`; all non-404 failures use `error.page.tsx`.
+
+Every unhandled error response is forced to
+`Cache-Control: private, no-store` at the framework's shared error funnel.
+This applies to every status and includes API-route failures; an intermediary
+must never replay one request's error to another user.
+
+## Reporting errors to your own service
+
+Every server and client failure already logs to the console unconditionally —
+that floor can never be turned off. On top of it, `web` gives you two
+app-owned hooks for sending the same failures to your own error-tracking
+service (Sentry, Bugsnag, your own endpoint, anything). Neither hook ever
+replaces the console floor, and there is no framework-hosted beacon endpoint
+— you decide where the error goes.
+
+### Server: `web.errors.report`
+
+Configure a `report` function under the `web.errors` namespace. It receives
+the thrown value and a context object describing where the failure happened —
+never the raw request URL or query string, only the route's own template path
+and the decoded pathname, so a token or secret sitting in a query parameter
+never reaches your sink by accident.
+
+```ts title="src/config/web.ts"
+import * as Sentry from "@sentry/node";
+
+export default {
+  errors: {
+    report(error, context) {
+      Sentry.captureException(error, {
+        tags: { kind: context.kind, phase: context.phase, routeName: context.routeName },
+        extra: {
+          routePath: context.routePath,
+          pathname: context.pathname,
+          method: context.method,
+          statusCode: context.statusCode,
+          requestId: context.requestId,
+        },
+      });
+    },
+  },
+};
+```
+
+`report` is called fire-and-forget — it is never awaited on the response
+path, so a slow or hanging call to Sentry cannot delay or fail a real HTTP
+response. The same error object reported twice for one request (a render
+failure a deferred value also surfaces, for example) reaches `report` once.
+A `report` that throws or rejects is caught, logged once to the console, and
+never retried for that failure — it cannot recurse into itself and it cannot
+take the server down. On a graceful shutdown, any `report` calls still in
+flight get a brief, bounded window to finish before the process exits.
+
+### Client: `onClientError`
+
+Register a callback from your own client code — typically `src/web/root.tsx`
+or wherever your app initializes — with `onClientError`. It receives every
+uncaught `window` error, unhandled promise rejection, and React hydration
+error the framework observes, plus whatever the framework's own error
+boundary catches after hydration.
+
+```tsx title="src/web/root.tsx"
+import * as Sentry from "@sentry/react";
+import { onClientError } from "@warlock.js/web";
+
+onClientError(({ error, kind, routeName, pathname }) => {
+  Sentry.captureException(error, { tags: { kind, routeName }, extra: { pathname } });
+});
+```
+
+Like the server hook, `onClientError` sits alongside `console.error`, never
+in place of it, dedupes the same error object across overlapping reporting
+paths, and isolates its own failures — a callback that throws is caught,
+logged once, and never called again for that same failure. There is
+deliberately no client-to-server beacon endpoint yet; wire your own tracking
+SDK, or `fetch()` your own endpoint, from inside the callback.
+
+## The universal `register()` hook
+
+`root.tsx`, `layout.tsx`, and pages may export a synchronous, no-argument
+`register()` hook. It runs once per real module namespace in both realms,
+before that module's middleware or loader. It must not return a Promise.
+
+Prefer a sidecar and named re-export for page registration so React Fast
+Refresh sees a clean component boundary:
+
+```tsx title="src/web/index.page.tsx"
+export { register } from "./index.register";
+
+export default function HomePage() {
+  return <main>Home</main>;
+}
+```

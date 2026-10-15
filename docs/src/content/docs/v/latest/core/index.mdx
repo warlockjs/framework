@@ -1,0 +1,41 @@
+---
+title: Core
+description: The Warlock.js framework foundation — HTTP routing, modules, middleware, conventions, and the connector lifecycle that ties every other package together.
+---
+
+`@warlock.js/core` is the framework. It defines the HTTP layer (routing,
+controllers, middleware, request/response helpers), the module conventions
+every Warlock app follows, the connector lifecycle that boots and shuts
+down the other packages, and the CLI you use to scaffold + install
+everything.
+
+If you're new, start with **[Getting Started](./getting-started/01-introduction/)** —
+five short pages take you from `<pm> create warlock` to your first route
+serving real traffic.
+
+## What core gives you
+
+- **HTTP server** powered by Fastify, with routing, middleware, and a
+  curated set of response helpers (`response.success`,
+  `response.notFound`, …).
+- **Module conventions** — `src/app/<module>/{routes,controllers,services,…}/`
+  with predictable file naming and clear boundaries.
+- **Connectors** — the auto-wiring layer that boots
+  `@warlock.js/cascade`, `@warlock.js/cache`, `@warlock.js/herald`,
+  `@warlock.js/logger`, mail, storage, and sockets at startup.
+- **CLI** — `warlock dev` / `warlock build` / `warlock add <feature>`
+  and a generator suite (`warlock generate.module`, `…controller`,
+  `…repository`).
+- **Validation, encryption, mail, file uploads, image processing,
+  benchmarking, retry helpers** — the boring reliable pieces, already
+  built and already wired.
+
+## Read by intent
+
+- **Get up and running** → [Getting Started](./getting-started/01-introduction/).
+- **Understand the framework's mental model** → [Architecture Concepts](./architecture-concepts/application/).
+- **Learn the must-know surface** → [The Basics](./the-basics/02-routing/).
+- **Reach for an advanced subsystem** → [Digging Deeper](./digging-deeper/mail/).
+- **Use the CLI** → [CLI](./cli/cli-commands/).
+- **Write tests** → [Testing](./testing/testing/).
+- **Copy-paste a working pattern** → [Recipes](./recipes/add-a-crud-module/).

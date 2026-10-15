@@ -1,0 +1,59 @@
+---
+title: In a Warlock app
+description: Configure Web-managed sitemap generations, page discovery, storage, and robots.txt.
+sidebar:
+  order: 3
+  label: "In a Warlock app"
+---
+
+`@warlock.js/sitemap` remains framework-blind. In a Warlock application,
+`@warlock.js/web` discovers page policy, publishes sitemap generations, and
+serves the HTTP routes.
+
+## Install and configure
+
+```sh
+warlock add sitemap
+```
+
+The command adds a disabled section in `src/config/web.ts`. Enable it after
+`app.publicUrl` is configured:
+
+```ts title="src/config/web.ts"
+import type { WebConfigurations } from "@warlock.js/web";
+
+const web: WebConfigurations = {
+  sitemap: {
+    enabled: true,
+    storage: { directory: "sitemap" },
+    coordination: "local",
+  },
+};
+
+export default web;
+```
+
+The origin is `app.publicUrl`; no request-derived fallback is used. Missing
+origin makes generation fail safely and `/sitemap.xml` returns `503` until a
+generation succeeds.
+
+`storage` selects durable generation and manifest storage. Its `directory`
+must be a dedicated relative prefix. Omit `disk` for the app's default storage.
+`outputDir` is the compatible local writer option; it conflicts with
+`storage` rather than silently winning.
+
+## What Web adds
+
+Web includes static pages, applies `config.sitemap: false`, expands locales,
+and lets dynamic pages declare concrete URLs with `config.sitemap.entries`.
+It keeps each published generation immutable, serves the latest valid manifest,
+and never creates a document in response to a crawler request.
+
+Use `coordination: "shared"` only with storage that supports atomic
+create-if-absent and consistent reads/listing. No Redis service is required.
+See the [Sitemap and robots.txt guide](/v/latest/web/guides/sitemap-and-robots/)
+for refreshes, model invalidation, conditional HTTP caching, shards, and
+robots.txt.
+
+API-only applications can use `new Sitemap({ baseUrl })` directly and choose
+their own delivery route. See [Build a sitemap](/v/latest/sitemap/essentials/standalone/).

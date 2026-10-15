@@ -1,0 +1,75 @@
+---
+title: "The fs facade"
+description: A quick tour of the fs object — files, directories, handles, and hashing — and where to go deep on each.
+sidebar:
+  order: 0
+  label: "The fs facade"
+---
+
+import { CardGrid, LinkCard, Aside } from "@astrojs/starlight/components";
+
+One object, the whole filesystem. `fs` groups everything you reach for — reading, writing, editing, walking, hashing — into a small, discoverable surface. It's the main way you use `@warlock.js/fs`; this page is the 60-second tour, with a link to go deep on each area.
+
+```ts title="the whole shape, at a glance"
+import { fs } from "@warlock.js/fs";
+
+await fs.files.putJson("config.json", { port: 3000 });   // files
+await fs.dirs.ensure("storage/uploads");                 // directories
+const pkg = fs.file("package.json");                     // a lazy handle
+const digest = await fs.hash.file("bundle.js");          // hashing
+```
+
+<Aside type="note" title="Async by design">
+Every facade method returns a `Promise`. Synchronous callers (CLI tools, code
+generators) drop to the [low-level primitives](../reference/api#low-level-primitives-sync--async)
+— that's the one escape hatch. And `fs` never sandboxes paths; containment is the storage layer's job.
+</Aside>
+
+## Files — `fs.files.*`
+
+Read, write, and **edit in place**. `getJson` can validate against a schema and fall back when a file is missing; `edit` / `mergeJson` patch a file without the read-then-write dance.
+
+```ts
+const cfg = await fs.files.getJson("config.json", { default: {} });
+await fs.files.editJson("package.json", (p) => ({ ...p, version: "4.7.0" }));
+```
+
+## Directories — `fs.dirs.*`
+
+Ensure, empty, copy, and **walk** — recursively, with a constant-memory async iterator.
+
+```ts
+for await (const entry of fs.dirs.walk("src")) {
+  // { path, name, type: "file" | "directory" }
+}
+```
+
+## Handles — `fs.file()` / `fs.dir()`
+
+Prefer an object over a path string? `fs.file(path)` and `fs.dir(path)` are lazy, immutable handles with pure-path helpers and the same verbs.
+
+```ts
+const file = fs.file("src/app/user.model.ts");
+file.extension;        // ".ts"
+await file.size();     // bytes
+```
+
+## Hashing — `fs.hash.*`
+
+SHA-256 by default. `string` / `buffer` are synchronous (in-memory); `file` / `dir` are async (they read from disk).
+
+```ts
+fs.hash.string("hello");         // sync
+await fs.hash.dir("dist");       // async — a stable tree fingerprint
+```
+
+## Go deeper
+
+<CardGrid>
+  <LinkCard title="Read and write files" href="./read-and-write-files" description="get / put, JSON, schema validation, existence and stats." />
+  <LinkCard title="Edit files in place" href="./edit-files-in-place" description="edit / editJson / mergeJson / ensureJson — read-modify-write, done for you." />
+  <LinkCard title="Manage directories" href="./manage-directories" description="ensure / empty / walk / list, recursive listing, tree size and hash." />
+  <LinkCard title="File & Directory handles" href="./work-with-handles" description="fs.file() / fs.dir() objects, path helpers, child handles." />
+  <LinkCard title="Hash files" href="./hash-files" description="fs.hash.* and checksum verification." />
+  <LinkCard title="API reference" href="../reference/api" description="Every method, option type, and the low-level primitives." />
+</CardGrid>

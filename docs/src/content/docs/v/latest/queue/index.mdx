@@ -1,0 +1,53 @@
+---
+title: Queue
+description: Durable background jobs on BullMQ + Redis — retries, delay, priority, progress, failed-job recovery.
+---
+
+`@warlock.js/queue` runs background work **outside the request/response
+cycle** — sending an invoice email, syncing inventory, generating a
+report — as durable jobs stored in Redis via [BullMQ](https://docs.bullmq.io).
+A job survives a process restart, retries on failure with backoff, and
+can be picked up by any worker process that shares the same Redis and
+job definitions.
+
+> Redis is required. BullMQ has no other backend.
+
+This is **not** the same as `@warlock.js/core`'s `Queue` class, which is
+an in-memory batcher inside one process (nothing stored, no retries,
+lost on exit). Reach for `@warlock.js/queue` whenever the work must
+survive a restart or be retried.
+
+## Try it in fifteen lines
+
+```ts
+import { defineConfig } from "@warlock.js/core";
+import { defineJob, queueConnector } from "@warlock.js/queue";
+
+// warlock.config.ts
+export default defineConfig({
+  connectors: [queueConnector()],
+});
+
+// anywhere in app code
+export const sendInvoice = defineJob({
+  name: "invoices.send",
+  attempts: 5,
+  backoff: { type: "exponential", delay: 2000 },
+  async handle(payload: { invoiceId: string }, ctx) {
+    await ctx.progress(50);
+  },
+});
+
+await sendInvoice.dispatch({ invoiceId: "42" }, { delay: "10m", priority: 1 });
+```
+
+The connector starts workers once your app code (and therefore every
+`defineJob`) has loaded, and drains active jobs on shutdown.
+
+## Read by intent
+
+- **First time using it** → [Getting started](./getting-started/introduction/).
+- **Understanding the mental model** → [Essentials](./essentials/configuration/).
+- **Looking up "how do I…?"** → [Guides](./guides/retry-and-failed-jobs/).
+- **Copy-paste a real task** → [Recipes](./recipes/idempotent-dispatch/).
+- **Method-by-method lookup** → [Reference](./reference/api/).

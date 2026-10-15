@@ -1,0 +1,58 @@
+---
+title: Sitemap
+description: A framework-blind sitemap builder — the Sitemap class for sites up to 50,000 URLs, SitemapIndex for larger ones, and hreflang alternates. Warlock web apps get it wired through web.sitemap.
+---
+
+`@warlock.js/sitemap` builds [sitemaps.org](https://www.sitemaps.org/protocol.html)
+documents. You add entries and it returns a valid XML document. It has **zero
+runtime dependencies** and knows nothing about Warlock. It has no connector,
+no config module, no lifecycle, and no page registry. It only generates
+sitemaps; it cannot parse one.
+
+```ts
+import { Sitemap } from "@warlock.js/sitemap";
+
+const sitemap = new Sitemap({ baseUrl: "https://example.com", changefreq: "weekly" });
+
+sitemap.add({ path: "/" });
+sitemap.add({ path: "/posts/hello-world", lastmod: new Date(), priority: 0.8 });
+
+await sitemap.saveTo("public/sitemap.xml");
+```
+
+Those lines work the same way in an Express handler, a cron script, a
+`node build-sitemap.mjs`, or a Warlock controller.
+
+## Two classes, split at the protocol ceiling
+
+The protocol limits one file to **50,000 URLs or 50MB uncompressed**.
+
+- **`Sitemap`** keeps every entry in memory. That makes `entries()`, the
+  diagnostics, and a repeatable `toXML()` possible. Use it for any site under
+  the ceiling.
+  → [Build a sitemap](/v/latest/sitemap/essentials/standalone/)
+- **`SitemapIndex`** streams from source factories. It writes size-capped
+  shards and a master index, then publishes the whole set atomically. It keeps
+  only the current shard in memory.
+  → [Large sites](/v/latest/sitemap/essentials/large-sites/)
+
+## In a Warlock web app
+
+You don't call either class yourself. `@warlock.js/web` finds your pages,
+expands locales, chooses `Sitemap` or `SitemapIndex`, generates the file at
+`warlock build` and at boot, and serves `/sitemap.xml` and `/robots.txt`. You
+configure all of it under `web.sitemap` in `src/config/web.ts`:
+
+```sh
+warlock add sitemap
+```
+
+→ [In a Warlock app](/v/latest/sitemap/essentials/configuration/) and the full
+[Sitemap and robots.txt guide](/v/latest/web/guides/sitemap-and-robots/).
+
+## Read by intent
+
+- **Building one yourself** → [Build a sitemap](/v/latest/sitemap/essentials/standalone/)
+- **Past 50,000 URLs, or one file per locale** → [Large sites](/v/latest/sitemap/essentials/large-sites/)
+- **Warlock web pages, `robots.txt`, locales** → [Sitemap and robots.txt](/v/latest/web/guides/sitemap-and-robots/)
+- **Method-by-method lookup** → [API reference](/v/latest/sitemap/reference/api/)

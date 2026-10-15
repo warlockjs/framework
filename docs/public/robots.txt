@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://warlock.js.org/sitemap-index.xml

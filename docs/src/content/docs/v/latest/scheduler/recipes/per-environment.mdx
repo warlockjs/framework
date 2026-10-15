@@ -1,0 +1,129 @@
+---
+title: "Schedule Differently Per Environment"
+sidebar:
+  order: 4
+---
+
+You almost never want the same schedule in development and production. A
+nightly report that emails real customers must **not** fire from your
+laptop. A polling job that hits a paid API every minute in prod should
+crawl (or stay off) in staging. The scheduler has no "environment"
+concept of its own — and it does not need one. Because a schedule is
+just chained method calls, plain JavaScript conditionals do the whole
+job.
+
+## Branch the cadence
+
+Pick the interval from the environment before you build the job:
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+const isProduction = process.env.NODE_ENV === "production";
+
+scheduler.addJob(
+  job("poll-exchange-rates", fetchRates).every(
+    isProduction ? 1 : 30,
+    "minute",
+  ), // every minute in prod, every 30 in dev
+);
+
+scheduler.start();
+```
+
+`every(value, unit)` takes a plain number, so any expression that
+produces one works — `isProduction ? 1 : 30`, a value read from config,
+whatever you like.
+
+## Register a job only in some environments
+
+Some jobs have no business running outside production at all. Guard the
+`addJob` call — a job that is never registered never fires:
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+// Always-on everywhere.
+scheduler.addJob(job("cleanup", cleanupTempFiles).daily().at("02:00"));
+
+// Production only — never email real customers from a laptop.
+if (process.env.NODE_ENV === "production") {
+  scheduler.addJob(
+    job("customer-digest", sendCustomerDigest).daily().at("07:00"),
+  );
+}
+
+scheduler.start();
+```
+
+## Drive it from a table when there are many
+
+Once you have more than a couple of these, a `switch` per job gets noisy.
+Describe the differences as data and loop:
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+type Env = "development" | "staging" | "production";
+
+const env = (process.env.NODE_ENV as Env) ?? "development";
+
+const schedules: Record<
+  string,
+  { fn: () => Promise<void>; cron: Record<Env, string | null> }
+> = {
+  "poll-rates": {
+    fn: fetchRates,
+    cron: {
+      development: "*/30 * * * *", // every 30 min
+      staging: "*/10 * * * *", // every 10 min
+      production: "* * * * *", // every minute
+    },
+  },
+  "customer-digest": {
+    fn: sendCustomerDigest,
+    cron: {
+      development: null, // never run locally
+      staging: null,
+      production: "0 7 * * *", // 7 AM daily
+    },
+  },
+};
+
+for (const [name, config] of Object.entries(schedules)) {
+  const expression = config.cron[env];
+
+  if (expression === null) {
+    continue;
+  }
+
+  scheduler.addJob(job(name, config.fn).cron(expression));
+}
+
+scheduler.start();
+```
+
+A `null` entry means "do not register here" — so one table is the single
+source of truth for what runs where.
+
+## Tune the tick interval too
+
+In production with sub-minute jobs you want the default 1-second tick.
+In a dev box where the fastest job is every 30 minutes, a slower tick
+saves needless wakeups:
+
+```ts
+scheduler.runEvery(isProduction ? 1_000 : 60_000);
+```
+
+The minimum is 100 ms; anything lower throws. See
+[Configuration](../essentials/configuration/) for the rest of the
+scheduler-level knobs.
+
+## Why no built-in environment switch?
+
+Because there is nothing the framework could add that beats a plain
+`if`. Environment detection, config precedence, secret gating — those
+belong to *your* app's config layer, not the scheduler's. The scheduler
+stays a small, predictable primitive and composes with whatever you
+already use to tell dev from prod.

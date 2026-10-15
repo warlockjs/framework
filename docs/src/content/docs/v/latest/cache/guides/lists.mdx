@@ -1,0 +1,170 @@
+---
+title: "Cache Lists"
+slug: v/latest/cache/lists
+---
+
+`cache.list<T>(key)` returns a typed list accessor for ordered collections — queues, recent-N buffers, stacks, sliding windows. Keeps the flat cache surface lean while giving list-shaped data a purpose-built API.
+
+## When to use a list instead of plain keys
+
+Use `cache.list()` when **order matters** and the size of the collection varies over time:
+
+- ✅ "Keep the 100 most recent audit events" — list with `trim()`
+- ✅ "A queue of pending jobs, first-in-first-out" — list with `push` + `shift`
+- ✅ "An undo stack" — list with `push` + `pop`
+- ❌ "Look up the user by ID" — plain `cache.get(key)`, no list needed
+- ❌ "Store one value per user" — many keys with a shared prefix, not a list
+
+If you'd put the data in a JavaScript `Array`, reach for `cache.list()`. If you'd put it in an `Object` or `Map`, use plain `cache.set` / `cache.get` with a dot-notation key.
+
+## Basic usage
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+type Event = { type: string; at: number };
+
+const recent = cache.list<Event>("recent.events");
+
+await recent.push({ type: "login", at: Date.now() });
+await recent.push({ type: "click", at: Date.now() });
+
+const last10 = await recent.slice(0, 10);
+const total = await recent.length();
+```
+
+## API
+
+| Method | Purpose |
+|--------|---------|
+| `push(...items)` | Append to tail. Returns new length. |
+| `unshift(...items)` | Prepend to head. Returns new length. |
+| `pop()` | Remove and return tail. `null` if empty. |
+| `shift()` | Remove and return head. `null` if empty. |
+| `slice(start?, end?)` | View slice. Does not mutate. |
+| `all()` | Full list. |
+| `length()` | Item count. |
+| `trim(start, end)` | Keep only indices `[start, end]` inclusive. |
+| `clear()` | Remove the list. |
+
+## Type safety
+
+The generic flows through every method — pass the element type once at the accessor:
+
+```ts
+type Job = { id: string; payload: { userId: number } };
+
+const queue = cache.list<Job>("jobs.pending");
+
+await queue.push({ id: "j1", payload: { userId: 42 } });   // ✓ typed correctly
+await queue.push("not a job" as never);                     // ✗ rejected at the caller
+```
+
+## Common recipes
+
+### Recent-N buffer
+
+```ts
+async function recordAudit(entry: AuditEntry) {
+  const audit = cache.list<AuditEntry>("audit.recent");
+  await audit.unshift(entry);    // newest at head
+  await audit.trim(0, 999);       // keep most-recent 1000
+}
+```
+
+### Lightweight FIFO queue
+
+```ts
+const queue = cache.list<Job>("jobs.pending");
+
+// Producer
+await queue.push(job);
+
+// Consumer
+const next = await queue.shift();
+if (next) await process(next);
+```
+
+### Stack (LIFO)
+
+```ts
+const stack = cache.list<Frame>("stack");
+await stack.push(frame);
+const top = await stack.pop();
+```
+
+### Bounded sliding window
+
+```ts
+async function recordMetric(value: number) {
+  const window = cache.list<number>("metrics.rolling");
+  await window.push(value);
+  await window.trim(-60, -1);    // keep last 60 samples
+}
+```
+
+## Empty-list cleanup
+
+When a list drains to zero items — via `pop()`, `shift()`, `trim()`, or `clear()` — the backing cache entry is **removed**, not left as an empty array. Subsequent `cache.get(key)` returns `null`, not `[]`.
+
+```ts
+await recent.push("a");
+await recent.pop();
+
+await cache.get("recent.events");   // null, not []
+await recent.length();               // 0
+```
+
+This keeps the store from accumulating empty list entries under keys that briefly held data.
+
+## Performance
+
+The current implementation stores the full list as a single cache entry and performs read-mutate-write on every op. That's correct for every driver but **O(n)** per operation.
+
+| Driver | List backing | Op complexity |
+|--------|-------|----|
+| `memory` | In-process array | O(n) |
+| `memoryExtended` | In-process array | O(n) |
+| `lru` | In-process array | O(n) |
+| `file` | JSON file | O(n) + disk I/O |
+| `redis` | Single JSON blob *(today)* | O(n) per op |
+| `null` | n/a | no-op |
+
+:::info Redis native commands coming in v2.1
+The Redis driver currently inherits the default JSON-blob implementation. A native override using `LPUSH` / `RPUSH` / `LRANGE` / `LTRIM` / `LLEN` is planned for v2.1, giving O(1) push/shift/pop and O(log n) range queries. Until then, avoid very large lists on Redis (anything over a few hundred items).
+:::
+
+## Concurrency
+
+:::warning Not safe for concurrent writers
+The default implementation reads the full list, mutates the array in memory, and writes it back. If two callers do this at the exact same instant for the same list, one write overwrites the other — the classic **read-modify-write race**:
+
+```
+Process A: reads [a, b]
+Process B: reads [a, b]
+Process A: pushes "c", writes [a, b, c]
+Process B: pushes "d", writes [a, b, d]   ← A's "c" is lost!
+```
+
+Single-process, single-writer usage (typical test / script / job-runner) is fine. For concurrent writers across processes, gate writes with a distributed lock via [`onConflict: "create"`](/v/latest/cache/set-options/#distributed-locking-recipe), or wait for the Redis-native override in v2.1.
+:::
+
+## What lists are NOT for
+
+- **Unordered uniqueness (sets)** — no native set today; use a plain object/Map in memory, or roll your own via `cache.get`/`cache.set`.
+- **Hash / field maps** — use individual keys with a shared prefix.
+- **Ordered top-N with scoring** — no sorted-set analog today.
+
+All three are tracked as candidates for v3.
+
+## Troubleshooting
+
+- **Push landed but `get` returns something unexpected** — the list's backing key is reserved for list storage. Don't mix `cache.set(key, ...)` with `cache.list(key)` on the same key.
+- **List seemed to lose entries under load** — likely the concurrent-writer race above. Add a lock or switch to a single writer.
+- **Type errors at the call site** — pass the element type at `cache.list<T>(key)`, not on each method.
+
+## Related Documentation
+
+- [Set Options](/v/latest/cache/set-options/) — distributed-lock recipe for concurrent-safe list writes
+- [Cache Manager](/v/latest/cache/cache-manager/) — full API surface
+- [Events](/v/latest/cache/events/) — list ops emit `set` / `removed` just like regular `set`/`remove`

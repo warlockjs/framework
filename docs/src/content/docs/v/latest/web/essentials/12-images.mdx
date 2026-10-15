@@ -1,0 +1,172 @@
+---
+title: Images
+slug: v/latest/web/essentials/images
+description: Render responsive images with <Image>, and serve bounded, cached variants of local uploads.
+sidebar:
+  order: 12
+  label: Images
+---
+
+`<Image>` (`@warlock.js/web`) renders `srcSet`/`src`, and a `<picture>` of
+modern formats when you have them, from a plain JSON descriptor. It never
+touches Sharp or the filesystem itself — every URL either comes off the
+descriptor verbatim or is built by a `loader`, a plain string function. The
+local uploads route (`uploadedFileController`, `@warlock.js/core`) is one way
+to produce that descriptor and serve the derivatives it points at; object
+storage / CDN setups produce the same shape another way.
+
+## The `ImageDescriptor`
+
+```ts
+type ImageDescriptor = {
+  src: string; // original path, e.g. "/uploads/posts/cover.jpg"
+  width: number; // intrinsic width of the original
+  height: number; // intrinsic height of the original
+  variants: Record<string, ImageVariantDescriptor>; // keyed by variant NAME, not width
+  formats?: ("avif" | "webp")[]; // extra formats to offer via <source>
+};
+```
+
+Each `ImageVariantDescriptor` is `{ width, height?, url?, urls? }`. A
+pre-generated `url` (object storage, a CDN) skips the loader for that
+variant's default format; `urls` does the same per extra format. Leave both
+unset and `<Image>` builds the URL with `loader` instead. The whole thing is
+plain, serializable JSON — safe to carry through a page `loader` and hydrate
+into the client without a second fetch.
+
+## `<Image>`
+
+```tsx
+import { Image } from "@warlock.js/web";
+
+<Image image={post.cover} alt={post.title} priority sizes="(min-width: 768px) 50vw, 100vw" />;
+```
+
+- `image` — an `ImageDescriptor`.
+- `alt` — required; the type has no default. Pass `alt=""` for a purely
+  decorative image, never omit it. In dev, an untyped call site that skips it
+  (plain JS, `as any`) logs a `console.error` naming the image's `src`;
+  production stays silent.
+- `sizes` — defaults to `"100vw"`. Own it whenever the image doesn't span the
+  full viewport width, the same as any responsive `<img>`.
+- `priority` — `true` sets `loading="eager"` and `fetchPriority="high"`.
+  Reserve it for the page's actual LCP image, and only that one; every other
+  `<Image>` stays `loading="lazy"` by default.
+- `loader` — defaults to the built-in loader described below.
+- `width`/`height` are always set from the descriptor's intrinsic size, so
+  the browser reserves layout space before the image decodes — the biggest
+  CLS win available (see
+  [Measuring Web Vitals](/v/latest/web/essentials/web-vitals/)).
+
+With `image.formats`, `<Image>` renders a `<picture>`: one `<source>` per
+format (in the order given), each with its own `srcSet` from the variants,
+then the `<img>` as the fallback. Without `formats`, it renders a plain
+`<img>` with `srcSet`/`src`. Either way the render is pure — same descriptor
+and props in, byte-identical markup out — so hydration always matches.
+
+## The default loader and named variants
+
+The default loader (`warlockImageLoader`) turns a variant name into a query
+string against the descriptor's own `src`:
+
+```
+/uploads/posts/cover.jpg?variant=card&format=webp
+```
+
+That URL is served by `uploadedFileController` (`@warlock.js/core`),
+mounted once:
+
+```ts title="src/http/routes.ts"
+router.get("/uploads/*", uploadedFileController);
+```
+
+Variants are named and bounded by `uploads.images` — a client can only ever
+request a name you declared, never an arbitrary size:
+
+```ts title="src/config/uploads.ts"
+export default {
+  images: {
+    variants: {
+      thumb: { width: 320 },
+      card: { width: 640, height: 360, fit: "cover", quality: 80 },
+      hero: { width: 1280, enlarge: true },
+    },
+    formats: ["webp"], // "&format=" allowlist; omit to keep each variant's source format
+    // maxSourceBytes: 25 MB, maxSourcePixels: 40_000_000 — both configurable
+  },
+};
+```
+
+- `width`/`height` are 1–8192; `fit` is `cover` | `contain` | `inside`;
+  `quality` is 1–100.
+- A variant never upscales a source smaller than its target by default — a
+  100px source requested at `{ width: 320 }` stays 100px. Opt in per variant
+  with `enlarge: true`; it's part of the normalized config, so toggling it
+  changes the derivative's cache key.
+- Any query key other than `variant`/`format`, a repeated key, an unknown
+  variant name, or a disallowed `format` returns 400.
+- Only jpeg, png, webp and avif sources are resized, detected from magic
+  bytes, never the extension. **gif and svg sources return 415.** A source
+  over `maxSourceBytes` or `maxSourcePixels` returns 413.
+- A non-raster original (svg, html, xml, …) is never served inline even at
+  its own URL with no `?variant=`: it goes out as `Content-Disposition:
+attachment`, with the svg/html/xml family downgraded to
+  `application/octet-stream` so a browser can't execute it even if it
+  ignores the disposition header.
+- Every derivative is cached on disk under a hash of the source path, size,
+  mtime, variant and format, written atomically, generated once even under
+  concurrent requests, and sent `Cache-Control: public, max-age=31536000,
+immutable` with an ETag. Rewriting the source changes the key, so the next
+  request renders fresh.
+
+## Eager generation at upload time
+
+Rendering the first variant on demand is fine for most apps; call
+`generateImageVariants` right after a save when you'd rather pay that cost
+once, at upload time, and store the descriptor next to the record it belongs
+to:
+
+```ts
+import { generateImageVariants } from "@warlock.js/core";
+
+const cover = await postImage.save("posts");
+const descriptor = await generateImageVariants(cover.path);
+// or: generateImageVariants(cover.path, { variants: ["thumb", "card"] })
+
+await Post.create({ title, cover: descriptor });
+```
+
+It shares `uploadedFileController`'s config, cache key and derivative path,
+so the first `GET ...?variant=card` after this call is already a cache hit —
+nothing renders twice. It throws the same `HttpError` statuses the route
+does: 400 when `uploads.images` isn't configured or a requested variant name
+isn't declared, 404 when `relativePath` doesn't resolve inside the storage
+root, 413/415 for the same source-size and source-format reasons as above.
+The returned value is a plain `ImageDescriptor` — pass it straight to
+`<Image image={...}>`.
+
+## Object storage and CDNs
+
+`uploadedFileController` only serves **local** uploads. An app storing
+images on S3/R2 behind a CDN should not proxy those files through this route
+at all — generate against the same bucket the CDN serves from and store the
+resulting descriptor (its `url`/`urls` already point at the CDN), or write a
+custom `ImageLoader`:
+
+```ts
+import type { ImageLoader } from "@warlock.js/web";
+
+const cdnLoader: ImageLoader = ({ src, variant, format }) =>
+  `https://cdn.example.com${src}/${variant}${format ? `.${format}` : ""}`;
+
+<Image image={post.cover} alt={post.title} loader={cdnLoader} />;
+```
+
+Either way, the app itself never fetches and re-streams someone else's
+bytes on every request.
+
+## See also
+
+- [Measuring Web Vitals](/v/latest/web/essentials/web-vitals/) — `priority`
+  and reserved layout space are two of the practices there; image delivery
+  and field measurement are two halves of the same LCP/CLS story.

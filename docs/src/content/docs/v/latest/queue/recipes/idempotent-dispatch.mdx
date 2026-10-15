@@ -1,0 +1,72 @@
+---
+title: "Dispatch a Job Exactly Once"
+sidebar:
+  order: 1
+---
+
+You have a job triggered from a webhook or a retried HTTP request, and
+the caller might fire it twice for the same logical unit of work — a
+payment webhook retried by the provider, a form submit the browser
+resent. `jobId` makes dispatch idempotent.
+
+```ts
+import { defineJob } from "@warlock.js/queue";
+
+export const sendInvoice = defineJob({
+  name: "invoices.send",
+  attempts: 5,
+  backoff: { type: "exponential", delay: 2000 },
+  async handle(payload: { invoiceId: string }) {
+    await mailer.sendInvoice(payload.invoiceId);
+  },
+});
+
+async function onInvoiceReady(invoiceId: string) {
+  await sendInvoice.dispatch(
+    { invoiceId },
+    { jobId: `invoice:${invoiceId}` }, // deterministic id from the domain data
+  );
+}
+```
+
+## Why this works
+
+A second `dispatch()` call with a `jobId` that still exists in Redis
+(waiting, delayed, or active) is a no-op — BullMQ recognizes the id and
+does not enqueue a duplicate. The second webhook delivery for the same
+invoice adds nothing.
+
+Once the job has **completed or failed**, the id is free again (unless
+you keep it with `removeOnComplete: false`) — dispatching the same
+`jobId` after that starts a fresh run. If you need "never run this
+twice, ever," check your own persisted state (e.g. `invoice.sentAt`)
+before calling `dispatch()` at all; `jobId` only protects the window
+while the job exists in the queue.
+
+## Checking whether it actually ran twice
+
+```ts
+const existing = await sendInvoice.find(`invoice:${invoiceId}`);
+
+if (existing) {
+  console.log(existing.state); // "waiting" | "active" | "completed" | ...
+}
+```
+
+## Combine with delay for debounced work
+
+`jobId` plus `delay` gives you a cheap debounce — repeated triggers
+within the delay window collapse into one run:
+
+```ts
+await sendInvoice.dispatch(
+  { invoiceId },
+  { jobId: `invoice:${invoiceId}`, delay: "30s" },
+);
+```
+
+If five identical triggers arrive within 30 seconds, only the first
+enqueues a job; the rest are no-ops because the id is still `delayed`.
+
+See [Defining jobs](../essentials/defining-jobs/) for the full
+`DispatchOptions` shape.

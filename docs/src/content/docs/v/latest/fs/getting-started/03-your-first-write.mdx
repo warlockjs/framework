@@ -1,0 +1,115 @@
+---
+title: "Your first write"
+description: A five-minute quick win — write JSON, read it back typed, and grab a lazy file handle, all through the fs facade.
+sidebar:
+  order: 3
+  label: "Your first write"
+---
+
+import { Steps, CardGrid, LinkCard, Aside } from "@astrojs/starlight/components";
+
+Let's write something to disk and read it back — the whole loop in about
+five minutes. Everything goes through the **`fs` facade**: one import,
+grouped namespaces, no factory and no config.
+
+<Steps>
+
+1. **Import the facade.**
+
+   One named import gets you the whole toolkit:
+
+   ```ts
+   import { fs } from "@warlock.js/fs";
+   ```
+
+   `fs.files` handles files, `fs.dirs` handles directories, and
+   `fs.file(path)` / `fs.dir(path)` give you lazy handle objects. That's
+   the entire surface you need to remember.
+
+2. **Write some JSON.**
+
+   Save an object as pretty-printed JSON — no manual `JSON.stringify`,
+   no `mkdir -p` dance:
+
+   ```ts
+   await fs.files.putJson("./data/config/app.json", {
+     name: "warlock",
+     version: "1.0.0",
+   });
+   ```
+
+   The `./data/config` folders didn't exist a second ago. `putJson`
+   created them for you before writing.
+
+   <Aside type="tip" title="Parents come free">
+     The facade auto-creates missing parent directories on write. You
+     never precede a write with a directory call.
+   </Aside>
+
+3. **Read it back — typed.**
+
+   Pass a type parameter and you get a real shape back, not `unknown`:
+
+   ```ts
+   type AppConfig = { name: string; version: string };
+
+   const config = await fs.files.getJson<AppConfig>("./data/config/app.json");
+   //    ^? AppConfig
+   ```
+
+   Parsing is handled for you. Want runtime validation too? Pass a
+   `schema` (seal, Zod, Valibot — any Standard Schema works) and bad data
+   throws instead of sneaking through.
+
+4. **Grab a handle and inspect it.**
+
+   When you're going to touch the same file more than once, bind it to a
+   `File` handle and ask it about itself:
+
+   ```ts
+   const file = fs.file("./data/config/app.json");
+
+   console.log(file.name);        // → "app.json"
+   console.log(await file.size()); // → bytes on disk
+   ```
+
+   `file.name` is instant — handles do zero IO until you call an async
+   method like `.size()`. From here `file.get()`, `file.editJson()`,
+   `file.copyTo()`, and friends all read cleaner than repeating the path.
+
+</Steps>
+
+That's the core rhythm: **write, read typed, handle.** Everything else in
+the library is a variation on these three moves.
+
+<Aside type="note" title="Why async?">
+  The `fs` facade is async-only by design — the honest interface for
+  disk IO. If you genuinely need a synchronous call, the low-level
+  primitives (`putFile`, `getFile`, `hashString`, …) are still
+  exported as the escape hatch. Reach for the facade first.
+</Aside>
+
+## Where to next
+
+<CardGrid>
+  <LinkCard
+    title="Working with files"
+    href="../../guides/files"
+    description="get, put, edit, append, merge JSON — the full fs.files surface."
+  />
+  <LinkCard
+    title="Working with directories"
+    href="../../guides/directories"
+    description="ensure, empty, list, walk, and hash whole trees with fs.dirs."
+  />
+  <LinkCard
+    title="File & directory handles"
+    href="../../guides/handles"
+    description="Lazy, immutable fs.file() / fs.dir() objects and how they chain."
+  />
+  <LinkCard
+    title="Hashing"
+    href="../../guides/hashing"
+    description="fs.hash for strings, buffers, files, and directory fingerprints."
+  />
+</CardGrid>

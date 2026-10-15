@@ -1,0 +1,396 @@
+---
+title: Loaders and metadata
+slug: v/latest/web/essentials/loaders-and-metadata
+description: Load request-scoped data on the server and derive typed document metadata.
+sidebar:
+  order: 3
+  label: Loaders and metadata
+---
+
+A page loader is its server-side controller. It can use the Warlock request
+context, DI, guards, and response controls, then return serializable data to the
+React component.
+
+## Optional setup modules
+
+Pair `products.page.tsx` with `products.setup.ts` to keep server policy and
+loaders beside, but outside, the UI component. `layout.setup.ts`,
+`root.setup.ts`, and `error.setup.ts` follow the same rule. The framework
+composes the pair on the server and projects only browser-safe `register()`
+code for the client.
+
+The UI must not value-import setup. It can retain inferred loader data with a
+type-only import:
+
+```tsx title="src/web/products.page.tsx"
+import type { loader } from "./products.setup";
+import type { PageProps } from "@warlock.js/web";
+
+export default function Products({ data }: PageProps<typeof loader>) {
+  return <h1>{data.products.length}</h1>;
+}
+```
+
+That type-only loader import is sufficient in development and production. It
+retains the framework-projected `register()` hook without adding a runtime UI
+import of setup.
+
+An export belongs to exactly one member of the pair. Duplicate `config`,
+`loader`, or `register` exports fail rather than receiving precedence. Setup
+files are optional and `warlock dev` detects their add/edit/delete changes.
+
+## Type loader data into the page
+
+```tsx title="src/web/products/[id].setup.ts"
+import { v } from "@warlock.js/seal";
+import type { PageConfig, PageLoaderContext, PageProps } from "@warlock.js/web";
+
+const productParams = v.object({ id: v.string() });
+
+export const config = {
+  route: { path: "/products/:id", name: "products.show" },
+  validation: { params: productParams },
+  cache: { public: true, maxAge: 60 },
+} satisfies PageConfig;
+
+export async function loader(
+  { request }: PageLoaderContext<typeof config.validation, typeof config.route>,
+) {
+  const id = request.input("id");
+
+  return {
+    product: { id, name: `Product ${id}` },
+  };
+}
+
+export const metadata = ({ data }: PageProps<typeof loader>) => ({
+  title: data.product.name,
+  description: `Details for ${data.product.name}`,
+});
+```
+
+Use the context type for the file role: `PageLoaderContext` for a page,
+`LayoutLoaderContext` for a layout, and `AppLoaderContext` for `root`. Type the
+context and let TypeScript infer the return value so `PageProps<typeof loader>`
+retains the concrete data shape.
+
+```tsx title="src/web/products/[id].page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import type { loader } from "./[id].setup";
+
+export default function ProductPage({ data }: PageProps<typeof loader>) {
+  return <h1>{data.product.name}</h1>;
+}
+```
+
+Do not annotate the whole function as `PageLoader`, use `satisfies` on a
+loader, duplicate its payload shape, or cast an unknown return.
+
+Components receive data, not HTTP objects. Keep repositories, secrets, and
+request work in the loader; the default component must also render in the
+browser.
+
+The `config.cache` declaration is the only shared-cache opt-in. Warlock
+applies its final cache floor after loader buffers commit, so a loader-written
+`Cache-Control` header cannot override the `no-store`, authentication, or
+cookie rules. [Read the complete cache policy →](/v/latest/web/essentials/routing/#cache-public-pages-explicitly)
+
+## Validate page input
+
+A page's `config.validation` declares a Seal schema per source. `params` and
+`query` stay separate keys; they are never merged. Declare either or both — a
+page with no dynamic segment can skip `params`, and one that reads no query
+keys can skip `query`:
+
+```tsx title="src/web/products/[id].page.tsx"
+import { v } from "@warlock.js/seal";
+import type { PageConfig } from "@warlock.js/web";
+
+export const config: PageConfig = {
+  validation: {
+    params: v.object({ id: v.int().coerce() }),
+    query: v.object({ tab: v.string().optional() }).stripUnknown(),
+  },
+};
+```
+
+`request.params` and `request.query` arrive as strings, so a numeric field
+needs `.coerce()` — `v.int()` alone rejects `"2"` with "This input accepts
+only numbers". Seal objects reject unknown keys by default, so a `query`
+schema without `.stripUnknown()` 400s on an ordinary tracking param such as
+`?utm_source=newsletter`; `.stripUnknown()` is the normal spelling for a
+public page's query.
+
+Validation runs once, after the app and layout loaders and before the page
+loader, so a layout redirect still wins and the error page renders inside
+layouts that have their data. When it fails, the response status is
+**400**, and every failing field is reported together.
+
+- **A full page load** renders your `error.page.tsx` with status 400. The error
+  it receives carries the validation issues, so the page can show them:
+
+  ```tsx title="src/web/error.page.tsx"
+  import type { ErrorPageProps } from "@warlock.js/web";
+
+  export default function ErrorPage({ error, status }: ErrorPageProps) {
+    const issues = (error as { errors?: { input: string; type: string; error: string }[] })?.errors;
+
+    return (
+      <main>
+        <p>Status: {status}</p>
+        {issues?.map((issue) => (
+          <p key={issue.input}>
+            {issue.input}: {issue.error}
+          </p>
+        ))}
+      </main>
+    );
+  }
+  ```
+
+  In production `errors` is always this safe `{ input, type, error }` shape —
+  which rule failed and where. In production, the `:value` placeholder in
+  page-validation messages renders `…` instead of the submitted value. A
+  custom rule or translation that builds its message from raw input without
+  `:value` isn't covered, so keep submitted values out of custom message
+  text.
+
+- **A client navigation** to the same URL receives the same 400.
+
+Before 5.11, a full page load that failed validation returned an empty 400
+body, so the browser showed a blank page.
+
+## Execution order
+
+Loaders run sequentially and are awaited root to leaf:
+
+1. the `root.tsx` application loader;
+2. the one rendering layout's loader;
+3. the page loader.
+
+There are at most three loader levels because a page can have only one
+rendering layout. Middleware from non-rendering layouts still composes across
+the full ancestry.
+
+Each loader level writes to its own buffered response. Surviving buffers commit
+root to leaf, so a discarded level cannot leak partial headers.
+
+## Abandoned requests — `signal`
+
+Every loader context includes `signal`, an `AbortSignal` that fires when the
+client disconnects before the response is finished. Pass it to anything that
+can be cancelled:
+
+```tsx title="src/web/products/index.page.tsx"
+import type { PageLoader } from "@warlock.js/web";
+
+export const loader = (async ({ signal }) => {
+  const res = await fetch("https://api.example.com/products", { signal });
+
+  return { products: await res.json() };
+}) satisfies PageLoader;
+```
+
+A disconnect also stops SSR, NDJSON navigation streams, and the pipeline
+between loader levels (app → layout → page). A loader that is already running
+and never checks `signal` still runs to the end.
+
+## Loader timeout — `web.loaderTimeout`
+
+The loaders of one request (app → layout → page, plus validation) must finish
+within `web.loaderTimeout` milliseconds, 15000 by default. If they don't,
+`signal` fires and the request gets your `error.page.tsx` with status 504 (a
+504 error record on a client navigation). Deferred values and rendering are
+not bounded by it. Set `0` to turn the limit off:
+
+```ts title="src/config/web.ts"
+export default {
+  loaderTimeout: 30_000,
+};
+```
+
+## Terminal outcomes
+
+- A core `Response` returned by any loader stops every lower loader and bypasses
+  buffered commits and metadata resolution. Return one only when that exact
+  response should win.
+- `response.redirect()`, `response.permanentRedirect()`, and
+  `response.notFound()` stop lower loaders but commit buffers through the
+  current level. Metadata is skipped.
+- A thrown error stops lower loaders, discards the throwing level's buffer, and
+  commits only levels above it.
+
+## Metadata behavior
+
+`config.metadata` can be a static object or a function of resolved loader data.
+Pages, layouts, and `root.tsx` all use that same shape. It supports `title`,
+`description`, `keywords`, `canonical`, `robots`, `openGraph`, and `twitter`.
+
+Use an explicit config type annotation. A title can be a string, a default and
+template pair, or an absolute title that no ancestor may format:
+
+```tsx title="src/web/root.tsx"
+import type { RootConfig } from "@warlock.js/web";
+
+export const config: RootConfig = {
+  metadata: { title: { default: "Acme", template: "%s | Acme" } },
+  strictMode: true,
+};
+```
+
+```tsx title="src/web/account/layout.tsx"
+import type { LayoutConfig } from "@warlock.js/web";
+
+export const config: LayoutConfig = {
+  metadata: { robots: "noindex" },
+};
+```
+
+```tsx title="src/web/account/profile.page.tsx"
+import type { PageConfig } from "@warlock.js/web";
+
+export const config: PageConfig = {
+  metadata: { title: { absolute: "Your profile" } },
+};
+```
+
+Metadata callbacks run only during server-side metadata resolution, after their
+own loader succeeds. They receive readonly `{ data, shared, child? }`; `child`
+is the already-resolved descendant metadata chain. Metadata-less layouts are
+skipped, while the page leaf is represented even when it contributes no
+metadata. The resolver visits page, inner layout, outer layout, then root once;
+each callback sees its own loader data. A callback returns that level's complete
+metadata: its explicit fields override `child.metadata`, and fields it omits do not carry
+forward. Spread `child.metadata` when the callback should retain descendant fields:
+
+```tsx title="src/web/account/layout.tsx"
+import type { LayoutConfig } from "@warlock.js/web";
+
+export const config: LayoutConfig = {
+  metadata: ({ data, child }) => ({
+    ...child?.metadata,
+    title: `${data.accountName} | ${child?.metadata.title ?? "Account"}`,
+  }),
+};
+```
+
+The callback may override a child title. An absolute child title remains
+authoritative. Static metadata defaults still merge with child metadata;
+`openGraph` and `twitter` merge field by field, arrays replace rather than
+merge, and the nearest title template formats a title once. A fallback from the
+same level is not formatted.
+
+When a title is supplied, the resolved browser/SSR output has a string `title`;
+template and absolute title objects are author input only.
+
+Metadata does not run after a loader failure. Warlock substitutes
+`{ title: "Something went wrong", robots: "noindex" }`, so a metadata
+function's `data` is never an optional failure-state value.
+
+Unknown metadata fields fail the build with the field name, source line, and a
+nearby suggestion when one exists. This catches typos such as `tittle` even
+when `config` has no explicit TypeScript annotation.
+
+## What survives the wire
+
+App, layout, and page loader data travels the browser wire serialized with
+[`devalue`](https://www.npmjs.com/package/devalue), not plain `JSON` — this
+changed in 5.12. Concretely, this now arrives in the browser exactly as the
+loader returned it:
+
+- `Date`, `Map`, `Set`, `BigInt`
+- `undefined` as an object property's value (not just at the top level)
+- a repeated reference to the same object (two properties pointing at the
+  same object hydrate as the same object, not two independent copies)
+- a cyclic structure (an object that, transitively, references itself)
+
+A class instance devalue does not recognize, a function, or a symbol is
+still refused — loudly. The build throws a `PageDataSerializationError`
+naming the loader level (`app`/`layout`/`page`), the key path, and the page
+route, in both dev and production. The fix is always the same: give the
+offending value a `resource` or a `toJSON()` method so it reaches the wire
+as a plain value devalue already knows how to serialize — a `resource` or a
+`toJSON()` is the serialization gate, never the wire format itself.
+
+This applies to `appData`/`layoutData`/`pageData` and to a
+[`defer()`](/v/latest/web/essentials/streaming-and-defer/)-ed value's
+eventual settlement. It does **not** change `shared`, which keeps its own,
+stricter gate: scalars, arrays, plain objects, or values with a `toJSON()` —
+`Date`, `Map`, `Set`, functions, and arbitrary class instances are rejected
+there regardless.
+
+### What the page's `data` type says
+
+Since 5.27, `data` in `PageProps`, `LayoutProps`, `AppProps` and in
+`metadata` callbacks is typed as what actually reaches the page:
+`Serialized<LoaderReturn, "devalue">` from `@warlock.js/core`, not the loader's
+raw return. The loader's own declared return type is untouched, and plain
+JSON-like data reads exactly as before.
+
+```tsx title="src/web/products/product.page.tsx"
+import type { PageProps } from "@warlock.js/web";
+import { getProduct } from "app/products/services/get-product.service";
+
+export async function loader() {
+  const product = await getProduct(); // a Product model
+
+  return { product, publishedAt: new Date() };
+}
+
+export default function ProductPage({ data }: PageProps<typeof loader>) {
+  // data.product      is the output of the model's resource
+  // data.publishedAt  is a Date: devalue keeps it native
+  return <h1>{data.product.title}</h1>;
+}
+```
+
+| The loader returns                                          | The page reads                                                               |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| a model registered in `ModelResourceRegistry`               | that resource's output, `ResourceOutput<typeof ProductResource>`             |
+| a model with no registry entry                              | its serialized `data` type                                                   |
+| a value with `toJSON()`                                     | the awaited result of `toJSON()`                                             |
+| `Date`, `Map`, `Set`, `RegExp`, `URL`                       | the same native type                                                         |
+| a class instance with private members and no `toJSON()`     | `never`, because devalue would throw at render                               |
+| a function-valued key                                       | dropped from the type; devalue still refuses a function at render, so do not return one |
+| a `defer()` key holding a promise                           | a `Promise` of the serialized settled value, for `use()`                     |
+
+A model reads as its resource automatically when it declares `static resource`:
+`warlock generate.typings` and `warlock dev` generate the `ModelResourceRegistry` entries. See
+[Serialized output on the wire](/v/latest/core/the-basics/resources-deep/#serialized-output-on-the-wire)
+for the generated file and the full rules.
+
+A promise nested in plain loader data (not a top-level `defer()` key) is
+awaited, and its settled value is serialized too. A model or resource resolved
+from a promise therefore reaches the page as its `toJSON()` output instead of
+making devalue throw, and the type reads the serialized settled value. This is
+not streaming; only a top-level `defer()` key streams, and inside `defer()` a
+promise nested under a key is still refused.
+
+## Page tracing phases
+
+When request tracing is enabled (`http.tracing`, off by default — see
+core's [request tracing](/v/latest/core/digging-deeper/request-tracing/)
+page), a page request reports three additional phases through the same
+vendor-neutral hooks: `loader` (per loader level — app, layout, page),
+`render.shell`, and `stream.end`. No extra configuration is needed on the
+web side beyond enabling `http.tracing` in `warlock.config.ts`.
+
+## Environment values
+
+Read deployment or request-scoped values in the loader and return only what is
+safe for the browser:
+
+```tsx
+import { env } from "@warlock.js/core";
+import type { PageLoader, PageProps } from "@warlock.js/web";
+
+export const loader = (async () => ({
+  siteName: env("PUBLIC_SITE_NAME"),
+})) satisfies PageLoader;
+
+export default function HomePage({ data }: PageProps<typeof loader>) {
+  return <h1>{data.siteName}</h1>;
+}
+```
+
+[Understand the enforced client/server boundary →](/v/latest/web/essentials/client-server-boundaries/)

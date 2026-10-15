@@ -1,0 +1,112 @@
+# Warlock.js
+
+> A modern, batteries-included TypeScript backend framework for Node.js. Warlock
+> ships an integrated ecosystem — HTTP, ORM (Cascade), validation (Seal), cache,
+> auth, logging, scheduling, messaging (Herald), and AI — built to work together
+> with first-class type-safety and a clean, convention-driven developer experience.
+
+Documentation: https://warlock.js.org
+
+## Packages
+
+Each package publishes its own `llms.txt` (index) and `llms-full.txt` (complete
+text). **Prefer the package-scoped file** when you only need one package — the
+combined `llms-full.txt` below is the whole framework and is far larger.
+
+- [@warlock.js/core](https://warlock.js.org/v/latest/core/): A robust nodejs framework for building blazing fast applications
+  - llms.txt: https://warlock.js.org/core/llms.txt
+  - llms-full.txt: https://warlock.js.org/core/llms-full.txt
+- [@warlock.js/cascade](https://warlock.js.org/v/latest/cascade/): ORM for managing databases
+  - llms.txt: https://warlock.js.org/cascade/llms.txt
+  - llms-full.txt: https://warlock.js.org/cascade/llms-full.txt
+- [@warlock.js/seal](https://warlock.js.org/v/latest/seal/): Comprehensive Validation library
+  - llms.txt: https://warlock.js.org/seal/llms.txt
+  - llms-full.txt: https://warlock.js.org/seal/llms-full.txt
+- [@warlock.js/cache](https://warlock.js.org/v/latest/cache/): A Robust Cache Manager for Nodejs
+  - llms.txt: https://warlock.js.org/cache/llms.txt
+  - llms-full.txt: https://warlock.js.org/cache/llms-full.txt
+- [@warlock.js/fs](https://warlock.js.org/v/latest/fs/): Filesystem primitives for Warlock.js â€” drop-in replacement for @warlock.js/fs.
+  - llms.txt: https://warlock.js.org/fs/llms.txt
+  - llms-full.txt: https://warlock.js.org/fs/llms-full.txt
+- [@warlock.js/logger](https://warlock.js.org/v/latest/logger/): A powerful logging system  for messages and errors in nodejs.
+  - llms.txt: https://warlock.js.org/logger/llms.txt
+  - llms-full.txt: https://warlock.js.org/logger/llms-full.txt
+- [@warlock.js/scheduler](https://warlock.js.org/v/latest/scheduler/): A simple scheduler package to run jobs in scheduled times
+  - llms.txt: https://warlock.js.org/scheduler/llms.txt
+  - llms-full.txt: https://warlock.js.org/scheduler/llms-full.txt
+- [@warlock.js/queue](https://warlock.js.org/v/latest/queue/): Durable background jobs for Warlock.js on BullMQ + Redis: defineJob, dispatch with delay/priority, retries with backoff, progress, failed-job access, in-process workers with graceful shutdown.
+  - llms.txt: https://warlock.js.org/queue/llms.txt
+  - llms-full.txt: https://warlock.js.org/queue/llms-full.txt
+- [@warlock.js/auth](https://warlock.js.org/v/latest/auth/): Authentication system for Warlock.js applications
+  - llms.txt: https://warlock.js.org/auth/llms.txt
+  - llms-full.txt: https://warlock.js.org/auth/llms-full.txt
+- [@warlock.js/access](https://warlock.js.org/v/latest/access/): Authorization (RBAC + ABAC) for Warlock.js applications
+  - llms.txt: https://warlock.js.org/access/llms.txt
+  - llms-full.txt: https://warlock.js.org/access/llms-full.txt
+- [@warlock.js/context](https://warlock.js.org/v/latest/context/): A simple and unified way to share context using AsyncLocalStorage for the Warlock.js framework
+  - llms.txt: https://warlock.js.org/context/llms.txt
+  - llms-full.txt: https://warlock.js.org/context/llms-full.txt
+- [@warlock.js/herald](https://warlock.js.org/v/latest/herald/): Message bus/brokers for RabbitMQ, Kafka, and more
+  - llms.txt: https://warlock.js.org/herald/llms.txt
+  - llms-full.txt: https://warlock.js.org/herald/llms-full.txt
+- [@warlock.js/notifications](https://warlock.js.org/v/latest/notifications/): Multi-channel notifications for Warlock.js — define once, fire anywhere; mail / in-app database / pluggable custom channels with preferences, rate limits, and idempotency.
+  - llms.txt: https://warlock.js.org/notifications/llms.txt
+  - llms-full.txt: https://warlock.js.org/notifications/llms-full.txt
+- [@warlock.js/web](https://warlock.js.org/v/latest/web/): Warlock.js web layer for the SSR page pipeline and client runtime.
+  - llms.txt: https://warlock.js.org/web/llms.txt
+  - llms-full.txt: https://warlock.js.org/web/llms-full.txt
+- [@warlock.js/ai](https://warlock.js.org/v/latest/ai/): Core @warlock.js AI framework — contracts, agent, workflow, supervisor
+  - llms.txt: https://warlock.js.org/ai/llms.txt
+  - llms-full.txt: https://warlock.js.org/ai/llms-full.txt
+- [@warlock.js/ai-openai](https://warlock.js.org/v/latest/ai/providers/openai/): OpenAI SDK adapter for @warlock.js/ai
+  - llms.txt: https://warlock.js.org/ai-openai/llms.txt
+  - llms-full.txt: https://warlock.js.org/ai-openai/llms-full.txt
+- [@warlock.js/ai-anthropic](https://warlock.js.org/v/latest/ai/providers/anthropic/): Anthropic SDK adapter for @warlock.js/ai
+  - llms.txt: https://warlock.js.org/ai-anthropic/llms.txt
+  - llms-full.txt: https://warlock.js.org/ai-anthropic/llms-full.txt
+- [@warlock.js/ai-google](https://warlock.js.org/v/latest/ai/providers/google/): Google Gemini adapter for @warlock.js/ai
+  - llms.txt: https://warlock.js.org/ai-google/llms.txt
+  - llms-full.txt: https://warlock.js.org/ai-google/llms-full.txt
+- [@warlock.js/ai-bedrock](https://warlock.js.org/v/latest/ai/providers/bedrock/): AWS Bedrock adapter for @warlock.js/ai
+  - llms.txt: https://warlock.js.org/ai-bedrock/llms.txt
+  - llms-full.txt: https://warlock.js.org/ai-bedrock/llms-full.txt
+- [@warlock.js/ai-deepseek](https://warlock.js.org/v/latest/ai/providers/deepseek/): DeepSeek adapter for @warlock.js/ai
+  - llms.txt: https://warlock.js.org/ai-deepseek/llms.txt
+  - llms-full.txt: https://warlock.js.org/ai-deepseek/llms-full.txt
+- [@warlock.js/ai-groq](https://warlock.js.org/v/latest/ai/providers/groq/): Groq adapter for @warlock.js/ai (OpenAI-compatible, thin wrapper over @warlock.js/ai-openai)
+  - llms.txt: https://warlock.js.org/ai-groq/llms.txt
+  - llms-full.txt: https://warlock.js.org/ai-groq/llms-full.txt
+- [@warlock.js/ai-mistral](https://warlock.js.org/v/latest/ai/providers/mistral/): Mistral AI adapter for @warlock.js/ai (OpenAI-compatible)
+  - llms.txt: https://warlock.js.org/ai-mistral/llms.txt
+  - llms-full.txt: https://warlock.js.org/ai-mistral/llms-full.txt
+- [@warlock.js/ai-xai](https://warlock.js.org/v/latest/ai/providers/xai/): xAI Grok adapter for @warlock.js/ai
+  - llms.txt: https://warlock.js.org/ai-xai/llms.txt
+  - llms-full.txt: https://warlock.js.org/ai-xai/llms-full.txt
+- [@warlock.js/ai-ollama](https://warlock.js.org/v/latest/ai/providers/ollama/): Ollama adapter for @warlock.js/ai
+  - llms.txt: https://warlock.js.org/ai-ollama/llms.txt
+  - llms-full.txt: https://warlock.js.org/ai-ollama/llms-full.txt
+- [@warlock.js/ai-live](https://warlock.js.org/v/latest/ai/providers/live/): Live & generative rich-media for @warlock.js/ai — ai.realtime() duplex voice sessions and ai.video() text-to-video. The heavy, demand-gated modalities, kept out of core so text/image/speech stay dependency-light.
+  - llms.txt: https://warlock.js.org/ai-live/llms.txt
+  - llms-full.txt: https://warlock.js.org/ai-live/llms-full.txt
+- [@warlock.js/ai-tools](https://warlock.js.org/v/latest/ai/providers/tools/): Ready-made agent tools (web search, fetch, HTTP, calculator, date-time) + an MCP client/server for @warlock.js/ai
+  - llms.txt: https://warlock.js.org/ai-tools/llms.txt
+  - llms-full.txt: https://warlock.js.org/ai-tools/llms-full.txt
+- [@warlock.js/ai-workspace](https://warlock.js.org/v/latest/ai/providers/workspace/): Policy-jailed filesystem + shell workspace for @warlock.js/ai agents
+  - llms.txt: https://warlock.js.org/ai-workspace/llms.txt
+  - llms-full.txt: https://warlock.js.org/ai-workspace/llms-full.txt
+- [@warlock.js/ai-panoptic](https://warlock.js.org/v/latest/ai/observability/ai-panoptic/): Observability collector + exporters for @warlock.js/ai
+  - llms.txt: https://warlock.js.org/ai-panoptic/llms.txt
+  - llms-full.txt: https://warlock.js.org/ai-panoptic/llms-full.txt
+- [create-warlock](https://warlock.js.org/v/latest/create-warlock/): Project scaffolder for the Warlock.js framework — interactive wizard and non-interactive CLI for creating new apps.
+  - llms.txt: https://warlock.js.org/create-warlock/llms.txt
+  - llms-full.txt: https://warlock.js.org/create-warlock/llms-full.txt
+- [@warlock.js/devtools](https://warlock.js.org/v/latest/devtools/): Development-only dashboard for Warlock.js apps at /__warlock: request timeline, queries with EXPLAIN, N+1 detection, dev mailbox, logs, cache operations and the route map. Refuses to run outside development.
+  - llms.txt: https://warlock.js.org/devtools/llms.txt
+  - llms-full.txt: https://warlock.js.org/devtools/llms-full.txt
+- [@warlock.js/sitemap](https://warlock.js.org/v/latest/sitemap/): A framework-blind sitemap builder: entries in, a valid sitemaps.org document out. Zero runtime dependencies.
+  - llms.txt: https://warlock.js.org/sitemap/llms.txt
+  - llms-full.txt: https://warlock.js.org/sitemap/llms-full.txt
+
+## Full text
+
+- [llms-full.txt](https://warlock.js.org/llms-full.txt): The complete documentation for every package, concatenated into a single file.

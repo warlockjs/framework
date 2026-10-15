@@ -1,0 +1,46 @@
+---
+title: "Dashboard"
+sidebar:
+  order: 3
+---
+
+`queueDashboard()` mounts the [bull-board](https://github.com/felixmosh/bull-board)
+UI — active, waiting, delayed, and failed jobs, with retry and delete —
+on Warlock's Fastify server.
+
+## Install and mount
+
+```sh
+npm install @bull-board/api @bull-board/fastify
+```
+
+```ts
+import { getHttpServer } from "@warlock.js/core";
+import { queueDashboard } from "@warlock.js/queue";
+
+await queueDashboard(getHttpServer(), { basePath: "/admin/queues" });
+```
+
+Call it before the server starts listening.
+
+## Options
+
+| Option | Default | Notes |
+|---|---|---|
+| `basePath` | `"/admin/queues"` | URL prefix the UI is mounted on |
+| `queues` | every queue with a registered job, plus the default queue | pass to show a specific subset |
+
+## Optional peers
+
+`@bull-board/api` and `@bull-board/fastify` are optional peer
+dependencies, loaded with a dynamic `import()` only when
+`queueDashboard()` is actually called — installing `@warlock.js/queue`
+alone does not pull them in. A missing one throws
+`QueueDashboardDependencyError` naming the package to install.
+
+## Protect it yourself
+
+The dashboard has no authentication of its own, and it can retry and
+delete jobs. Put it behind your app's own auth (a middleware on the
+route, an IP allowlist, a reverse-proxy rule) — `queueDashboard()` does
+not add one for you.

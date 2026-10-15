@@ -1,0 +1,69 @@
+---
+title: Crawler mode
+slug: v/latest/web/essentials/crawler-mode
+description: Serve a detected crawler the fully resolved document instead of a streamed shell.
+sidebar:
+  order: 7
+  label: Crawler mode
+---
+
+`web.streaming.crawlers` is new in `@warlock.js/web` 5.12. It exists because a
+crawler never runs the browser's defer-bootstrap script, so it never has the
+chance to observe a chunk that arrives after the shell — streamed to one, a
+[`defer()`](/v/latest/web/essentials/streaming-and-defer/)-ed section would
+stay missing from whatever it indexes forever.
+
+## What changes for a detected crawler
+
+Every full-document request from a detected crawler skips streaming
+entirely: every deferred value is awaited and inlined into the page data
+before the first byte goes out, and the response waits for React's
+`onAllReady` before anything flushes. A rejection takes the ordinary
+boundary/status escalation path, exactly as a synchronous loader throw
+would — nothing has flushed yet, so there is no 200 already on the wire to
+contradict.
+
+A page that never calls `defer()` renders identically for every user agent.
+
+## Built-in detection
+
+Detection is case-insensitive and, by default, matches this list:
+`googlebot`, `bingbot`, `yandex`, `duckduckbot`, `baiduspider`, `slurp`,
+`applebot`, `facebookexternalhit`, `twitterbot`, `linkedinbot`, `discordbot`,
+`slackbot`, `telegrambot`, `whatsapp`, `embedly`, `pinterest`.
+
+No configuration is required to get this default behavior.
+
+## Disable or customize detection
+
+```ts title="warlock.config.ts"
+export default {
+  web: {
+    streaming: {
+      crawlers: false, // disable detection entirely — every request streams
+      // OR customize it:
+      crawlers: {
+        userAgents: [/mybot/i], // REPLACES the built-in list, not merges with it
+        detect: (request) => request.header("x-render-mode") === "crawler", // wins outright when given
+      },
+    },
+  },
+};
+```
+
+`userAgents` replaces the built-in list rather than extending it. `detect`,
+when given, wins outright over the user-agent list.
+
+## `Vary: User-Agent`
+
+A page that never calls `defer()` never carries a `Vary` header — its
+response is identical for every requester. A page that **does** `defer()`
+renders differently depending on the request's `User-Agent` (streamed for a
+browser, fully resolved for a detected crawler), so its document response
+carries `Vary: User-Agent`, so a shared cache never serves one
+representation to a client that asked for the other.
+
+## See also
+
+- [Streaming SSR and defer()](/v/latest/web/essentials/streaming-and-defer/) —
+  the streaming contract crawler mode bypasses.

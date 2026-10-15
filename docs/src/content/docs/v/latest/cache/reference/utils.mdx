@@ -1,0 +1,268 @@
+---
+title: "Utilities"
+slug: v/latest/cache/utils
+---
+
+The low-level helpers the cache layer is built from. Every driver leans on
+these for TTL parsing, key sanitization, tag merging, and vector scoring —
+and they're all re-exported from `@warlock.js/cache`, so you can reach for
+them directly when you're writing a custom driver or doing cache-adjacent
+work outside the manager.
+
+You rarely need them at the application call site — `cache.set("k", v, "1h")`
+parses the duration for you. They earn their keep when you step *outside* the
+normal flow: building a driver that doesn't extend `BaseCacheDriver`, scoring
+vectors by hand, or normalizing a TTL for some non-cache code path.
+
+## Parse TTL
+
+`parseTtl(input)` normalizes a TTL into seconds. Accepts a number (seconds,
+returned unchanged), `Infinity` (no expiration), or a human-readable duration
+string parsed via [`ms`](https://www.npmjs.com/package/ms). Throws
+[`CacheConfigurationError`](/v/latest/cache/errors/#cacheconfigurationerror)
+on unparseable strings or negative numbers.
+
+```ts
+import { parseTtl } from "@warlock.js/cache";
+
+parseTtl(3600);         // 3600
+parseTtl("1h");         // 3600
+parseTtl("30m");        // 1800
+parseTtl("7d");         // 604800
+parseTtl("2 weeks");    // 1209600
+parseTtl(Infinity);     // Infinity   (no expiration)
+
+parseTtl(-5);           // throws — negative numbers rejected
+parseTtl("");           // throws — empty string rejected
+parseTtl("forever");    // throws — not a valid duration
+```
+
+Reach for it when you need the numeric seconds value for non-cache code —
+logging, a custom metric, a downstream API that expects seconds:
+
+```ts
+const ttlSeconds = parseTtl(userSuppliedTtl);
+metrics.gauge("cache.session.ttl_seconds", ttlSeconds);
+await cache.set("session", data, ttlSeconds);
+```
+
+:::note Accepted duration grammar
+`ms` accepts compact (`"1s"`, `"30m"`, `"2h"`, `"7d"`, `"1w"`, `"1y"`) and
+verbose (`"1 second"`, `"30 minutes"`, `"7 days"`) forms. Compound forms like
+`"1h30m"` are **not** accepted — use `"90m"` or the numeric equivalent.
+:::
+
+## Resolve TTL
+
+`resolveTtl(ttl?, expiresAt?, fallback)` applies the precedence the drivers
+use: caller's `ttl` wins, otherwise `expiresAt` is converted to relative
+seconds, otherwise the `fallback` (driver default) is used. Supplying both
+`ttl` and `expiresAt` throws
+[`CacheConfigurationError`](/v/latest/cache/errors/#cacheconfigurationerror)
+— two ways to say the same thing.
+
+```ts
+import { resolveTtl } from "@warlock.js/cache";
+
+resolveTtl(60, undefined, 9999);                            // 60   — caller ttl wins
+resolveTtl("1h", undefined, 9999);                          // 3600 — duration string parsed
+resolveTtl(undefined, new Date(Date.now() + 60_000), 9999); // ~60  — expiresAt converted
+resolveTtl(undefined, undefined, 1800);                     // 1800 — fallback used
+resolveTtl(undefined, undefined, Infinity);                 // Infinity (no expiry)
+
+resolveTtl(60, Date.now() + 60_000, 9999);                  // throws — both supplied
+```
+
+Used internally by `BaseCacheDriver.resolveSetOptions(...)`. Call it directly
+when writing a custom driver that doesn't extend `BaseCacheDriver` but still
+wants consistent TTL semantics.
+
+## expiresAt to TTL
+
+`expiresAtToTtl(expiresAt)` converts an absolute deadline (a `Date` or epoch
+milliseconds) into a relative TTL in seconds. Throws
+[`CacheConfigurationError`](/v/latest/cache/errors/#cacheconfigurationerror)
+when the deadline is in the past — silently storing an already-expired entry
+would hide a caller bug (stale timestamp, wrong unit).
+
+```ts
+import { expiresAtToTtl } from "@warlock.js/cache";
+
+expiresAtToTtl(new Date(Date.now() + 60_000));  // ~60
+expiresAtToTtl(Date.now() + 30 * 60 * 1000);    // ~1800
+
+expiresAtToTtl(Date.now() - 1000);              // throws — past deadline
+```
+
+## Normalize to Options
+
+`normalizeToOptions(input)` coerces the polymorphic third `set` argument into
+a uniform [`CacheSetOptions`](/v/latest/cache/set-options/) shape, so callers
+can skip per-shape branching.
+
+```ts
+import { normalizeToOptions } from "@warlock.js/cache";
+
+normalizeToOptions(undefined);                  // {}
+normalizeToOptions(null);                        // {}
+normalizeToOptions(60);                          // { ttl: 60 }
+normalizeToOptions("1h");                         // { ttl: "1h" }
+normalizeToOptions({ ttl: "1h", tags: ["x"] });  // returned as-is
+```
+
+## Normalize to Remember Options
+
+`normalizeToRememberOptions(input)` is the sibling for the `remember()` call
+site, where the polymorphic second argument is `CacheTtl | RememberOptions`
+(no `expiresAt`, no `onConflict`). Same shape, so callers can spread without
+branching.
+
+```ts
+import { normalizeToRememberOptions } from "@warlock.js/cache";
+
+normalizeToRememberOptions(60);                          // { ttl: 60 }
+normalizeToRememberOptions("1h");                         // { ttl: "1h" }
+normalizeToRememberOptions({ ttl: "1h", tags: ["x"] });  // returned as-is
+```
+
+## Parse Cache Key
+
+`parseCacheKey(key, options?)` turns a string or object key into a sanitized
+`dot.notation` string. Curly braces, quotes, and brackets are stripped; colons
+and commas become dots. This keeps keys predictable and collision-resistant —
+the same logic every built-in driver applies under the hood.
+
+```ts
+import { parseCacheKey } from "@warlock.js/cache";
+
+parseCacheKey("users:1");                // "users.1"
+
+// Objects serialize deterministically into a flat key
+parseCacheKey({ limit: 3, page: 1, search: "John" });
+// "limit.3.page.1.search.John"
+
+parseCacheKey({ user: { id: 5 }, tags: ["a", "b"] });
+// "user.id.5.tags.a.b"
+```
+
+Pass a `globalPrefix` (static string or a function) to namespace the result:
+
+```ts
+parseCacheKey("user:1", { globalPrefix: "myapp" });
+// "myapp.user.1"
+
+parseCacheKey("user:1", {
+  globalPrefix: () => `tenant.${getCurrentTenant().id}`,
+});
+// "tenant.1.user.1"
+```
+
+:::tip Prefer plain dot strings
+In application code, just write `cache.set("user.1", ...)`. Reach for
+`parseCacheKey` only when you're programmatically deriving a key from a
+complex object (e.g. a query-filter cache).
+:::
+
+## Merge Tag Sets
+
+`mergeTagSets(...lists)` unions any number of tag arrays into a single deduped
+array, dropping `undefined`/empty entries. Returns `undefined` when nothing
+survives — so callers can skip emitting an empty `tags: []`. This is what
+scoped caches use to merge scope tags + handle tags + per-call tags additively.
+
+```ts
+import { mergeTagSets } from "@warlock.js/cache";
+
+mergeTagSets(["a", "b"], ["b", "c"]);   // ["a", "b", "c"]
+mergeTagSets(undefined, ["x"]);          // ["x"]
+mergeTagSets(undefined, undefined);      // undefined
+mergeTagSets([], []);                     // undefined
+```
+
+## Inject Tags
+
+`injectTags(options, extraTags)` appends extra tags onto any option bag that
+already shapes `tags?: string[]`. Pure — it clones the input and never mutates.
+Tags are appended as-is; pair with `mergeTagSets` if you need de-duplication.
+
+```ts
+import { injectTags } from "@warlock.js/cache";
+
+injectTags({ ttl: "1h" }, ["unread"]);   // { ttl: "1h", tags: ["unread"] }
+injectTags({ tags: ["a"] }, ["b"]);       // { tags: ["a", "b"] }
+```
+
+## Cosine Similarity
+
+`cosineSimilarity(a, b)` returns the cosine of the angle between two
+equal-length numeric vectors — a value in `[-1, 1]` where `1` is perfectly
+aligned, `0` orthogonal, `-1` opposing. For typical embedding spaces the
+practical range is `[0, 1]`. A zero-norm vector on either side returns `0`.
+Dimension mismatch (or an empty vector) throws
+[`CacheConfigurationError`](/v/latest/cache/errors/#cacheconfigurationerror)
+— failing loud beats a silently-wrong score.
+
+```ts
+import { cosineSimilarity } from "@warlock.js/cache";
+
+cosineSimilarity([1, 0, 0], [1, 0, 0]);  // 1
+cosineSimilarity([1, 0, 0], [0, 1, 0]);  // 0
+cosineSimilarity([1, 0, 0], [-1, 0, 0]); // -1
+cosineSimilarity([0, 0, 0], [1, 2, 3]);  // 0  — zero-norm by convention
+
+cosineSimilarity([1, 2, 3], [1, 2]);     // throws — dimension mismatch
+cosineSimilarity([], []);                // throws — empty vectors
+```
+
+You typically don't call this directly —
+[`cache.similar()`](/v/latest/cache/similarity/) uses it under the hood for
+the brute-force memory drivers. Reach for it when you're building custom
+retrieval that needs the same scoring without going through the cache:
+
+```ts
+const queryVec = [1, 0, 0];
+const ranked = candidates
+  .map((candidate) => ({
+    ...candidate,
+    score: cosineSimilarity(queryVec, candidate.vector),
+  }))
+  .sort((a, b) => b.score - a.score);
+```
+
+## Expiration Constants
+
+The `CACHE_FOR` enum provides common TTL values in seconds — handy when you'd
+rather not eyeball a magic number.
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+await cache.set("temp", data, CACHE_FOR.HALF_HOUR);    // 30 minutes
+await cache.set("session", data, CACHE_FOR.ONE_HOUR);  // 1 hour
+await cache.set("daily", data, CACHE_FOR.ONE_DAY);     // 24 hours
+await cache.set("weekly", data, CACHE_FOR.ONE_WEEK);   // 7 days
+```
+
+| Constant | Value (seconds) | Duration |
+|----------|----------------:|----------|
+| `HALF_HOUR` | 1800 | 30 minutes |
+| `ONE_HOUR` | 3600 | 1 hour |
+| `HALF_DAY` | 43200 | 12 hours |
+| `ONE_DAY` | 86400 | 24 hours |
+| `ONE_WEEK` | 604800 | 7 days |
+| `HALF_MONTH` | 1296000 | 15 days |
+| `ONE_MONTH` | 2592000 | 30 days |
+| `TWO_MONTHS` | 5184000 | 60 days |
+| `SIX_MONTHS` | 15768000 | 180 days |
+| `ONE_YEAR` | 31536000 | 365 days |
+
+Since these are plain seconds, the duration-string form (`"30m"`, `"7d"`)
+gets you the same result with less ceremony — use whichever reads better at
+the call site.
+
+## Related Documentation
+
+- [Set Options](/v/latest/cache/set-options/) — the `CacheSetOptions` shape these helpers normalize
+- [Similarity Retrieval](/v/latest/cache/similarity/) — `cache.similar()`, which uses `cosineSimilarity`
+- [Make Your Own Cache Driver](/v/latest/cache/make-your-own-cache-driver/) — where these helpers earn their keep
+- [Errors](/v/latest/cache/errors/) — `CacheConfigurationError` and friends

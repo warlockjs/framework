@@ -1,0 +1,146 @@
+---
+title: "@warlock.js/web"
+description: Server-rendered React pages for Warlock apps, with hydration, typed loaders, filesystem routing, and production CSS.
+sidebar:
+  order: 1
+  label: "Overview"
+---
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+`@warlock.js/web` is Warlock's React page layer. A page is an ordinary Warlock
+route that renders a document instead of JSON, so pages share the application's
+route table, middleware, validation, request context, and lifecycle.
+
+Pages render on the server and hydrate in the browser. After hydration,
+`<Link>` provides client navigation while loaders keep request-only work on the
+server.
+
+## Choose your starting point
+
+Install only the highest layer you need. Dependencies are resolved for you:
+
+```bash
+warlock add web       # React SSR page layer
+warlock add tailwind  # Web + Tailwind CSS v4
+warlock add shadcn    # Web + Tailwind + shadcn/ui prerequisites
+```
+
+For shadcn/ui, Warlock prepares the project; shadcn's own CLI still adds the
+components:
+
+```bash
+npx shadcn@latest add button card
+```
+
+Do not run `shadcn init` after `warlock add shadcn`; Warlock has already written
+the project-specific aliases, stylesheet, design tokens, and `cn` helper.
+
+[See the complete Tailwind and shadcn/ui setup →](./getting-started/tailwind-and-shadcn/)
+
+## A page in one file
+
+Create `src/web/about.page.tsx`:
+
+```tsx title="src/web/about.page.tsx"
+import type { PageConfig } from "@warlock.js/web";
+
+export const config: PageConfig = {
+  metadata: { title: "About" },
+};
+
+export default function AboutPage() {
+  return (
+    <main>
+      <h1>About</h1>
+    </main>
+  );
+}
+```
+
+With no `config.route`, that file serves `/about`. Warlock derives routes from
+files beneath `src/web/`; an explicit literal `config.route` can override the
+path and name when needed.
+
+## Learn Web by task
+
+<CardGrid>
+  <LinkCard
+    title="Install Web"
+    href="./getting-started/installation/"
+    description="Choose Web, Tailwind, or shadcn and see exactly what the command creates."
+  />
+  <LinkCard
+    title="Create your first page"
+    href="./getting-started/first-page/"
+    description="Render a page, declare metadata, and navigate without a reload."
+  />
+  <LinkCard
+    title="Add Tailwind and shadcn/ui"
+    href="./getting-started/tailwind-and-shadcn/"
+    description="Set up Tailwind v4, generate components, and avoid the init trap."
+  />
+  <LinkCard
+    title="Routing"
+    href="./essentials/routing/"
+    description="Filesystem routes, named routes, dynamic segments, groups, and wildcards."
+  />
+  <LinkCard
+    title="Layouts and special pages"
+    href="./essentials/layouts-and-special-pages/"
+    description="Compose prefixes and middleware; own the 404 and error boundaries."
+  />
+  <LinkCard
+    title="Loaders and metadata"
+    href="./essentials/loaders-and-metadata/"
+    description="Move server work into typed loaders and control the document head."
+  />
+  <LinkCard
+    title="Streaming and defer()"
+    href="./essentials/streaming-and-defer/"
+    description="Stream a slow loader value in after the shell with defer() and Suspense."
+  />
+  <LinkCard
+    title="Crawler mode"
+    href="./essentials/crawler-mode/"
+    description="Serve a detected bot the fully resolved document instead of a stream."
+  />
+  <LinkCard
+    title="Page caching"
+    href="./essentials/page-caching/"
+    description="Opt a route into a tagged, server-held cache with instant invalidation."
+  />
+  <LinkCard
+    title="Scroll restoration"
+    href="./essentials/scroll-restoration/"
+    description="Automatic scroll position restore on back/forward navigation."
+  />
+  <LinkCard
+    title="Client navigation"
+    href="./essentials/client-navigation/"
+    description="Navigate, refresh loaders, and show router-owned pending state."
+  />
+  <LinkCard
+    title="Localization"
+    href="./essentials/localization/"
+    description="Read the locale, derive text direction, translate, and switch locale live."
+  />
+  <LinkCard
+    title="Client/server boundaries"
+    href="./essentials/client-server-boundaries/"
+    description="Keep secrets and server-only imports out of the browser bundle."
+  />
+  <LinkCard
+    title="Development and production"
+    href="./guides/development-and-production/"
+    description="Understand Fast Refresh, live route changes, manifests, and CSS delivery."
+  />
+  <LinkCard
+    title="Sitemap and robots.txt"
+    href="./guides/sitemap-and-robots/"
+    description="Generate sitemap.xml from your pages, with locale alternates, and serve robots.txt."
+  />
+</CardGrid>
+
+Upgrading from v4? Web is an opt-in addition in v5; start with the
+[v5 migration guide](/v/latest/core/upgrade-to-v5/).

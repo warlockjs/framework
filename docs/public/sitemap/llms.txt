@@ -1,0 +1,9 @@
+# Warlock Sitemap
+
+> Package: `@warlock.js/sitemap`
+
+> A framework-blind sitemap builder: entries in, a valid sitemaps.org document out. Zero runtime dependencies.
+
+## Skills
+
+- [sitemap-overview](@warlock.js/sitemap/sitemap-overview/SKILL.md): Front-door orientation for `@warlock.js/sitemap`: framework-blind `Sitemap` and streaming `SitemapIndex` builders, URL metadata, hreflang, Google image entries, sharding, diagnostics, and atomic publication. Use when adding or debugging sitemap output; Warlock page discovery and `/sitemap.xml` routing belong to `@warlock.js/web`.

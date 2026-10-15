@@ -1,0 +1,30 @@
+---
+title: Cache
+description: Warlock's caching layer — multi-driver, with tags, locks, SWR, and vector similarity search.
+---
+
+> Standalone — usable in any Node project, no `@warlock.js/core` required.
+
+`@warlock.js/cache` is the caching layer. Pick a driver — memory, Redis, Postgres, file, LRU, or null — then wrap the slow thing in `remember` and move on:
+
+```ts
+import { cache, RedisCacheDriver } from "@warlock.js/cache";
+
+cache.setCacheConfigurations({
+  default: "redis",
+  drivers: { redis: RedisCacheDriver },
+  options: { redis: { url: process.env.REDIS_URL } },
+});
+await cache.init();
+
+// First call computes and stores; the next 999 within the hour are ~1ms reads.
+const product = await cache.remember(
+  `products.${productId}`,
+  "1h",
+  () => db.products.findById(productId),
+);
+```
+
+That one call is stampede-safe by default: when a thousand requests miss the same key at once, exactly one regenerates it while the rest wait for the result. Tag related entries for surgical invalidation, lock against races with `cache.lock`, serve stale-while-revalidate for hot reads, even cache by vector similarity for AI-adjacent workloads — each is one short call away.
+
+**[Get started →](/v/latest/cache/introduction/)** — pick a driver and cache your first value in a few lines.

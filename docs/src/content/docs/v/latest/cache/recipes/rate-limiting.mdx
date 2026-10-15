@@ -1,0 +1,93 @@
+---
+title: "Rate Limiting"
+slug: v/latest/cache/rate-limiting
+---
+
+A counter with an expiry is all you need for a basic rate limiter: count
+requests against a per-client key, reject once the count crosses your limit,
+and let the key expire to reset the window.
+[`update()`](/v/latest/cache/update-merge/) gives you the atomic
+increment-and-set in one call.
+
+## The pattern
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+const LIMIT = 100;          // requests…
+const WINDOW = "1m";        // …per window
+
+async function checkRateLimit(clientId: string): Promise<boolean> {
+  const key = `ratelimit.${clientId}`;
+
+  // Atomically read → increment → write, refreshing the window each hit.
+  const count = await cache.update<number>(
+    key,
+    (current) => (current ?? 0) + 1,
+    { ttl: WINDOW },
+  );
+
+  return count <= LIMIT;   // false → over the limit, reject
+}
+```
+
+Use it at the edge of a handler:
+
+```ts
+const allowed = await checkRateLimit(request.ip);
+
+if (!allowed) {
+  return response.status(429).send({ error: "Too many requests" });
+}
+```
+
+## How the window behaves
+
+`update()` runs the read-modify-write under a per-key in-process lock, so
+concurrent requests for the same client can't lose increments. Because it
+re-applies `{ ttl: WINDOW }` on **every** hit, this is a **sliding window**:
+the clock resets with each request, so a client must go quiet for a full
+`WINDOW` to regain capacity. That's a good fit for "stop hammering me" abuse
+protection.
+
+:::note Want a fixed window instead?
+A fixed window (capacity refills at a wall-clock boundary regardless of
+traffic) needs a key that rolls over on its own — e.g. bucket by the minute:
+`ratelimit.${clientId}.${Math.floor(Date.now() / 60_000)}`. Each minute is a
+fresh key.
+:::
+
+## Distributed limits
+
+`update()` is atomic **within one process**, not across instances — on every
+driver it serializes via an in-process lock (the Redis driver doesn't override
+it with `WATCH`/`MULTI`). For a single API node that's exactly right.
+
+Running multiple nodes that must share one budget? Use the Redis driver's
+**native atomic** counter via [`increment()`](/v/latest/cache/atomic-operations/),
+which maps to Redis `INCRBY` and is atomic cluster-wide:
+
+```ts
+async function checkRateLimitDistributed(clientId: string): Promise<boolean> {
+  const key = `ratelimit.${clientId}.${Math.floor(Date.now() / 60_000)}`;
+
+  const count = await cache.increment(key);   // native INCRBY on redis
+
+  return count <= LIMIT;
+}
+```
+
+:::caution
+`increment()` doesn't attach a TTL, so the per-minute bucket keys above won't
+auto-expire on their own — prune them with a [scheduled
+job](/v/latest/cache/job-guard/), or run this on a driver/key policy that
+evicts (e.g. an [`lru`](/v/latest/cache/lru-memory/) cap, or a Redis key
+eviction policy). The sliding-window `update()` version above has no such
+caveat — its key always carries a TTL.
+:::
+
+## Related Documentation
+
+- [Update & Merge](/v/latest/cache/update-merge/) — atomic read-modify-write
+- [Atomic Operations](/v/latest/cache/atomic-operations/) — `increment()` / `decrement()`
+- [Choosing a Driver](/v/latest/cache/choosing-a-driver/) — single-node vs. distributed

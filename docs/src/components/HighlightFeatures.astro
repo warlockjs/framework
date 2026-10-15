@@ -1,0 +1,304 @@
+---
+/**
+ * HighlightFeatures — shared "what this package gets right" block.
+ *
+ * One component, reused across every package overview page. Each feature
+ * is icon + title + 1-line lede + 2-line body + optional code peek.
+ *
+ * Usage (from MDX):
+ *
+ *   import HighlightFeatures from "../../../../../components/HighlightFeatures.astro";
+ *
+ *   <HighlightFeatures
+ *     kicker="why logger"
+ *     title="Built for production logs, not console noise"
+ *     features={[
+ *       {
+ *         icon: "M4 6h16M4 12h16M4 18h10",
+ *         title: "Structured channels",
+ *         lede: "Pick a channel per concern.",
+ *         body: "Route prod logs to JSON, dev to pretty console, audits to a separate file — all via a single config.",
+ *         code: "log.channel(\"audit\").info(...)",
+ *         codeLang: "ts",
+ *       },
+ *       …
+ *     ]}
+ *   />
+ *
+ * The component is presentational only — no data fetching, no client JS.
+ */
+
+interface Feature {
+  /** SVG path data — single <path d="..." /> drawn at 24x24 viewBox. */
+  icon: string;
+  /** Short noun title, ~2-4 words. */
+  title: string;
+  /** Single-sentence summary above the body. */
+  lede: string;
+  /** 1-2 sentence elaboration. */
+  body: string;
+  /** Optional code peek — keep to 1-3 lines. */
+  code?: string;
+  /** Language label shown above the code peek; defaults to "ts". */
+  codeLang?: string;
+}
+
+interface Props {
+  /** Mono uppercase tag above the title — e.g. "highlights" or "why logger". */
+  kicker?: string;
+  /** Section heading. */
+  title: string;
+  /** Optional one-line subtitle under the heading. */
+  subtitle?: string;
+  /** 3-6 features; the grid is responsive. */
+  features: Feature[];
+}
+
+const { kicker, title, subtitle, features } = Astro.props as Props;
+---
+
+<section class="warlock-highlights not-content">
+  <header class="warlock-highlights-head">
+    {kicker && <p class="warlock-highlights-kicker">{kicker}</p>}
+    <h2 class="warlock-highlights-title">{title}</h2>
+    {subtitle && <p class="warlock-highlights-subtitle">{subtitle}</p>}
+  </header>
+
+  <div class="warlock-highlights-grid">
+    {features.map((f) => (
+      <article class="warlock-highlight-card">
+        <span class="warlock-highlight-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d={f.icon} />
+          </svg>
+        </span>
+        <h3 class="warlock-highlight-title">{f.title}</h3>
+        <p class="warlock-highlight-lede">{f.lede}</p>
+        <p class="warlock-highlight-body">{f.body}</p>
+        {f.code && (
+          <div class="warlock-highlight-code" aria-label="example">
+            <div class="warlock-highlight-code-bar">
+              <span class="warlock-highlight-code-dot warlock-highlight-code-dot--red" aria-hidden="true" />
+              <span class="warlock-highlight-code-dot warlock-highlight-code-dot--yellow" aria-hidden="true" />
+              <span class="warlock-highlight-code-dot warlock-highlight-code-dot--green" aria-hidden="true" />
+              <span class="warlock-highlight-code-lang">{f.codeLang ?? "ts"}</span>
+            </div>
+            <pre><code>{f.code}</code></pre>
+          </div>
+        )}
+      </article>
+    ))}
+  </div>
+</section>
+
+<style>
+  .warlock-highlights {
+    margin-block: 3rem;
+  }
+
+  .warlock-highlights-head {
+    max-width: 44rem;
+    margin: 0 auto 2rem;
+    text-align: center;
+  }
+
+  .warlock-highlights-kicker {
+    font-family: var(--sl-font-mono);
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--sl-color-text-accent);
+    letter-spacing: 0.06em;
+    margin: 0 0 0.7rem;
+    text-transform: lowercase;
+    opacity: 0.85;
+  }
+
+  .warlock-highlights-title {
+    font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2.1rem);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.018em;
+    margin: 0;
+    color: var(--sl-color-white);
+  }
+
+  .warlock-highlights-subtitle {
+    margin: 0.7rem 0 0;
+    color: var(--sl-color-gray-3);
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+
+  .warlock-highlights-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    gap: 1.1rem;
+  }
+
+  /* ---------- Card ---------- */
+
+  .warlock-highlight-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 1.4rem 1.3rem 1.3rem;
+    border-radius: var(--warlock-radius);
+    background:
+      linear-gradient(180deg, rgba(245, 184, 0, 0.025), transparent 55%),
+      var(--warlock-surface-dark, #161b29);
+    border: 1px solid var(--sl-color-hairline);
+    transition:
+      transform 0.18s ease,
+      border-color 0.18s ease,
+      box-shadow 0.18s ease;
+    overflow: hidden;
+  }
+
+  /* Top accent rule that lights up on hover */
+  .warlock-highlight-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 1.3rem;
+    right: 1.3rem;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--sl-color-text-accent) 35%, transparent),
+      transparent
+    );
+    opacity: 0;
+    transition: opacity 0.18s ease;
+  }
+
+  .warlock-highlight-card:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--sl-color-text-accent) 40%, var(--sl-color-hairline));
+    box-shadow:
+      0 1px 0 rgba(245, 184, 0, 0.08),
+      0 18px 40px -24px rgba(245, 184, 0, 0.22);
+  }
+
+  .warlock-highlight-card:hover::before {
+    opacity: 1;
+  }
+
+  :root[data-theme="light"] .warlock-highlight-card {
+    background:
+      linear-gradient(180deg, rgba(161, 98, 7, 0.04), transparent 55%),
+      #ffffff;
+  }
+
+  .warlock-highlight-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--sl-color-text-accent) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--sl-color-text-accent) 30%, var(--sl-color-hairline));
+    color: var(--sl-color-text-accent);
+    margin-bottom: 0.35rem;
+    box-shadow: 0 0 18px -6px color-mix(in srgb, var(--sl-color-text-accent) 60%, transparent);
+  }
+
+  .warlock-highlight-title {
+    font-size: 1.025rem;
+    font-weight: 700;
+    letter-spacing: -0.012em;
+    margin: 0;
+    color: var(--sl-color-white);
+    line-height: 1.25;
+  }
+
+  .warlock-highlight-lede {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: var(--sl-color-text-accent);
+    line-height: 1.4;
+  }
+
+  .warlock-highlight-body {
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    color: var(--sl-color-gray-3);
+  }
+
+  /* ---------- Code peek ---------- */
+
+  .warlock-highlight-code {
+    margin-top: 0.85rem;
+    border-radius: var(--warlock-radius-sm);
+    border: 1px solid var(--sl-color-hairline);
+    background: var(--warlock-surface-darker, #0f1422);
+    overflow: hidden;
+  }
+
+  :root[data-theme="light"] .warlock-highlight-code {
+    background: #f8fafc;
+  }
+
+  .warlock-highlight-code-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.7rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
+    background: color-mix(in srgb, var(--sl-color-bg) 50%, transparent);
+  }
+
+  .warlock-highlight-code-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    display: inline-block;
+  }
+
+  .warlock-highlight-code-dot--red {
+    background: #ef4444;
+    opacity: 0.55;
+  }
+
+  .warlock-highlight-code-dot--yellow {
+    background: #f5b800;
+    opacity: 0.55;
+  }
+
+  .warlock-highlight-code-dot--green {
+    background: #22c55e;
+    opacity: 0.55;
+  }
+
+  .warlock-highlight-code-lang {
+    margin-inline-start: auto;
+    font-family: var(--sl-font-mono);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--sl-color-gray-4);
+    font-weight: 600;
+  }
+
+  .warlock-highlight-code pre {
+    margin: 0;
+    padding: 0.85rem 0.95rem;
+    background: transparent;
+    overflow-x: auto;
+  }
+
+  .warlock-highlight-code code {
+    font-family: var(--sl-font-mono);
+    font-size: 0.78rem;
+    line-height: 1.55;
+    color: var(--sl-color-white);
+    background: transparent;
+    padding: 0;
+    border: 0;
+    white-space: pre;
+  }
+</style>

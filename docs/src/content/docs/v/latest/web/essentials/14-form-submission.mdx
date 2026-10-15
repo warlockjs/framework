@@ -1,0 +1,97 @@
+---
+title: Form submission
+description: Submit @mongez/react-form data through named Warlock API routes.
+sidebar:
+  order: 14
+---
+
+`useSubmitForm` connects an existing `@mongez/react-form` form to the app's configured HTTP client. Install its optional peers and import it from the form subpath:
+
+```tsx
+import { Form } from "@mongez/react-form";
+import { useSubmitForm } from "@warlock.js/web/form";
+
+export default function CreateOrder() {
+  const createOrder = useSubmitForm({
+    route: "orders.create",
+    params: { customerId: "42" },
+    onSuccess: result => console.log(result.data),
+  });
+
+  return <Form onSubmit={createOrder.submit}>{/* controls */}</Form>;
+}
+```
+
+It needs `@mongez/http:^3.5.0` and `@mongez/react-form:^4.0.0`. By default it uses the configured `http` singleton, preserving its base URL, interceptors, authentication, and error handling. Pass `client` when a different configured `Http` instance is required.
+
+Pass exactly one of `route` or `path`. A named route uses its server-declared method; a direct `path` defaults to `POST` and accepts `method`. Use `params` for path segments and `query` for URL parameters. GET and HEAD send form values as query data; other requests send native `FormData`.
+
+Named API routes are captured in the same generated declaration file as page
+routes. With `.warlock/typings/web-routes.d.ts` included in the app TypeScript
+project, `route` and `params` are checked against the registered API route.
+The browser receives only each API route's name, path, and method; it never
+receives handlers, schemas, or server policy. An API route registered with
+method `"all"` does not prevent boot, but cannot be submitted by name: choose
+an explicit `path` and `method` instead.
+
+The hook returns `submit`, `data`, `error`, `response`, `isLoading`, `formErrors`, `reset`, and `cancel`. Data, error, and response begin as `null`; loading begins as `false` and form errors as an empty array. Lifecycle callbacks receive the full `HttpResult`. `beforeSubmit` may return `false` to cancel before a request. Duplicate calls share the pending promise; cancellation and unmount prevent stale state updates. `reset()` clears results and errors assigned by the hook without clearing form values or cancelling an active request.
+
+Validation field mapping is enabled by default. Matching fields receive server errors, while unknown field names and general errors are collected in `formErrors`. Disable it with `mapFieldErrors: false`, or supply a mapper returning field-message pairs.
+
+Named route metadata deliberately contains only name, path, and method (plus the type-only `response` map described below). A route registered with `all` has no safe browser verb; use a direct path with an explicit method.
+
+## Typed API responses
+
+Since 5.27, a route whose handler declares `responseSchema` (see core's [Declare response types](/v/latest/core/the-basics/03-controllers/#declare-response-types-with-responseschema)) gets a `response` map in its generated `ApiRouteRegistry` entry, and `useSubmitForm({ route })` types `data`, `response` and `onSuccess` from the route's declared 2xx body. There is no generic argument and no cast.
+
+```ts title="src/app/auth/controllers/login.controller.ts"
+login.responseSchema = {
+  200: { body: { user: UserResource, token: "string" } },
+  400: { body: { error: "string" } },
+};
+```
+
+```tsx title="src/web/login.page.tsx"
+import { Form } from "@mongez/react-form";
+import { useSubmitForm } from "@warlock.js/web/form";
+
+export default function Login() {
+  const login = useSubmitForm({
+    route: "auth.login",
+    onSuccess: async ({ data }) => {
+      if (data) {
+        console.log(data.user.name, data.token); // typed from the 200 body
+      }
+    },
+  });
+
+  return <Form onSubmit={login.submit}>{/* controls */}</Form>;
+}
+```
+
+`login.data` has the same type, or `null` until a request succeeds. With several declared 2xx statuses the body is the union of them. Read a declared body anywhere with the public types from `@warlock.js/web`:
+
+| Type                                | What it is                                                                                              |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `ApiResponse<Name, Status = 200>`   | The declared body for that status, or `unknown` when the route or the status is not declared (never `any`). |
+| `ApiResponses<Name>`                | The whole status-to-body map. Empty for an undeclared route or a `runtimeRoute` name.                   |
+| `ApiSuccessResponse<Name>`          | The union of the declared 2xx bodies, or `unknown` when there is none.                                  |
+
+```ts
+import type { ApiResponse } from "@warlock.js/web";
+
+type LoginError = ApiResponse<"auth.login", 400>; // { error: string }
+```
+
+- A route without `responseSchema` keeps `unknown`, and an app with no `responseSchema` at all generates a byte-identical declaration file.
+- A direct `path` target, and an explicit `useSubmitForm<Schema, Data>` call, are unchanged: you supply `Data` yourself.
+- Each resource in a schema is mapped back to its `*.resource.ts(x)` export. A resource defined elsewhere is typed `unknown`, and core warns with the route and field.
+- The declaration file holds types only; the `response` map adds nothing to what the browser receives at runtime.
+
+## Page actions instead
+
+`useSubmitForm` posts to an API route and leaves the result to your callbacks. When the form belongs to a page and the outcome should re-render it or redirect (and work without JavaScript), export an `action` from the page and use `<Form>`; see [Page actions](./15-page-actions).
+
+## Prefetch cache (5.21)
+
+The client prefetch cache is cleared on refresh, on locale change and after form submits. `clearPrefetchCache()` is exported from `@warlock.js/web` if you need to clear it yourself after a mutation made outside a form.

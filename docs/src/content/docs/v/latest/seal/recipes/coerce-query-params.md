@@ -1,0 +1,137 @@
+---
+title: "Coerce query-string and form params"
+sidebar:
+  order: 4
+  label: "Coerce query params"
+---
+
+Query strings and form-encoded bodies arrive as strings — always. `?page=2&active=true` gives you `{ page: "2", active: "true" }`, not numbers and booleans. Validating that against `v.int()` fails, because `"2"` is a string, not an integer. The fix is **coercion**: reshape the value before the type rule checks it.
+
+Seal keeps coercion explicit (it never silently coerces behind your back), so you opt in exactly where you need it.
+
+## Numbers — reach for `v.numeric()`
+
+`v.numeric()` accepts numeric strings *and* numbers, and coerces the output to a real number. It's the query-param workhorse.
+
+```ts
+import { v, validate, type Infer } from "@warlock.js/seal";
+
+const listQuery = v.object({
+  page: v.numeric().min(1).default(1),
+  perPage: v.numeric().min(1).max(100).default(20),
+});
+
+const result = await validate(listQuery, { page: "3" });
+result.data;
+// → { page: 3, perPage: 20 }
+//   "3" coerced to 3; perPage defaulted because it was absent.
+```
+
+Note the difference from `v.int()`, which does **not** coerce:
+
+```ts
+await validate(v.object({ page: v.int() }), { page: "3" });
+// → ERROR: "The page must be a number" — a string is not an integer.
+
+await validate(v.object({ page: v.numeric() }), { page: "3" });
+// → { page: 3 } — numeric coerces the string first.
+```
+
+Rule of thumb: **`v.numeric()` for anything that arrives as text** (query, form, headers), **`v.int()` / `v.number()` for JSON bodies** where the client already sent a real number.
+
+### Keep integer/number strictness — `.coerce()` (5.9+)
+
+`v.numeric()` accepts *any* numeric string, so `"3.5"` passes as `3.5`. When the **type** matters — you want a strict integer from a query string, so `"3"` is accepted but `"3.5"` is rejected — chain `.coerce()` on the number validator instead:
+
+```ts
+const listQuery = v.object({
+  page: v.int().coerce().min(1).default(1),
+});
+
+await validate(listQuery, { page: "3" });
+// → { page: 3 }  — the numeric string is parsed, then the int rule passes.
+
+await validate(listQuery, { page: "3.5" });
+// → ERROR — coercion parses "3.5" to 3.5, and the int rule still rejects it.
+```
+
+`.coerce()` is available on the whole number family (`int`, `number`, `float`, `numeric`). It is **opt-in and only reshapes a numeric-shaped string into a number** — anything non-numeric passes through untouched so it still fails the type rule, and `v.int()` stays strict everywhere you don't add it. The inferred output type is unchanged (`v.int().coerce()` is still `number`).
+
+Use `.coerce()` when the *type* matters (a strict `int` / `float` from text); reach for `v.numeric()` when you just want "a number from text".
+
+## Enums — `.in()` reads strings directly
+
+Enum-style params are already strings, so a plain `v.string().in([...])` works — no coercion needed. Add `.default()` to make the param optional with a sensible fallback:
+
+```ts
+const sortQuery = v.object({
+  sort: v.string().in(["asc", "desc"]).default("asc"),
+});
+
+await validate(sortQuery, { sort: "desc" });   // → { sort: "desc" }
+await validate(sortQuery, {});                 // → { sort: "asc" }  (default)
+await validate(sortQuery, { sort: "sideways" });
+// → ERROR { type: "in", input: "sort" }
+```
+
+Want the inferred type to narrow to `"asc" | "desc"` instead of `string`? Use `v.literal("asc", "desc")` instead of `.in([...])` — the literal carries the union into `Infer<>`.
+
+## Booleans — `.coerce()` (5.10+)
+
+A flag arrives as `?active=true`, i.e. the string `"true"` — `v.boolean()` only accepts real booleans by default and rejects it. Chain `.coerce()` to reshape the value *before* the boolean type rule runs:
+
+```ts
+const filterQuery = v.object({
+  active: v.boolean().coerce().default(true),
+});
+
+await validate(filterQuery, { active: "false" });  // → { active: false }
+await validate(filterQuery, { active: "true" });   // → { active: true }
+await validate(filterQuery, { active: "1" });      // → { active: true }
+await validate(filterQuery, { active: "0" });      // → { active: false }
+```
+
+`.coerce()` converts *exactly* `"true"` / `"1"` / `1` → `true` and `"false"` / `"0"` / `0` → `false`. Case-sensitive, no trimming — anything else (`"yes"`, `"on"`, `"TRUE"`, `""`) passes through unchanged and still fails the type rule. `v.boolean()` does not coerce by default; the inferred output type is unchanged (`v.boolean().coerce()` is still `boolean`). Form-style truthy strings like `"yes"` / `"on"` are a different concern — use `v.boolean().accepted()` / `.declined()` instead (see [pick the right primitive](../guides/pick-the-right-primitive.md)).
+
+## Dates — `v.date()` already normalizes
+
+`v.date()` ships a built-in mutator that parses date strings and timestamps into a `Date`, so query-string dates need no extra work:
+
+```ts
+const rangeQuery = v.object({
+  from: v.date().optional(),
+  to: v.date().optional(),
+});
+
+await validate(rangeQuery, { from: "2024-01-01", to: "2024-12-31" });
+// → { from: Date(2024-01-01), to: Date(2024-12-31) }
+```
+
+Add `.toISOString()` if you want the output back as a string instead of a `Date`.
+
+## Putting it together — a paginated list endpoint
+
+```ts
+const productsQuery = v.object({
+  page: v.numeric().min(1).default(1),
+  perPage: v.numeric().min(1).max(100).default(24),
+  sort: v.string().in(["price", "name", "newest"]).default("newest"),
+  inStock: v.boolean().coerce().optional(),
+  category: v.string().optional(),
+});
+
+type ProductsQuery = Infer.Output<typeof productsQuery>;
+// { page: number; perPage: number; sort: "price"|"name"|"newest"; inStock?: boolean; category?: string }
+
+const result = await validate(productsQuery, request.query);
+
+if (result.isValid) {
+  // result.data is fully coerced and defaulted — ready to hand to your DB query.
+}
+```
+
+## Related
+
+- [Validate a request body](./validate-request-body.md) — the JSON-body counterpart
+- [Pick the right primitive](../guides/pick-the-right-primitive.md) — `v.numeric` vs `v.int`, `v.boolean().accepted()` for form booleans
+- [Essentials → Modifiers](../essentials/02-modifiers.md) — where mutators sit in the pipeline

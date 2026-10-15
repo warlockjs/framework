@@ -1,0 +1,215 @@
+---
+title: "Update & Merge"
+slug: v/latest/cache/update-merge
+---
+
+`update()` and `merge()` are atomic read-modify-write helpers. Use them instead of the ad-hoc `get → spread → set` pattern, which can drop updates when two requests run at once:
+
+```ts
+// ❌ Classic bug — two requests racing lose one of the updates
+const user = await cache.get("user.1");
+await cache.set("user.1", { ...user, lastSeen: Date.now() });
+
+// ✅ Safe — update() does read + transform + write as a single atomic step
+await cache.update("user.1", (user) => ({ ...user, lastSeen: Date.now() }));
+```
+
+Under the hood, each `update()` / `merge()` call takes a **per-key chain lock**: when N concurrent calls land on the same key, they run one after another in FIFO order instead of stepping on each other. Calls against **different** keys still run in parallel.
+
+## update(key, fn, options?)
+
+Read the current value, pass it to the callback, write what the callback returns.
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+// Simple counter
+await cache.update<number>("views", (current) => (current ?? 0) + 1);
+
+// Update nested state
+await cache.update<UserState>("user.1.state", (current) => ({
+  ...(current ?? defaultState),
+  lastSeenAt: Date.now(),
+}));
+
+// Conditional update — return null to remove the entry
+await cache.update<Session>("session.abc", (current) => {
+  if (!current || current.expired) {
+    return null;
+  }
+  return { ...current, extendedAt: Date.now() };
+});
+```
+
+### Callback contract
+
+- Receives `current: T | null` — missing keys resolve to `null`, not an exception.
+- Return the new value to write.
+- Return `null` to **remove** the entry.
+- Async callbacks are supported.
+
+### TTL preservation
+
+By default, `update()` preserves whatever TTL is on the existing entry. Pass an explicit `{ ttl }` to reset it:
+
+```ts
+// Preserve existing TTL
+await cache.update("user.1", (user) => ({ ...user, name: "Jane" }));
+
+// Reset TTL on update
+await cache.update(
+  "user.1",
+  (user) => ({ ...user, name: "Jane" }),
+  { ttl: "1h" },
+);
+```
+
+## merge(key, partial, options?)
+
+Shallow-merge sugar for the common "update one field" shape:
+
+```ts
+await cache.merge<User>("user.1", { name: "Jane" });
+
+await cache.merge<User>(
+  "user.1",
+  { lastSeenAt: Date.now() },
+  { ttl: "1h" },
+);
+```
+
+### Rules
+
+- **Shallow only.** Arrays are replaced wholesale. Nested objects overwrite.
+- **Missing key → treats current as `{}`**, creates the entry with the partial.
+- **Preserves TTL** unless an explicit `{ ttl }` option is passed.
+
+### What about deep merge?
+
+Deep merge is deliberately not built in — it invites edge cases around arrays, nullish values, and nested undefined. If you need deep-merge semantics, compose it explicitly inside `update()` using whatever deep-merge utility your project already uses:
+
+```ts
+import { merge as deepMerge } from "lodash";   // or "lodash-es" / "deepmerge" / etc.
+
+await cache.update<User>("user.1", (current) => deepMerge({}, current, patch));
+```
+
+## Concurrent correctness
+
+Both `update()` and `merge()` use a per-key chain lock on the driver instance. Concurrent callers are serialized end-to-end, not merely woken up together:
+
+```ts
+await cache.set("counter", 0);
+
+// 10 concurrent increments on the same key — all serialize
+await Promise.all(
+  Array.from({ length: 10 }, () =>
+    cache.update<number>("counter", (current) => (current ?? 0) + 1),
+  ),
+);
+
+await cache.get("counter");   // 10 — no lost updates
+```
+
+The lock lives on the driver, not globally. Concurrent updates against **different keys** still run in parallel.
+
+:::warning In-process only
+The chain lock only serializes calls within a single Node.js process. If you run multiple servers (or multiple workers), two nodes can still both call `update()` on the same key at the same time and one update gets lost — last-write-wins.
+
+Cross-process-safe `update()` on Redis (using Redis's own `WATCH`/`MULTI` optimistic-concurrency primitive — it retries the write if the key changed during the callback) is planned for v2.1.
+
+**Until it lands:** if cross-process safety matters today, wrap the update in a distributed lock using [`onConflict: "create"`](/v/latest/cache/set-options/#distributed-locking-recipe). Example:
+
+```ts
+const lock = await cache.set(`lock.user.${id}`, process.pid, {
+  onConflict: "create",
+  ttl: "10s",
+});
+if (!lock.wasSet) return;     // another node is already updating
+
+try {
+  await cache.update(`user.${id}`, (current) => ({ ...current, ...patch }));
+} finally {
+  await cache.remove(`lock.user.${id}`);
+}
+```
+:::
+
+## Driver support
+
+| Driver | `update()` | `merge()` |
+|--------|:-:|:-:|
+| `memory` | ✓ | ✓ |
+| `memoryExtended` | ✓ | ✓ |
+| `lru` | ✓ | ✓ |
+| `redis` | ✓ (in-process only today) | ✓ (in-process only today) |
+| `file` | ✗ throws `CacheUnsupportedError` | ✗ throws `CacheUnsupportedError` |
+| `null` | ✓ (no-op) | ✓ (no-op) |
+
+The file driver is deliberately unsupported — it has no file-lock primitive today, so concurrent updates would clobber each other silently. Throwing is safer than lying. See [Errors](/v/latest/cache/errors/) for the `CacheUnsupportedError` pattern.
+
+## When to reach for what
+
+| Task | Use |
+|------|-----|
+| "Add 1 to this counter" | [`increment()`](/v/latest/cache/atomic-operations/#increment-and-decrement) — Redis-native `INCRBY` |
+| "Change one field on a cached object" | `merge()` |
+| "Read-decide-maybe-write, possibly remove" | `update()` |
+| "Only set if missing" | [`set(k, v, { onConflict: "create" })`](/v/latest/cache/set-options/#conditional-writes--onconflict) |
+| "Only set if already exists" | [`set(k, v, { onConflict: "update" })`](/v/latest/cache/set-options/#conditional-writes--onconflict) |
+| "Read-then-delete atomically" | [`pull()`](/v/latest/cache/cache-manager/) |
+
+## Real-world examples
+
+All examples below assume:
+```ts
+import { cache } from "@warlock.js/cache";
+
+type User = { id: number; name: string; theme: "light" | "dark"; lastSeenAt?: number };
+```
+
+### Update user settings
+
+```ts
+async function updateUserTheme(userId: number, theme: "light" | "dark") {
+  return cache.merge<User>(`user.${userId}`, { theme });
+}
+```
+
+### Append to an activity log field
+
+```ts
+async function recordActivity(userId: number, activity: Activity) {
+  return cache.update<{ activities: Activity[] }>(
+    `user.${userId}.activities`,
+    (current) => ({
+      activities: [...(current?.activities ?? []), activity].slice(-100),
+    }),
+  );
+}
+```
+
+### Expire a session safely
+
+```ts
+async function touchSession(sessionId: string) {
+  return cache.update<Session>(`session.${sessionId}`, (session) => {
+    if (!session) return null;
+    if (session.expiresAt < Date.now()) return null;
+    return { ...session, lastSeenAt: Date.now() };
+  });
+}
+```
+
+## Troubleshooting
+
+- **`CacheUnsupportedError: update() is not supported on the file driver`** — switch to memory or redis for the keys you need `update()` on. File driver's `update` support is gated on the file-lock primitive (tracked in the backlog).
+- **Concurrent updates losing writes across nodes** — the in-process chain lock doesn't cross process boundaries. Gate with a distributed lock via `onConflict: "create"` or wait for v2.1 Redis `WATCH`/`MULTI`.
+- **Callback received `null` but my code assumed the key existed** — missing keys pass `null` to the callback. Use `?? defaultValue` or an explicit `if (!current) return null;` guard.
+
+## Related Documentation
+
+- [Set Options](/v/latest/cache/set-options/) — `onConflict` for conditional writes
+- [Atomic Operations](/v/latest/cache/atomic-operations/) — counters and conditional-write patterns
+- [Stampede Prevention](/v/latest/cache/stampede-prevention/) — `remember()` for cache-aside lookups
+- [Errors](/v/latest/cache/errors/) — `CacheUnsupportedError`

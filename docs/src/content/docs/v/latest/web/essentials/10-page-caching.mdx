@@ -1,0 +1,221 @@
+---
+title: Server-side page caching
+slug: v/latest/web/essentials/page-caching
+description: Opt a route into a tagged, server-held cache that serves a HIT without re-running loaders or rendering.
+sidebar:
+  order: 10
+  label: Page caching
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+The server-side page cache is new in `@warlock.js/web` 5.12. It is a second,
+independent opt-in in `config.cache` — separate from `public`/`maxAge`, which
+only decide the `Cache-Control` header a downstream CDN/proxy should honour.
+`serverCache` has the framework itself hold the resolved bytes and serve a
+HIT without re-running loaders or rendering at all.
+
+## Opt in with `serverCache` and `tags`
+
+```tsx title="src/web/products/index.page.tsx"
+import type { PageConfig } from "@warlock.js/web";
+
+export const config: PageConfig = {
+  route: { path: "/products", name: "products.index" },
+  cache: {
+    public: true,
+    maxAge: 60,
+    serverCache: true,
+    tags: ["products"],
+    // or: tags: (data) => [`product:${data.id}`],
+    ttl: 300, // optional — defaults to maxAge
+  },
+};
+```
+
+- `serverCache` requires `public: true` — like every `config.cache` opt-in — **and**
+  `tags`. A stored entry with no tags could never be invalidated early, so
+  `serverCache: true` with no `tags` is a boot-time `InvalidPageCacheOptInError`.
+- `tags` is a static array, or a function `(data, { shared }) => string[]` —
+  called right before the entry is stored. The second argument is the sealed
+  `shared` snapshot at store time, so a route can tag by something middleware
+  resolved (a tenant, a theme):
+  ``tags: (data, { shared }) => [`theme:${shared.theme}`]``.
+- `ttl` is the server cache's own freshness window in seconds, independent of
+  the CDN-facing `maxAge`. Omit it to reuse `maxAge`.
+- `varyBy?: (request) => string` adds a request-derived component to the cache
+  key, for entries that split on something other than the host (a header an
+  edge proxy sets, for example). It runs before the cache lookup — and before
+  middleware — so it must read the request directly, e.g.
+  `varyBy: (request) => String(request.header("x-theme") ?? "")`. Don't vary
+  on a cookie: a request that carries one bypasses the cache entirely (see
+  below). A non-function `varyBy` is a boot-time error naming the page file.
+
+## What gets cached
+
+Storage is checked once per render and requires all of:
+
+- `GET` only — a mutating method is never cached.
+- `status === 200`.
+- No `Set-Cookie` on the response.
+- A provably unauthenticated request — the same fail-closed rule that governs
+  `Cache-Control`. If Warlock cannot determine whether the request used
+  authenticated state, it refuses to store, exactly as it refuses to emit a
+  public `Cache-Control`.
+
+**One entry is capped at `pageCache.maxEntryBytes`** (default `1_048_576`,
+1 MiB). A cache miss copies the document for storage up to that size. A page
+larger than the cap is still sent to the visitor in full, but it isn't cached,
+and a `[warlock:web]` warning is logged. A value that isn't a positive integer
+fails when the config is read.
+
+**Bypass happens earlier, before storage is even considered.** A request
+carrying an `Authorization` header or **any cookie** never consults the cache
+and is never stored. That check runs before any loader, so a credentialed
+visitor is never handed a stale guest page. Their own page is never stored
+for guests either, whatever the session cookie is called. The one exception
+is the `locale` cookie: the resolved locale is already part of the key, so a
+request whose only cookie is `locale` is still cached. An empty or malformed
+`Cookie` header counts as a cookie.
+
+In practice, a browser that holds any other cookie (a session, analytics, a
+consent banner) always gets a fresh render. Anonymous traffic without cookies
+(first visits, crawlers, link previews) is what the page cache serves.
+
+<Aside type="caution" title="Upgrading from 5.16 or earlier">
+  Before 5.17, only the configured `auth.cookie.name` (default `access_token`) bypassed the cache.
+  An app whose session cookie had another name could have a signed-in render stored and served to
+  guests. Purge existing page-cache entries, and any CDN copies of `public` pages, when you deploy
+  5.17.
+</Aside>
+
+## The cache key
+
+```
+(host) + (normalised path) + "?" + (sorted query) + "|" + locale + "|" + variant + "|vary=" + varyBy
+```
+
+- The key always includes the request `Host` (lower-cased). Before 5.13 the
+  host was not part of the key, so two hosts (tenants) serving the same URL
+  shared one entry — a host-routed multi-tenant app could serve tenant B the
+  document and `shared` payload the cache stored for tenant A. Existing
+  entries are simply re-keyed; `tags` still invalidate them.
+- The path is normalised: trailing slash stripped (except the root `/`). The
+  path keeps its case, so `/About` and `/about` are separate entries.
+  (Changed in 5.21: earlier versions lower-cased the path.)
+- The query string is re-serialized with its keys sorted, so `?a=1&b=2` and
+  `?b=2&a=1` resolve to the same entry.
+- `locale` is the resolved locale for the request.
+- `variant` is `html` for a document request or `json` for the
+  `x-warlock-data` representation. A request for the NDJSON representation on
+  a `serverCache` route never streams: the values are fully resolved and
+  stored/served as the `json` variant instead, since there is nothing left to
+  defer.
+- `"|vary=" + varyBy` is appended only when the route declares
+  `cache.varyBy(request)` (see above).
+
+## Changed in 5.21
+
+- With CSP enabled, the `html` variant is **not cached**: a cached document
+  would replay a stale nonce. The `json` variant is still cached.
+- A cache-backend outage (redis down, for example) is treated as a miss: the
+  page renders uncached and a throttled warning is logged. It never returns a
+  500. Store writes are fire-and-forget.
+
+## Where entries live: the page-cache namespace
+
+Stored pages and their tag index live in the page cache's own namespace,
+`warlock.page.<deployment>`. It is separate from your app's cache
+`globalPrefix`, so the GET that stores a page and the POST (or background
+job) that invalidates it always see the same entries, even if your
+`globalPrefix` changes from request to request.
+
+The `<deployment>` part is chosen once, in this order:
+
+1. `pageCache.namespace`, when you set it;
+2. otherwise your cache driver's `globalPrefix`, when it is a static string;
+3. otherwise nothing.
+
+Case 3 is fine for an in-process driver (memory, LRU, memory-extended). On
+a shared backend (redis, pg/database, file) it is a startup error the first
+time the page cache is used. Two deployments sharing one Redis, such as
+staging and production, would otherwise read and invalidate each other's
+pages. The app name and the Host are not enough to tell them apart. Set a
+value unique to each deployment:
+
+```ts title="src/config/pageCache.ts"
+import { env } from "@warlock.js/core";
+
+export default {
+  namespace: env("PAGE_CACHE_NAMESPACE"), // e.g. "shop-production", "shop-staging"
+};
+```
+
+## What gets stored, for a page with a lazy boundary
+
+On an eligible `HTML` `MISS`, Warlock stores the same streamed document bytes
+the `MISS` visitor received — including any `React.lazy` boundary that
+resolved during that render (a per-request theme, for example). A later `HIT`
+replays exactly that render, never a not-yet-resolved Suspense fallback.
+
+## Pages that use `defer()`
+
+A page using [`defer()`](/v/latest/web/essentials/streaming-and-defer/) is
+stored fully resolved — every deferred value is awaited before the entry is
+written, exactly as a detected crawler's render is. A HIT is then served
+buffered, not streamed.
+
+## Invalidating stored entries
+
+```ts
+import { invalidatePageCache } from "@warlock.js/web/page-cache";
+
+await invalidatePageCache(["products"]);
+```
+
+Imported from `@warlock.js/web/page-cache`, not the root package: it is
+server-only (it reaches `@warlock.js/cache`), and keeping it off the root
+barrel keeps `@warlock.js/cache` out of the client bundle.
+
+Evicts every stored entry under any of the given tags, through
+`@warlock.js/cache`'s tag index.
+
+## The `x-warlock-cache` header
+
+Every response from a `serverCache` route carries `x-warlock-cache: hit`,
+`miss`, or `bypass`, alongside the usual `Cache-Control`.
+
+## `@warlock.js/cache` is an optional peer
+
+`@warlock.js/cache` is only loaded, via a lazy `await import(...)`, the first
+time some route with `serverCache: true` actually needs the store — an
+application that never opts in is never forced to install it. Enabling
+`serverCache` without the package installed fails loudly, naming the package:
+
+```
+A page declares `config.cache.serverCache: true`, but "@warlock.js/cache" could not be
+loaded. Install it as a dependency of your application — it is an optional peer of
+@warlock.js/web and is only required when a route opts into the server-side page cache.
+```
+
+## Cluster behavior
+
+Cross-worker reach depends on the configured `@warlock.js/cache` driver:
+
+- A **shared driver** (redis, pg) removes the entry for every worker on their
+  next read — `invalidatePageCache` reaches the whole cluster.
+- The **memory** driver (and other in-process drivers such as LRU or
+  memory-extended) only clears the calling worker's own heap. Every other
+  worker keeps serving its stale entry until `ttl`/`maxAge` expires. Enabling
+  `serverCache` with an in-process driver in a clustered deployment logs a
+  one-time startup warning; use a shared driver for cluster-wide invalidation.
+
+## See also
+
+- [Streaming SSR and defer()](/v/latest/web/essentials/streaming-and-defer/) —
+  the deferred-value contract a `serverCache` route resolves fully before
+  storing.
+- [Crawler mode](/v/latest/web/essentials/crawler-mode/) — the other path that
+  stores/serves a fully resolved render.
+- [Multi-theme](/v/latest/web/guides/multi-theme/) — `varyBy` and tag-based
+  invalidation for a per-tenant/per-theme cache.

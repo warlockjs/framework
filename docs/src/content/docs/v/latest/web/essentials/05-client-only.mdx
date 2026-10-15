@@ -1,0 +1,110 @@
+---
+title: Client-only rendering
+slug: v/latest/web/essentials/client-only
+description: Render browser-only UI after hydration without a server/client markup mismatch.
+sidebar:
+  order: 5
+  label: Client-only rendering
+---
+
+`<ClientOnly>` and `useIsClient()` are new in `@warlock.js/web` 5.12. Use
+them when a small part of a universal page needs a browser API such as
+`localStorage`, `window`, or a DOM-only widget.
+
+## Render a server-safe fallback
+
+`<ClientOnly>` renders its `fallback` on the server and again during the
+client's hydration render. It renders `children` only after the component has
+mounted. The initial browser markup therefore matches the server markup, and
+the later swap does not cause a hydration mismatch.
+
+```tsx title="src/web/dashboard.page.tsx"
+import { ClientOnly } from "@warlock.js/web";
+
+function LocalTime() {
+  return <time>{new Date().toLocaleTimeString()}</time>;
+}
+
+export default function DashboardPage() {
+  return (
+    <ClientOnly fallback={<p>Loading your preferences…</p>}>
+      <LocalTime />
+    </ClientOnly>
+  );
+}
+```
+
+The fallback defaults to `null`. Keep it safe for server rendering: it is the
+content in the server response and the initial paint.
+
+## Defer an expression with function children
+
+A plain JSX child is constructed before it reaches `<ClientOnly>`. When the
+expression itself reads a browser API, pass a function instead; Warlock calls
+it only after mount.
+
+```tsx title="src/web/map.page.tsx"
+import { ClientOnly } from "@warlock.js/web";
+
+export default function MapPage() {
+  return (
+    <ClientOnly fallback={<p>Loading map…</p>}>
+      {() => <p>Last map: {window.localStorage.getItem("last-map")}</p>}
+    </ClientOnly>
+  );
+}
+```
+
+Use this form whenever creating the child would touch `window` or `document`.
+
+## Read the mounted state directly
+
+Use `useIsClient()` when the component needs the boolean rather than a
+fallback/children split. It returns `false` on the server and during hydration,
+then `true` on the render after mount.
+
+```tsx title="src/web/theme-toggle.tsx"
+import { useIsClient } from "@warlock.js/web";
+
+export function ThemeToggle() {
+  const isClient = useIsClient();
+
+  return <button disabled={!isClient}>Toggle theme</button>;
+}
+```
+
+Because the initial value is always `false`, do not replace this with a
+`typeof window` render branch: the server and hydration pass must return the
+same markup.
+
+## Rendering is not module loading
+
+`<ClientOnly>` defers **rendering**, not **module loading**. A normal import is
+still evaluated when the page module loads on the server, before
+`<ClientOnly>` can hide its component. If a browser-only library touches
+`window` at its top level, load it with `React.lazy` as well.
+
+```tsx title="src/web/analytics.page.tsx"
+import { lazy, Suspense } from "react";
+import { ClientOnly } from "@warlock.js/web";
+
+const BrowserOnlyChart = lazy(() => import("../components/browser-only-chart"));
+
+export default function AnalyticsPage() {
+  return (
+    <ClientOnly fallback={<p>Loading chart…</p>}>
+      <Suspense fallback={<p>Loading chart…</p>}>
+        <BrowserOnlyChart />
+      </Suspense>
+    </ClientOnly>
+  );
+}
+```
+
+`React.lazy` defers the dynamic `import()` until `BrowserOnlyChart` is
+rendered. Inside `<ClientOnly>`, that cannot happen on the server. The
+`<Suspense>` boundary supplies a fallback while the browser fetches the lazy
+chunk.
+
+For the broader import boundary, see
+[Client/server boundaries](/v/latest/web/essentials/client-server-boundaries/).

@@ -1,0 +1,56 @@
+---
+title: Scheduler
+description: Cron jobs — fluent API, timezone pinning, overlap prevention, retry with backoff.
+---
+
+> Standalone — usable in any Node project, no `@warlock.js/core` required.
+
+`@warlock.js/scheduler` runs recurring work **inside your Node
+process** — cleanups, reports, syncs, health pings — without an
+external cron daemon or a docker-cron sidecar. Describe a schedule in
+plain English (`.daily().at("03:00")`) or with a cron string
+(`.cron("0 3 * * *")`), pin it to a timezone so DST never shifts your
+nightly run, retry on failure with backoff, and watch the whole
+lifecycle through typed events.
+
+It is **not** a distributed queue. Jobs run in the calling process; if
+the process dies before the next tick, the schedule resumes from now,
+not from the missed fire time. Need exactly-once-eventually across many
+replicas? Reach for BullMQ or Temporal — and check the
+[distributed-locking backlog item](https://github.com/warlockjs/scheduler)
+for where this package is headed.
+
+## Try it in fifteen lines
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+// Log every failure, register one nightly job, start ticking.
+scheduler.on("job:error", (name, error) => {
+  console.error(`${name} failed:`, error);
+});
+
+scheduler.addJob(
+  job("nightly-cleanup", async () => {
+    await db.deleteExpiredTokens();
+  })
+    .daily()
+    .at("03:00")
+    .inTimezone("America/New_York")
+    .retry(3, 1000),
+);
+
+scheduler.start();
+```
+
+That is a complete, running scheduler. The singleton is ready to use —
+no setup, no config object. From here you add more jobs, listen to more
+events, and wire `scheduler.shutdown()` into your `SIGTERM` handler.
+
+## Read by intent
+
+- **First time using it** → [Getting started](./getting-started/introduction/).
+- **Understanding the mental model** → [Essentials](./essentials/configuration.mdx).
+- **Looking up "how do I…?"** → [Guides](./guides/timezone.mdx).
+- **Copy-paste a real task** → [Recipes](./recipes/nightly-job.mdx).
+- **Method-by-method lookup** → [Reference](./reference/api.mdx).

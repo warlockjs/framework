@@ -1,0 +1,150 @@
+---
+title: "Similarity Retrieval"
+slug: v/latest/cache/similarity
+---
+
+Most cache operations look up entries by exact key match. **Similarity retrieval** looks them up by *meaning* — give the cache a query vector, get back the stored entries whose vectors are closest to it. Same `set` / `get` model you already know, just a different lookup function.
+
+```ts
+// Embed once on the way in...
+await cache.set("doc.support-policy", policy, {
+  vector: await embed(policy.text),
+  tags: ["docs"],
+});
+
+// ...then ask for the entries closest to a fresh query.
+const hits = await cache.similar(await embed(userQuestion), {
+  topK: 5,
+  threshold: 0.7,
+});
+
+for (const hit of hits) {
+  console.log(hit.key, hit.score, hit.value);
+}
+```
+
+Why live here, in `@warlock.js/cache`? Because everything a vector store needs — TTL, eviction, tagging, namespacing, deep-clone-on-read — already does. Similarity is the same primitive with a different match function.
+
+## When to reach for it
+
+- **Semantic caching** — skip an LLM round-trip when the incoming prompt is close enough to one you've already answered.
+- **RAG retrieval** — pull the top-k document chunks for a user query before handing them to a model.
+- **Deduping near-duplicates** — webhook payloads, support tickets, scraped articles.
+- **Recommendations** — "find items like this one" without building a full vector pipeline.
+
+If exact-key lookup works for your case, use that — it's faster and cheaper. Reach for `similar()` when the keys you'd want to match against don't exist yet at query time.
+
+## Vocabulary, briefly
+
+- **Embedding / vector** — a fixed-length array of numbers that represents a piece of text (or image, or audio). Two pieces of text with similar meaning produce vectors that point in similar directions.
+- **Cosine similarity** — a score in `[-1, 1]` measuring how aligned two vectors are. `1` means identical direction, `0` means unrelated, `-1` means opposite. For embeddings from typical models, the practical range is `[0, 1]`.
+- **topK** — return at most this many results, ordered by similarity (highest first).
+- **Threshold** — drop hits below this score before topK truncation.
+
+Cache is **embedding-agnostic** — bring your own embedder (OpenAI, Cohere, a local model, anything that returns `number[]`). The cache stores and ranks; it doesn't compute embeddings.
+
+## Putting it together
+
+### Set with a vector
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+const text = "Refunds are issued within 14 days of purchase.";
+const vector = await embedder.embed(text);
+
+await cache.set("policy.refunds", { text }, {
+  vector,
+  tags: ["policies"],
+  ttl: "30d",
+});
+```
+
+The `vector` lives alongside the entry. Read it back with plain `get`:
+
+```ts
+const policy = await cache.get<{ text: string }>("policy.refunds");
+// → { text: "Refunds are issued within 14 days of purchase." }
+```
+
+### Query with a vector
+
+```ts
+const queryVec = await embedder.embed("How do I get my money back?");
+
+const hits = await cache.similar<{ text: string }>(queryVec, {
+  topK: 3,
+  threshold: 0.7,
+});
+// hits[0] = { key: "policy.refunds", value: { text: "..." }, score: 0.89 }
+```
+
+### Filter by tag
+
+Tag filters narrow the candidate pool **before** ranking — handy for multi-tenant setups or when one cache holds multiple knowledge bases.
+
+```ts
+const hits = await cache.similar(queryVec, {
+  topK: 5,
+  tags: ["docs"],          // only entries tagged with "docs" are scored
+});
+```
+
+### Threshold & topK together
+
+```ts
+// Up to 10 results, but only ones scoring 0.8+
+const hits = await cache.similar(queryVec, { topK: 10, threshold: 0.8 });
+
+// May return zero results if nothing clears the floor — that's a feature.
+```
+
+## What gets stored, what gets ranked
+
+`similar()` only considers entries written with `set({ vector })`. A plain `set` adds the entry to the cache as KV — it's invisible to similarity queries. This means you can mix vector-indexed and plain entries in the same cache without polluting your similarity results.
+
+```ts
+// Indexed for similarity:
+await cache.set("doc.1", doc1, { vector: vec1 });
+
+// Plain KV — invisible to similar():
+await cache.set("session.abc", sessionData, "1h");
+
+// Only doc.1 shows up here:
+const hits = await cache.similar(queryVec, { topK: 10 });
+```
+
+## Capability matrix
+
+Not every driver indexes vectors. The capability is opt-in per driver:
+
+| Driver | Status | Notes |
+|---|---|---|
+| `memory` | ✅ Brute force | Dev / small datasets only — O(N) per query |
+| `lru-memory` | ✅ Brute force | Same — eviction also drops vectors |
+| `memory-extended` | ✅ Brute force | Inherits `memory` semantics |
+| `pg` *(with `vector` config)* | ✅ pgvector | Production option — HNSW or IVFFlat index, native cosine `<=>` |
+| `pg` *(without `vector` config)* | ❌ Throws `CacheUnsupportedError` | Run KV-only |
+| `redis` | ❌ Throws `CacheUnsupportedError` | RediSearch support is on the backlog |
+| `file` | ❌ Throws `CacheUnsupportedError` | No similarity index |
+| `null` | n/a — `similar()` returns `[]` | Black-hole semantics preserved |
+
+For dev, start with `memory`. For production, switch to [`pg`](/v/latest/cache/pg/) with the `vector` config block — same code, real index.
+
+## Errors you might hit
+
+- **`CacheUnsupportedError`** — you called `similar()` on a driver that doesn't index vectors, or `set({ vector })` on the same. Check the matrix above.
+- **`CacheConfigurationError: Vector dimension mismatch`** — the query vector's length doesn't match what's stored. This usually means the embedder changed (or the dimension config on the driver is wrong). Vectors are not portable across embedders — re-embed on a switch.
+- **`CacheConfigurationError: pgvector extension not installed`** — only on `pg`. Run `CREATE EXTENSION vector;` once, or remove `options.pg.vector` to fall back to KV-only.
+
+## Production warning — memory drivers
+
+The memory family does brute-force scans. That's fine for development, fine for a few thousand entries, **not fine for production knowledge bases at scale**. Each query is `O(N)` over every vector-tagged entry. Past ~10k entries you'll feel it.
+
+For real production workloads, use the [`pg` driver](/v/latest/cache/pg/) with `vector` config — pgvector's HNSW index is sub-linear and battle-tested.
+
+## See also
+
+- [`pg` driver](/v/latest/cache/pg/) — Postgres + pgvector setup
+- [Set Options](/v/latest/cache/set-options/) — TTL, tags, conflict policy details
+- [Tags](/v/latest/cache/tags/) — building tag-narrowed knowledge bases

@@ -1,0 +1,167 @@
+---
+title: "API reference"
+description: "The complete public surface of @warlock.js/sitemap — Sitemap, SitemapIndex, the entry and result types, the errors, and the serialiser building blocks."
+sidebar:
+  order: 1
+  label: "API reference"
+---
+
+Everything below is exported from `@warlock.js/sitemap`. The package has zero
+runtime dependencies and imports nothing from Warlock.
+
+## `Sitemap`
+
+```ts
+class Sitemap {
+  constructor(options: SitemapOptions); // throws InvalidBaseUrlError
+
+  add(entry: SitemapEntry): this; // throws InvalidSitemapEntryError
+  addMany(entries: Iterable<SitemapEntry>): this;
+  declareRoute(route: string): this;
+
+  get size(): number;
+  entries(): readonly ResolvedSitemapEntry[];
+  routes(): readonly RouteSummary[];
+  duplicates(): readonly DuplicateReport[];
+
+  toXML(): string; // pure, synchronous, repeatable
+  saveTo(filePath: string): Promise<void>; // atomic; creates parent dirs
+  publishTo(outDir: string, fileName?: string): Promise<string>; // owned-dir publish; default "sitemap.xml"
+}
+```
+
+`Sitemap` keeps every entry in memory, so it is limited to the protocol
+maximum of 50,000 URLs or 50MB. It satisfies core's `XMLable` contract, so
+`response.xml(sitemap)` works. See
+[Build a sitemap](/v/latest/sitemap/essentials/standalone/).
+
+## `SitemapIndex`
+
+```ts
+class SitemapIndex {
+  constructor(options: SitemapIndexOptions); // throws InvalidBaseUrlError, RangeError
+
+  addSource(source: SitemapSourceFactory): this;
+  addSource(key: string, source: SitemapSourceFactory): this; // throws DuplicateSourceKeyError
+
+  saveTo(outDir: string): Promise<SitemapSetResult>; // atomic, owned-directory publish
+}
+```
+
+`SitemapIndex` streams entries and writes shards plus a master index. It has
+no `toXML()`. See [Large sites](/v/latest/sitemap/essentials/large-sites/).
+
+## Options
+
+```ts
+type SitemapOptions = {
+  baseUrl: string; // absolute http(s) origin
+  changefreq?: ChangeFreq;
+  priority?: number;
+  lastmod?: string | Date;
+};
+
+type SitemapIndexOptions = {
+  baseUrl: string;
+  filePrefix?: string; // default "sitemap"
+  indexFileName?: string; // default "sitemap_index.xml"
+  gzip?: boolean; // default false
+  maxUrlsPerFile?: number; // default 50_000, never above it
+  maxBytesPerFile?: number; // default 50 * 1024 * 1024, never above it
+  changefreq?: ChangeFreq;
+  priority?: number;
+  lastmod?: string | Date;
+};
+```
+
+## Entries
+
+```ts
+type SitemapEntry = {
+  path: string; // concrete path, or an absolute URL used as given
+  name?: string; // diagnostics only; never serialised
+  route?: string; // the pattern it came from; feeds routes()/duplicates()
+  lastmod?: string | Date; // Date -> toISOString(); string passed through
+  changefreq?: ChangeFreq;
+  priority?: number; // 0.0–1.0
+  alternates?: readonly SitemapAlternate[];
+};
+
+type SitemapAlternate = {
+  hreflang: string; // any string: "en", "en-GB", "x-default"
+  path: string;
+};
+
+/** An entry after normalisation: leading slash, defaults folded in, lastmod serialised. */
+type ResolvedSitemapEntry = Omit<SitemapEntry, "lastmod"> & { lastmod?: string };
+
+type ChangeFreq = "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never";
+```
+
+## Diagnostics and results
+
+```ts
+type RouteSummary = { route: string; count: number }; // count 0 = a declared route produced nothing
+
+type DuplicateReport = {
+  path: string;
+  count: number; // always >= 2
+  routes: readonly (string | undefined)[]; // the route of each add, in order
+};
+
+type SitemapSource = Iterable<SitemapEntry> | AsyncIterable<SitemapEntry>;
+type SitemapSourceFactory = () => SitemapSource | Promise<SitemapSource>;
+
+type SitemapSetResult = {
+  indexPath: string;
+  files: readonly SitemapFileResult[];
+  totalUrls: number;
+  duplicates: readonly DuplicateReport[];
+  routes: readonly RouteSummary[];
+};
+
+type SitemapFileResult = {
+  path: string;
+  key?: string; // the source key, when the source was named
+  urls: number;
+  bytes: number;
+  gzipped: boolean;
+};
+```
+
+## Errors
+
+| Error | Thrown from | When |
+| --- | --- | --- |
+| `InvalidBaseUrlError` | `new Sitemap()`, `new SitemapIndex()` | `baseUrl` is missing, relative, or not `http(s)`. |
+| `InvalidSitemapEntryError` | `add()`, and while `SitemapIndex` writes | No path, a priority outside `0.0`–`1.0`, an unknown `changefreq`, an invalid `Date`, or an alternate with no `hreflang`. |
+| `DuplicateSourceKeyError` | `SitemapIndex.addSource()` | Two source keys differ only in case, so they would overwrite each other's shard files. |
+| `UnownedOutputDirectoryError` | `SitemapIndex.saveTo()`, `Sitemap.publishTo()` | `outDir` isn't empty and has no `.sitemap-set.json` marker. Nothing is written. |
+
+`SitemapIndex` also throws `RangeError` from its constructor when
+`maxUrlsPerFile` or `maxBytesPerFile` is above the protocol limit, and from
+`addSource()` when a key isn't a valid filename fragment (letters, digits, `-`,
+and `_`).
+
+## Building blocks
+
+```ts
+function buildSitemapXml(entries: readonly ResolvedSitemapEntry[], baseUrl: string): string;
+function renderUrlBlock(entry: ResolvedSitemapEntry, baseUrl: string): string;
+function escapeXml(value: string): string;
+function joinOrigin(origin: string, routePath: string): string;
+```
+
+`buildSitemapXml` writes the sitemaps.org `urlset` document. It uses the
+correct namespace and element order, declares the `xhtml` namespace only when
+an entry has alternates, and escapes `&`, `<`, `>`, `"`, and `'`.
+`joinOrigin` joins an origin and a path with exactly one slash between them.
+
+## Not in this package
+
+Page discovery, the page-level `sitemap` export, locale expansion, the
+`/sitemap.xml` route, `robots.txt`, and `MissingPublicUrlError` are part of
+`@warlock.js/web/sitemap`. See
+[Sitemap and robots.txt](/v/latest/web/guides/sitemap-and-robots/).
+
+Source: [`@warlock.js/sitemap/src/`](https://github.com/warlockjs/core/tree/main/%40warlock.js/sitemap/src)

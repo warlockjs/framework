@@ -1,0 +1,153 @@
+---
+title: "Built-in Metrics"
+slug: v/latest/cache/metrics
+---
+
+`cache.metrics()` returns a running snapshot of cache health — counters, hit-rate, latency percentiles, per-driver breakdowns. Built-in to the manager, no setup, no external deps.
+
+```ts
+const m = cache.metrics();
+// {
+//   hits: 9821, misses: 173, sets: 412, removed: 18, errors: 0,
+//   hitRate: 0.983,
+//   latencyMs: { p50: 0.4, p95: 2.1, p99: 8.2, samples: 1000 },
+//   byDriver: { memory: { ... }, redis: { ... } },
+//   startedAt: 1714185600000,
+// }
+```
+
+## What's tracked
+
+| Field | Source |
+|---|---|
+| `hits`, `misses` | `hit` / `miss` events from drivers |
+| `sets` | `set` event fires on every successful write |
+| `removed` | `removed` event on `cache.remove(key)` |
+| `errors` | `error` event (driver failures, SWR background refresh failures, etc.) |
+| `hitRate` | Computed at snapshot time: `hits / (hits + misses)` |
+| `latencyMs.p50/p95/p99` | Sampled by the manager around every `get` / `set` / `remove` |
+| `byDriver` | Same fields broken out per driver name |
+| `startedAt` | Millisecond timestamp the collector last reset |
+
+## Lazy attach
+
+The collector subscribes to events the first time you call `cache.metrics()` or `cache.resetMetrics()`. Apps that never read metrics pay zero cost — no listeners, no allocations, no latency sampling.
+
+Once attached, the collector survives `cache.use()` driver switches because it listens on the manager's global event bus, which re-attaches handlers to every loaded driver.
+
+```ts
+// First call attaches the collector. Earlier events are NOT counted.
+cache.metrics();
+
+// Subsequent ops are tracked.
+await cache.set("k", "v");
+await cache.get("k");
+
+// Read updated counts.
+const snapshot = cache.metrics();
+```
+
+> **Tip.** If you want metrics on every op including the first, call `cache.metrics()` once during app startup right after `cache.init()`.
+
+## Latency sampling
+
+Latency is sampled by the manager's wrapper around `get` / `set` / `remove`. Each sample is appended to a **circular buffer** (default size 1000) per driver — older samples are overwritten when the buffer is full. Percentiles are computed at snapshot time by sorting a copy of the buffer.
+
+This means percentiles reflect "the most recent ~1000 ops," not the lifetime distribution. That's the right tradeoff for live dashboards: a slow stretch shows up immediately and ages out as traffic recovers.
+
+## Reset
+
+`cache.resetMetrics()` zeroes counters, drops every latency sample, and sets `startedAt` to now. Useful for tests, for boundary measurements (deploy, traffic burst), or for periodic export pipelines that "tail" the snapshot:
+
+```ts
+setInterval(() => {
+  const snapshot = cache.metrics();
+  exporter.send(snapshot);
+  cache.resetMetrics();
+}, 60_000);
+```
+
+## Per-driver breakdown
+
+When traffic flows through more than one driver (manual `cache.use("redis")`, per-call `set(k, v, { driver: "memory" })`), each one gets its own bucket:
+
+```ts
+const m = cache.metrics();
+
+console.log(`memory hit rate: ${m.byDriver.memory?.hitRate ?? 0}`);
+console.log(`redis p95: ${m.byDriver.redis?.latencyMs.p95 ?? 0}ms`);
+```
+
+Drivers that never fire events stay absent from `byDriver`.
+
+## Integration recipes
+
+### Prometheus (via prom-client)
+
+```ts
+import client from "prom-client";
+
+const hits = new client.Counter({ name: "cache_hits_total", labelNames: ["driver"] });
+const misses = new client.Counter({ name: "cache_misses_total", labelNames: ["driver"] });
+const latency = new client.Histogram({
+  name: "cache_op_seconds",
+  labelNames: ["driver"],
+  buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1],
+});
+
+setInterval(() => {
+  const snapshot = cache.metrics();
+
+  for (const [driver, row] of Object.entries(snapshot.byDriver)) {
+    hits.inc({ driver }, row.hits);
+    misses.inc({ driver }, row.misses);
+  }
+
+  cache.resetMetrics();
+}, 10_000);
+```
+
+### StatsD
+
+```ts
+import StatsD from "hot-shots";
+const statsd = new StatsD();
+
+setInterval(() => {
+  const snapshot = cache.metrics();
+  statsd.gauge("cache.hit_rate", snapshot.hitRate);
+  statsd.gauge("cache.p95_ms", snapshot.latencyMs.p95);
+  statsd.gauge("cache.p99_ms", snapshot.latencyMs.p99);
+  cache.resetMetrics();
+}, 10_000);
+```
+
+### Plain logging
+
+```ts
+setInterval(() => {
+  const m = cache.metrics();
+  console.log(
+    `[cache] hitRate=${(m.hitRate * 100).toFixed(1)}% ` +
+      `p95=${m.latencyMs.p95.toFixed(2)}ms errors=${m.errors}`,
+  );
+}, 60_000);
+```
+
+## When to reach for events instead
+
+The metrics collector is the right answer when you want **aggregate** observability — "how is the cache doing overall." For per-event reactions (alerting on individual errors, audit-logging specific keys), use the [event system](/v/latest/cache/events/) directly:
+
+```ts
+cache.on("error", ({ key, error }) => {
+  pagerDuty.trigger(`Cache error on ${key}`, error);
+});
+```
+
+Both can coexist — events fire whether the metrics collector is attached or not.
+
+## Related
+
+- [Event System](/v/latest/cache/events/) — raw events that drive the collector.
+- [Stale-while-revalidate](/v/latest/cache/swr/) — `error` events also surface SWR background refresh failures.
+- [Cache Manager](/v/latest/cache/cache-manager/) — manager-level driver and config reference.

@@ -1,0 +1,612 @@
+---
+title: "Cache Driver Interface"
+slug: v/latest/cache/cache-driver-interface
+---
+
+Every custom cache driver must implement this interface. All built-in drivers follow this contract.
+
+## options
+
+Driver configuration object.
+
+```ts
+options: Options;
+```
+
+## name
+
+Unique driver identifier.
+
+```ts
+name: string;
+```
+
+Example:
+```ts
+const driver = cache.driver("redis");
+console.log(driver.name); // "redis"
+```
+
+## set(key, value, ttlOrOptions?)
+
+Store a value in cache. The third argument accepts three shapes — a positional TTL (number or duration string) for the common case, or a rich [`CacheSetOptions`](/v/latest/cache/set-options/) object.
+
+```ts
+type CacheTtl = number | string;
+
+set(
+  key: string | GenericObject,
+  value: any,
+  ttlOrOptions?: CacheTtl | CacheSetOptions,
+): Promise<any>;
+```
+
+Examples:
+```ts
+// Positional TTL
+await cache.set("product.123", product, 3600);        // seconds
+await cache.set("product.123", product, "1h");        // duration string
+
+// Rich options
+await cache.set("product.123", product, {
+  ttl: "1h",
+  tags: ["products"],
+  onConflict: "create",
+});
+```
+
+See [Set Options](/v/latest/cache/set-options/) for the full option reference.
+
+## get(key)
+
+Retrieve a value from cache. Returns the value if found and not expired, otherwise `null`.
+
+```ts
+get<T = any>(key: string | GenericObject): Promise<T | null>;
+```
+
+Example:
+```ts
+const product = await cache.get("product.123");
+if (product === null) {
+  console.log("Product not in cache");
+}
+```
+
+## has(key)
+
+Check if a key exists in cache without retrieving its value. Returns `true` if key exists and is not expired, `false` otherwise.
+
+```ts
+has(key: string | GenericObject): Promise<boolean>;
+```
+
+Example:
+```ts
+const exists = await cache.has("rate-limit.user.456");
+```
+
+## remove(key)
+
+Delete a single key from cache.
+
+```ts
+remove(key: string | GenericObject): Promise<void>;
+```
+
+Example:
+```ts
+await cache.remove("product.123");
+```
+
+## flush()
+
+Clear all cached data.
+
+```ts
+flush(): Promise<void>;
+```
+
+Example:
+```ts
+await cache.flush();
+```
+
+## removeNamespace(namespace)
+
+Delete all keys within a namespace. Namespace is the first segment of a key before the first dot.
+
+```ts
+removeNamespace(namespace: string): Promise<any>;
+```
+
+Example:
+```ts
+// Removes all keys like "product.123", "product.456", etc.
+await cache.removeNamespace("product");
+```
+
+## remember(key, ttl, callback)
+
+Get a value from cache. If not found or expired, execute the callback function and cache the result. Includes automatic stampede prevention within a single process.
+
+```ts
+remember<T = any>(
+  key: string | GenericObject,
+  ttl: CacheTtl,
+  callback: () => Promise<T>,
+): Promise<T>;
+```
+
+Example:
+```ts
+const user = await cache.remember("user.789", "1h", async () => {
+  return await database.users.find(789);
+});
+```
+
+See [Stampede Prevention](/v/latest/cache/stampede-prevention/) for details.
+
+## pull(key)
+
+Retrieve and delete a key atomically.
+
+```ts
+pull<T = any>(key: string | GenericObject): Promise<T | null>;
+```
+
+Example:
+```ts
+const order = await cache.pull("order-session.abc123");
+```
+
+## forever(key, value)
+
+Store a value permanently with no expiration.
+
+```ts
+forever<T = any>(key: string | GenericObject, value: T): Promise<T>;
+```
+
+Example:
+```ts
+await cache.forever("config.app", { version: "1.0.0" });
+```
+
+## increment(key, value?)
+
+Atomically increase a numeric value by the given amount (default 1). Returns the new value. Throws if the stored value is not numeric.
+
+```ts
+increment(key: string | GenericObject, value?: number): Promise<number>;
+```
+
+Example:
+```ts
+const count = await cache.increment("product.views.123", 1);
+```
+
+## decrement(key, value?)
+
+Atomically decrease a numeric value by the given amount (default 1). Returns the new value. Throws if the stored value is not numeric.
+
+```ts
+decrement(key: string | GenericObject, value?: number): Promise<number>;
+```
+
+Example:
+```ts
+const stock = await cache.decrement("inventory.widget", 5);
+```
+
+## update(key, fn, options?)
+
+Atomically read, transform, and write a cached value. The callback receives the current value (or `null` on miss) and returns the next value. Returning `null` removes the entry.
+
+```ts
+update<T = any>(
+  key: string | GenericObject,
+  fn: (current: T | null) => T | null | Promise<T | null>,
+  options?: { ttl?: CacheTtl },
+): Promise<T | null>;
+```
+
+Example:
+```ts
+await cache.update<User>("user.1", (current) => ({
+  ...(current ?? defaultUser),
+  lastSeenAt: Date.now(),
+}));
+```
+
+Throws `CacheUnsupportedError` on the file driver. See [Update & Merge](/v/latest/cache/update-merge/).
+
+## merge(key, partial, options?)
+
+Shallow-merge a partial object into a cached value. Treats missing keys as `{}`.
+
+```ts
+merge<T extends Record<string, any> = Record<string, any>>(
+  key: string | GenericObject,
+  partial: Partial<T>,
+  options?: { ttl?: CacheTtl },
+): Promise<T>;
+```
+
+Example:
+```ts
+await cache.merge<User>("user.1", { name: "Jane" });
+```
+
+Throws `CacheUnsupportedError` on the file driver.
+
+## list(key)
+
+Obtain a list accessor bound to the key. Returns a [`CacheListAccessor<T>`](/v/latest/cache/lists/) for queue/stack/recent-N workflows.
+
+```ts
+list<T = any>(key: string | GenericObject): CacheListAccessor<T>;
+```
+
+Example:
+```ts
+const recent = cache.list<Event>("recent.events");
+await recent.push(event);
+await recent.trim(0, 99);
+```
+
+See [Cache Lists](/v/latest/cache/lists/) for the full accessor API.
+
+## many(keys)
+
+Retrieve multiple values in one operation. Returns an array in the same order as the input keys. Missing or expired keys return `null` in their positions.
+
+```ts
+many(keys: (string | GenericObject)[]): Promise<any[]>;
+```
+
+Example:
+```ts
+const [user, product, order] = await cache.many([
+  "user.123",
+  "product.456",
+  "order.789",
+]);
+```
+
+## setMany(items, ttl?)
+
+Store multiple key-value pairs in one operation.
+
+```ts
+setMany(items: Record<string, any>, ttl?: CacheTtl): Promise<void>;
+```
+
+Example:
+```ts
+await cache.setMany({
+  "user.123": { id: 123, name: "Alice" },
+  "user.456": { id: 456, name: "Bob" },
+}, "1h");
+```
+
+## tags(tags)
+
+Create a tagged cache instance to group related keys. Returns a `TaggedCacheDriver` instance.
+
+```ts
+tags(tags: string[]): TaggedCacheDriver;
+```
+
+Example:
+```ts
+const tagged = cache.tags(["products", "featured"]);
+await tagged.set("item.1", product1);
+await tagged.invalidate();   // drops every key tagged "products" or "featured"
+```
+
+## similar(vector, options)
+
+Vector-based retrieval. Returns the nearest stored entries to `vector` by cosine similarity, ordered by descending score.
+
+```ts
+similar<T = any>(
+  vector: number[],
+  options: CacheSimilarOptions,
+): Promise<CacheSimilarHit<T>[]>;
+```
+
+Example:
+```ts
+const hits = await cache.similar(await embed(query), {
+  topK: 5,
+  threshold: 0.7,
+  tags: ["docs"],
+});
+```
+
+Drivers that don't index vectors throw `CacheUnsupportedError`. See [Similarity Retrieval](/v/latest/cache/similarity/) for the full API and capability matrix.
+
+## parseKey(key)
+
+Normalize a cache key for driver storage. Sanitizes special characters and applies global prefix.
+
+```ts
+parseKey(key: string | GenericObject): string;
+```
+
+Key parsing rules:
+- String keys: strip `{}"[]`, replace `:` and `,` with `.`
+- Object keys: JSON stringify then apply string rules
+- Global prefix is prepended if configured
+
+Example:
+```ts
+const parsed = cache.parseKey({ namespace: "product", id: 123 });
+// "app.namespace.product.id.123"
+```
+
+## setOptions(options)
+
+Update driver configuration at runtime.
+
+```ts
+setOptions(options: Options): any;
+```
+
+## connect()
+
+Establish connection to the cache backend.
+
+```ts
+connect(): Promise<any>;
+```
+
+## disconnect()
+
+Close connection to the cache backend.
+
+```ts
+disconnect(): Promise<void>;
+```
+
+## client
+
+Optional reference to the underlying backend client (Redis connection, Memcached instance, etc.).
+
+```ts
+client?: ClientType;
+```
+
+## on / off / once
+
+Event subscription methods. Return the driver instance for chaining.
+
+```ts
+on(event: CacheEventType, handler: CacheEventHandler): this;
+off(event: CacheEventType, handler: CacheEventHandler): this;
+once(event: CacheEventType, handler: CacheEventHandler): this;
+```
+
+See [Event System](/v/latest/cache/events/) for the full event catalog.
+
+## setLoggingState(shouldLog)
+
+Toggle per-driver operation logging at runtime.
+
+```ts
+setLoggingState(shouldLog: boolean): any;
+```
+
+## Complete Interface Definition
+
+```ts
+export interface CacheDriver<ClientType, Options> {
+  options: Options;
+  name: string;
+
+  // Core
+  set(
+    key: string | GenericObject,
+    value: any,
+    ttlOrOptions?: CacheTtl | CacheSetOptions,
+  ): Promise<any>;
+  get<T = any>(key: string | GenericObject): Promise<T | null>;
+  has(key: string | GenericObject): Promise<boolean>;
+  remove(key: string | GenericObject): Promise<void>;
+  flush(): Promise<void>;
+  removeNamespace(namespace: string): Promise<any>;
+
+  // Convenience
+  remember<T = any>(
+    key: string | GenericObject,
+    ttl: CacheTtl,
+    callback: () => Promise<T>,
+  ): Promise<T>;
+  pull<T = any>(key: string | GenericObject): Promise<T | null>;
+  forever<T = any>(key: string | GenericObject, value: T): Promise<T>;
+
+  // Atomic + mutation
+  increment(key: string | GenericObject, value?: number): Promise<number>;
+  decrement(key: string | GenericObject, value?: number): Promise<number>;
+  update<T = any>(
+    key: string | GenericObject,
+    fn: (current: T | null) => T | null | Promise<T | null>,
+    options?: { ttl?: CacheTtl },
+  ): Promise<T | null>;
+  merge<T extends Record<string, any> = Record<string, any>>(
+    key: string | GenericObject,
+    partial: Partial<T>,
+    options?: { ttl?: CacheTtl },
+  ): Promise<T>;
+
+  // Bulk
+  many(keys: (string | GenericObject)[]): Promise<any[]>;
+  setMany(items: Record<string, any>, ttl?: CacheTtl): Promise<void>;
+
+  // Collections
+  list<T = any>(key: string | GenericObject): CacheListAccessor<T>;
+  tags(tags: string[]): TaggedCacheDriver;
+
+  // Similarity
+  similar<T = any>(
+    vector: number[],
+    options: CacheSimilarOptions,
+  ): Promise<CacheSimilarHit<T>[]>;
+
+  // Infrastructure
+  parseKey(key: string | GenericObject): string;
+  setOptions(options: Options): any;
+  setLoggingState(shouldLog: boolean): any;
+  connect(): Promise<any>;
+  disconnect(): Promise<void>;
+  client?: ClientType;
+
+  // Events
+  on(event: CacheEventType, handler: CacheEventHandler): this;
+  off(event: CacheEventType, handler: CacheEventHandler): this;
+  once(event: CacheEventType, handler: CacheEventHandler): this;
+}
+```
+
+## Return types
+
+### CacheSetResult
+
+Returned by conditional writes (`onConflict: "create"` or `"update"`):
+
+```ts
+type CacheSetResult<T = any> = {
+  wasSet: boolean;       // did the write take effect?
+  existing: T | null;    // prior value, populated on "create" rejections
+};
+```
+
+See [Set Options — Conditional writes](/v/latest/cache/set-options/#conditional-writes--onconflict).
+
+### CacheSimilarHit / CacheSimilarOptions
+
+Used by `similar()`:
+
+```ts
+type CacheSimilarOptions = {
+  topK: number;          // required — max hits returned
+  threshold?: number;    // [0, 1]; hits scoring strictly below are dropped
+  tags?: string[];       // narrow candidate pool by tag (union)
+};
+
+type CacheSimilarHit<T = unknown> = {
+  key: string;           // post-parseKey normalized key
+  value: T;              // deep-cloned stored value
+  score: number;         // cosine similarity [0, 1]
+};
+```
+
+See [Similarity Retrieval](/v/latest/cache/similarity/).
+
+### CacheListAccessor
+
+Returned by `list()`:
+
+```ts
+interface CacheListAccessor<T = any> {
+  push(...items: T[]): Promise<number>;
+  unshift(...items: T[]): Promise<number>;
+  pop(): Promise<T | null>;
+  shift(): Promise<T | null>;
+  slice(start?: number, end?: number): Promise<T[]>;
+  all(): Promise<T[]>;
+  length(): Promise<number>;
+  trim(start: number, end: number): Promise<void>;
+  clear(): Promise<void>;
+}
+```
+
+See [Cache Lists](/v/latest/cache/lists/).
+
+## Error types
+
+Drivers throw specific error classes — consumers should catch these selectively:
+
+- `CacheConfigurationError` — bad options, invalid TTL string, conflicting `ttl` + `expiresAt`
+- `CacheDriverNotInitializedError` — operations called before `init()`
+- `CacheUnsupportedError` — driver doesn't implement the requested op (today: `update` / `merge` on file)
+- `CacheConcurrencyError` — reserved for future `WATCH`/`MULTI` retry exhaustion
+- `CacheConnectionError` — reserved for driver connection failures
+
+See [Errors](/v/latest/cache/errors/) for the full catalog.
+
+## Event Types
+
+The event system emits:
+
+- `hit` — cache hit (value retrieved)
+- `miss` — cache miss (value not found or expired)
+- `set` — value stored in cache
+- `removed` — key removed from cache
+- `flushed` — entire cache cleared
+- `expired` — key expired (TTL reached)
+- `connected` — driver connected
+- `disconnected` — driver disconnected
+- `error` — error occurred during operation
+
+See [Event System](/v/latest/cache/events/).
+
+## Implementing a Custom Driver
+
+- Extend [BaseCacheDriver](/v/latest/cache/base-cache-driver/) to reuse key parsing, logging, TTL handling, event emission, and default implementations for `has`, `remember`, `pull`, `forever`, `increment`, `decrement`, `many`, `setMany`, `tags`, `update`, `merge`, and `list`.
+- Implement these required abstract methods: `set()`, `get()`, `remove()`, `flush()`, `removeNamespace()`.
+- In `set()`, call `this.resolveSetOptions(ttlOrOptions)` to normalize the third argument into `{ ttl, tags, onConflict }`.
+- Override `update` / `merge` / `list` only when your driver can offer stronger semantics (e.g. Redis-native commands). Throw `CacheUnsupportedError` from any op your driver can't safely support.
+
+## Example skeleton
+
+```ts
+import {
+  BaseCacheDriver,
+  type CacheDriver,
+  type CacheKey,
+  type CacheSetOptions,
+  type CacheSetResult,
+  type CacheTtl,
+} from "@warlock.js/cache";
+
+type MyCacheOptions = {
+  globalPrefix?: string;
+  ttl?: CacheTtl;
+};
+
+export class MyCacheDriver
+  extends BaseCacheDriver<any, MyCacheOptions>
+  implements CacheDriver<any, MyCacheOptions>
+{
+  public name = "myCache";
+
+  public async set(
+    key: CacheKey,
+    value: any,
+    ttlOrOptions?: CacheTtl | CacheSetOptions,
+  ): Promise<any> {
+    const { ttl, tags, onConflict } = this.resolveSetOptions(ttlOrOptions);
+    // ... store value with normalized options ...
+
+    if (tags?.length) {
+      await this.applyTags(this.parseKey(key), tags);
+    }
+
+    if (onConflict === "create" || onConflict === "update") {
+      const result: CacheSetResult = { wasSet: true, existing: null };
+      return result;
+    }
+
+    return this;
+  }
+
+  public async get(key: CacheKey) { /* ... */ }
+  public async remove(key: CacheKey) { /* ... */ }
+  public async flush() { /* ... */ }
+  public async removeNamespace(namespace: string) { /* ... */ }
+}
+```
+
+See [Make Your Own Cache Driver](/v/latest/cache/make-your-own-cache-driver/) for a complete end-to-end example.

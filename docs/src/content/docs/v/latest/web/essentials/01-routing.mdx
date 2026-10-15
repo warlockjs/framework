@@ -1,0 +1,178 @@
+---
+title: Routing
+slug: v/latest/web/essentials/routing
+description: Derive page routes from files or declare literal paths and stable names.
+sidebar:
+  order: 1
+  label: Routing
+---
+
+A page with no `config.route` derives its URL and name from its location beneath
+`src/web/`.
+
+## Filesystem routing
+
+| File                                   | Derived path    | Derived name  |
+| -------------------------------------- | --------------- | ------------- |
+| `src/web/index.page.tsx`               | `/`             | `index`       |
+| `src/web/about.page.tsx`               | `/about`        | `about`       |
+| `src/web/blog/index.page.tsx`          | `/blog`         | `blog`        |
+| `src/web/products/[id].page.tsx`       | `/products/:id` | `products.id` |
+| `src/web/(marketing)/pricing.page.tsx` | `/pricing`      | `pricing`     |
+
+The rules are:
+
+- `index.page.tsx` claims its directory. It is the only special ordinary-page
+  filename; `home.page.tsx` serves `/home`, not `/`.
+- Every directory and non-index filename contributes a path segment.
+- A plain `[id]` directory or filename becomes a whole-segment `:id` parameter.
+- A `(group)` directory contributes nothing to the path or route name; it only
+  organizes files. Bracket syntax inside a group name is a boot-time error
+  because a group can never contribute a dynamic segment. Write
+  `(marketing)/[id]/page.page.tsx`, not
+  `(marketing[id])/page.page.tsx`.
+- The route name is the dotted sequence of contributing segments.
+
+## Explicit routes
+
+Put a literal path or object in the page's `config`:
+
+```tsx title="src/web/products/[id].page.tsx"
+import type { PageConfig } from "@warlock.js/web";
+
+export const config: PageConfig = {
+  route: { path: "/catalog/:id", name: "products.show" },
+};
+
+export default function ProductPage() {
+  return <main>Product</main>;
+}
+```
+
+An explicit route wins over filesystem derivation for both path and name. A
+bare string inside `config` is also valid:
+
+```ts
+import type { PageConfig } from "@warlock.js/web";
+
+export const config: PageConfig = { route: "/products" };
+```
+
+Warlock reads `config.route` without executing application code. Route
+variables, function calls, computed keys, spreads, and indirect config aliases
+are refused.
+
+Two pages that resolve to the same effective path or name fail discovery and
+name both files, instead of leaving one page silently unreachable.
+
+## Resolve a named URL
+
+Use `href()` to interpolate a name from the published route table:
+
+```ts
+import { href } from "@warlock.js/web";
+
+const productUrl = href("products.show", { id: "42" });
+```
+
+During development and production builds, Warlock writes the discovered route
+table to `.warlock/typings/web-routes.d.ts`. Include that directory in the
+application TypeScript project. Once present, `href()` accepts only known page
+names and requires the parameters declared by the route:
+
+```ts
+href("products.show", { id: "42" });
+// href("products.shoow", { id: "42" }); // TypeScript error
+// href("products.show", {}); // TypeScript error: id is required
+```
+
+The generated file is an aid, not a security boundary. Before declarations
+exist (for example in a new checkout), names remain strings and `href()` still
+validates against the published route table at runtime.
+
+## Cache public pages explicitly
+
+Page documents and their `x-warlock-data` representations are `no-store` by
+default. Opt a public page into shared caching with `config.cache`:
+
+```tsx title="src/web/products/index.page.tsx"
+import type { PageConfig } from "@warlock.js/web";
+
+export const config: PageConfig = {
+  route: { path: "/products", name: "products.index" },
+  cache: { public: true, maxAge: 60 },
+};
+```
+
+`maxAge` is seconds. Both keys are required:
+`cache: { public: true }` fails at boot with
+`InvalidPageCacheOptInError` because Warlock will not guess a freshness
+window. Remove `cache` entirely to keep the safe default.
+
+The declaration is an opt-in, not permission to cache every response:
+
+| Request or response state                                              | Final `Cache-Control`      |
+| ---------------------------------------------------------------------- | -------------------------- |
+| No `cache` declaration                                                 | `no-store`                 |
+| Opted in, provably unauthenticated, no cookie sent or written          | `public, max-age=<maxAge>` |
+| The request carries a cookie other than `locale` (including malformed) | `private, no-store`        |
+| Authenticated state was used, or the response sets or clears a cookie  | `private, no-store`        |
+| Warlock cannot determine whether authenticated state was used          | `no-store`                 |
+
+The final decision is applied once after loaders finish, to both the document
+and data response. A loader cannot bypass it by setting `Cache-Control`
+manually.
+
+## Page-route grammar
+
+Page routes support static segments, whole-segment parameters, the exact `*`
+wildcard, and a terminal wildcard such as `/docs/*`.
+
+They do not support regex parameters, optional parameters, multiple parameters
+inside one segment, parameters mixed with text, doubled or trailing slashes,
+or a non-terminal wildcard. Write two pages for an optional segment and
+validate constrained values in the loader.
+
+An unsupported declared path fails at boot with
+`PageRoutePathNotSupportedError`; Warlock does not normalize it or register
+it literally. Rejected examples include `/users/:id?`,
+`/users/:id(\\d+)`, `/near/:lat-:lng`, `/a//b`, and `/users/`.
+
+## Catch-all filenames are not supported
+
+:::danger[`[...slug]` fails page discovery]
+Filesystem routing recognizes a whole-segment parameter such as `[id]`, not
+catch-all filename syntax. If discovery encounters
+`src/web/docs/[...slug].page.tsx`, it throws
+`PageFileSegmentNotSupportedError` and stops the build. The error identifies
+both the page and rejected segment:
+
+```text
+"docs/[...slug].page.tsx" contains the filesystem segment "[...slug]", which is not supported: Segment "[...slug]" is a catch-all pattern, which page routes do not support — page routes support only a whole-segment param such as "[id]", not a catch-all. Page routes support a plain static segment or a whole-segment dynamic param such as "[id]".
+```
+
+:::
+
+Use an explicit terminal wildcard instead:
+
+```tsx title="src/web/docs/catch-all.page.tsx"
+import type { PageConfig } from "@warlock.js/web";
+
+export const config: PageConfig = {
+  route: { path: "/docs/*", name: "docs.catchAll" },
+};
+```
+
+## Default export failures
+
+Every discovered page must default-export a runtime component. A page with
+only named exports is a hard build failure naming the file. A type-only default
+export does not count because it disappears at runtime.
+
+## Prefixes from layouts
+
+Every URL segment is written either in the page route/filesystem path or in a
+layout prefix above it. A prefix replaces its own directory segment for a
+derived page route and prepends an explicit page path.
+
+[See layout prefix and middleware composition →](/v/latest/web/essentials/layouts-and-special-pages/)

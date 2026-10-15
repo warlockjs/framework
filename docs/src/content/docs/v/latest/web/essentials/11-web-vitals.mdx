@@ -1,0 +1,209 @@
+---
+title: Measuring Web Vitals
+slug: v/latest/web/essentials/web-vitals
+description: Report field Core Web Vitals with the official web-vitals library, attributed to route, device, and navigation type.
+sidebar:
+  order: 11
+  label: Web Vitals
+---
+
+Warlock sends **no telemetry of its own**. There is no bundled `web-vitals`
+dependency and no built-in collection endpoint — an app that wants real user
+Core Web Vitals data installs the library itself, registers a reporter once
+on the client, and sends the numbers to its own endpoint. This page is that
+recipe.
+
+```
+npm install web-vitals
+```
+
+## Register the reporter once, on the client only
+
+`web-vitals`' functions touch `window` the moment they're called, and a
+page, layout, or `root.tsx` module is evaluated during SSR — so the
+registration cannot sit at module scope. Add a small client component to
+`root.tsx`, rendered inside `#vessel` so it hydrates with the rest of the
+tree, and fire the registration from a `useEffect`:
+
+```tsx title="src/web/vitals-reporter.tsx"
+import { useEffect } from "react";
+
+export function VitalsReporter() {
+  useEffect(() => {
+    import("./report-web-vitals").then(({ reportWebVitals }) => reportWebVitals());
+  }, []);
+
+  return null;
+}
+```
+
+```tsx title="src/web/root.tsx"
+import { Head, Scripts } from "@warlock.js/web";
+import type { AppProps } from "@warlock.js/web";
+import { VitalsReporter } from "./vitals-reporter";
+
+export default function App({ children }: AppProps) {
+  return (
+    <html lang="en">
+      <head>
+        <Head />
+      </head>
+      <body>
+        <div id="vessel">
+          {children}
+          <VitalsReporter />
+        </div>
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+```
+
+The dynamic `import()` inside the effect keeps `web-vitals` out of both the
+server bundle and the initial client chunk — it only downloads once the page
+has already hydrated. `<ClientOnly>` (see
+[Client-only rendering](/v/latest/web/essentials/client-only/)) works
+equally well if the reporter belongs beside other client-only widgets
+instead of the root.
+
+## Report the metrics
+
+```ts title="src/web/report-web-vitals.ts"
+import { onLCP, onINP, onCLS, onFCP, onTTFB } from "web-vitals";
+import { currentRoute, routerEvents } from "@warlock.js/web";
+import type { Metric } from "web-vitals";
+
+function deviceClass(): "mobile" | "desktop" {
+  return window.matchMedia("(max-width: 768px)").matches ? "mobile" : "desktop";
+}
+
+let navigationType: "hard" | "soft" = "hard";
+let softRouteName: string | undefined;
+
+function send(metric: Metric) {
+  const route = currentRoute();
+
+  const body = JSON.stringify({
+    name: metric.name, // "LCP" | "INP" | "CLS" | "FCP" | "TTFB"
+    value: metric.value,
+    id: metric.id,
+    rating: metric.rating, // "good" | "needs-improvement" | "poor"
+    route: navigationType === "hard" ? route?.name : softRouteName,
+    navigationType,
+    device: deviceClass(),
+    url: location.href,
+  });
+
+  navigator.sendBeacon("/api/vitals", body);
+}
+
+export function reportWebVitals() {
+  onLCP(send);
+  onINP(send);
+  onCLS(send);
+  onFCP(send);
+  onTTFB(send);
+
+  routerEvents.onNavigated(() => {
+    navigationType = "soft";
+    softRouteName = currentRoute()?.name;
+  });
+}
+```
+
+`/api/vitals` is an ordinary application API route that stores or forwards
+the beacon — nothing about it is Warlock-specific.
+
+- `currentRoute()` (`@warlock.js/web`) returns `{ name, params? }` for
+  whatever the server matched for the page on screen, correct from the very
+  first render since the hydration payload already carries the match.
+- `routerEvents.onNavigated(callback)` (`@warlock.js/web`) fires after a
+  client navigation's tree swap commits — the signal that a route changed
+  without a document reload.
+- `navigator.sendBeacon` fires-and-forgets even while the page is unloading,
+  which is why it — not `fetch` — is the standard transport for vitals data.
+
+## Soft navigations and attribution
+
+`web-vitals` reports **per hard page load**. LCP and CLS are defined
+relative to one document's paint timeline and layout history, so they stay
+attributed to the route the visitor hard-landed on — a Warlock client
+navigation (`<Link>`, `navigateTo()`, `refresh()`, see
+[Streaming and defer](/v/latest/web/essentials/streaming-and-defer/) for how
+a client navigation's data request works) never reloads the document, so
+`web-vitals` has no way to know it happened at all.
+
+**INP is different**: it's a whole-session metric, the single worst
+interaction across the page's entire lifetime, and it keeps accumulating
+across every soft navigation before it reports once, late.
+
+So the recipe above attributes:
+
+- **LCP and CLS** to the route the visitor hard-landed on
+  (`navigationType: "hard"`, the route read once at registration time).
+- **INP** to whichever route was current when it finally reports, tracked
+  between hard load and report time with `routerEvents.onNavigated`
+  (`navigationType: "soft"`).
+
+Don't try to make LCP/CLS "follow" a soft-navigated route — that misattributes
+a metric that is, by definition, about the initial document load to a route
+the browser never actually loaded as a document.
+
+## Thresholds — judge at p75, per route and device
+
+| Metric | Good (p75) |
+| ------ | ---------- |
+| LCP    | ≤ 2.5s     |
+| INP    | ≤ 200ms    |
+| CLS    | ≤ 0.1      |
+
+Compute the 75th percentile of collected samples, grouped by route name and
+device class, before comparing against these numbers. A single sample means
+nothing, and mixing mobile with desktop or one route with another hides the
+one that's actually failing.
+
+Field RUM is the ground truth for these three. A lab tool (Lighthouse,
+WebPageTest) cannot measure INP at all — it has no real interaction to time —
+so it substitutes **Total Blocking Time (TBT)** as a proxy. Treat a lab TBT
+number as a pre-deploy smell test, and the field p75 above as the number
+that decides whether a route is actually fast for visitors.
+
+## Practices that move these numbers
+
+**Images** — use the `<Image>` component (`@warlock.js/web`). Its
+`width`/`height` reserve layout space before the image decodes, which is the
+biggest CLS win available. Set `priority` only on the page's actual LCP
+image — it flips `loading` to `"eager"` and `fetchPriority` to `"high"`,
+right for exactly one image per page. Every other image stays
+`loading="lazy"` by default.
+
+**Fonts** — preload the above-the-fold webfont with `<link rel="preload"
+as="font">` in `root.tsx`'s `<head>`, and set `font-display: swap` (or
+`optional`) on the `@font-face` rule.
+
+**CSS** — only imported stylesheets are supported (see
+[Client/server boundaries](/v/latest/web/essentials/client-server-boundaries/)).
+Canon: no inline `<style>` tags — imported CSS lets the framework's
+stylesheet pipeline dedupe, cache, and ship a real `<link>` the browser can
+start fetching early.
+
+**Hydration** — keep the client bundle small; every byte the browser must
+parse before it can respond to input is a direct INP cost. Wrap
+non-critical widgets in `<ClientOnly>` paired with `React.lazy`, so their
+code doesn't download until after the page has hydrated.
+
+**Suspense / `defer()`** — size a `<Suspense>` fallback to match the
+dimensions the resolved content will have (see
+[Streaming and defer](/v/latest/web/essentials/streaming-and-defer/)), or
+the swap from fallback to content is a CLS hit.
+
+**Third-party scripts** — load after first interaction, or defer to a
+`<ClientOnly>` widget, so they never ship in the initial hydration bundle.
+
+## See also
+
+- [Client-only rendering](/v/latest/web/essentials/client-only/) — the
+  `<ClientOnly>` / `useIsClient()` primitive the reporter relies on.
+- [Streaming and defer](/v/latest/web/essentials/streaming-and-defer/) —
+  `defer()` and `<Suspense>`, relevant to the CLS guidance above.

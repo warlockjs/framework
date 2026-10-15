@@ -1,0 +1,77 @@
+---
+title: "Split Dispatching From Processing"
+sidebar:
+  order: 2
+---
+
+A web server that only needs to **enqueue** jobs — never run them —
+should not spin up in-process workers. Turning workers off there keeps
+job handlers, and their memory/CPU footprint, out of the request path
+entirely; a separate worker process (or several, for horizontal
+scaling) does the actual processing.
+
+## The web process: dispatch only
+
+```ts title="src/config/queue.ts"
+import type { QueueConfig } from "@warlock.js/queue";
+
+const queueConfig: QueueConfig = {
+  connection: { host: "127.0.0.1", port: 6379 },
+  workers: { enabled: false }, // this process never runs jobs
+};
+
+export default queueConfig;
+```
+
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+import { queueConnector } from "@warlock.js/queue";
+
+export default defineConfig({
+  connectors: [queueConnector()],
+});
+```
+
+`dispatch()` on any `defineJob` still works normally — it only needs
+the Redis connection, not a worker.
+
+## The worker process: processing only
+
+A separate entry point, run as its own process (a dedicated container,
+`pm2` app, or systemd unit):
+
+```ts title="worker.ts"
+import { setQueueConfig, startWorkers, closeQueue } from "@warlock.js/queue";
+import "./src/app/invoices/jobs/send-invoice.job";
+import "./src/app/reports/jobs/generate-report.job";
+// every module that calls defineJob must be imported here too
+
+setQueueConfig({
+  connection: { host: "127.0.0.1", port: 6379 },
+  workers: { concurrency: 10 },
+});
+
+await startWorkers();
+
+process.on("SIGTERM", async () => {
+  await closeQueue();
+  process.exit(0);
+});
+```
+
+## The rule that makes this work
+
+Both processes must define the **same job names** and use the **same
+`prefix`** — the worker process only knows how to run a job if
+`defineJob` registered a handler for that exact name before
+`startWorkers()` is called. A job dispatched from the web process with
+no matching definition in any running worker sits in Redis until a
+worker with that definition starts, or fails immediately if the worker
+that does exist has never registered it.
+
+Scale the worker process independently of the web process — more
+worker replicas raise total throughput; `workers.concurrency` raises
+how many jobs one worker instance runs in parallel.
+
+See [Configuration](../essentials/configuration/) for the full
+`QueueConfig` and connector behaviour.

@@ -1,0 +1,439 @@
+---
+title: "Make Your Own Cache Driver"
+slug: v/latest/cache/make-your-own-cache-driver
+---
+
+`@warlock.js/cache` ships with several cache drivers out of the box:
+
+- [Redis Cache Driver](/v/latest/cache/redis/)
+- [File Cache Driver](/v/latest/cache/file/)
+- [Memory Cache Driver](/v/latest/cache/memory/)
+- [Memory Extended Cache Driver](/v/latest/cache/memory-extended/)
+- [LRU Memory Cache Driver](/v/latest/cache/lru-memory/)
+- [Null Cache Driver](/v/latest/cache/null/)
+
+But you can easily make your own. Implement the [CacheDriver interface](/v/latest/cache/cache-driver-interface/), or extend [BaseCacheDriver](/v/latest/cache/base-cache-driver/) to inherit key parsing, TTL normalization, logging, events, and default implementations for most methods.
+
+## Example: Memcached driver
+
+```ts
+import {
+  BaseCacheDriver,
+  type CacheDriver,
+  type CacheKey,
+  type CacheSetOptions,
+  type CacheSetResult,
+  type CacheTtl,
+} from "@warlock.js/cache";
+import Memcached from "memcached";
+
+export type MemCachedCacheDriverOptions = {
+  host: string;
+  port: number;
+  globalPrefix?: string;
+  ttl?: CacheTtl;
+};
+
+export class MemCachedCacheDriver
+  extends BaseCacheDriver<Memcached, MemCachedCacheDriverOptions>
+  implements CacheDriver<Memcached, MemCachedCacheDriverOptions>
+{
+  public name = "memcached";
+
+  public async connect() {
+    this.log("connecting");
+    this.client = new Memcached(`${this.options.host}:${this.options.port}`);
+    this.log("connected");
+  }
+
+  public async disconnect() {
+    this.log("disconnecting");
+    this.client.end();
+    this.log("disconnected");
+  }
+
+  public async removeNamespace(namespace: string) {
+    namespace = this.parseKey(namespace);
+    this.log("clearing", namespace);
+    // Memcached has no pattern-based deletion — document the limitation
+    this.log("cleared", namespace);
+  }
+
+  public async set(
+    key: CacheKey,
+    value: any,
+    ttlOrOptions?: CacheTtl | CacheSetOptions,
+  ): Promise<any> {
+    const parsedKey = this.parseKey(key);
+    const { ttl, tags, onConflict } = this.resolveSetOptions(ttlOrOptions);
+
+    this.log("caching", parsedKey);
+
+    // Memcached has a native `add` command for "create" (fail if exists).
+    // For "update" (fail if missing), use `replace`. "upsert" uses `set`.
+    const command =
+      onConflict === "create"
+        ? "add"
+        : onConflict === "update"
+        ? "replace"
+        : "set";
+
+    return new Promise((resolve, reject) => {
+      this.client[command](
+        parsedKey,
+        JSON.stringify(this.prepareDataForStorage(value, ttl)),
+        ttl ?? 0,
+        async (error) => {
+          if (error) {
+            if (onConflict === "create" || onConflict === "update") {
+              const existing =
+                onConflict === "create" ? await this.get(key) : null;
+              resolve({ wasSet: false, existing } satisfies CacheSetResult);
+              return;
+            }
+            this.log("error", error.message);
+            return reject(error);
+          }
+
+          if (tags?.length) {
+            await this.applyTags(parsedKey, tags);
+          }
+
+          this.log("cached", parsedKey);
+          await this.emit("set", { key: parsedKey, value, ttl });
+
+          if (onConflict === "create" || onConflict === "update") {
+            resolve({ wasSet: true, existing: null } satisfies CacheSetResult);
+            return;
+          }
+
+          resolve(value);
+        },
+      );
+    });
+  }
+
+  public async get(key: CacheKey) {
+    const parsedKey = this.parseKey(key);
+    this.log("fetching", parsedKey);
+
+    return new Promise((resolve, reject) => {
+      this.client.get(parsedKey, async (error, value) => {
+        if (error) {
+          this.log("error", error.message);
+          return reject(error);
+        }
+
+        if (!value) {
+          this.log("notFound", parsedKey);
+          await this.emit("miss", { key: parsedKey });
+          return resolve(null);
+        }
+
+        try {
+          const data = JSON.parse(value);
+          const result = await this.parseCachedData(parsedKey, data);
+          await this.emit(result === null ? "miss" : "hit", {
+            key: parsedKey,
+            value: result,
+          });
+          resolve(result);
+        } catch {
+          this.log("error", "Failed to parse cached data");
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  public async remove(key: CacheKey) {
+    const parsedKey = this.parseKey(key);
+    this.log("removing", parsedKey);
+
+    return new Promise((resolve, reject) => {
+      this.client.del(parsedKey, async (error) => {
+        if (error) return reject(error);
+        this.log("removed", parsedKey);
+        await this.emit("removed", { key: parsedKey });
+        resolve();
+      });
+    });
+  }
+
+  public async flush() {
+    this.log("flushing");
+    return new Promise((resolve, reject) => {
+      this.client.flush(async (error) => {
+        if (error) return reject(error);
+        this.log("flushed");
+        await this.emit("flushed");
+        resolve();
+      });
+    });
+  }
+}
+```
+
+## Example: Simple in-memory driver
+
+A minimal driver that leans on every BaseCacheDriver default:
+
+```ts
+import {
+  BaseCacheDriver,
+  type CacheDriver,
+  type CacheKey,
+  type CacheSetOptions,
+  type CacheSetResult,
+  type CacheTtl,
+} from "@warlock.js/cache";
+
+type SimpleMemoryOptions = {
+  globalPrefix?: string;
+  ttl?: CacheTtl;
+};
+
+export class SimpleMemoryCacheDriver
+  extends BaseCacheDriver<SimpleMemoryCacheDriver, SimpleMemoryOptions>
+  implements CacheDriver<SimpleMemoryCacheDriver, SimpleMemoryOptions>
+{
+  public name = "simpleMemory";
+
+  private storage = new Map<string, any>();
+
+  public async removeNamespace(namespace: string) {
+    namespace = this.parseKey(namespace);
+    this.log("clearing", namespace);
+
+    for (const key of this.storage.keys()) {
+      if (key.startsWith(namespace)) {
+        this.storage.delete(key);
+      }
+    }
+
+    this.log("cleared", namespace);
+  }
+
+  public async set(
+    key: CacheKey,
+    value: any,
+    ttlOrOptions?: CacheTtl | CacheSetOptions,
+  ): Promise<any> {
+    const parsedKey = this.parseKey(key);
+    const { ttl, tags, onConflict } = this.resolveSetOptions(ttlOrOptions);
+
+    const exists = this.storage.has(parsedKey);
+
+    if (onConflict === "create" && exists) {
+      const existing = await this.get(key);
+      return { wasSet: false, existing } satisfies CacheSetResult;
+    }
+
+    if (onConflict === "update" && !exists) {
+      return { wasSet: false, existing: null } satisfies CacheSetResult;
+    }
+
+    this.log("caching", parsedKey);
+    this.storage.set(parsedKey, this.prepareDataForStorage(value, ttl));
+
+    if (tags?.length) {
+      await this.applyTags(parsedKey, tags);
+    }
+
+    this.log("cached", parsedKey);
+    await this.emit("set", { key: parsedKey, value, ttl });
+
+    if (onConflict === "create" || onConflict === "update") {
+      return { wasSet: true, existing: null } satisfies CacheSetResult;
+    }
+
+    return value;
+  }
+
+  public async get(key: CacheKey) {
+    const parsedKey = this.parseKey(key);
+    this.log("fetching", parsedKey);
+
+    const data = this.storage.get(parsedKey);
+    if (!data) {
+      this.log("notFound", parsedKey);
+      await this.emit("miss", { key: parsedKey });
+      return null;
+    }
+
+    const result = await this.parseCachedData(parsedKey, data);
+    await this.emit(result === null ? "miss" : "hit", {
+      key: parsedKey,
+      value: result,
+    });
+    return result;
+  }
+
+  public async remove(key: CacheKey) {
+    const parsedKey = this.parseKey(key);
+    this.log("removing", parsedKey);
+    this.storage.delete(parsedKey);
+    this.log("removed", parsedKey);
+    await this.emit("removed", { key: parsedKey });
+  }
+
+  public async flush() {
+    this.log("flushing");
+    this.storage.clear();
+    this.log("flushed");
+    await this.emit("flushed");
+  }
+}
+```
+
+## Required methods
+
+Your driver must provide:
+
+| Method | Purpose |
+|--------|---------|
+| `name` | Driver identifier |
+| `set()` | Store value. Call `this.resolveSetOptions(ttlOrOptions)` first. |
+| `get()` | Retrieve value or `null`. Emit `hit` / `miss`. |
+| `remove()` | Delete a key. Emit `removed`. |
+| `flush()` | Clear all data. Emit `flushed`. |
+| `removeNamespace()` | Delete keys under a prefix. Throw if unsupported. |
+| `connect()` | Establish backend connection. Emit `connected`. |
+| `disconnect()` | Tear down the connection. Emit `disconnected`. |
+
+## Inherited-for-free from `BaseCacheDriver`
+
+These come with sensible defaults — you only override them if your backend can offer stronger semantics (Redis-native commands, for instance):
+
+- `has()` — built on `get()`
+- `remember()` — stampede-safe wrapper around `get()` + `set()`
+- `pull()` — `get()` + `remove()`
+- `forever()` — `set(key, value, Infinity)`
+- `increment()` / `decrement()` — read-mutate-write counter (non-atomic — override for Redis `INCRBY`)
+- `many()` / `setMany()` — `Promise.all` over `get`/`set`
+- `tags()` — wraps the driver in a `TaggedCache` instance
+- `update()` / `merge()` — chain-serialized read-modify-write (in-process locking)
+- `list()` — returns a JSON-blob-backed `MemoryCacheList` (override for Redis `LPUSH`/`LRANGE`)
+- `lock()` — distributed lock built on `set({ onConflict: "create" })` with auto-release
+- `similar()` — default throws `CacheUnsupportedError` (override if your backend indexes vectors)
+- `parseKey()`, `setOptions()`, `setLoggingState()`, event methods, `ttl` getter, `resolveSetOptions()`, `applyTags()`, `getKeysForTags()`
+
+## Overriding optional operations
+
+### With native support
+
+Override a method when the backend gives you a better implementation:
+
+```ts
+// Redis has atomic INCRBY — override the default read-mutate-write
+public async increment(key: CacheKey, value: number = 1): Promise<number> {
+  const parsedKey = this.parseKey(key);
+  const result = await this.client.incrBy(parsedKey, value);
+  await this.emit("set", { key: parsedKey, value: result });
+  return result;
+}
+```
+
+### Without support — throw `CacheUnsupportedError`
+
+When your backend genuinely can't support an operation safely, throw instead of silently doing the wrong thing:
+
+```ts
+import { CacheUnsupportedError } from "@warlock.js/cache";
+
+public async update(): Promise<never> {
+  throw new CacheUnsupportedError(
+    "`update()` is not supported on the memcached driver — no compare-and-swap (CAS) primitive.",
+  );
+}
+
+public async merge(): Promise<never> {
+  throw new CacheUnsupportedError(
+    "`merge()` is not supported on the memcached driver.",
+  );
+}
+```
+
+The file driver ships this pattern — `update` and `merge` throw because there's no file-lock primitive yet.
+
+### Similarity (`set({ vector })` + `similar()`)
+
+`BaseCacheDriver` ships a default `similar()` that throws `CacheUnsupportedError` — your driver inherits that automatically and doesn't need to do anything if you don't index vectors.
+
+If your backend supports vector indexing (an embedded database with cosine distance, a managed vector store, etc.), override `similar()` and check for `vector` in `resolveSetOptions(...)` inside `set()`:
+
+```ts
+import type { CacheSimilarHit, CacheSimilarOptions } from "@warlock.js/cache";
+
+public async set(key, value, ttlOrOptions) {
+  const { ttl, tags, onConflict, vector } = this.resolveSetOptions(ttlOrOptions);
+
+  if (vector) {
+    // Index the vector alongside the entry — pseudocode for your backend.
+    await this.backend.indexVector(parsedKey, vector);
+  }
+  // … rest of set …
+}
+
+public async similar<T = any>(
+  vector: number[],
+  options: CacheSimilarOptions,
+): Promise<CacheSimilarHit<T>[]> {
+  const tagFilter = await this.getKeysForTags(options.tags);
+  const candidates = await this.backend.nearestNeighbors(vector, options.topK * 2);
+  return candidates
+    .filter((c) => !tagFilter || tagFilter.has(c.key))
+    .filter((c) => options.threshold === undefined || c.score >= options.threshold)
+    .slice(0, options.topK);
+}
+```
+
+`getKeysForTags(tags)` is a `BaseCacheDriver` helper that resolves the candidate set for a given tag union. See `MemoryCacheDriver` and `PgCacheDriver` for reference implementations.
+
+If your backend doesn't support similarity at all, do nothing — the default throw stays. If it supports it conditionally (the way `pg` requires `options.vector` config), throw `CacheUnsupportedError` from `similar()` when the prerequisite isn't met.
+
+## Registering your driver
+
+After creating your driver, register it in your cache configuration:
+
+```ts title="src/config/cache.ts"
+import { CacheConfigurations } from "@warlock.js/cache";
+import { MemCachedCacheDriver } from "./drivers/MemCachedCacheDriver";
+
+const cacheConfigurations: CacheConfigurations<"memcached"> = {
+  drivers: {
+    memcached: MemCachedCacheDriver,
+  },
+  default: "memcached",
+  options: {
+    memcached: {
+      host: "localhost",
+      port: 11211,
+      globalPrefix: "myapp",
+      ttl: "1h",
+    },
+  },
+};
+
+export default cacheConfigurations;
+```
+
+:::tip TypeScript type safety
+The `CacheConfigurations` type takes a generic parameter listing your custom driver names — this keeps autocomplete working:
+
+- Single custom driver: `CacheConfigurations<"memcached">`
+- Multiple custom drivers: `CacheConfigurations<"memcached" | "custom">`
+- Mix with built-in drivers: custom generics still include built-ins (`redis`, `memory`, etc.)
+:::
+
+## Checklist for a new driver
+
+1. Pick a unique `name`.
+2. Implement `connect()`, `disconnect()`, and the 5 required data methods.
+3. In `set()`, **always** call `this.resolveSetOptions(ttlOrOptions)` before doing anything else.
+4. Emit the standard events (`hit`, `miss`, `set`, `removed`, `flushed`, `expired`) — consumers rely on them for observability.
+5. Override only the inherited methods where your backend offers a genuine win.
+6. For operations your backend can't support, throw `CacheUnsupportedError` — don't silently degrade.
+7. Write tests using the same `vi.mock` pattern the Redis driver does — see the `testing skill`.
+
+See [Cache Driver Interface](/v/latest/cache/cache-driver-interface/) for full method signatures and [Base Cache Driver](/v/latest/cache/base-cache-driver/) for available helpers.

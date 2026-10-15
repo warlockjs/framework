@@ -1,0 +1,35 @@
+{
+  "name": "@warlock.js/docs",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Warlock.js framework docs site — Starlight + Tailwind, deployed to warlock.js.org.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warlockjs/docs"
+  },
+  "scripts": {
+    "sync:changelog": "node scripts/generate-changelog.mjs",
+    "test:changelog": "node --test scripts/generate-changelog.test.mjs",
+    "check:changelog-freshness": "node scripts/check-changelog-freshness.mjs",
+    "test:changelog-freshness": "node --test scripts/check-changelog-freshness.test.mjs",
+    "check:mdx-guard": "node scripts/check-mdx-in-md.mjs",
+    "predev": "node scripts/generate-changelog.mjs",
+    "prestart": "node scripts/generate-changelog.mjs",
+    "prebuild": "node scripts/check-mdx-in-md.mjs && node scripts/generate-changelog.mjs && node scripts/check-changelog-freshness.mjs",
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.39.2",
+    "astro": "^6.3.1",
+    "astro-mermaid": "^2.0.1",
+    "mermaid": "^11.15.0",
+    "sharp": "^0.34.5",
+    "starlight-sidebar-topics": "^0.7.1"
+  },
+  "packageManager": "pnpm@11.24.0"
+}

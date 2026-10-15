@@ -1,0 +1,83 @@
+---
+title: "Run a Job Every Night at 2 AM"
+sidebar:
+  order: 1
+---
+
+The single most common scheduler task: run some maintenance work once a
+day, in the small hours, when traffic is low. Here is the whole thing.
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+scheduler.addJob(
+  job("purge-old-logs", async () => {
+    await db.logs.deleteWhere({ createdAt: { lt: thirtyDaysAgo() } });
+  })
+    .daily()
+    .at("02:00"),
+);
+
+scheduler.start();
+```
+
+`daily()` sets the cadence to once every 24 hours; `at("02:00")` pins it
+to 2 AM. By default that is **2 AM UTC** — read on if your "2 AM" means
+a wall clock somewhere specific.
+
+## Make it 2 AM in your timezone
+
+A server in Frankfurt and a server in Virginia both run on UTC if you
+let them — so "2 AM" drifts unless you say where. Pin the job to an IANA
+timezone and it fires at 02:00 *there*, shifting automatically across
+daylight-saving changes:
+
+```ts
+job("purge-old-logs", purgeLogs)
+  .daily()
+  .at("02:00")
+  .inTimezone("America/New_York"); // 2 AM Eastern, summer and winter
+```
+
+## See that it actually fired
+
+You do not want to discover at 9 AM that the 2 AM job has been silently
+throwing for a week. Wire two listeners before you start:
+
+```ts
+scheduler.on("job:complete", (name, result) => {
+  console.log(`${name} done in ${result.duration}ms`);
+});
+
+scheduler.on("job:error", (name, error) => {
+  console.error(`${name} failed:`, error);
+});
+```
+
+`job:complete` carries a `JobResult` with the wall-clock `duration` —
+handy for spotting a cleanup that is slowly growing past its window.
+
+## A note on long-lived processes
+
+The scheduler ticks **inside your process**. For the 2 AM job to fire,
+the process has to be alive at 2 AM. That is the normal case for a
+long-running API server or worker. If your process restarts at 02:01,
+the missed run is gone — the schedule picks up from *now*, it does not
+replay the slot it slept through. (Catch-up-on-recover is a
+[backlog item](https://github.com/warlockjs/scheduler), not current
+behavior.)
+
+## Prefer cron? Same job, one line
+
+If you are migrating from a crontab and already think in cron, the
+equivalent is:
+
+```ts
+job("purge-old-logs", purgeLogs).cron("0 2 * * *");
+```
+
+`.cron()` and the fluent `.daily().at()` form are two ways to say the
+same thing — pick whichever reads better to you. See
+[Defining Jobs](../essentials/defining-jobs/) for the full fluent
+vocabulary and [the cron skill](../essentials/defining-jobs/#cron-expressions)
+for field syntax.

@@ -1,0 +1,106 @@
+---
+title: "Semantic LLM Response Cache"
+slug: v/latest/cache/semantic-llm-cache
+---
+
+Exact-match caching is useless for LLM prompts — "What's your refund policy?"
+and "How do refunds work?" are different strings but the same question. A
+**semantic cache** keys on *meaning*: embed the prompt, look for a stored
+answer whose embedding is close enough, and reuse it. That turns repeat LLM
+calls (slow, expensive) into a vector lookup.
+
+This combines [`set({ vector })`](/v/latest/cache/set-options/) to index
+answers and [`cache.similar()`](/v/latest/cache/similarity/) to retrieve them.
+
+## The pattern
+
+Cache is **embedding-agnostic** — you compute the vector with whatever embedder
+you like and hand it over. On a miss, call the model and store the answer
+indexed by its embedding:
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+async function answer(question: string): Promise<string> {
+  const vector = await embed(question);   // your embedder → number[]
+
+  // 1. Look for a semantically-close cached answer.
+  const [hit] = await cache.similar<string>(vector, {
+    topK: 1,
+    threshold: 0.95,   // only reuse very close matches
+  });
+
+  if (hit) {
+    return hit.value;  // cache hit — skip the model entirely
+  }
+
+  // 2. Miss → ask the model, then index the answer by its embedding.
+  const reply = await llm.complete(question);
+
+  await cache.set(`qa.${Date.now()}`, reply, {
+    vector,
+    ttl: "7d",
+  });
+
+  return reply;
+}
+```
+
+Each `similar()` hit carries the original `key`, the stored `value`, and the
+cosine `score`:
+
+```ts
+const hits = await cache.similar<string>(vector, { topK: 3, threshold: 0.8 });
+// [{ key: "qa.1714…", value: "Refunds are processed…", score: 0.97 }, …]
+```
+
+## Tuning the threshold
+
+`threshold` is the cosine-similarity floor in `[0, 1]` — hits below it are
+dropped before `topK` truncation. It's the dial between reuse and correctness:
+
+- **High (`0.95`+)** — reuse only near-identical questions. Safest; fewer hits.
+- **Lower (`0.85`)** — broader reuse, more hits, higher risk of serving an
+  answer to a *similar but not identical* question.
+
+Start strict and loosen only with evals to back it up.
+
+## Scoping with tags
+
+Pass `tags` to both the write and the query to keep separate knowledge bases
+from bleeding into each other — per-tenant answers, per-locale, per-product:
+
+```ts
+await cache.set(`qa.${id}`, reply, { vector, tags: ["tenant.7"], ttl: "7d" });
+
+const hits = await cache.similar<string>(vector, {
+  topK: 1,
+  threshold: 0.95,
+  tags: ["tenant.7"],   // only consider this tenant's answers
+});
+```
+
+## Dev vs. production
+
+| Environment | Driver | Notes |
+|---|---|---|
+| Dev / small datasets | [`memory`](/v/latest/cache/memory/) | Brute-force O(N) scan — fine for a few thousand entries |
+| Production | [`pg`](/v/latest/cache/pg/) *(with `vector` config)* | Real pgvector index (HNSW / IVFFlat), native cosine `<=>` |
+
+The code above doesn't change between them — only your driver config does.
+Drivers without a similarity index (`redis`, `file`) throw
+`CacheUnsupportedError` when you pass `vector`; see the
+[capability matrix](/v/latest/cache/similarity/#capability-matrix).
+
+:::tip Cost story
+Every cache hit here is a model call you didn't pay for. Pair a strict
+`threshold` with a generous `ttl` on stable answers (policies, docs) to
+maximize the hit rate where reuse is safe.
+:::
+
+## Related Documentation
+
+- [Similarity Retrieval](/v/latest/cache/similarity/) — `cache.similar()` in full
+- [Set Options](/v/latest/cache/set-options/) — the `vector` write option
+- [Postgres Cache Driver](/v/latest/cache/pg/) — production pgvector setup
+- [Choosing a Driver](/v/latest/cache/choosing-a-driver/) — similarity support per driver

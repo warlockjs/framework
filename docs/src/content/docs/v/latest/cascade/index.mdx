@@ -1,0 +1,52 @@
+---
+title: Cascade
+description: Warlock's database ORM — models, relations, migrations, vector search, atomic ops.
+---
+
+> Standalone — usable in any Node project, no `@warlock.js/core` required.
+
+`@warlock.js/cascade` is the data layer. Define models with decorators,
+declare relations between them, write migrations to evolve the schema,
+run queries through a fluent builder, do atomic updates safely under
+concurrency, search by vector embedding, paginate, and subscribe to
+model events.
+
+Define a model once — the schema is your validator, your TypeScript type, and your table shape in a single declaration — and the class queries itself:
+
+```ts
+import { v, type Infer } from "@warlock.js/seal";
+import { Model, RegisterModel } from "@warlock.js/cascade";
+
+export const userSchema = v.object({
+  name: v.string(),
+  email: v.string().email(),
+  status: v.enum(["active", "inactive"]).default("active"),
+});
+
+@RegisterModel()
+export class User extends Model<Infer<typeof userSchema>> {
+  public static table = "users";
+  public static schema = userSchema;
+}
+
+// Write — validated against the schema, returns a hydrated instance
+const user = await User.create({ name: "Ada Lovelace", email: "ada@example.com" });
+user.id;             // the new ID Cascade assigned
+user.get("status");  // "active" — the schema default applied
+
+// Read it back — the model is the query entry point, no repository to import
+const found = await User.find(user.id);
+found?.get("email"); // "ada@example.com"
+```
+
+One declaration — no parallel `type User = { ... }`, no `db.collection(...)`, no repository layer. The schema keeps your type and your table in lockstep, and the class is the query entry point.
+
+## Read by intent
+
+- **First time using it** → [Getting Started](./getting-started/01-introduction/).
+- **Understand the mental model** → [Architecture Concepts](./architecture-concepts/configuration/).
+- **Learn the must-know surface** → [The Basics](./the-basics/01-crud-basics/).
+- **Reach for an advanced subsystem** → [Digging Deeper](./digging-deeper/aggregates/).
+- **Use the CLI** → [CLI](./cli/cli/).
+- **Copy-paste a working pattern** → [Recipes](./recipes/audit-trail/).
+- **Look up a method signature** → [Reference](./reference/operations-api/).

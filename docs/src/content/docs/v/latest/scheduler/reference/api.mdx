@@ -1,0 +1,313 @@
+---
+title: "API Reference"
+sidebar:
+  order: 1
+---
+
+Every public export of `@warlock.js/scheduler`, in one place. For the
+narrative version of any of these, follow the cross-links into the
+guides.
+
+```ts
+import {
+  scheduler, // default Scheduler singleton
+  Scheduler, // the class, for isolated instances
+  job, // Job factory
+  Job, // the class
+  parseCron, // CronParser factory
+  CronParser, // the class
+} from "@warlock.js/scheduler";
+
+import type {
+  TimeType,
+  Day,
+  JobIntervals,
+  JobResult,
+  JobStatus,
+  RetryConfig,
+  SchedulerEvents,
+  CronFields,
+} from "@warlock.js/scheduler";
+```
+
+## Factories
+
+### `job(name, callback)`
+
+Creates a [`Job`](#job). The callback is `(job: Job) => Promise<any>` —
+it receives the job instance, so you can read `job.name` / `job.lastRun`
+/ `job.isRunning` at run time.
+
+```ts
+const cleanup = job("cleanup", async () => {
+  await db.deleteExpiredTokens();
+});
+```
+
+### `parseCron(expression)`
+
+Creates a standalone [`CronParser`](#cronparser) — useful for previewing
+next-run times without scheduling anything. Equivalent to
+`new CronParser(expression)`.
+
+## `Job`
+
+A schedule + a callback. Every configuration method returns `this` for
+chaining and recomputes `nextRun` on the spot. The fluent methods and
+`cron()` are **mutually exclusive** — setting one clears the other.
+
+### Interval methods
+
+| Method | Equivalent | Notes |
+| ------ | ---------- | ----- |
+| `every(value, unit)` | — | Throws if `value` is `0`, negative, `NaN`, or `Infinity` |
+| `everySecond()` | `every(1, "second")` | |
+| `everySeconds(n)` | `every(n, "second")` | |
+| `everyMinute()` | `every(1, "minute")` | |
+| `everyMinutes(n)` | `every(n, "minute")` | |
+| `everyHour()` | `every(1, "hour")` | |
+| `everyHours(n)` | `every(n, "hour")` | |
+| `everyDay()` | `every(1, "day")` | |
+| `daily()` | `every(1, "day")` | alias of `everyDay()` |
+| `twiceDaily()` | `every(12, "hour")` | |
+| `everyWeek()` | `every(1, "week")` | |
+| `weekly()` | `every(1, "week")` | alias of `everyWeek()` |
+| `everyMonth()` | `every(1, "month")` | |
+| `monthly()` | `every(1, "month")` | alias of `everyMonth()` |
+| `everyYear()` | `every(1, "year")` | |
+| `yearly()` | `every(1, "year")` | alias of `everyYear()` |
+| `always()` | `every(1, "minute")` | |
+
+`unit` is a [`TimeType`](#timetype). See
+[Defining Jobs](../essentials/defining-jobs/).
+
+### Day & time methods
+
+#### `at(time)`
+
+`"HH:mm"` or `"HH:mm:ss"`. Throws at definition time on a malformed
+string or out-of-range component (hour > 23, minute/second > 59).
+
+#### `on(day)`
+
+A [`Day`](#day) string (`"monday"`, …) or a day-of-month number `1–31`.
+Numeric values outside `1–31` throw. A numeric day also sets
+`intervals.dayOfMonthMode` to `"specific"`.
+
+#### `beginOf(type)` / `endOf(type)`
+
+`type` is `"day" | "month" | "year"` (any other `TimeType` throws).
+
+| Call | Fires at |
+| ---- | -------- |
+| `beginOf("day")` | 00:00 daily |
+| `endOf("day")` | 23:59 daily |
+| `beginOf("month")` | 1st at 00:00 |
+| `endOf("month")` | last day at 23:59 (recomputed per month) |
+| `beginOf("year")` | Jan 1 at 00:00 |
+| `endOf("year")` | Dec 31 at 23:59 |
+
+`endOf("month")` is dynamic (correct across February, leap years);
+`beginOf("year")` / `endOf("year")` lock the month.
+
+### Cron
+
+#### `cron(expression)`
+
+Switch the job to a 5-field cron expression. Clears any fluent interval
+config. Throws on an invalid expression. See
+[the cron field reference](../essentials/defining-jobs/#cron-expressions).
+
+### Timezone
+
+#### `inTimezone(tz)`
+
+An IANA string (e.g. `"America/New_York"`). Default is `"UTC"`. The zone
+applies to every "now" comparison and every constraint. See
+[Timezone](../guides/timezone/).
+
+### Execution options
+
+#### `retry(maxRetries, delay = 1000, backoffMultiplier?)`
+
+Retry on failure. `delay` is milliseconds; passing `backoffMultiplier`
+enables exponential backoff (`delay × multiplier^(attempt-1)`). Throws on
+negative `maxRetries`, negative `delay`, or zero/negative
+`backoffMultiplier`. `retry(0)` means a single attempt, no retries. See
+[Retry & Backoff](../guides/retry-backoff/).
+
+#### `preventOverlap(skip = true)`
+
+Skip a scheduled tick if the job is already running (only relevant when
+the job is also invoked outside the scheduler loop). See
+[Overlap Prevention](../guides/overlap-prevention/).
+
+### Execution control
+
+| Method | Returns | Purpose |
+| ------ | ------- | ------- |
+| `run()` | `Promise<JobResult>` | Run the callback once now. Honors `retry`; never throws — failures land in `result.error`. Advances `lastRun` and `nextRun` on both success and failure. |
+| `waitForCompletion()` | `Promise<void>` | Resolves when the current run finishes; resolves immediately if not running. All concurrent waiters resolve together. |
+| `prepare()` | `void` | Recompute `nextRun` against the current clock. Called by the scheduler on `start()` / `addJob` while running. |
+| `terminate()` | `this` | Clear all schedule config, cron parser, `nextRun`, and `lastRun`. The job stays registered but never fires until reconfigured. |
+
+### Getters
+
+| Getter | Type | Notes |
+| ------ | ---- | ----- |
+| `name` | `string` | Set at construction (readonly). |
+| `nextRun` | `Dayjs \| null` | Next scheduled run. |
+| `lastRun` | `Dayjs \| null` | Last attempt — **success or failure**. |
+| `isRunning` | `boolean` | Currently executing? |
+| `intervals` | `Readonly<JobIntervals>` | Current fluent config. |
+| `cronExpression` | `string \| null` | `null` when using the fluent API. |
+
+`isDue()` and `shouldRun()` also exist (booleans the scheduler uses
+internally): `isDue()` is pure time readiness; `shouldRun()` is `isDue()`
+plus the overlap rule.
+
+## `Scheduler`
+
+Owns the tick loop, the registered jobs, the execution mode, and the
+typed event emitter. Use the exported `scheduler` singleton, or
+`new Scheduler()` for an isolated instance (tests, separate pools).
+
+### Job management
+
+| Method | Returns | Purpose |
+| ------ | ------- | ------- |
+| `addJob(job)` | `this` | Register a job. Prepares it immediately if the scheduler is already running. |
+| `addJobs(jobs)` | `this` | Register several. Prepares each if already running. |
+| `newJob(name, callback)` | `Job` | Create, register, and return a job in one call. |
+| `removeJob(name)` | `boolean` | `true` if found and removed. |
+| `getJob(name)` | `Job \| undefined` | Look up by name. |
+| `list()` | `readonly Job[]` | All registered jobs. |
+
+### Configuration
+
+| Method | Returns | Purpose |
+| ------ | ------- | ------- |
+| `runEvery(ms)` | `this` | Tick interval. Minimum **100 ms** (lower throws). Default 1000 ms. |
+| `runInParallel(parallel, maxConcurrency = 10)` | `this` | Run a tick's due jobs concurrently, batched by `maxConcurrency`. Default is sequential. |
+
+### Lifecycle
+
+| Method | Returns | Purpose |
+| ------ | ------- | ------- |
+| `start()` | `void` | Prepare all jobs and begin ticking. Emits `scheduler:started`. Throws if already running or if zero jobs are registered. |
+| `stop()` | `void` | Halt the tick loop immediately (does not wait for in-flight jobs). Emits `scheduler:stopped`. No-op (and silent) if not running. |
+| `shutdown(timeout = 30000)` | `Promise<void>` | Stop, then await in-flight jobs up to `timeout` ms. The timeout is a hard cap — jobs still running after it are abandoned. |
+
+### Getters
+
+| Getter | Type |
+| ------ | ---- |
+| `isRunning` | `boolean` |
+| `jobCount` | `number` |
+
+### Events
+
+`Scheduler` extends Node's `EventEmitter` with a typed `on` / `once` /
+`off` / `emit` narrowed by [`SchedulerEvents`](#schedulerevents). See
+[Events](../guides/events/).
+
+## `CronParser`
+
+Standard 5-field cron engine. Day-of-month + day-of-week use **Vixie OR
+semantics**: when both fields are restricted (neither is `*`), a date
+matches if *either* matches.
+
+| Member | Type | Purpose |
+| ------ | ---- | ------- |
+| `new CronParser(expression)` | — | Parse and validate. Throws on bad field count, out-of-range values, inverted ranges, or bad steps. |
+| `nextRun(from = dayjs())` | `Dayjs` | Next fire moment after `from`. Scans up to one year forward, then throws. |
+| `matches(date)` | `boolean` | Is `date` a fire moment? |
+| `fields` | `Readonly<CronFields>` | The parsed numeric arrays. |
+| `expression` | `string` | The original string. |
+
+Supported field syntax: `*`, `5`, `1,3,5`, `1-5`, `*/5`, `1-10/2`. Not
+supported: named tokens (`MON`, `JAN`), macros (`@daily`), a seconds
+field, or Quartz modifiers (`L`, `W`, `#`).
+
+## Types
+
+### `TimeType`
+
+```ts
+type TimeType = "second" | "minute" | "hour" | "day" | "week" | "month" | "year";
+```
+
+### `Day`
+
+```ts
+type Day = "sunday" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday";
+```
+
+### `JobIntervals`
+
+```ts
+type JobIntervals = {
+  day?: Day | number;
+  dayOfMonthMode?: "specific" | "last";
+  month?: number;
+  time?: string;
+  every?: { type?: TimeType; value?: number };
+};
+```
+
+### `JobResult`
+
+```ts
+type JobResult = {
+  success: boolean;
+  duration: number; // ms, end-to-end including retry waits
+  error?: unknown; // present when success === false
+  retries?: number; // attempts that failed before the final outcome
+};
+```
+
+### `RetryConfig`
+
+```ts
+type RetryConfig = {
+  maxRetries: number;
+  delay: number;
+  backoffMultiplier?: number;
+};
+```
+
+### `SchedulerEvents`
+
+```ts
+type SchedulerEvents = {
+  "job:start": [jobName: string];
+  "job:complete": [jobName: string, result: JobResult];
+  "job:error": [jobName: string, error: unknown];
+  "job:skip": [jobName: string, reason: string];
+  "scheduler:started": [];
+  "scheduler:stopped": [];
+  "scheduler:tick": [timestamp: Date];
+};
+```
+
+### `CronFields`
+
+```ts
+type CronFields = {
+  minutes: number[];
+  hours: number[];
+  daysOfMonth: number[];
+  months: number[];
+  daysOfWeek: number[];
+};
+```
+
+### `JobStatus`
+
+```ts
+type JobStatus = "idle" | "running" | "completed" | "failed";
+```
+
+Exported for downstream typing. The current `Job` surface exposes run
+state through the `isRunning` boolean rather than a single `status`
+field.
