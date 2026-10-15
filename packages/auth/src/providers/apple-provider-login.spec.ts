@@ -27,7 +27,7 @@ vi.mock("jose", async () => {
   const { readdirSync } = await import("node:fs");
   const { resolve } = await import("node:path");
   const { pathToFileURL } = await import("node:url");
-  const store = resolve(__dirname, "../../../node_modules/.pnpm");
+  const store = resolve(__dirname, "../../../../node_modules/.pnpm");
   const entry = readdirSync(store).find((name) => name.startsWith("jose@"));
 
   if (!entry) {

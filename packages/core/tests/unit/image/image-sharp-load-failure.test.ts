@@ -26,7 +26,7 @@ import { describe, expect, it } from "vitest";
  * failure reason has to be replayed, or the wrong cause reappears one call later.
  */
 
-const repoRoot = path.resolve(__dirname, "../../../..");
+const repoRoot = path.resolve(__dirname, "../../../../..");
 
 const toUrl = (absolutePath: string) => `file:///${absolutePath.split(path.sep).join("/")}`;
 

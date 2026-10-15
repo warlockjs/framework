@@ -28,7 +28,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  * output.
  */
 
-const repoRoot = path.resolve(__dirname, "../../../..");
+const repoRoot = path.resolve(__dirname, "../../../../..");
 const imageEntry = path
   .resolve(__dirname, "../../../src/image/index.ts")
   .split(path.sep)

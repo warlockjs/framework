@@ -35,7 +35,7 @@ import { createWebBuildContribution } from "./contribution";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.resolve(__dirname, "..", "..");
-const WORKSPACE_ROOT = path.resolve(WEB_ROOT, "..");
+const WORKSPACE_ROOT = path.resolve(WEB_ROOT, "../..");
 
 const temporaryDirectories: string[] = [];
 

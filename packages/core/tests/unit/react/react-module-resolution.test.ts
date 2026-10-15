@@ -35,7 +35,7 @@ import { afterAll, describe, expect, it } from "vitest";
  * built output.
  */
 
-const repoRoot = path.resolve(__dirname, "../../../..");
+const repoRoot = path.resolve(__dirname, "../../../../..");
 const reactSource = path.resolve(__dirname, "../../../src/react/index.ts");
 
 /** Absolute path → the `file:///` URL form a spawned ESM process can import. */

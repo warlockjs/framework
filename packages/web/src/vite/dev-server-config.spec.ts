@@ -26,7 +26,8 @@ import { RESOLVED_CLIENT_PAGE_REGISTRY_ID } from "./page-registry-plugin";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.resolve(__dirname, "..", "..");
-const WORKSPACE_ROOT = path.resolve(WEB_ROOT, "..");
+const PACKAGES_ROOT = path.resolve(WEB_ROOT, "..");
+const WORKSPACE_ROOT = path.resolve(PACKAGES_ROOT, "..");
 
 const SINGLETON_PACKAGES = ["core", "cache", "logger", "context", "cascade"] as const;
 
@@ -60,7 +61,7 @@ describe("dev SSR config: stateful framework packages stay external", () => {
       // sibling aliased to its TypeScript source.
       resolveAlias: [...SINGLETON_PACKAGES, "web"].map((name) => ({
         find: new RegExp(`^@warlock\\.js/${name}$`),
-        replacement: path.join(WORKSPACE_ROOT, name, "src", "index.ts"),
+        replacement: path.join(PACKAGES_ROOT, name, "src", "index.ts"),
       })),
     });
 
