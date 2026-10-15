@@ -11,7 +11,7 @@ failure and a schema wrapper workaround. WR-008 independently confirms the docum
 confirms an ignored workspace read byte cap. Other entries distinguish implemented
 application workarounds from investigations still awaiting runtime qualification.
 
-Last updated: 2026-10-15, Asia/Riyadh.
+Last updated: 2026-10-16, Asia/Riyadh (5.30.0 status added).
 
 The current inventory contains 27 entries: 8 confirmed bugs and 19 requests or
 contract clarifications. Keep all framework findings from both sessions in this
@@ -50,6 +50,41 @@ of new findings and point back to this report.
 | WR-025 | AI / Anthropic feature request                      | `context_management`, compaction, fallbacks, cache TTL, `count_tokens`     | Not expressible through `ModelCallOptions`; Bureau serializes its own Anthropic body             |
 | WR-026 | Anthropic adapter clarification                     | Thinking configuration for Opus 5.5 / Sonnet 5.5 / Fable 5.1 rules         | Adapter infers enabled/budget forms that these models reject; not verified against the new rules |
 | WR-027 | Web performance request                             | Load Vite only in development                                              | Production cold start spends ~0.55 s in Vite/rollup loading that a built app never uses         |
+
+## Status in 5.30.0
+
+Each package's `CHANGELOG.md` (`## 5.30.0`) has the exact entries. **Fixed** means the
+finding's request is met; **partial** names what is left.
+
+| ID     | Status  | What 5.30.0 ships                                                                                                                                                                   |
+| ------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| WR-001 | Partial | `pnpm bench:types` in seal: a generated composed-schema project measured with `tsc --extendedDiagnostics`, a committed baseline and a 5% `--check` budget. No inference rewrite. |
+| WR-002 | Fixed   | A redirecting action stays submitting until the redirected page has loaded and committed.                                                                                         |
+| WR-003 | Fixed   | Route `logging: { body, query }` and `http.logging`; lifecycle logs record a bounded request snapshot; credential query parameters are masked in logged URLs. BREAKING for custom channels reading `context.request`. |
+| WR-004 | Fixed   | `warlock.config.ts` fallback bundles its local graph (extensionless imports, `paths` aliases) with packages kept external.                                                         |
+| WR-005 | Fixed   | Typed `http.serverOptions`, including `serverOptions.http.maxHeaderSize`.                                                                                                          |
+| WR-006 | Fixed   | `response.sse()` and `response.stream()` retain nothing by default (`retainEvents` / `retainChunks`), with awaitable `write()`, `drain()`, `backpressured` and a disconnect `signal`. |
+| WR-007 | Fixed   | An optional discriminated union accepts an absent or `undefined` field; `null` still needs `.nullable()`.                                                                          |
+| WR-008 | Fixed   | `v.literal("")` keeps `""` under required, `.present()`, `.optional()` and `.nullable()`; `.default("")` no longer fails "is required".                                           |
+| WR-009 | Fixed   | `read.maxBytes` bounds direct and tool reads (UTF-8 safe, `truncated` metadata); `hash` stays the whole-file hash.                                                                |
+| WR-010 | Fixed   | `ctx.signal` reaches `WorkspaceBackend.exec()`; pre-aborted calls never spawn; abort kills the process tree; results separate `cancelled` from `timedOut`.                        |
+| WR-011 | Fixed   | `<Form>` honours the submitter's `formAction` and name/value in both paths; new `query` prop.                                                                                      |
+| WR-012 | Fixed   | `request.signal` aborts only on a client disconnect before the response finishes.                                                                                                 |
+| WR-013 | Fixed   | `<Form independent>` submits without sharing or aborting the pending submission.                                                                                                   |
+| WR-014 | Fixed   | Graceful drain closes connections that go idle and sends `Connection: close` on responses during drain; active sockets are never force-closed.                                     |
+| WR-015 | Partial | `moveDirectoryNoReplaceAsync()` refuses an occupied destination with `not-moved` / `moved` / `uncertain` outcomes and no copy fallback. Node has no `renameat2`, so two short swap windows remain and are documented. |
+| WR-016 | Fixed   | An abandoned page request throws `ClientDisconnectedError` before render; a connected loader timeout still answers 504.                                                           |
+| WR-017 | Fixed   | `@warlock.js/core/errors` (published entry plus a workspace shim) imports nothing else. No `sideEffects` flag: the root entry has real side effects.                              |
+| WR-018 | Fixed   | `http.errorMapper` maps non-`HttpError` errors to a status, message or payload.                                                                                                     |
+| WR-019 | Fixed   | Log methods return the logger synchronously; `await log.flush()` waits for async channels; channel failures go to `log.onChannelError()`. BREAKING.                               |
+| WR-020 | Partial | Typed `validate()` result, typed discriminated-union Standard Schema output, `v.file()` keeps `UploadedFile`. `.refine()` stays `value: any`: rules run before children validate, so a typed value would be wrong. |
+| WR-021 | Fixed   | `DistributiveOmit`, `LinkPropsWithout` and `isRouteName()`.                                                                                                                        |
+| WR-022 | Fixed   | Provider content blocks round-trip through responses, messages and the agent loop.                                                                                                 |
+| WR-023 | Fixed   | `FinishReason` adds `context_exceeded`, `pause_turn` and `refusal`; the agent resumes paused turns.                                                                                |
+| WR-024 | Fixed   | Tool calls in one trip run concurrently by default (`toolDispatch: "sequential"` restores the old behaviour); results stay in request order.                                      |
+| WR-025 | Fixed   | `providerOptions` (Anthropic `betas`, `body`, `thinkingDisplay`), `cacheControl.ttl`, `AnthropicModel.countTokens()`; recordings hash `providerOptions` when set.                 |
+| WR-026 | Fixed   | Claude 5-family models only receive adaptive thinking; Sonnet 5.5 maps `effort: "none"` to `between_tools`.                                                                        |
+| WR-027 | Partial | Production start loads no Vite, Rollup, Babel or other build tooling; `@fastify/static` loads only when something is served. An app with a public folder still loads it at boot. |
 
 ## Entries
 
