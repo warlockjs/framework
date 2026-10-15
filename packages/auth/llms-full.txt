@@ -1,0 +1,2116 @@
+# Warlock Auth — full skills
+
+> Package: `@warlock.js/auth`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/auth/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## auth-basics  `@warlock.js/auth/auth-basics/SKILL.md`
+
+---
+name: auth-basics
+description: "Start here for @warlock.js/auth configuration, user models, credentials, and application session flows."
+---
+
+# Auth basics
+
+JWT-based authentication for Warlock. `Auth` base model + `authMiddleware` gate + `authService` for login/logout/refresh + `AccessToken` / `RefreshToken` persistence + multi-user-type support.
+
+> This skill is the auth **map** — read it first, then load the specific skill for the task.
+
+## Install
+
+```bash
+npm install @warlock.js/auth
+```
+
+## Foundations
+
+1. **Users extend `Auth`.** Your `User`, `Admin`, etc. extend the shared base model that knows how to issue tokens and verify passwords. Multiple user types coexist (see the `customize-user-type` topic).
+2. **`auth.userType.<name>` config maps a user-type slug to the model class.** The middleware uses this to hydrate the right model from a token.
+3. **Tokens persist.** Both `AccessToken` and `RefreshToken` are Cascade models — issuing a token writes a row; logout / revoke deletes or marks-revoked. Stateless JWT verification + stateful revocation list.
+4. **`authMiddleware` gates or resolves routes.** Use `authMiddleware("user")` for a typed hard gate, `authMiddleware()` for the configured/default user type, or `authMiddleware({ source: "cookie", key: "token", optional: true })` for a public route that receives a valid user when present. The object form can set a page-local login redirect. Legacy `authMiddleware(userType, "cookie:name")` remains valid.
+5. **`authService.login(Model, credentials, deviceInfo?)` is the full happy path.** Verifies credentials, creates token pair (access + refresh), emits events, returns `{ user, tokens }`.
+6. **Refresh-token rotation is on by default.** Each refresh consumes the old token and issues new ones from the same "family" — replay detection revokes the family.
+7. **JWT secret lives in the env.** Generate with `warlock jwt.generate` (see the `run-auth-commands` topic).
+
+## Minimal wire-up
+
+```ts title="src/app/users/models/user/user.model.ts"
+import { Auth } from "@warlock.js/auth";
+import { RegisterModel } from "@warlock.js/cascade";
+
+@RegisterModel()
+export class User extends Auth {
+  public static table = "users";
+
+  public get userType(): string {
+    return "user";
+  }
+}
+```
+
+```ts title="warlock.config.ts"
+import {
+  authMigrations,
+  registerAuthCleanupCommand,
+  registerJWTSecretGeneratorCommand,
+} from "@warlock.js/auth";
+import { defineConfig } from "@warlock.js/core";
+
+export default defineConfig({
+  cli: {
+    commands: [
+      registerJWTSecretGeneratorCommand(),
+      registerAuthCleanupCommand(),
+    ],
+  },
+  database: {
+    migrations: authMigrations,
+  },
+});
+```
+
+```ts title="src/config/auth.ts"
+import { env } from "@warlock.js/core";
+import { User } from "app/users/models/user/user.model";
+
+export default {
+  userType: {
+    user: User,
+    // admin: Admin,  // for multi-user-type
+  },
+  defaultUserType: "user", // needed for authMiddleware() when multiple types exist
+  accessToken: {
+    secret: env("JWT_SECRET"),
+    expiresIn: "1h",
+  },
+  refreshToken: {
+    secret: env("JWT_REFRESH_SECRET"), // recommended: a separate refresh secret
+    enabled: true,
+    expiresIn: "30d",
+    rotation: true,
+    maxPerUser: 5,
+  },
+};
+```
+
+### Token lifetimes are validated — a bad one throws
+
+`expiresIn` (both blocks) must be a duration string the [`ms`](https://github.com/vercel/ms) package parses to a **positive** number: `"1h"`, `"30m"`, `"7d"`, `"30 days"`, or `NO_EXPIRATION` (`"100y"`). Anything else throws on the first token issue, naming the key:
+
+```
+auth.accessToken.expiresIn: "30dayz" is not a valid ms duration — use a positive duration string such as "1h", "7d", or NO_EXPIRATION.
+```
+
+That is deliberate. `ms` answers `undefined` for a string it can't parse (`"30dayz"`, `"thirty days"`) and `0` for `"0d"`, and a signer given either emits a JWT with **no `exp` claim** — a credential that never expires. A typo must not be able to produce that quietly, so it fails loudly instead of falling back to a default nobody asked for. Defaults still apply when the key is **absent**: `1h` for access, `7d` for refresh.
+
+Two values that look right and are not:
+
+- `expiresIn: 2592000` — a bare number. `ms` *formats* numbers instead of parsing them, so this is rejected; write `"30d"`.
+- `expiresIn: env("JWT_TTL")` where the variable is unset — resolves to `""` and is rejected. Give the env read a default: `env("JWT_TTL") || "1h"`.
+
+## Pick a skill
+
+| If the task is about… | Load |
+| --- | --- |
+| Gating routes with `authMiddleware(allowedUserType)`, any-authenticated vs typed access | The `protect-routes` topic |
+| `authService.login(...)`, `attemptLogin`, full credentials-to-tokens flow + logout | The `handle-login-and-logout` topic |
+| Token lifecycle — `generateAccessToken`, `createRefreshToken`, rotation, family revocation, max-per-user | The `manage-tokens` topic |
+| Register a new user + issue tokens in one flow | The `register-user` topic |
+| Multi-user-type apps (`user`, `admin`, `client`), `config.auth.userType.<name>` mapping | The `customize-user-type` topic |
+| `warlock jwt.generate` + `warlock auth.cleanup` CLI commands | The `run-auth-commands` topic |
+
+## Things NOT to do
+
+- Don't write your own JWT signing logic — use `authService` / `jwt` from this package so signature/secret/expiry stay consistent.
+- Don't store the JWT secret in the model layer or anywhere user-modifiable. It lives in `.env` only.
+- Don't return the raw `User` from a login endpoint without shaping output. Configure `static toJsonColumns` or `static resource` (see the `define-model` topic of the `warlock-js-cascade` skill).
+- Don't run `auth.cleanup` from app boot. Schedule it (cron, scheduler) as a periodic task — see the `scheduler-basics` topic of the `warlock-js-scheduler` skill.
+
+
+## customize-token-storage  `@warlock.js/auth/customize-token-storage/SKILL.md`
+
+---
+name: customize-token-storage
+description: 'Override the persisted AccessToken / RefreshToken models to add columns (multi-tenant `organization_id`, device metadata), rename, or change storage — without forking the package. Extend the model + `schema.extend(...)`, register it under `config.auth.accessToken.model` / `config.auth.refreshToken.model`, override `issue()` to populate the new column, and add a migration. Triggers: `accessToken.model`, `refreshToken.model`, `AccessToken.issue`, `RefreshToken.issue`, `accessTokenSchema`, `refreshTokenSchema`, "add a column to the token table", "multi-tenant tokens", "organization_id on access token", "override the token model", "custom token storage"; typical import `import { AccessToken, accessTokenSchema } from "@warlock.js/auth"`. Skip: multiple user TYPES (not token storage) — the `customize-user-type` topic; the token lifecycle API — the `manage-tokens` topic; the config blocks themselves — the `auth-basics` topic.'
+---
+
+# Customize token storage
+
+The package ships `AccessToken` and `RefreshToken` models and runs the whole token flow through their **named statics** — `issue`, `findByToken`, `activeFor`, `revokeAllFor`, etc. The auth service never references a column name directly; it resolves the *active* model from config. So you change token storage by **registering a subclass**, not by forking.
+
+Reach for this when you need an extra column on the token tables — the common case is a tenant key (`organization_id`) so tokens are partitioned per organization, or richer device metadata.
+
+```ts title="src/app/users/models/user/user.model.ts"
+import { Auth } from "@warlock.js/auth";
+import { RegisterModel } from "@warlock.js/cascade";
+
+@RegisterModel()
+export class User extends Auth {
+  public static table = "users";
+
+  public get userType(): string {
+    return "user";
+  }
+}
+```
+
+## The three pieces
+
+A storage override is always three coordinated steps. Miss any one and it breaks — see the strict-mode note below.
+
+### 1. Extend the model + its schema
+
+`accessTokenSchema` / `refreshTokenSchema` are exported so you compose them with `.extend(...)` instead of re-declaring the base shape. Override `issue()` to populate your new column (the user is in hand there).
+
+```ts title="src/app/auth/models/app-access-token.ts"
+import { AccessToken, accessTokenSchema, type Auth } from "@warlock.js/auth";
+import { v } from "@warlock.js/seal";
+
+export class AppAccessToken extends AccessToken {
+  public static schema = accessTokenSchema.extend({
+    organization_id: v.string().exists("Organization", { column: "id" }),
+  });
+
+  // populate the tenant key on issue — read it off the authenticating user
+  public static issue(user: Auth, token: string, expiresAt: Date) {
+    return this.create({
+      token,
+      user_id: user.id,
+      user_type: user.userType,
+      expires_at: expiresAt,
+      organization_id: user.get("organization_id"),
+    });
+  }
+}
+```
+
+Refresh tokens follow the same shape — extend `refreshTokenSchema`, and override `issue(user, token, options)` (`options` is `{ familyId, expiresAt, deviceInfo? }`) the same way, copying the base fields plus your column.
+
+```ts title="src/app/auth/models/app-refresh-token.ts"
+import { RefreshToken, refreshTokenSchema, type Auth, type RefreshTokenIssueOptions } from "@warlock.js/auth";
+import { v } from "@warlock.js/seal";
+
+export class AppRefreshToken extends RefreshToken {
+  public static schema = refreshTokenSchema.extend({
+    organization_id: v.string().exists("Organization", { column: "id" }),
+  });
+
+  public static issue(user: Auth, token: string, options: RefreshTokenIssueOptions) {
+    return this.create({
+      token,
+      user_id: user.id,
+      user_type: user.userType,
+      family_id: options.familyId,
+      expires_at: options.expiresAt,
+      organization_id: user.get("organization_id"),
+    });
+  }
+}
+```
+
+### 2. Register the subclass in config
+
+```ts title="src/config/auth.ts"
+import { env } from "@warlock.js/core";
+import { User } from "app/users/models/user/user.model";
+import { AppAccessToken } from "app/auth/models/app-access-token";
+import { AppRefreshToken } from "app/auth/models/app-refresh-token";
+
+export default {
+  userType: { user: User },
+  accessToken: {
+    model: AppAccessToken,            // ← the override
+    secret: env("JWT_SECRET"),
+    expiresIn: "1h",
+  },
+  refreshToken: {
+    model: AppRefreshToken,           // ← the override
+    secret: env("JWT_REFRESH_SECRET"),
+    expiresIn: "30d",
+  },
+};
+```
+
+From here the service, the middleware, and every `authService` helper transparently use your model — `findByToken`, `revokeAllFor`, `enforceMax`, and the rest all run against your columns.
+
+### 3. Add the column to the migration
+
+The new column needs a real database column. Add it to your token-table migration (the FK + index match your `User` model's tenant convention):
+
+```ts
+this.uuid("organization_id").references("organizations").onDelete("cascade").index();
+```
+
+See the `write-migration` topic of the `warlock-js-cascade` skill for the migration mechanics.
+
+## Why all three — the strict-mode trap
+
+This is the failure people hit. Cascade's `strictMode: "strip"` **drops any field your schema doesn't declare** before the INSERT. So if you set `organization_id` in `issue()` but don't add it to the schema (step 1), the value is silently stripped, and a NOT-NULL `organization_id` column then **fails the INSERT**. The chain is: `issue()` sets it → the *schema* must declare it so it survives → the *migration* must create the column. All three, or nothing.
+
+## You do NOT need read-side scoping
+
+Token lookups go by the unique `token` string (`findByToken`), which already uniquely identifies a row regardless of tenant. So you don't need a tenant-scoped global query scope on the token model — `organization_id` is there for FK cascade-cleanup when an org is deleted, plus partitioning and analytics, not for lookup safety.
+
+## What you're overriding (the contract)
+
+Your subclass inherits and may override these statics — the service calls them, never raw queries:
+
+| Static | Role |
+| --- | --- |
+| `issue(user, token, …)` | persist a freshly-signed token (override to add columns) |
+| `findByToken(token)` | look a row up by its token string |
+| `findForUser(user, token)` | a user-scoped lookup (logout) |
+| `activeFor(user)` | active, unexpired sessions, newest-first |
+| `revokeAllFor(user)` / `revokeFamily(id)` | revoke a set, returning the revoked rows |
+| `enforceMax(user, max)` | cap concurrent refresh tokens |
+| `purgeExpired()` | delete expired rows (CLI cleanup) |
+| `findNeverExpiring()` / `purgeNeverExpiring()` | find/delete rows that can never expire (CLI remediation) |
+
+Plus two instance getters, both of which the route gate consults on every request:
+
+| Getter | Role |
+| --- | --- |
+| `isExpired` | whether the row's persisted expiry has passed — **the middleware rejects the request when this is `true`** |
+| `neverExpires` | whether nothing can ever retire the row (unusable `expires_at`, or a token with no `exp` claim) |
+
+If you rename a column, override the statics **and these getters** so they map to your name — the service depends on the method, not the column.
+
+⚠️ **Do not drop `isExpired`.** The middleware treats a row that cannot answer as **expired** and rejects the request, so removing the getter locks every user out rather than letting them through. That direction is deliberate: the fail-open reading is what let expired sessions stay usable before 4.12.0.
+
+## Things NOT to do
+
+- **Don't set a column without declaring it in `schema.extend(...)`.** `strictMode: "strip"` removes it; a NOT-NULL column then fails the INSERT.
+- **Don't add a tenant-scoped global scope to the token model.** Lookups are by unique token; a leaky scope is a cross-tenant exposure risk for no lookup benefit.
+- **Don't fork the package to add a column.** Extend + register — you keep receiving package fixes.
+- **Don't forget the migration.** The schema declares the field; only the migration creates the database column.
+
+## See also
+
+- The `customize-user-type` topic — multiple user *types* (a different axis from token *storage*).
+- The `manage-tokens` topic — the token lifecycle your statics power.
+- The `define-model` topic of the `warlock-js-cascade` skill — extending models and schemas.
+
+
+## customize-user-type  `@warlock.js/auth/customize-user-type/SKILL.md`
+
+---
+name: customize-user-type
+description: 'Support multiple user types (user / admin / client / staff) in one auth system — each Auth subclass overrides userType, config.auth.userType.<slug> maps slug to model class, authMiddleware(''admin'') gates per type. Triggers: `Auth`, `userType`, `config.auth.userType`, `Authenticable`, `@RegisterModel`, `confirmPassword`; "add admins and users", "multiple user types", "separate client and vendor personas", "per-type login"; typical import `import { Auth } from "@warlock.js/auth"`. Skip: `authMiddleware` semantics — the `protect-routes` topic; login flow — the `handle-login-and-logout` topic; RBAC libs `casl`, `accesscontrol`, `rbac`.'
+---
+
+# Customize user type (multi-user-type auth)
+
+The `Auth` base class has a `userType` slot. Subclass it once per type, register each class under `config.auth.userType.<slug>`, and the auth flow handles the rest.
+
+## Define a model per user type
+
+```ts title="src/app/users/models/user/user.model.ts"
+import { Auth } from "@warlock.js/auth";
+import { RegisterModel } from "@warlock.js/cascade";
+import { v, type Infer } from "@warlock.js/seal";
+
+export const userSchema = v.object({
+  email: v.string().email(),
+  password: v.string(),
+});
+
+export type UserSchema = Infer<typeof userSchema>;
+
+@RegisterModel()
+export class User extends Auth<UserSchema> {
+  public static table = "users";
+  public static schema = userSchema;
+
+  public get userType(): string {
+    return "user";
+  }
+}
+```
+
+```ts title="src/app/admins/models/admin.model.ts"
+import { Auth } from "@warlock.js/auth";
+import { RegisterModel } from "@warlock.js/cascade";
+import { v, type Infer } from "@warlock.js/seal";
+
+export const adminSchema = v.object({
+  email: v.string().email(),
+  password: v.string(),
+});
+
+export type AdminSchema = Infer<typeof adminSchema>;
+
+@RegisterModel()
+export class Admin extends Auth<AdminSchema> {
+  public static table = "admins";
+  public static schema = adminSchema;
+
+  public get userType(): string {
+    return "admin";
+  }
+}
+```
+
+Each gets its own table, its own schema, its own `userType` slug. They DON'T share table — they're separate models.
+
+## Register them in `config.auth`
+
+```ts title="src/config/auth.ts"
+import { env } from "@warlock.js/core";
+import { User } from "app/users/models/user/user.model";
+import { Admin } from "app/admins/models/admin.model";
+
+export default {
+  userType: {
+    user: User,
+    admin: Admin,
+    // staff: Staff,
+    // client: Client,
+  },
+  accessToken: {
+    secret: env("JWT_SECRET"),
+    expiresIn: "1h",
+  },
+  refreshToken: {
+    secret: env("JWT_REFRESH_SECRET"),
+    enabled: true,
+    expiresIn: "30d",
+    rotation: true,
+  },
+};
+```
+
+The keys (`"user"`, `"admin"`) are the **userType slugs** that flow through every token, middleware call, and event payload.
+
+## Gate routes per user type
+
+```ts
+import { router, type RequestHandler } from "@warlock.js/core";
+import { authMiddleware } from "@warlock.js/auth";
+
+const userAccountController: RequestHandler = async ({ response }) => response.success({});
+const listUsersController: RequestHandler = async ({ response }) => response.success({});
+const backOfficeController: RequestHandler = async ({ response }) => response.success({});
+const dashboardController: RequestHandler = async ({ response }) => response.success({});
+
+router.get("/account", userAccountController, { middleware: [authMiddleware("user")] });
+router.get("/admin/users", listUsersController, { middleware: [authMiddleware("admin")] });
+router.get("/back-office", backOfficeController, { middleware: [authMiddleware(["admin", "staff"])] });
+router.get("/dashboard", dashboardController, { middleware: [authMiddleware([])] }); // any logged-in
+```
+
+See the `protect-routes` topic.
+
+## Login per user type — pass the right Model
+
+`authService.login(Model, credentials, deviceInfo?)` is keyed off the model you pass:
+
+```ts
+// User login endpoint
+const result = await authService.login(User, credentials);
+// Issues tokens with userType "user"; middleware will route them to User model.
+
+// Admin login endpoint
+const result = await authService.login(Admin, credentials);
+// Issues tokens with userType "admin"; middleware will route them to Admin model.
+```
+
+The middleware then uses `config.auth.userType[token.userType]` to know which model to hydrate.
+
+## Cross-type behavior
+
+- **Tokens are scoped to their issuing user-type.** A user-type token doesn't unlock admin-type routes.
+- **AccessToken / RefreshToken rows carry the `user_type` column.** Same model classes, different rows per type.
+- **`authMiddleware(["admin", "user"])`** allows either — useful for endpoints shared between roles.
+
+## When NOT to use multi-user-type
+
+If the distinction is **permissions/roles within one user shape**, use a `role` column on a single User model instead. Multi-user-type is right when:
+
+- Different tables / schemas (admins have an `admin_level`; users have a `subscription_tier`).
+- Separate registration flows (admins are created via an admin panel; users self-register).
+- Truly separate concepts at the data layer (clients vs vendors in a marketplace).
+
+If users and admins differ only in a `role` field, stick with one `User` model + a role check at the controller layer.
+
+## `Auth` base — what your subclass inherits
+
+```ts
+abstract class Auth<TSchema> extends Model<TSchema> implements Authenticable {
+  // ...all the Model<> methods
+  public abstract get userType(): string;
+  public generateAccessToken(payload?: Record<string, unknown>): Promise<AccessTokenOutput>;
+  public generateRefreshToken(deviceInfo?: DeviceInfo): Promise<RefreshToken | undefined>;
+  public createTokenPair(deviceInfo?: DeviceInfo): Promise<TokenPair>;
+  public confirmPassword(password: string): Promise<boolean>;
+}
+```
+
+`userType` is the only required override (an abstract getter — return the type slug). Override `generateAccessToken` if you need a non-default payload.
+
+`Auth` implements the `Authenticable` contract — that interface mirrors exactly these methods (`userType`, `generateAccessToken`, `generateRefreshToken`, `createTokenPair`, `confirmPassword`), so the class fails to compile if it drifts from the contract. Use `confirmPassword(plaintext)` to check a password against the stored hash (e.g. a "confirm current password" step).
+
+## Things NOT to do
+
+- Don't use multi-user-type for what's really role-based access control. Use a `role` column on a single User model when the data shape is shared.
+- Don't forget the `public get userType(): string` override. It's an abstract getter on `Auth` — a subclass without it won't compile, and middleware lookups key off its return value.
+- Don't reuse the same `userType` slug across two models — the `config.auth.userType` map can only point one slug at one model.
+- Don't put admins and users in the same table differentiated by a flag. Separate tables means migrations don't coupling, queries don't accidentally cross, and audit logs are cleaner.
+
+## See also
+
+- The `protect-routes` topic — `authMiddleware` semantics
+- The `handle-login-and-logout` topic — passing the right Model to `login`
+- The `define-model` topic of the `warlock-js-cascade` skill — `@RegisterModel`, models in general
+
+
+## handle-login-and-logout  `@warlock.js/auth/handle-login-and-logout/SKILL.md`
+
+---
+name: handle-login-and-logout
+description: 'Run the full login flow via authService.login(Model, credentials, deviceInfo?) — verify password, create access + refresh token pair, fire events. Logout via authService.logout(user, accessToken?, refreshToken?) revokes tokens. Triggers: `authService.login`, `authService.logout`, `authService.attemptLogin`, `authService.refreshTokens`, `authService.revokeAllTokens`, `authEvents`; "build a login endpoint", "POST /login controller", "logout from all devices", "verify credentials and issue tokens"; typical import `import { authService, authEvents } from "@warlock.js/auth"`. Skip: token internals — the `manage-tokens` topic; sign-up — the `register-user` topic; competing libs `passport-local`, `next-auth` credentials.'
+---
+
+# Login + logout
+
+`authService` exposes the full flow. Pass the model class so the service knows which user-type to look up.
+
+```ts title="src/app/users/models/user/user.model.ts"
+import { Auth } from "@warlock.js/auth";
+import { RegisterModel } from "@warlock.js/cascade";
+
+@RegisterModel()
+export class User extends Auth {
+  public static table = "users";
+
+  public get userType(): string {
+    return "user";
+  }
+}
+```
+
+## Login — `authService.login(Model, credentials, deviceInfo?)`
+
+```ts
+import { authService } from "@warlock.js/auth";
+import { type RequestHandler } from "@warlock.js/core";
+import { User } from "app/users/models/user/user.model";
+
+export const loginController: RequestHandler = async ({ request, response }) => {
+  const result = await authService.login(
+    User,
+    {
+      email: request.input("email"),
+      password: request.input("password"),
+    },
+    {
+      userAgent: request.header("user-agent"),
+      ip: request.ip,
+    },
+  );
+
+  if (!result) {
+    return response.unauthorized({ error: "Invalid credentials" });
+  }
+
+  return response.success({
+    user: result.user,
+    tokens: result.tokens,
+  });
+};
+```
+
+The returned shape:
+
+```ts
+{
+  user: T,                    // your User subclass, hydrated
+  tokens: {
+    accessToken: { token: string, expiresAt: string },
+    refreshToken?: { token: string, expiresAt: string },   // omitted if refresh tokens disabled
+  },
+}
+```
+
+Returns `null` on failure (wrong password, user not found). The service emits `login.attempt` → `login.success` or `login.failed` events as it goes — subscribe via the auth event bus if you need an audit trail.
+
+## What `credentials` looks like
+
+The shape is **arbitrary** — every key except `password` is used as a `where(...)` filter against the model. The password is verified separately via bcrypt.
+
+```ts
+// Email + password
+authService.login(User, { email: "ada@example.com", password: "..." });
+
+// Username + password
+authService.login(User, { username: "ada", password: "..." });
+
+// Phone-based OTP (where password is the OTP hash)
+authService.login(User, { phone: "+1...", password: hashedOTP });
+```
+
+For lower-level credential verification (just check, don't issue tokens), use `authService.attemptLogin(Model, credentials)` — returns the user or null without creating tokens.
+
+## Device info
+
+The optional `deviceInfo` carries metadata into the refresh token row:
+
+```ts
+authService.login(User, credentials, {
+  userAgent: request.header("user-agent"),
+  ip: request.ip,
+  deviceId: "...", // your client-side device fingerprint
+  familyId: "...", // pre-existing family for token rotation, usually omitted
+});
+```
+
+Useful for "show active sessions" UIs — see `authService.getActiveSessions(user)`.
+
+## Logout — `authService.logout(user, accessToken?, refreshToken?)`
+
+```ts
+import { type RequestHandler } from "@warlock.js/core";
+
+export const logoutController: RequestHandler = async ({ request, response }) => {
+  await authService.logout(
+    request.locals.user!,
+    request.authorizationValue, // access token from the Authorization header
+    request.input("refreshToken"), // refresh token from the request body
+  );
+
+  return response.success({ message: "Logged out" });
+};
+```
+
+The contract:
+
+- **Pass the access token** → that specific access-token row is deleted.
+- **Pass the refresh token** → that specific refresh-token row is revoked.
+- **Omit refresh token** → behavior depends on `config.auth.refreshToken.logoutWithoutToken`:
+  - `"revoke-all"` (default) — every refresh token for this user is revoked. Fail-safe.
+  - `"error"` — throws. Force the client to send the refresh token.
+
+The `revoke-all` default is the right call for most apps. If a client loses track of the refresh token, logout still works and the user has to log in fresh on every device.
+
+## Logout-everywhere
+
+```ts
+await authService.revokeAllTokens(user);
+// Revokes every refresh token + deletes every access token for this user.
+```
+
+Useful for "logout from all devices" buttons. Fires `token.revoked` per token + `logout.all` once.
+
+## Refresh tokens — `authService.refreshTokens(refreshTokenString, deviceInfo?)`
+
+```ts
+import { type RequestHandler } from "@warlock.js/core";
+
+export const refreshController: RequestHandler = async ({ request, response }) => {
+  const tokens = await authService.refreshTokens(request.input("refreshToken"), {
+    userAgent: request.header("user-agent"),
+    ip: request.ip,
+  });
+
+  if (!tokens) {
+    return response.unauthorized({ error: "Invalid refresh token" });
+  }
+
+  return response.success({ tokens });
+};
+```
+
+Returns a new token pair or `null` (token expired, revoked, or replay-detected). With rotation enabled (default), the old refresh token is consumed; the new pair stays in the same "family." Replay → revoke the whole family. See the `manage-tokens` topic.
+
+## Auth events
+
+`authEvents` is a type-safe event bus (over `@mongez/events`) that fires on every meaningful auth moment. Subscribe with `on` / `subscribe`, unsubscribe with `off` / `unsubscribeAll`:
+
+```ts
+import { authEvents } from "@warlock.js/auth";
+
+authEvents.on("login.success", (user, tokens, deviceInfo) => {
+  /* audit */
+});
+authEvents.on("login.failed", (credentials, reason) => {
+  /* alert on brute force */
+});
+authEvents.on("logout", (user) => {
+  /* clear server-side session, if any */
+});
+authEvents.on("token.refreshed", (user, newPair, oldToken) => {
+  /* track rotation */
+});
+authEvents.on("cleanup.completed", (count) => {
+  /* metrics */
+});
+```
+
+Full event list: `login.attempt`, `login.success`, `login.failed`, `logout`, `logout.all`, `logout.failsafe`, `token.created`, `token.refreshed`, `token.revoked`, `token.expired`, `token.familyRevoked`, `session.created`, `session.destroyed`, `cleanup.completed`.
+
+## Things NOT to do
+
+- Don't `authService.login(User, { password })` without other credentials — the password is the secret; the other fields are the lookup. A login with only a password is a logic bug.
+- Don't return the password hash in the response. `static toJsonColumns` on the User model should explicitly exclude it.
+- Don't store the refresh token in localStorage. Use an httpOnly secure cookie for refresh tokens; the access token can sit in memory.
+- Don't issue a new token pair without revoking the old one when rotation is enabled. `refreshTokens` does this for you — don't bypass it.
+
+## See also
+
+- The `manage-tokens` topic — token lifecycle, rotation, family revocation
+- The `register-user` topic — sign-up that issues tokens after creation
+- The `protect-routes` topic — where the access token gets consumed
+
+## Browser sessions for Web pages
+
+For cookie sessions read by `@warlock.js/web` pages, log in with `authService.loginWithSessionCookies(request, response, Model, credentials)`. It requires a same-origin `Origin`/`Referer` even without cookies (login CSRF) and sets the access and refresh cookies (`auth.cookie.name`, `auth.cookie.refreshName`, `Path=/`). To share a session across subdomains, configure `auth.cookie.cookieDomain(request)` to return (for example) `".example.com"`; return `undefined` for host-only cookies. With `cookieDomain` configured, always pass the request to cookie helpers so they select the same Domain: `authService.setSessionCookies(response, tokens, request)`, `authService.clearSessionCookies(response, request)`, and `authService.clearAuthCookie(response, options, request)`. Omitting it throws `CookieDomainRequestRequiredError`. Domain clears also remove the legacy host-only names. Resolve pages with `pageSession({ project })` (`web.session`); header beats cookie; `auth.session.maxAge` defaults to `"30d"`. A page session with multiple `userTypes` cannot renew its cookie: the resolver only supplies a renewal user type when exactly one type is allowed, so it reads the session but skips automatic renewal. Multi-instance: share the JWT secret and the cache store, keep clocks in sync.
+
+
+## login-with-providers  `@warlock.js/auth/login-with-providers/SKILL.md`
+
+---
+name: login-with-providers
+description: 'Log in without a password — Google (OIDC code + PKCE + state + nonce, id_token verified with `jose`), GitHub, Discord, LinkedIn, Apple (`form_post` callback), Facebook and X, passkeys (WebAuthn via `@simplewebauthn/server`) and phone one-time codes (delivered through a `@warlock.js/notifications` channel). Every method ends in `authService.completeLogin(user)`, the same tokens, rows and events as password login. `startProviderLogin`, `completeProviderLogin`, `generatePasskeyRegistrationOptions`, `verifyPasskeyRegistration`, `generatePasskeyAuthenticationOptions`, `verifyPasskeyAuthentication`, `requestOtp`, `verifyOtp`, `otpRequestThrottleMiddleware`, `otpVerifyThrottleMiddleware`, `AuthProvider`. Triggers: "login with Google", "sign in with Google", "login with GitHub", "Sign in with Apple", "login with Discord", "login with LinkedIn", "login with Facebook", "login with X", `auth.providers.github`, "OAuth", "OIDC", "passkeys", "WebAuthn", "passwordless", "SMS code login", "WhatsApp OTP", "phone login", `warlock add auth-google`, `warlock add auth-passkeys`, `AuthProviderSdkMissingError`, `InvalidProviderCallbackError`, `ProviderEmailNotVerifiedError`, `InvalidPasskeyError`, `EC009`, `EC010`, `EC011`, `auth.providers`, `auth.passkeys`, `auth.otp`; typical import `import { completeProviderLogin, verifyOtp } from "@warlock.js/auth"`. Skip: password login — the `handle-login-and-logout` topic; email tokens — the `verify-email-and-reset-password` topic; defining an SMS channel — the `define-channel` topic of the `warlock-js-notifications` skill.'
+---
+
+# Login with an OAuth provider, passkeys, or a phone code
+
+Services only, as with password login: you write the routes. Each `verify`/`complete` call returns the same `LoginResult` as `authService.login`, so the next step is the same too:
+
+```ts
+const { user, tokens } = await completeProviderLogin(User, "google", request, response);
+authService.setAuthCookie(response, tokens.accessToken); // cookie session, or return tokens as JSON
+```
+
+`authService.completeLogin(user, deviceInfo?)` is that shared ending. It applies `auth.canAuthenticate` (403) and issues tokens. Call it only for a user you have already authenticated.
+
+## Install
+
+| Method | Command | Installs |
+| --- | --- | --- |
+| Google | `warlock add auth-google` | `jose` |
+| Apple, LinkedIn | `warlock add auth-google` (or `npm install jose`) — there is no separate `auth-apple` / `auth-linkedin` feature yet | `jose` |
+| GitHub, Discord, Facebook, X | nothing — plain OAuth 2 over `fetch` | nothing |
+| Passkeys | `warlock add auth-passkeys` | `@simplewebauthn/server` (add `@simplewebauthn/browser` to your client bundle) |
+| Phone code | `warlock add notifications` + your own `sms`/`whatsapp` channel | nothing else. Auth ships no SMS/WhatsApp driver |
+
+The SDKs are optional peers, loaded with `import()` only when a method runs. If one is missing, the call throws `AuthProviderSdkMissingError` (500), and the message names the `warlock add` command. Run the migrations: `authMigrations` now includes `provider_accounts` and `passkey_credentials`, and `one_time_tokens` gained an `attempts` column.
+
+## Google
+
+```ts
+// src/config/auth.ts
+providers: {
+  google: {
+    clientId: env("GOOGLE_CLIENT_ID"),
+    clientSecret: env("GOOGLE_CLIENT_SECRET"),
+    redirectUri: `${env("APP_URL")}/auth/google/callback`, // exactly as registered at Google
+    // scopes: ["openid", "email", "profile"],
+  },
+  // emailField: "email",
+  // createUser: async (profile, Model) => Model.create({ ... }),
+},
+```
+
+```ts
+router.get("/auth/google", async ({ response }) =>
+  response.redirect(await startProviderLogin(response, "google")),
+);
+
+router.get("/auth/google/callback", async ({ request, response }) => {
+  const { tokens } = await completeProviderLogin(User, "google", request, response);
+  authService.setAuthCookie(response, tokens.accessToken);
+  return response.redirect("/");
+});
+```
+
+Client side, the button is just a link. It must be a top-level navigation, not a `fetch`, so the state cookie goes out and comes back:
+
+```tsx
+<a href="/auth/google">Continue with Google</a>
+```
+
+- `state`, `nonce` and the PKCE verifier go into a signed, 10-minute, HttpOnly `auth_provider_state` cookie (SameSite=Lax, so it survives Google's redirect back). The callback clears the cookie, so a started login can complete only once.
+- The callback rejects, with `InvalidProviderCallbackError` (400, `EC009`): a missing, forged or expired cookie, a `state` mismatch, a `?error=` from Google, a failed code exchange, and an id_token with a bad signature, `iss`, `aud`, `exp` or `nonce`. `error.reason` says which. The response message is generic.
+- **Linking.** An existing `provider_accounts` row (provider plus Google `sub`) always decides the user. Without one, the Google email must be verified (`email_verified: true`), or the call throws `ProviderEmailNotVerifiedError` (403, `EC010`) and nothing is linked or created. A verified email links the matching user, or creates one with `{ email, name, emailVerifiedAt: now }`.
+- Other OIDC providers: implement `AuthProvider` (`authorizationUrl(state)`, `handleCallback({ query, expected })`) and register it under `auth.providers.custom.<name>`.
+
+## GitHub, Discord, LinkedIn
+
+Same shape as Google: a config block under `auth.providers.<name>`, a GET
+route that redirects to `startProviderLogin(response, "<name>")`, and a GET
+callback that calls `completeProviderLogin(User, "<name>", request, response)`.
+
+```ts
+// src/config/auth.ts
+providers: {
+  github: {
+    clientId: env("GITHUB_CLIENT_ID"),
+    clientSecret: env("GITHUB_CLIENT_SECRET"),
+    redirectUri: `${env("APP_URL")}/auth/github/callback`,
+    // scopes: ["read:user", "user:email"],
+  },
+  discord: {
+    clientId: env("DISCORD_CLIENT_ID"),
+    clientSecret: env("DISCORD_CLIENT_SECRET"),
+    redirectUri: `${env("APP_URL")}/auth/discord/callback`,
+    // scopes: ["identify", "email"],
+  },
+  linkedin: {
+    clientId: env("LINKEDIN_CLIENT_ID"),
+    clientSecret: env("LINKEDIN_CLIENT_SECRET"),
+    redirectUri: `${env("APP_URL")}/auth/linkedin/callback`,
+    // scopes: ["openid", "profile", "email"],
+  },
+},
+```
+
+- **GitHub** — OAuth 2 + PKCE. `/user.email` is `null` unless public, so the email is read from `/user/emails`: only the address that is both **primary and verified** is used; otherwise the profile has no email and the unverified-email rule applies.
+- **Discord** — OAuth 2 + PKCE; `email` comes from `/users/@me` and counts as verified only when Discord's `verified` flag is `true`.
+- **LinkedIn** — OpenID Connect; the id_token is verified with `jose` against LinkedIn's JWKS (signature, issuer, audience, expiry, nonce). `email_verified` must be the boolean `true`.
+- Provider names resolve by own key only — `auth.providers` inherited keys such as `toString` never resolve as a provider.
+
+## Apple
+
+```ts
+// src/config/auth.ts
+providers: {
+  apple: {
+    clientId: env("APPLE_CLIENT_ID"), // the Services ID
+    teamId: env("APPLE_TEAM_ID"),
+    keyId: env("APPLE_KEY_ID"),
+    privateKey: env("APPLE_PRIVATE_KEY"), // the .p8 file's PKCS8 PEM contents
+    redirectUri: `${env("APP_URL")}/auth/apple/callback`,
+    // scopes: ["name", "email"],
+  },
+},
+```
+
+```ts
+router.get("/auth/apple", async ({ response }) =>
+  response.redirect(await startProviderLogin(response, "apple")),
+);
+
+// Apple POSTs the callback (form_post) when name/email scopes are requested —
+// this route must accept a POST body, not just a query string.
+router.post("/auth/apple/callback", async ({ request, response }) => {
+  const { tokens } = await completeProviderLogin(User, "apple", request, response);
+  authService.setAuthCookie(response, tokens.accessToken);
+  return response.redirect("/");
+});
+```
+
+- Apple has no static client secret: a fresh ES256 JWT (`iss` = team id, `sub` = client id, `aud` = Apple, `kid` = key id) is signed with your `.p8` private key on every callback.
+- The account name arrives only on the **first** authorization, as a `user` form field (`{"name":{"firstName","lastName"}}`) — save it then, since later logins never send it again.
+- The email may be a private-relay address (`@privaterelay.appleid.com`); it is still a real, working address and is accepted like any other.
+- Same rejections and linking rules as Google, through `InvalidProviderCallbackError` / `ProviderEmailNotVerifiedError`.
+- Apple's `form_post` callback is a cross-site POST, so its state cookie is written `SameSite=None; Secure` instead of the usual `Lax` — a browser drops a `Lax` cookie there. `Secure` needs HTTPS: Apple requires it in production anyway, and for local dev you need `https://` or `http://localhost` (browsers treat `localhost` as a secure context even over plain http).
+
+## Facebook
+
+```ts
+providers: {
+  facebook: {
+    clientId: env("FACEBOOK_CLIENT_ID"),
+    clientSecret: env("FACEBOOK_CLIENT_SECRET"),
+    redirectUri: `${env("APP_URL")}/auth/facebook/callback`,
+    // scopes: ["email", "public_profile"],
+  },
+},
+```
+
+```ts
+router.get("/auth/facebook", async ({ response }) =>
+  response.redirect(await startProviderLogin(response, "facebook")),
+);
+
+router.get("/auth/facebook/callback", async ({ request, response }) => {
+  const { tokens } = await completeProviderLogin(User, "facebook", request, response);
+  authService.setAuthCookie(response, tokens.accessToken);
+  return response.redirect("/");
+});
+```
+
+- Plain OAuth 2 (no `id_token`); the profile comes from Graph `/me?fields=id,name,email,picture`. Facebook only ever returns a confirmed address, so a present `email` counts as verified.
+- An app without the `email` permission granted (or a user with none on file) gets no email — the same missing/unverified path as every other provider, never an invented address.
+
+## X (Twitter)
+
+```ts
+providers: {
+  x: {
+    clientId: env("X_CLIENT_ID"),
+    clientSecret: env("X_CLIENT_SECRET"),
+    redirectUri: `${env("APP_URL")}/auth/x/callback`,
+    // scopes: ["tweet.read", "users.read"],
+  },
+},
+```
+
+```ts
+router.get("/auth/x", async ({ response }) =>
+  response.redirect(await startProviderLogin(response, "x")),
+);
+
+router.get("/auth/x/callback", async ({ request, response }) => {
+  const { tokens } = await completeProviderLogin(User, "x", request, response);
+  authService.setAuthCookie(response, tokens.accessToken);
+  return response.redirect("/");
+});
+```
+
+- OAuth 2 with PKCE, plus HTTP Basic auth (`client_id:client_secret`) at the token endpoint for the confidential client — X requires both together.
+- X's `/2/users/me` never returns an email address at all. `email` is always `undefined`; a first login therefore always needs an existing `provider_accounts` link (create one another way first) or it is rejected the same as any missing email — X gives auth no way to invent or infer one.
+
+## Passkeys
+
+```ts
+passkeys: { rpID: "example.com", rpName: "Example", origin: "https://example.com" },
+```
+
+```ts
+// Register (logged in)
+router.post("/auth/passkeys/register/options", async ({ request, response }) =>
+  response.success(await generatePasskeyRegistrationOptions(request.locals.user)),
+  { middleware: [authMiddleware("user")] });
+router.post("/auth/passkeys/register", async ({ request, response }) => {
+  await verifyPasskeyRegistration(request, request.locals.user, request.input("credential"));
+  return response.success({ registered: true });
+}, { middleware: [authMiddleware("user")] });
+
+// Log in
+router.post("/auth/passkeys/login/options", async ({ response }) =>
+  response.success(await generatePasskeyAuthenticationOptions()));
+router.post("/auth/passkeys/login", async ({ request, response }) => {
+  const { tokens } = await verifyPasskeyAuthentication(request, request.input("credential"));
+  authService.setAuthCookie(response, tokens.accessToken);
+  return response.success({ ok: true });
+});
+```
+
+Browser:
+
+```ts
+import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
+
+const post = (url: string, body?: unknown) =>
+  fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
+    .then((r) => r.json());
+
+// register
+const regOptions = await post("/auth/passkeys/register/options");
+await post("/auth/passkeys/register", { credential: await startRegistration({ optionsJSON: regOptions }) });
+
+// log in
+const authOptions = await post("/auth/passkeys/login/options");
+await post("/auth/passkeys/login", { credential: await startAuthentication({ optionsJSON: authOptions }) });
+```
+
+(Unwrap `response.success`'s envelope if your app wraps payloads.)
+
+- Challenges live in `one_time_tokens` as SHA-256 hashes, expire after 5m (`auth.passkeys.challengeExpiresIn`), and are **consumed before verification**. A replayed challenge fails, and so does one whose first verification failed.
+- The request `Origin` must be one of `auth.passkeys.origin`. The same list is checked against the signed `clientDataJSON`.
+- The signature counter must advance. A counter that did not move past the stored value (when either is non-zero) is rejected as a cloned authenticator. The new counter is saved with a compare-and-set.
+- Every rejection throws `InvalidPasskeyError` (400, `EC011`) with a `reason`.
+
+## Phone code (OTP)
+
+```ts
+otp: { channel: "sms" /* or "whatsapp" */, phoneField: "phone", expiresIn: "5m", maxAttempts: 5 },
+```
+
+```ts
+router.post("/auth/otp/request", async ({ request, response }) => {
+  await requestOtp(User, request.input("phone"), { channel: request.input("via") === "whatsapp" ? "whatsapp" : "sms" });
+  return response.success({ message: "If that number is registered, a code is on its way." });
+}, { middleware: [otpRequestThrottleMiddleware()] }); // 3 / 1h per phone + IP
+
+router.post("/auth/otp/verify", async ({ request, response }) => {
+  const { tokens } = await verifyOtp(User, request.input("phone"), request.input("code"));
+  authService.setAuthCookie(response, tokens.accessToken);
+  return response.success({ ok: true });
+}, { middleware: [otpVerifyThrottleMiddleware()] }); // 5 failures / 15m per phone + IP
+```
+
+- Codes have 6 digits and are stored in `one_time_tokens` (purpose `otp`) as a salted HMAC keyed from your access-token secret, never as plain SHA-256, which is trivially reversible for 6 digits. A new request invalidates the previous code.
+- Every verify counts an attempt atomically first. After `maxAttempts` the code is invalidated, even if the right code comes next, and even under concurrent guesses.
+- Delivery: `notify.channel(channel).send(phone, { body, code, expiresAt })`. Register that channel in `config/notifications.ts`, or set `auth.otp.send(phone, message, channel)`. `auth.otp.message(code)` changes the text.
+- **Anti-enumeration:** an unknown phone gets the same `requestOtp` result (nothing sent) and the same `InvalidOneTimeTokenError` (400, `EC008`) from `verifyOtp`.
+- CSRF: `verifyOtp` is a POST. If the route uses cookie auth, the 5.12 Origin check applies. Otherwise there is no ambient credential to ride.
+
+## Gotchas
+
+- `completeProviderLogin` needs the **same** response object to clear the state cookie. Do not pass a different one.
+- One provider identity links to one account, of one user type.
+- `auth.cleanup` hard-deletes expired and consumed `one_time_tokens` rows (challenges and codes included).
+- The passkey specs run the real `@simplewebauthn/server` against a software ES256 authenticator, and the consume-once, OTP attempt cap, counter compare-and-set and provider-link uniqueness are proven on real MongoDB and Postgres. Google's token endpoint is still mocked, so test a real Google client before you ship.
+- A counter the SDK rejects is reported with `reason: "counter-regression"`, the same as auth's own check.
+
+## See also
+
+- The `handle-login-and-logout` topic: password login and `setAuthCookie`
+- The `throttle-login-attempts` topic: the throttle the OTP presets wrap
+- The `define-channel` topic of the `warlock-js-notifications` skill: an SMS/WhatsApp channel
+
+
+## manage-tokens  `@warlock.js/auth/manage-tokens/SKILL.md`
+
+---
+name: manage-tokens
+description: 'Token lifecycle — generateAccessToken, createRefreshToken, createTokenPair, refreshTokens (with rotation + replay detection), revokeAllTokens, revokeTokenFamily, cleanupExpiredTokens, getActiveSessions. Triggers: `createTokenPair`, `refreshTokens`, `revokeTokenFamily`, `cleanupExpiredTokens`, `getActiveSessions`, `jwt.generate`, `jwt.verify`, `AccessToken`, `RefreshToken`; "rotate refresh tokens", "detect token replay", "logout from all devices", "list active sessions", "clean up expired tokens"; typical import `import { authService, jwt } from "@warlock.js/auth"`. Skip: login flow — the `handle-login-and-logout` topic; CLI cleanup — the `run-auth-commands` topic; competing libs `jsonwebtoken`, `jose`, `fast-jwt`.'
+---
+
+# Manage tokens
+
+Tokens are persisted Cascade models. Issuing a token writes a row. Verification checks the row exists. Revocation deletes / marks-revoked. This gives you JWT's stateless verification + statelful revocation.
+
+## Token shapes
+
+```ts
+type AccessTokenOutput = { token: string; expiresAt: string };
+type RefreshTokenOutput = { token: string; expiresAt: string };
+
+type TokenPair = {
+  accessToken: AccessTokenOutput;
+  refreshToken?: RefreshTokenOutput;   // omitted if config.auth.refreshToken.enabled = false
+};
+```
+
+## Issuing tokens
+
+```ts
+import { authService } from "@warlock.js/auth";
+
+// Just an access token (rare — usually use createTokenPair)
+const access = await authService.generateAccessToken(user);
+
+// Just a refresh token
+const refresh = await authService.createRefreshToken(user, deviceInfo);
+
+// Both — the everyday case
+const pair = await authService.createTokenPair(user, deviceInfo);
+```
+
+`createTokenPair` is the typical issuance path. It respects `config.auth.refreshToken.enabled` — if disabled, returns only `accessToken`.
+
+## Refresh with rotation — `refreshTokens`
+
+Refresh and family revocation use durable family revision checks inside a
+serializable Cascade transaction. Run the additive `authMigrations` before
+using the upgraded APIs. Transaction support is required: the service fails
+rather than falling back to uncoordinated writes. MongoDB deployments therefore
+need a transaction-capable topology.
+
+An operation that owns its transaction retries serialization conflicts at most
+three times. Inside an application-owned transaction it joins once and leaves
+retry/rollback to the caller. Auth notifications from owned attempts are emitted
+only after successful commit; notifications inside an application-owned outer
+transaction retain their existing timing before that outer commit. Keep external
+side effects outside such a transaction.
+
+```ts
+const next = await authService.refreshTokens(oldRefreshToken, deviceInfo);
+// next: TokenPair | null
+```
+
+What happens internally:
+
+1. Verify the JWT signature on the old refresh token.
+2. Find the row in `RefreshToken` — must exist + not be revoked.
+3. Look up the user via `config.auth.userType[token.userType]`.
+4. **Rotation** (default — `config.auth.refreshToken.rotation = true`): revoke the old refresh token, create a new pair from the same `family_id`.
+5. **No rotation**: mark the old as "used" but keep it valid.
+
+**Replay detection.** If the old refresh token is presented again after rotation (already revoked but still in the DB):
+
+```ts
+// Inside refreshTokens, on a revoked-token presentation:
+await authService.revokeTokenFamily(refreshToken.get("family_id"));
+```
+
+Every refresh token in the same family is revoked. Pattern: a leaked refresh token is used by both legitimate user and attacker — the second use triggers the revoke, both sides get kicked.
+
+## Family — the rotation chain
+
+```
+login            → creates family X — refresh token A in family X
+refresh (A)      → revokes A; creates B in family X
+refresh (B)      → revokes B; creates C in family X
+refresh (A again)→ A is revoked → revoke family X entirely
+```
+
+The family ties together "successive rotations of one session." In 5.19 it is also a durable `AuthTokenFamily` row: family revoke marks that family, revokes its refresh rows, and deletes its associated access rows atomically. Access rows from before family association are conservatively deleted only for the same user and user type; they are never guessed into a family.
+
+## Listing active sessions
+
+```ts
+const sessions = await authService.getActiveSessions(user);
+
+for (const session of sessions) {
+  session.get("device_info");     // { userAgent, ip, deviceId? } if provided at login
+  session.get("created_at");
+  session.get("expires_at");
+}
+```
+
+Use this for "active sessions" UIs. Revoke a specific session by calling `.revoke()` on the `RefreshToken` instance.
+
+## Removing tokens
+
+```ts
+// Specific access token
+await authService.removeAccessToken(user, accessTokenString);
+
+// Specific session/family
+await authService.revokeTokenFamily(familyId);
+
+// All access tokens for a user
+await authService.removeAllAccessTokens(user);
+
+// Everything — access + refresh + family
+await authService.revokeAllTokens(user);
+
+// A specific family
+await authService.revokeTokenFamily(familyId);
+```
+
+## Max refresh tokens per user
+
+```ts
+// In config.auth.refreshToken:
+{
+  maxPerUser: 5,   // default
+}
+```
+
+When issuing a new refresh token, the service counts active tokens for the user and revokes the oldest until count < `maxPerUser`. Pattern: limits how many simultaneous sessions a user can hold; prevents an attacker who got a token from gradually accumulating many.
+
+## Expired-token cleanup
+
+```ts
+const cleaned = await authService.cleanupExpiredTokens();
+// Returns: number of expired refresh tokens removed (also purges expired access-token rows
+// and hard-deletes expired or consumed one_time_tokens rows).
+// Fires "token.expired" event per token + "cleanup.completed" with the count.
+```
+
+Every purge is a hard delete on every driver, including MongoDB. `AccessToken`, `RefreshToken`,
+`OneTimeToken` and `PasskeyCredential` all declare `static deleteStrategy = "permanent"`, so a
+purge never copies credential material into a `*Trash` collection despite MongoDB's driver
+default being `"trash"`.
+
+Run this periodically via the scheduler:
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+import { authService } from "@warlock.js/auth";
+
+scheduler.addJob(
+  job("auth-cleanup", () => authService.cleanupExpiredTokens())
+    .daily()
+    .at("03:00"),
+);
+```
+
+Or use the bundled CLI command — see the `run-auth-commands` topic.
+
+## JWT helpers
+
+For low-level JWT signing/verification (outside the authService flow):
+
+```ts
+import { jwt } from "@warlock.js/auth";
+
+const token = await jwt.generate(payload, { expiresIn: 3_600_000 }); // milliseconds
+const decoded = await jwt.verify(token);
+
+const refreshToken = await jwt.generateRefreshToken(payload, { expiresIn });
+const decodedRefresh = await jwt.verifyRefreshToken(refreshToken);
+```
+
+⚠️ **`jwt.generate` / `jwt.generateRefreshToken` are the low-level escape hatch — `expiresIn` goes straight to `fast-jwt`.** It takes a number of milliseconds or an `ms`-style string, and rejects an unparseable string. What it does **not** reject is `undefined` or `0`: both skip the check and emit a token with **no `exp` claim**. Pass a positive value, and never pass the result of parsing a config string without checking it first.
+
+**`jwt.verify` / `jwt.verifyRefreshToken` require an `exp` claim** (since 4.12.0) and reject a token without one. There is no deadline to check on such a token, so verification would otherwise succeed indefinitely. `requiredClaims` is additive — `jwt.verify(token, { requiredClaims: ["iat"] })` requires `iat` **and** `exp`; you cannot opt out of `exp`. If you want a token that effectively never expires, use `expiresIn: NO_EXPIRATION` (`"100y"`), which stamps a real `exp` about a century out.
+
+If tokens minted before 4.12.0 may lack an `exp`, see `warlock auth.purge-never-expiring` in the `run-auth-commands` topic — they are still in your token tables and no date-based cleanup can reach them.
+
+`authService.generateAccessToken` / `createRefreshToken` read `config.auth.accessToken.expiresIn` / `config.auth.refreshToken.expiresIn`, validate them, and throw naming the key if the value is not a positive `ms` duration — before anything is signed, persisted, or capped.
+
+The package signs access and refresh tokens with independent secrets — `config.auth.accessToken.secret` and `config.auth.refreshToken.secret`. Setting a distinct `refresh.secret` is recommended: it prevents an access-token compromise from forging refresh tokens (and vice versa). The refresh secret is **optional** — when `config.auth.refreshToken.secret` is unset, refresh tokens fall back to the main `config.auth.accessToken.secret`, so refresh works out of the box without a second secret.
+
+## Things NOT to do
+
+- Don't use raw JWT libraries directly. The package handles signing, verification, secret loading, and the access/refresh split.
+- Don't disable rotation (`config.auth.refreshToken.rotation = false`) unless you genuinely understand the tradeoff — you lose replay detection.
+- Don't increase `maxPerUser` to a huge number "to be safe." Each active refresh token is a revocation surface; fewer simultaneous tokens means less attack surface.
+- Don't manually delete `AccessToken` rows in a service. The user might be hitting a request mid-revoke and get an inconsistent state. Use the `authService` helpers.
+- Run the additive `authMigrations` on upgrade. Do not alter or backfill token rows yourself; legacy access tokens are handled conservatively on family revoke.
+
+## See also
+
+- The `handle-login-and-logout` topic — full login/logout flow that uses these primitives
+- The `run-auth-commands` topic — the bundled cleanup command
+- The `scheduler-basics` topic of the `warlock-js-scheduler` skill — scheduling cleanup
+
+
+## overview  `@warlock.js/auth/overview/SKILL.md`
+
+---
+name: overview
+description: "@warlock.js/auth overview for orientation and choosing the focused skill for the task."
+---
+
+# `@warlock.js/auth` — overview
+
+JWT authentication for Warlock apps. You get a base `Auth` model your user types extend, an `authMiddleware` route gate, an `authService` that runs login/logout/refresh (with refresh-token rotation and replay detection), persisted access + refresh tokens, multi-user-type support, lifecycle events, and two bundled CLI commands.
+
+Coupled to `@warlock.js/core` — you're inside a Warlock project before this package makes sense.
+
+Server-only: `package.json` declares `"warlock": { "environment": "server" }`. `@warlock.js/web`'s build refuses app client code that value-imports this package; type-only imports are allowed, and server loaders/controllers/modules are unaffected.
+
+## When to reach for it
+
+- You're building a Warlock app that needs login, protected routes, and token-based sessions.
+- You need **multiple user types** (admins + regular users, or client/vendor/staff personas) gated separately on the same auth system.
+- You want refresh-token **rotation + replay detection** out of the box rather than hand-rolling token security.
+
+Skip if you're not on `@warlock.js/core` (the package depends on it), or if you need session-cookie auth rather than JWTs.
+
+## The mental model in one paragraph
+
+Your user model extends the `Auth` base model and declares its `userType`. A login flows through `authService.login(Model, credentials, deviceInfo?)`: it verifies the password, issues a persisted access + refresh pair, and fires events. `authMiddleware("user")` is a typed hard gate; `authMiddleware()` resolves the configured default type; the object form selects header/cookie credentials, `optional`, and a page-local redirect. Refresh rotation uses a durable token family: family revocation invalidates its refresh and associated access rows. CLI commands generate the JWT secret and clean up expired tokens.
+
+## Skills index
+
+Nine task skills. Most apps need `auth-basics` + `protect-routes` + `handle-login-and-logout`.
+
+### Foundations
+
+#### `auth-basics`
+Start here. The `Auth` base model, `authMiddleware` gate, `authService` (login/logout/refresh), AccessToken + RefreshToken persistence, multi-user-type support.
+
+### The flows
+
+#### `handle-login-and-logout`
+`authService.login(Model, credentials, deviceInfo?)` — verify password, issue the token pair, fire events. `authService.logout(user, accessToken?, refreshToken?)` — revoke tokens. For your `POST /login` and `POST /logout` controllers.
+
+#### `register-user`
+Sign up a new user and issue the first token pair — `User.create({ ...password: await hashPassword(plain) })` then `authService.createTokenPair(user)`. For `POST /register`.
+
+#### `protect-routes`
+`authMiddleware` object and legacy overloads: typed/default hard gates, optional resolution, credential source, and page-local redirects. Sets `request.locals.user` + `request.decodedAccessToken` when a user resolves.
+
+### Going deeper
+
+#### `manage-tokens`
+The token lifecycle — `generateAccessToken`, `createRefreshToken`, `createTokenPair`, `refreshTokens` (rotation + replay detection), `revokeAllTokens`, `revokeTokenFamily`, `cleanupExpiredTokens`, `getActiveSessions`. For custom login/registration, token revocation, "logout everywhere", and scheduled cleanup.
+
+#### `customize-user-type`
+Support multiple user types in one system — each `Auth` subclass overrides `userType`, `config.auth.userType.<slug>` maps the slug to a model class, `authMiddleware("admin")` / `authMiddleware(["admin", "staff"])` gates per type.
+
+#### `customize-token-storage`
+Override the persisted `AccessToken` / `RefreshToken` models to add columns (multi-tenant `organization_id`), rename, or change storage — extend the model + schema and register it under `config.auth.accessToken.model` / `config.auth.refreshToken.model`.
+
+#### `throttle-login-attempts`
+Brute-force / credential-stuffing protection — `loginThrottleMiddleware()` counts only failed logins, resets on success, locks per-account + per-IP after a threshold, and rejects pre-controller with 429. Cache-backed, fails open on a cache outage.
+
+#### `run-auth-commands`
+Two CLI commands — `warlock jwt.generate` (strong JWT secret → `.env`) and `warlock auth.cleanup` (remove expired refresh tokens). Register via `registerJWTSecretGeneratorCommand()` and `registerAuthCleanupCommand()`.
+
+## What this package deliberately doesn't do
+
+- **Session-cookie auth.** It's JWT/token-based. If you need server-side sessions, this isn't it.
+- **OAuth / social login / SSO.** No provider adapters here — wire those at the controller layer and create the user through this package's models.
+- **Authorization / roles / permissions (RBAC).** It authenticates (who you are) and gates by user *type*, not fine-grained permissions. Build RBAC on top.
+- **Standalone use.** It depends on `@warlock.js/core` for routing, models (Cascade), and config.
+
+## See also
+
+- The `warlock-conventions` topic of the `warlock-js-core` skill — the framework auth runs inside (routing, middleware, config).
+- The `cascade-basics` topic of the `warlock-js-cascade` skill — the ORM behind the `Auth`, `AccessToken`, and `RefreshToken` models.
+- `mongez-agent-kit-authoring-skills` (load via agent-kit sync) — how this `overview` topic becomes `.claude/skills/warlock-js-auth/overview.md`.
+
+
+## protect-routes  `@warlock.js/auth/protect-routes/SKILL.md`
+
+---
+name: protect-routes
+description: 'Gate HTTP routes via authMiddleware(allowedUserType) — the argument is required and a valid token is always required: [] allows any authenticated user, a user-type restricts to those types. Sets request.locals.user + request.decodedAccessToken on success, 401 on failure. Triggers: `authMiddleware`, `request.locals.user`, `request.decodedAccessToken`, `AuthErrorCodes`, `MissingAccessToken`, `InvalidAccessToken`; "how do I protect a route", "restrict route by user type", "require any logged-in user"; typical import `import { authMiddleware } from "@warlock.js/auth"`. Skip: multi-user-type config — the `customize-user-type` topic; issuing the token — the `handle-login-and-logout` topic; competing libs `passport`, `express-jwt`, `next-auth` middleware.'
+---
+
+# Gate routes with `authMiddleware`
+
+`authMiddleware` returns a Warlock middleware. Attach it to routes or route groups. The legacy string overload is preserved; the object overload makes credential source, optional resolution, and a page-local redirect explicit.
+
+```ts title="src/app/users/models/user/user.model.ts"
+import { Auth } from "@warlock.js/auth";
+import { RegisterModel } from "@warlock.js/cascade";
+
+@RegisterModel()
+export class User extends Auth {
+  public static table = "users";
+
+  public get userType(): string {
+    return "user";
+  }
+}
+```
+
+## Two modes
+
+Middleware is attached via the route's `options.middleware` array (the third argument) — never as a positional argument.
+
+```ts
+import { router, type RequestHandler } from "@warlock.js/core";
+import { authMiddleware } from "@warlock.js/auth";
+
+const accountController: RequestHandler = async ({ response }) => response.success({});
+const adminController: RequestHandler = async ({ response }) => response.success({});
+const staffController: RequestHandler = async ({ response }) => response.success({});
+
+// Required default type (`auth.defaultUserType`, or the sole configured type)
+router.get("/account", accountController, {
+  middleware: [authMiddleware()],
+});
+
+// Mode 2 — required, specific user type(s)
+//   Rejects missing/invalid credentials with 401 and a disallowed user type with 403.
+router.get("/admin", adminController, {
+  middleware: [authMiddleware("admin")],
+});
+
+router.get("/staff", staffController, {
+  middleware: [authMiddleware(["admin", "staff"])],
+});
+```
+
+The `userType` slug must match a key in `config.auth.userType.<name>` — see the `customize-user-type` topic.
+
+## What the middleware does
+
+On success, before your controller runs:
+
+```ts
+request.locals.user = <hydrated user model instance>;
+request.decodedAccessToken = <decoded JWT payload>;
+```
+
+The user is loaded via `Model.find(decodedToken.id)` against the `config.auth.userType[userType]` class. If the user no longer exists (deleted), the access token row is destroyed and the request gets 401.
+
+A token passes three separate checks, in order — a token can fail any one of them while satisfying the other two:
+
+1. **The JWT verifies** — signature, algorithm, `tokenType`, and (since 4.12.0) the presence of an `exp` claim that has not passed. A token with *no* `exp` is rejected: there is no deadline to check, so it would otherwise verify indefinitely.
+2. **The access-token row still exists** — deleting it (logout) invalidates the token immediately, before its JWT expiry.
+3. **The row's own `expires_at` has not passed** (since 4.12.0). The database is the authority on the session: a row whose expiry has elapsed is rejected and deleted, even if the JWT itself is still within its lifetime. A row with a missing or unparseable `expires_at` is treated as expired, not as never-expiring.
+
+Missing or invalid credentials return 401; an authenticated disallowed user type returns 403:
+
+| Error code | When |
+| --- | --- |
+| `MissingAccessToken` | No credential at the configured source |
+| `InvalidAccessToken` | Token doesn't verify (signature, missing/passed `exp`, wrong token type), has no DB row, or the row's `expires_at` has passed |
+| `Unauthorized` | Token valid but user-type isn't in the allowed list (403) |
+
+## Page routes: redirect to login instead of the JSON 401
+
+By default every auth failure — API or page — returns the JSON `401` above. That's right for an API client, but a logged-out human who *navigates* to a guarded page route gets a raw JSON error blob instead of a login screen.
+
+Opt into a redirect with `auth.pageAuth` (5.8+). Set `loginPath` and a guarded **page** route (`route.isPage`) that a logged-out browser hits redirects to `loginPath?returnUrl=<original path>` instead of returning the JSON 401:
+
+```ts title="src/config/auth.ts"
+import { User } from "app/users/models/user/user.model";
+
+export default {
+  userType: { user: User },
+  pageAuth: {
+    loginPath: "/login",        // set this to turn the redirect on
+    returnUrlParam: "returnUrl", // optional, this is the default
+  },
+};
+```
+
+Behavior, precisely:
+
+- **Page route + `loginPath` set** → `302` redirect to `loginPath?returnUrl=<encoded request path>`. The login flow reads `returnUrl` to send the user back where they were headed. If `loginPath` already carries a query string, the param is appended with `&` instead of `?`.
+- **Page route + `loginPath` unset** → the JSON `401` is unchanged. The redirect is **opt-in**, so an app that hasn't configured `pageAuth` keeps exactly its current behavior.
+- **API route** → always the JSON `401`, regardless of `pageAuth`. The API contract is never altered.
+
+The page-vs-API signal is `request.route.isPage`. Config is typed as `PageAuthConfig` on `AuthConfigurations` (`loginPath?: string`, `returnUrlParam?: string`, default `"returnUrl"`); read at runtime through `authConfig.pageAuth`.
+
+> A local `redirect` object is preferred for a page that needs a different login destination; absent it, `auth.pageAuth` remains the compatibility fallback.
+
+## Reading the user in a controller
+
+`request.locals.user` types as `RequestUser` — an empty interface by default. Narrow it once, app-wide, via module augmentation so it carries your model's shape:
+
+```ts title="src/app/users/request-user.ts"
+import type { User } from "app/users/models/user/user.model";
+
+declare module "@warlock.js/auth" {
+  interface RequestUser extends User {}
+}
+```
+
+```ts
+import { type RequestHandler } from "@warlock.js/core";
+
+export const accountController: RequestHandler = async ({ request, response }) => {
+  const user = request.locals.user!;          // typed via the RequestUser augmentation above
+  return response.success({
+    id: user.id,
+    email: user.get("email"),
+  });
+};
+```
+
+Because the middleware always requires a valid token, `request.locals.user` is guaranteed present inside any gated controller (the middleware would have responded 401 otherwise). The `!` is safe here.
+
+## Route-group protection
+
+```ts
+router.group({ prefix: "/admin", middleware: [authMiddleware("admin")] }, () => {
+  router.get("/users", listUsersController);
+  router.post("/users", createUserController);
+});
+```
+
+Every route inside the group is gated — the group's `middleware` array applies to each route in the callback. Cleaner than repeating the middleware on each route.
+
+## Optional auth
+
+Use `optional: true` in the object form when a public route should receive a verified user when one is present. Missing or invalid credentials continue anonymously; a hard gate remains the default.
+
+```ts
+middleware: [authMiddleware({ source: "header", optional: true })]
+```
+
+## Automatic cookie renewal
+
+Add `refresh: { source: "cookie", key: "refresh_token", overlapMs?: 5000 }`
+to a typed cookie middleware to renew an absent, invalid, or expired access
+cookie before the handler. It writes the successor access and refresh cookies
+through `authService.setAuthCookie`; it never replays a handler. `overlapMs` is
+clamped to 0â€“10,000 ms (default 5,000). Only the exact immediate successor is
+tolerated during that window. The legacy `refreshTokens` API stays strict; a
+later old-token presentation revokes its family.
+## Custom error responses
+
+The middleware uses the framework's `response.unauthorized({...})` shape. To override the response globally, hook the framework's error transformer to remap `AuthErrorCodes.*` codes.
+
+## When flat user types aren't enough — reach for `@warlock.js/access`
+
+`authMiddleware` gates on **user type** by flat string membership. That answers "is this an admin?" and nothing more. It deliberately cannot express:
+
+- a permission matrix (`articles.publish` rather than `"editor"`)
+- role hierarchy or inheritance
+- **who may act on whom** — "an `admin` may create a `teacher`, but only a `superAdmin` may create or promote an `admin`"
+
+That last one is the difference between a role check and an authorization model: without it, an account-creation endpoint gated on `authMiddleware("admin")` is a privilege-escalation path.
+
+Install `@warlock.js/access` (the `overview` topic of the `warlock-js-access` skill) for that. It layers RBAC plus per-permission ABAC policies over the same authenticated user:
+
+```ts
+import { router, type RequestHandler } from "@warlock.js/core";
+import { authMiddleware } from "@warlock.js/auth";
+import { gate, can, definePolicy } from "@warlock.js/access";
+import { User } from "app/users/models/user/user.model";
+
+const articlesController: RequestHandler = async ({ request, response }) => {
+  // Who-may-act-on-whom: an ABAC policy on top of the RBAC grant
+  definePolicy("users.create", (actor, target, ctx) =>
+    ctx.hasRole("superAdmin") || (target as User).userType === "teacher",
+  );
+
+  if (await can(request.locals.user!, "users.create", { resource: request.body })) {
+    /* ... */
+  }
+
+  return response.success({});
+};
+
+// Permission-based route gate, in place of a user-type gate
+router.post("/articles", articlesController, { middleware: [authMiddleware([]), gate("articles.create")] });
+```
+
+Use `authMiddleware` to establish *who the caller is*, and `access` to decide *what they may do*. They compose — `access` reads the user `authMiddleware` put on the request.
+
+## Cookie credentials
+
+Use `{ source: "cookie", key: "token" }` in the object form. The same checks and `request.locals.user` outcome apply; legacy `authMiddleware("user", "cookie:token")` is also supported.
+
+```ts
+router.get("/browser-account", accountController, {
+  middleware: [authMiddleware({ source: "cookie", key: "token" })],
+});
+```
+
+A route is header-only or cookie-only, never both — `tokenFrom` accepts exactly one source, so there is no header/cookie precedence to define. A route that legitimately needs to accept either composes two `authMiddleware` instances against the app's own optional-auth pattern (above).
+
+### Writing and clearing the cookie: `authService.setAuthCookie` / `clearAuthCookie`
+
+Reading a cookie is opt-in per route (above); *writing* one is a separate, explicit step your login/logout controller calls — `authService.login`/`logout` never set cookies implicitly, so upgrading never starts emitting `Set-Cookie` for an existing bearer-only app.
+
+```ts
+import { type RequestHandler } from "@warlock.js/core";
+import { authService } from "@warlock.js/auth";
+import { User } from "app/users/models/user/user.model";
+
+export const loginController: RequestHandler = async ({ request, response }) => {
+  const result = await authService.login(User, {
+    email: request.input("email"),
+    password: request.input("password"),
+  });
+  if (!result) return response.unauthorized({ error: "Invalid credentials" });
+
+  const { user, tokens } = result;
+  authService.setAuthCookie(response, tokens.accessToken); // Max-Age derived from tokens.accessToken.expiresAt
+
+  return response.success({ id: user.id });
+};
+
+export const logoutController: RequestHandler = async ({ request, response }) => {
+  const user = request.locals.user!;
+  await authService.logout(user, request.header("authorization"));
+  authService.clearAuthCookie(response);
+
+  return response.success({});
+};
+```
+
+`setAuthCookie(response, token, options?)` accepts either the raw token string or an `AccessTokenOutput` (`{ token, expiresAt }`, e.g. `tokens.accessToken` from `login`) — passing the latter derives `Max-Age` from `expiresAt` automatically; pass `options.maxAge` (seconds) to override it, or a bare string with no `maxAge` for a session cookie. `clearAuthCookie(response, options?)` clears it.
+
+Cookie **attribute flags are not configurable** — `HttpOnly`, `SameSite=Lax`, and `Secure` outside development come from core's `secureCookieDefaults()`, the same floor every `response.cookie()` call gets. Only the cookie's `name` (default `"access_token"`) and `path` (default `"/"`) can be set, via `options` or the `auth.cookie` config block:
+
+```ts title="src/config/auth.ts"
+import { User } from "app/users/models/user/user.model";
+
+export default {
+  userType: { user: User },
+  cookie: {
+    name: "access_token", // must match the `cookie:<name>` a route reads
+    path: "/",
+  },
+};
+```
+
+The cookie name `setAuthCookie`/`clearAuthCookie` write **must match** the name a `cookie:<name>` token source reads — they are not linked automatically.
+
+### CSRF: an automatic Origin check on cookie-authenticated writes
+
+Cookie auth changes the CSRF picture that bearer-token auth doesn't have: a browser attaches cookies to same-site requests it didn't originate. `SameSite=Lax` already blocks the classic cross-site `<form method="post">` case, but not a same-site GET redirect chain or a client that ignores `SameSite`.
+
+To close that gap, `authMiddleware` automatically runs a CSRF Origin check on every request whose credential came from a `cookie:` source **and** whose method is unsafe (`POST`/`PUT`/`PATCH`/`DELETE`) — there is nothing to opt into, and nothing to configure to turn it on:
+
+- **Allowed** when `Origin` equals the request's own origin, or is listed in `auth.csrf.allowedOrigins` (config, default `[]`).
+- If `Origin` is absent, `Referer`'s origin is checked the same way.
+- If **both** are absent, or the check fails, the request is rejected with `403` and `errorCode: AuthErrorCodes.CsrfOriginMismatch` ("EC006") — never silently passed through.
+- **Header-token auth is completely unaffected**, as are safe methods (`GET`/`HEAD`/`OPTIONS`) under cookie auth.
+
+```ts title="src/config/auth.ts"
+import { User } from "app/users/models/user/user.model";
+
+export default {
+  userType: { user: User },
+  csrf: {
+    allowedOrigins: ["https://admin.example.com"], // extra trusted origins, beyond same-origin
+  },
+};
+```
+
+This is an Origin check, not a double-submit CSRF token — cheaper, and closes the gap `SameSite=Lax` leaves open, but it doesn't help a client whose privacy proxy strips both `Origin` and `Referer` (that request is rejected outright, fail-closed, rather than silently allowed). A double-submit token mechanism is deferred to a later release; track it if your threat model includes Origin-stripping clients.
+
+## Tooling can read how a route authenticates
+
+`authMiddleware()` tags the function it returns with a frozen, non-enumerable descriptor under `Symbol.for("warlock.auth")` (exported as `AUTH_MIDDLEWARE_DESCRIPTOR`, typed `AuthMiddlewareDescriptor`): `{ sources: ("header" | { cookie: string })[], userTypes: string[] }`. `warlock generate.openapi` reads it to emit bearer/cookie security for guarded routes. It never appears in logs, spreads or JSON, and changes nothing at runtime. Custom guards without it are simply documented as unauthenticated.
+
+## Things NOT to do
+
+- Don't call `authMiddleware` outside route definition. It returns a function — the function is what runs per-request. Calling it once per request creates a fresh middleware on every hit (wasteful) and a fresh allowed-types Set (correctness if the input changes per call).
+- Don't manually decode JWTs in the controller. The middleware already does it and exposes the decoded payload via `request.decodedAccessToken`.
+- Don't trust `request.locals.user` set by client-supplied headers. The middleware is the only place that sets it on the server — client headers can't reach this slot.
+- Don't pass an unknown user-type to `authMiddleware("typo")`. The middleware will reject every request because the lookup fails. Test the wire-up with a real token of each user type.
+
+## See also
+
+- The `customize-user-type` topic — config and multi-user-type semantics
+- The `handle-login-and-logout` topic — where the access token gets issued in the first place
+- The `throttle-login-attempts` topic — brute-force throttle to stack in front of the login route
+- The `overview` topic of the `warlock-js-access` skill — permissions, roles, and who-may-act-on-whom policies, when user-type gating isn't enough
+
+
+## register-user  `@warlock.js/auth/register-user/SKILL.md`
+
+---
+name: register-user
+description: 'Sign up a new user and issue the initial token pair — User.create({...password: await hashPassword(plain)}) then authService.createTokenPair(user). Triggers: `User.create`, `hashPassword`, `verifyPassword`, `authService.createTokenPair`, `toJsonColumns`, `strongPassword`, `authEvents`; "build a register endpoint", "POST /register controller", "sign up a new user", "hash password on signup", "email verification flow"; typical import `import { authService } from "@warlock.js/auth"; import { hashPassword } from "@warlock.js/core"`. Skip: login — the `handle-login-and-logout` topic; token internals — the `manage-tokens` topic; competing libs `bcrypt`, `bcryptjs`, `argon2`.'
+---
+
+# Register-and-issue-tokens flow
+
+Two-step on the server: create the user (with hashed password), then issue tokens. Cascade handles the persistence; `authService` handles the tokens.
+
+```ts title="src/app/users/models/user/user.model.ts"
+import { Auth } from "@warlock.js/auth";
+import { RegisterModel } from "@warlock.js/cascade";
+
+@RegisterModel()
+export class User extends Auth {
+  public static table = "users";
+
+  public get userType(): string {
+    return "user";
+  }
+}
+```
+
+## The minimal shape
+
+```ts
+import { authService } from "@warlock.js/auth";
+import { hashPassword, type RequestHandler } from "@warlock.js/core";
+import { User } from "app/users/models/user/user.model";
+
+export const registerController: RequestHandler = async ({ request, response }) => {
+  const { email, password, name } = request.all();
+
+  // 1. Check duplicates
+  const existing = await User.first({ email });
+  if (existing) {
+    return response.conflict({ error: "Email already registered" });
+  }
+
+  // 2. Create the user with hashed password
+  const user = await User.create({
+    email,
+    name,
+    password: await hashPassword(password),
+  });
+
+  // 3. Issue tokens
+  const tokens = await authService.createTokenPair(user, {
+    userAgent: request.header("user-agent"),
+    ip: request.ip,
+  });
+
+  // 4. Respond
+  return response.successCreate({
+    user,         // shape via static toJsonColumns / static resource
+    tokens,
+  });
+};
+```
+
+That's the whole flow. `User.create({...})` runs the schema validation (including `.email()`, `.min()`, etc. on each field), so you don't need a separate validation pass — see the `handle-seal-errors` topic of the `warlock-js-seal` skill for catching validation failures.
+
+## Hash the password on the way in
+
+Always pass `hashPassword(plain)` — never store the plain password. The `hashPassword` helper is `bcrypt`-based and async; the cost factor matches the framework default.
+
+```ts
+import { hashPassword, verifyPassword } from "@warlock.js/core";
+
+const hash = await hashPassword("plaintext");      // store this
+const ok = await verifyPassword("plaintext", hash); // compare on login
+```
+
+`authService.attemptLogin` already calls `verifyPassword` against the stored hash — you don't compare passwords manually.
+
+## Schema enforcement
+
+Define the password as `v.string().strongPassword(12)` (or similar) in your User schema so weak passwords are rejected at `create()` time:
+
+```ts
+const userSchema = v.object({
+  email: v.string().email(),
+  name: v.string().min(2).max(120),
+  password: v.string().strongPassword(12),   // 12+ chars, upper/lower/digit/symbol
+  // status, role, etc.
+});
+```
+
+But **don't return the password in the public output**:
+
+```ts
+@RegisterModel()
+export class User extends Model<UserSchema> {
+  public static table = "users";
+  public static schema = userSchema;
+  public static toJsonColumns = ["id", "email", "name", "created_at"];   // omit password
+}
+```
+
+Without this, `JSON.stringify(user)` in your response leaks the hash.
+
+## Email verification flow (extending registration)
+
+Since 5.13 auth ships this. Declare `emailVerifiedAt: v.date().optional()` on the schema, then send the verification after creating the user:
+
+```ts
+import { authService, sendEmailVerification } from "@warlock.js/auth";
+
+const user = await User.create({ ...data, password: await hashPassword(data.password) });
+
+await sendEmailVerification(user); // hashed, single-use, 24h token via @warlock.js/notifications
+
+const tokens = await authService.createTokenPair(user);
+return response.successCreate({ user, tokens });
+```
+
+Gate routes that need a confirmed address with `requireVerifiedEmail()` after `authMiddleware`. See the `verify-email-and-reset-password` topic.
+
+## Side effects via auth events
+
+Hook post-registration logic:
+
+```ts
+import { authEvents } from "@warlock.js/auth";
+
+authEvents.on("session.created", async (user, refreshToken, deviceInfo) => {
+  if (user.get("created_at") > new Date(Date.now() - 5000)) {
+    // freshly created in the last 5s — treat as registration
+    await sendWelcomeEmail(user);
+  }
+});
+```
+
+Cleaner alternative: emit your own `user.registered` event from the controller after `User.create`. Decouples auth-package events from your domain events.
+
+## Things NOT to do
+
+- Don't pass the plain password to `User.create()`. `await hashPassword(plain)` first.
+- Don't return the user without `toJsonColumns` / `resource` shaping — the password hash will leak otherwise.
+- Don't issue tokens before validating the user shape. `User.create` runs validation; let it throw on bad input before tokens get created.
+- Don't run "send welcome email" inline in the controller. Push it to a queue or run it after-commit via the outbox pattern — see the `manage-transactions` topic of the `warlock-js-cascade` skill.
+
+## See also
+
+- The `handle-login-and-logout` topic — login flow (same `createTokenPair` step)
+- The `manage-tokens` topic — token issuance internals
+- The `define-model` topic of the `warlock-js-cascade` skill — `toJsonColumns` / `resource` for public output
+
+
+## run-auth-commands  `@warlock.js/auth/run-auth-commands/SKILL.md`
+
+---
+name: run-auth-commands
+description: 'Three bundled CLI commands — warlock jwt.generate (creates strong JWT secret + writes to .env), warlock auth.cleanup (removes expired refresh tokens), and warlock auth.purge-never-expiring (finds and revokes token rows that can never expire). Register via registerJWTSecretGeneratorCommand(), registerAuthCleanupCommand() and registerAuthPurgeNeverExpiringCommand(). Triggers: `registerJWTSecretGeneratorCommand`, `registerAuthCleanupCommand`, `registerAuthPurgeNeverExpiringCommand`, `warlock jwt.generate`, `warlock auth.cleanup`, `warlock auth.purge-never-expiring`, `cleanupExpiredTokens`, `purgeNeverExpiringTokens`, `command`; "token never expires", "no exp claim", "Invalid Date expires_at"; "generate JWT secret", "bootstrap .env JWT_SECRET", "cron job for expired tokens", "schedule auth cleanup"; typical import `import { registerJWTSecretGeneratorCommand, registerAuthCleanupCommand, registerAuthPurgeNeverExpiringCommand } from "@warlock.js/auth"`. Skip: programmatic cleanup — the `manage-tokens` topic; in-process scheduling — the `scheduler-basics` topic of the `warlock-js-scheduler` skill; competing tools `dotenv-cli`, `node-cron`.'
+---
+
+# Run auth commands
+
+The package ships three CLI commands. Register them in `warlock.config.ts`; the framework picks them up.
+
+## Register
+
+```ts title="warlock.config.ts"
+import {
+  registerAuthCleanupCommand,
+  registerAuthPurgeNeverExpiringCommand,
+  registerJWTSecretGeneratorCommand,
+} from "@warlock.js/auth";
+import { defineConfig } from "@warlock.js/core";
+
+export default defineConfig({
+  cli: {
+    commands: [
+      registerJWTSecretGeneratorCommand(),
+      registerAuthCleanupCommand(),
+      registerAuthPurgeNeverExpiringCommand(),
+    ],
+  },
+});
+```
+
+## `warlock jwt.generate` — JWT secret bootstrap
+
+```bash
+npx warlock jwt.generate
+```
+
+Generates a cryptographically strong secret string and writes it to your `.env` as `JWT_SECRET=...` (and `JWT_REFRESH_SECRET=...` if refresh tokens are enabled).
+
+Run it once when setting up a new project. Each developer typically runs it locally; production secrets come from your secret manager (Vault, AWS Secrets Manager, k8s secrets) and bypass this command.
+
+**Don't commit `.env`.** The generated secret should never live in the repo. The command writes to `.env`, which `.gitignore` already excludes in a default Warlock project.
+
+## `warlock auth.cleanup` — expired token sweep
+
+```bash
+npx warlock auth.cleanup
+```
+
+Runs `authService.cleanupExpiredTokens()` — deletes every refresh token whose `expires_at` has passed, then sweeps expired access-token rows and hard-deletes expired or consumed `one_time_tokens` rows (verification/reset tokens, OTP codes, passkey challenges). Fires `token.expired` per refresh token and `cleanup.completed` once.
+
+Schedule it periodically. Two common shapes:
+
+### Via the scheduler
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+import { authService } from "@warlock.js/auth";
+
+scheduler.addJob(
+  job("auth-cleanup", () => authService.cleanupExpiredTokens())
+    .daily()
+    .at("03:00")
+    .preventOverlap(),
+);
+
+scheduler.start();
+```
+
+In-process — no shell call. See the `scheduler-basics` topic of the `warlock-js-scheduler` skill.
+
+### Via system cron
+
+```cron
+0 3 * * *  cd /path/to/app && /usr/local/bin/npx warlock auth.cleanup
+```
+
+Out-of-process — works when you don't want the scheduler subsystem running in this service.
+
+## How often?
+
+Once a day is usually enough. The check is cheap (single indexed DELETE on `expires_at < now()`), and refresh tokens that have already expired don't grant access — cleanup is housekeeping, not security.
+
+If you have very-short-lived refresh tokens (1h expiry) and a million-user scale where the table grows fast, cleanup more often (hourly).
+
+## `warlock auth.purge-never-expiring` — one-off remediation
+
+```bash
+npx warlock auth.purge-never-expiring --dry-run   # report only
+npx warlock auth.purge-never-expiring             # report, then revoke
+```
+
+Register with `registerAuthPurgeNeverExpiringCommand()`.
+
+Finds every token row that **can never retire itself**, on two independent signals: an `expires_at` that is missing or unparseable, and a stored token carrying no `exp` claim. It reports `id` / `user_id` / `user_type` / `expires_at` per row — never the token string, which is a live credential until the row is deleted — and then deletes them. Affected users must log in again.
+
+**This is not a substitute for `auth.cleanup`, and `auth.cleanup` is not a substitute for it.** Cleanup selects `expires_at < now`; an `Invalid Date` compares `false` against *every* date, so such a row satisfies neither `< now` nor `> now` and no date predicate can ever reach it. The "no `exp` claim" signal is not in a column at all — it is inside the JWT.
+
+Run it once after upgrading to 4.12.0 **if any deployment ever ran an `expiresIn` that `ms` could not parse** (`"30dayz"`, `"0d"`, `""`, a bare number). Those configurations minted tokens that verify forever. It is safe to run when unaffected — it reports nothing and deletes nothing.
+
+Unlike `auth.cleanup`, do **not** schedule it: it is a full table scan (it must read rows to judge them, since neither signal is expressible as a `where`), and once the poisoned rows are gone, 4.12.0 cannot create more.
+
+## Custom commands
+
+If `auth.cleanup` doesn't cover everything your app needs (e.g. you also want to revoke tokens for inactive users), write your own command and combine the auth service helpers:
+
+```ts title="src/app/users/models/user/user.model.ts"
+import { Auth } from "@warlock.js/auth";
+import { RegisterModel } from "@warlock.js/cascade";
+
+@RegisterModel()
+export class User extends Auth {
+  public static table = "users";
+
+  public get userType(): string {
+    return "user";
+  }
+}
+```
+
+```ts
+import { command } from "@warlock.js/core";
+import { authService } from "@warlock.js/auth";
+import { User } from "app/users/models/user/user.model";
+
+export function registerDeepCleanupCommand() {
+  return command({
+    name: "auth.deep-cleanup",
+    description: "Expire stale tokens AND revoke tokens for inactive users",
+    preload: {
+      env: true,
+      config: ["auth", "database"],
+      connectors: ["database"],
+    },
+    action: async () => {
+      await authService.cleanupExpiredTokens();
+
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const stale = await User.where("last_seen_at", "<", thirtyDaysAgo).get();
+
+      for (const user of stale) {
+        await authService.revokeAllTokens(user);
+      }
+    },
+  });
+}
+```
+
+Register it the same way as the bundled commands — call the factory inside `defineConfig({ cli: { commands: [...] } })`.
+
+## Things NOT to do
+
+- Don't run `jwt.generate` repeatedly in production. It changes the secret, which invalidates every token in flight. Generate once per environment.
+- Don't run `auth.cleanup` from a long-running scheduler at sub-minute intervals. The DELETE itself is cheap, but the per-token `token.expired` event fan-out has cost. Hourly is plenty even at scale.
+- Don't put the JWT secret in your codebase fallback (`env("JWT_SECRET", "dev-secret")`). A missing secret should fail the boot — not silently degrade to a dev value.
+
+## See also
+
+- The `manage-tokens` topic — `cleanupExpiredTokens` internals
+- The `scheduler-basics` topic of the `warlock-js-scheduler` skill — in-process scheduling
+
+
+## throttle-login-attempts  `@warlock.js/auth/throttle-login-attempts/SKILL.md`
+
+---
+name: throttle-login-attempts
+description: 'Brute-force / credential-stuffing protection via `loginThrottleMiddleware` — a failure-aware route gate that counts only failed logins (resets on success), locks per-account and per-source after a threshold, and rejects pre-controller with 429 so the DB lookup and bcrypt verify are skipped. Cache-backed (shared across replicas), fixed-window, fails open on a cache outage. Triggers: `loginThrottleMiddleware`, `AuthErrorCodes.TooManyAttempts`, `EC004`, "rate limit login", "brute force protection", "lock account after failed logins", "throttle login attempts", "too many login attempts 429"; typical import `import { loginThrottleMiddleware } from "@warlock.js/auth"`. Skip: generic per-route request rate limiting that counts every request (use core `middleware.rateLimit`); gating a route by auth — the `protect-routes` topic; issuing tokens — the `handle-login-and-logout` topic.'
+---
+
+# Throttle login attempts with `loginThrottleMiddleware`
+
+`loginThrottleMiddleware(options?)` returns a Warlock middleware that defends the login (and refresh / password-reset) routes against brute-force and credential-stuffing — without punishing a user who fat-fingers a password then gets it right.
+
+The trick that makes it different from a plain rate limiter: it's **failure-aware**. It hooks the response *after* your controller runs (`response.onSent`), counts only the attempts that actually failed, and **clears the counter the moment a login succeeds**. A generic request limiter can't do that — it runs before the controller and counts every hit, success or not.
+
+## The shortest version
+
+```ts
+import { loginThrottleMiddleware } from "@warlock.js/auth";
+
+router.post("/auth/login", loginController, {
+  middleware: [loginThrottleMiddleware()], // 5 failures / 15m → 15m lockout, per email + ip
+});
+```
+
+That's the whole feature for most apps. Defaults: **5** failed attempts within a **15m** window trips a **15m** lockout, tracked independently per account (the `email` field) **and** per source IP.
+
+> **Heads-up — account-lockout is a DoS surface.** Because the default tracks per-`email`, an attacker who knows a victim's address can lock them out by spamming failed logins. The per-IP counter mitigates it (the attacker's own IP trips too); for purely anonymous endpoints prefer `by: ["ip"]`, and for high-value accounts consider a CAPTCHA step over a hard lock. See [Gotchas](#gotchas).
+
+## How it behaves
+
+1. **Before the controller** — if the account or the IP is currently locked, it short-circuits with `429` and never touches the database or the bcrypt verify (this is also what neutralises the CPU-DoS angle of brute-forcing). The body carries `AuthErrorCodes.TooManyAttempts` (`EC004`).
+2. **After the controller** — it inspects the outcome. A non-2xx response is a failed login: it bumps a fixed-window counter for each tracked identifier, and once a counter reaches `max` it writes a lock key. A 2xx response is a success: it **clears** the counter and lock for that identifier.
+
+Per-account tracking stops a password-spray against one user from many IPs; per-source tracking stops one IP from stuffing many accounts. A lock on **either** identifier rejects the request — defense-in-depth.
+
+## Options
+
+```ts
+loginThrottleMiddleware({
+  max: 5,                 // failures allowed in the window before lockout
+  window: "15m",          // counting window — ms-format string or seconds (number)
+  lockoutDuration: "15m", // how long the lock lasts once tripped
+  by: ["email", "ip"],    // identifiers tracked, each independently
+  identifierKey: "email", // which credential field is the account key
+  errorMessage: "Too many attempts. Try again later.",
+});
+```
+
+Two escape hatches for non-standard setups:
+
+```ts
+loginThrottleMiddleware({
+  // your controller signals failure with a 200 body instead of a status code
+  isFailure: (response) => response.parsedBody?.ok === false,
+
+  // derive the account key from somewhere other than email/ip
+  identify: (request) => [`tenant.${request.input("tenant")}.${request.input("username")}`],
+});
+```
+
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `max` | `5` | Failures within the window before lockout |
+| `window` | `"15m"` | Counting window (`ms`-string or seconds) |
+| `lockoutDuration` | `"15m"` | Lock TTL once tripped |
+| `by` | `["email", "ip"]` | Identifiers tracked independently |
+| `identifierKey` | `"email"` | Credential field used as the account key |
+| `errorMessage` | i18n `auth.errors.tooManyAttempts` | 429 message override |
+| `isFailure` | `(res) => !res.isOk` | What counts as a failed attempt |
+| `identify` | built-in email + ip extraction | Custom identifier list |
+
+## The 429 response
+
+On lockout the middleware sends:
+
+```jsonc
+{ "error": "...", "errorCode": "EC004" } // AuthErrorCodes.TooManyAttempts
+```
+
+`@warlock.js/auth` ships built-in `en` and `ar` text for `auth.errors.tooManyAttempts` (and every other `auth.errors.*` key it uses); define the key in your own locale files, or pass `errorMessage`, to override it. Map `EC004` in your error transformer the same way you map the other `AuthErrorCodes`.
+
+## Beyond login
+
+The middleware isn't login-specific — drop it on any route where repeated failures should lock something out. For the refresh and reset endpoints there's no email in the body, so track by IP only:
+
+```ts
+router.post("/auth/refresh-token", refreshController, {
+  middleware: [loginThrottleMiddleware({ by: ["ip"], max: 10, window: "1m" })],
+});
+
+router.post("/auth/forgot-password", forgotController, {
+  middleware: [loginThrottleMiddleware({ max: 3, window: "1h", lockoutDuration: "1h" })],
+});
+```
+
+## When to use this vs core's `rateLimit`
+
+| | `loginThrottleMiddleware` (auth) | `middleware.rateLimit` (core) |
+| --- | --- | --- |
+| Counts | only **failed** logins | **every** request |
+| Resets on a successful login | yes | no |
+| Locks per account / per IP | yes | per key (default IP) |
+| Storage | `@warlock.js/cache` (shared across replicas) | in-process map |
+
+They compose. For a hard ceiling on request volume *and* failure-aware account lockout, stack both: `middleware: [middleware.rateLimit({ max: 30, duration: 60_000 }), loginThrottleMiddleware()]`.
+
+## Gotchas
+
+- **Needs an initialised cache driver.** Storage is `@warlock.js/cache` (a peer dep, transitively present via core). If the driver isn't configured at runtime, the middleware **fails open** — it logs and lets the request through, because a throttle outage must never become an auth outage. That also means: no cache, no protection. Verify your cache config in production.
+- **Account lockout can be weaponised.** An attacker who knows a victim's email can lock them out by spamming failures. The per-IP counter mitigates this (the attacker's IP locks too), but for purely anonymous endpoints prefer `by: ["ip"]`. For high-value accounts, consider a CAPTCHA step instead of a hard lock.
+- **Counts are atomic and exact across servers (redis/pg).** Each failure does a create-only `cache.set(key, 0, { ttl: window })` (only the first failure opens the window and sets the TTL) followed by an atomic `cache.increment(key)`, so concurrent failures on different servers are never lost. The memory cache driver is per-process — counts and locks are then per-process, so use redis/pg when running more than one instance.
+- **Fixed window, not sliding.** The window is anchored at the first failure and does not extend on each subsequent one — predictable lockout timing. The lock key is independent and always lasts `lockoutDuration`.
+- **Defense-in-depth, not a WAF.** This is application-layer. It won't stop a volumetric L3/L4 flood — pair it with an edge/CDN rate limit for that.
+- **Don't call it per-request.** Like every middleware, call it once at route definition; it returns the function that runs per request.
+
+## See also
+
+- The `protect-routes` topic — gate a route behind a valid token (`authMiddleware`); stack the throttle in front of it on login routes.
+- The `handle-login-and-logout` topic — the login flow whose failures this middleware counts.
+- The `use-middleware` topic of the `warlock-js-core` skill — `middleware.rateLimit` and the built-in middleware suite.
+
+
+## verify-email-and-reset-password  `@warlock.js/auth/verify-email-and-reset-password/SKILL.md`
+
+---
+name: verify-email-and-reset-password
+description: 'Email verification and password reset with hashed, single-use, expiring, purpose-bound tokens delivered through `@warlock.js/notifications` — `sendEmailVerification(user)`, `verifyEmail(token)`, `requestPasswordReset(Model, email)`, `resetPassword(token, newPassword)`, the `requireVerifiedEmail()` guard, and the `tokenIssueThrottleMiddleware` / `tokenConsumeThrottleMiddleware` presets. Reset revokes every access token, refresh token and cookie session; a reset request answers the same for unknown emails. Triggers: `sendEmailVerification`, `verifyEmail`, `requestPasswordReset`, `resetPassword`, `requireVerifiedEmail`, `isEmailVerified`, `OneTimeToken`, `InvalidOneTimeTokenError`, `EmailNotVerifiedError`, `NotificationsUnavailableError`, `EC007`, `EC008`, `auth.verification`, `auth.passwordReset`; "verify email", "confirm email address", "forgot password", "reset password link", "block unverified users", "resend verification email"; typical import `import { requestPasswordReset, resetPassword } from "@warlock.js/auth"`. Skip: sign-up itself — the `register-user` topic; login throttling — the `throttle-login-attempts` topic; defining notifications — the `define-notification` topic of the `warlock-js-notifications` skill.'
+---
+
+# Verify email + reset password
+
+Four service functions, one guard, two throttle presets. Auth ships no controllers — wire the routes yourself (examples below).
+
+## Prerequisites
+
+1. **`@warlock.js/notifications` installed and configured with a `mail` channel.** It is an optional peer; without it (or without `src/config/notifications.ts`) every send/request call throws `NotificationsUnavailableError` **before** a token is issued — never a silent skip.
+2. **The `one_time_tokens` table.** It ships in `authMigrations` next to the access/refresh tables; run your migrations.
+3. **A verified-date field on the user schema** (default `emailVerifiedAt`):
+
+```ts
+export const userSchema = v.object({
+  // ...
+  emailVerifiedAt: v.date().optional(),
+});
+```
+
+If the schema strips it, `verifyEmail` throws naming the field instead of pretending it worked.
+
+## Tokens
+
+- 32 random bytes, base64url. Only the **SHA-256 hash** is stored; the raw token exists only in the notification.
+- **Single use**, consumed with a conditional update — of two concurrent uses, exactly one succeeds.
+- **Expiring**: verification `24h`, reset `60m` by default.
+- **Purpose-bound**: a verification token is never accepted by `resetPassword`, and vice versa.
+- A new reset request **invalidates the user's earlier unused reset tokens**. Verification tokens are not invalidated by a resend.
+- Unknown, wrong-purpose, expired and used tokens all throw one `InvalidOneTimeTokenError` (`400`, `EC008`).
+
+## Email verification
+
+```ts
+import { requireVerifiedEmail, sendEmailVerification, verifyEmail } from "@warlock.js/auth";
+import { type RequestHandler } from "@warlock.js/core";
+
+// after User.create(...) in your register controller
+await sendEmailVerification(user);
+
+export const verifyEmailController: RequestHandler = async ({ request, response }) => {
+  const user = await verifyEmail(request.input("token")); // throws InvalidOneTimeTokenError
+  return response.success({ user });
+};
+
+router.post("/auth/verify-email", verifyEmailController, {
+  middleware: [tokenConsumeThrottleMiddleware()],
+});
+
+router.post("/auth/verify-email/resend", resendController, {
+  middleware: [authMiddleware("user"), tokenIssueThrottleMiddleware({ by: ["ip"] })],
+});
+
+// Opt-in guard, AFTER authMiddleware: 403 EmailNotVerifiedError (EC007)
+router.post("/orders", createOrder, {
+  middleware: [authMiddleware("user"), requireVerifiedEmail()],
+});
+```
+
+`isEmailVerified(user)` answers the same question in code.
+
+## Password reset
+
+```ts
+import { requestPasswordReset, resetPassword } from "@warlock.js/auth";
+
+export const forgotPasswordController: RequestHandler = async ({ request, response }) => {
+  await requestPasswordReset(User, request.input("email"));
+  // Same answer whether or not the account exists.
+  return response.success({ message: "If that account exists, we sent a reset link." });
+};
+
+export const resetPasswordController: RequestHandler = async ({ request, response }) => {
+  // Validate strength FIRST — the token is consumed before the password is written.
+  await resetPassword(request.input("token"), request.input("password"));
+  return response.success({ message: "Password updated. Please log in again." });
+};
+
+router.post("/auth/forgot-password", forgotPasswordController, {
+  middleware: [tokenIssueThrottleMiddleware()], // 3 / 1h per email + per IP
+});
+router.post("/auth/reset-password", resetPasswordController, {
+  middleware: [tokenConsumeThrottleMiddleware()], // 10 failures / 15m per IP
+});
+```
+
+`resetPassword` writes the password, then calls `authService.revokeAllTokens(user)`: every refresh token is revoked and every access token deleted, which also kills cookie sessions (a cookie holds an access token). It emits `password.reset`; `requestPasswordReset` emits `password.resetRequested`.
+
+**Password hashing.** By default auth saves `hashPassword(plain)` and checks it with `verifyPassword`, the same check login uses. If your model hashes on save (`useHashedPassword()`), that first write gets hashed twice and fails the check, so auth saves the plaintext and lets your transformer hash it once. If neither write passes the check, it throws. Plaintext is never the first thing written. To write it yourself, set `auth.passwordReset.setPassword`.
+
+## Throttling
+
+Both presets wrap `loginThrottleMiddleware` and accept its options:
+
+| Preset | Tracks | Counts | Default |
+| --- | --- | --- | --- |
+| `tokenIssueThrottleMiddleware` | email + IP | **every** request (a reset request's success is the anti-enumeration answer, so failure-aware counting would never trip) | 3 / 1h, 1h lock |
+| `tokenConsumeThrottleMiddleware` | IP | failures only, cleared on success | 10 / 15m, 15m lock |
+
+## Configuration (`src/config/auth.ts`)
+
+```ts
+const authConfigurations: AuthConfigurations = {
+  // ...
+  verification: {
+    expiresIn: "24h",
+    field: "emailVerifiedAt",
+    url: (token) => `${env("APP_URL")}/verify-email?token=${token}`,
+    notification: myVerificationNotification, // optional replacement
+  },
+  passwordReset: {
+    expiresIn: "60m",
+    identifierField: "email",
+    url: (token) => `${env("APP_URL")}/reset-password?token=${token}`,
+    notification: myResetNotification,
+    setPassword: async (user, plain) => { /* optional */ },
+  },
+  oneTimeToken: { model: AppOneTimeToken }, // optional model override
+};
+```
+
+The default notifications are `defineNotification` objects (`type: "auth.email-verification"` / `"auth.password-reset"`, `via: ["mail"]`). To replace one, pass anything with a `send(user, { token, expiresAt, url? })` method, for example your own `defineNotification<OneTimeTokenNotificationData>({...})`. `notifications` still has to be installed and configured.
+
+## Gotchas
+
+- **Without `url` config, the email contains the raw token**, not a link. Set `url` for anything user-facing.
+- **Timing isn't equalised.** An unknown email skips the database write and the send, so the response can come back measurably faster. The throttle limits probing, but it doesn't hide the timing difference.
+- **Channel send failures don't throw.** `@warlock.js/notifications` only rethrows configuration errors (such as a missing `mail` channel). An SMTP failure goes to its `failed` event, so observe it there.
+- `auth.cleanup` hard-deletes expired and consumed `one_time_tokens` rows (never trashed, even on MongoDB).
+
+## See also
+
+- The `register-user` topic — where `sendEmailVerification` is usually called
+- The `throttle-login-attempts` topic — the underlying throttle
+- The `configure-notifications` topic of the `warlock-js-notifications` skill — mail channel setup
+
+

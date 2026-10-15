@@ -1,0 +1,196 @@
+---
+name: manage-tokens
+description: 'Token lifecycle — generateAccessToken, createRefreshToken, createTokenPair, refreshTokens (with rotation + replay detection), revokeAllTokens, revokeTokenFamily, cleanupExpiredTokens, getActiveSessions. Triggers: `createTokenPair`, `refreshTokens`, `revokeTokenFamily`, `cleanupExpiredTokens`, `getActiveSessions`, `jwt.generate`, `jwt.verify`, `AccessToken`, `RefreshToken`; "rotate refresh tokens", "detect token replay", "logout from all devices", "list active sessions", "clean up expired tokens"; typical import `import { authService, jwt } from "@warlock.js/auth"`. Skip: login flow — the `handle-login-and-logout` topic; CLI cleanup — the `run-auth-commands` topic; competing libs `jsonwebtoken`, `jose`, `fast-jwt`.'
+---
+
+# Manage tokens
+
+Tokens are persisted Cascade models. Issuing a token writes a row. Verification checks the row exists. Revocation deletes / marks-revoked. This gives you JWT's stateless verification + statelful revocation.
+
+## Token shapes
+
+```ts
+type AccessTokenOutput = { token: string; expiresAt: string };
+type RefreshTokenOutput = { token: string; expiresAt: string };
+
+type TokenPair = {
+  accessToken: AccessTokenOutput;
+  refreshToken?: RefreshTokenOutput;   // omitted if config.auth.refreshToken.enabled = false
+};
+```
+
+## Issuing tokens
+
+```ts
+import { authService } from "@warlock.js/auth";
+
+// Just an access token (rare — usually use createTokenPair)
+const access = await authService.generateAccessToken(user);
+
+// Just a refresh token
+const refresh = await authService.createRefreshToken(user, deviceInfo);
+
+// Both — the everyday case
+const pair = await authService.createTokenPair(user, deviceInfo);
+```
+
+`createTokenPair` is the typical issuance path. It respects `config.auth.refreshToken.enabled` — if disabled, returns only `accessToken`.
+
+## Refresh with rotation — `refreshTokens`
+
+Refresh and family revocation use durable family revision checks inside a
+serializable Cascade transaction. Run the additive `authMigrations` before
+using the upgraded APIs. Transaction support is required: the service fails
+rather than falling back to uncoordinated writes. MongoDB deployments therefore
+need a transaction-capable topology.
+
+An operation that owns its transaction retries serialization conflicts at most
+three times. Inside an application-owned transaction it joins once and leaves
+retry/rollback to the caller. Auth notifications from owned attempts are emitted
+only after successful commit; notifications inside an application-owned outer
+transaction retain their existing timing before that outer commit. Keep external
+side effects outside such a transaction.
+
+```ts
+const next = await authService.refreshTokens(oldRefreshToken, deviceInfo);
+// next: TokenPair | null
+```
+
+What happens internally:
+
+1. Verify the JWT signature on the old refresh token.
+2. Find the row in `RefreshToken` — must exist + not be revoked.
+3. Look up the user via `config.auth.userType[token.userType]`.
+4. **Rotation** (default — `config.auth.refreshToken.rotation = true`): revoke the old refresh token, create a new pair from the same `family_id`.
+5. **No rotation**: mark the old as "used" but keep it valid.
+
+**Replay detection.** If the old refresh token is presented again after rotation (already revoked but still in the DB):
+
+```ts
+// Inside refreshTokens, on a revoked-token presentation:
+await authService.revokeTokenFamily(refreshToken.get("family_id"));
+```
+
+Every refresh token in the same family is revoked. Pattern: a leaked refresh token is used by both legitimate user and attacker — the second use triggers the revoke, both sides get kicked.
+
+## Family — the rotation chain
+
+```
+login            → creates family X — refresh token A in family X
+refresh (A)      → revokes A; creates B in family X
+refresh (B)      → revokes B; creates C in family X
+refresh (A again)→ A is revoked → revoke family X entirely
+```
+
+The family ties together "successive rotations of one session." In 5.19 it is also a durable `AuthTokenFamily` row: family revoke marks that family, revokes its refresh rows, and deletes its associated access rows atomically. Access rows from before family association are conservatively deleted only for the same user and user type; they are never guessed into a family.
+
+## Listing active sessions
+
+```ts
+const sessions = await authService.getActiveSessions(user);
+
+for (const session of sessions) {
+  session.get("device_info");     // { userAgent, ip, deviceId? } if provided at login
+  session.get("created_at");
+  session.get("expires_at");
+}
+```
+
+Use this for "active sessions" UIs. Revoke a specific session by calling `.revoke()` on the `RefreshToken` instance.
+
+## Removing tokens
+
+```ts
+// Specific access token
+await authService.removeAccessToken(user, accessTokenString);
+
+// Specific session/family
+await authService.revokeTokenFamily(familyId);
+
+// All access tokens for a user
+await authService.removeAllAccessTokens(user);
+
+// Everything — access + refresh + family
+await authService.revokeAllTokens(user);
+
+// A specific family
+await authService.revokeTokenFamily(familyId);
+```
+
+## Max refresh tokens per user
+
+```ts
+// In config.auth.refreshToken:
+{
+  maxPerUser: 5,   // default
+}
+```
+
+When issuing a new refresh token, the service counts active tokens for the user and revokes the oldest until count < `maxPerUser`. Pattern: limits how many simultaneous sessions a user can hold; prevents an attacker who got a token from gradually accumulating many.
+
+## Expired-token cleanup
+
+```ts
+const cleaned = await authService.cleanupExpiredTokens();
+// Returns: number of expired refresh tokens removed (also purges expired access-token rows
+// and hard-deletes expired or consumed one_time_tokens rows).
+// Fires "token.expired" event per token + "cleanup.completed" with the count.
+```
+
+Every purge is a hard delete on every driver, including MongoDB. `AccessToken`, `RefreshToken`,
+`OneTimeToken` and `PasskeyCredential` all declare `static deleteStrategy = "permanent"`, so a
+purge never copies credential material into a `*Trash` collection despite MongoDB's driver
+default being `"trash"`.
+
+Run this periodically via the scheduler:
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+import { authService } from "@warlock.js/auth";
+
+scheduler.addJob(
+  job("auth-cleanup", () => authService.cleanupExpiredTokens())
+    .daily()
+    .at("03:00"),
+);
+```
+
+Or use the bundled CLI command — see the `run-auth-commands` topic.
+
+## JWT helpers
+
+For low-level JWT signing/verification (outside the authService flow):
+
+```ts
+import { jwt } from "@warlock.js/auth";
+
+const token = await jwt.generate(payload, { expiresIn: 3_600_000 }); // milliseconds
+const decoded = await jwt.verify(token);
+
+const refreshToken = await jwt.generateRefreshToken(payload, { expiresIn });
+const decodedRefresh = await jwt.verifyRefreshToken(refreshToken);
+```
+
+⚠️ **`jwt.generate` / `jwt.generateRefreshToken` are the low-level escape hatch — `expiresIn` goes straight to `fast-jwt`.** It takes a number of milliseconds or an `ms`-style string, and rejects an unparseable string. What it does **not** reject is `undefined` or `0`: both skip the check and emit a token with **no `exp` claim**. Pass a positive value, and never pass the result of parsing a config string without checking it first.
+
+**`jwt.verify` / `jwt.verifyRefreshToken` require an `exp` claim** (since 4.12.0) and reject a token without one. There is no deadline to check on such a token, so verification would otherwise succeed indefinitely. `requiredClaims` is additive — `jwt.verify(token, { requiredClaims: ["iat"] })` requires `iat` **and** `exp`; you cannot opt out of `exp`. If you want a token that effectively never expires, use `expiresIn: NO_EXPIRATION` (`"100y"`), which stamps a real `exp` about a century out.
+
+If tokens minted before 4.12.0 may lack an `exp`, see `warlock auth.purge-never-expiring` in the `run-auth-commands` topic — they are still in your token tables and no date-based cleanup can reach them.
+
+`authService.generateAccessToken` / `createRefreshToken` read `config.auth.accessToken.expiresIn` / `config.auth.refreshToken.expiresIn`, validate them, and throw naming the key if the value is not a positive `ms` duration — before anything is signed, persisted, or capped.
+
+The package signs access and refresh tokens with independent secrets — `config.auth.accessToken.secret` and `config.auth.refreshToken.secret`. Setting a distinct `refresh.secret` is recommended: it prevents an access-token compromise from forging refresh tokens (and vice versa). The refresh secret is **optional** — when `config.auth.refreshToken.secret` is unset, refresh tokens fall back to the main `config.auth.accessToken.secret`, so refresh works out of the box without a second secret.
+
+## Things NOT to do
+
+- Don't use raw JWT libraries directly. The package handles signing, verification, secret loading, and the access/refresh split.
+- Don't disable rotation (`config.auth.refreshToken.rotation = false`) unless you genuinely understand the tradeoff — you lose replay detection.
+- Don't increase `maxPerUser` to a huge number "to be safe." Each active refresh token is a revocation surface; fewer simultaneous tokens means less attack surface.
+- Don't manually delete `AccessToken` rows in a service. The user might be hitting a request mid-revoke and get an inconsistent state. Use the `authService` helpers.
+- Run the additive `authMigrations` on upgrade. Do not alter or backfill token rows yourself; legacy access tokens are handled conservatively on family revoke.
+
+## See also
+
+- The `handle-login-and-logout` topic — full login/logout flow that uses these primitives
+- The `run-auth-commands` topic — the bundled cleanup command
+- The `scheduler-basics` topic of the `warlock-js-scheduler` skill — scheduling cleanup

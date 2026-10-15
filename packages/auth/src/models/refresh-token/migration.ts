@@ -1,0 +1,36 @@
+import { migrate } from "@warlock.js/cascade";
+import { RefreshToken } from "./refresh-token.model";
+
+export const RefreshTokenMigration = migrate(RefreshToken, {
+  name: "refreshToken",
+  up() {
+    // Create table
+    this.createTableIfNotExists();
+
+    // Primary key
+    this.primaryUuid();
+
+    // Token fields
+    this.text("token").unique();
+    // `foreignId` matches the DataSource's default primary-key type so the
+    // column stays compatible with the user model's `id` (integer by default,
+    // or uuid) — hardcoding uuid here 500'd login on integer-PK apps (5e47bdb3).
+    this.foreignId("user_id").index();
+    this.string("user_type", 50).nullable();
+    this.text("family_id").index().nullable();
+    this.timestamp("expires_at").index().nullable();
+    this.timestamp("last_used_at").nullable();
+    this.timestamp("revoked_at").nullable();
+    this.json("device_info").nullable();
+
+    // Composite index for the per-user active-session lookups
+    // (revokeAllFor / enforceMax / activeFor all filter on user_id + user_type).
+    this.index(["user_id", "user_type"]);
+
+    // Timestamps
+    this.timestamps();
+  },
+  down() {
+    this.dropTableIfExists();
+  },
+});

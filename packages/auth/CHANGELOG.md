@@ -1,0 +1,410 @@
+﻿# Changelog — @warlock.js/auth
+
+All notable changes to `@warlock.js/auth` are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
+
+## 5.29.0 - 2026-10-01
+
+### Changed
+
+- Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after `agent-kit` copies them into an app.
+
+## 5.28.0 - 2026-10-01
+
+### Changed
+
+- Lockstep release; package APIs are unchanged. `llms.txt` now lists every skill topic with its description (frontmatter in CRLF files was skipped).
+
+## 5.27.0 - 2026-10-01
+
+### Added
+
+- `authMiddleware()` now tags the middleware it returns with a non-enumerable, frozen, JSON-safe descriptor under `Symbol.for("warlock.auth")` (`{ sources, userTypes }`), exported as `AUTH_MIDDLEWARE_DESCRIPTOR` / `AuthMiddlewareDescriptor`, so other tooling can read a route's resolved credential sources and allowed user types without changing runtime behavior.
+
+## 5.26.0 - 2026-09-30
+
+### Added
+
+- Cookie sessions now support `auth.cookie.cookieDomain(request)` and `pageSession`/`sessionMiddleware`'s `cookieDomain(request)` override. Returning a Domain scopes issued and renewed cookies to it; returning `undefined` preserves host-only cookies. Clearing a Domain-scoped session also clears the legacy host-only cookie names. When configured, pass `request` to `setSessionCookies(response, tokens, request)`, `clearSessionCookies(response, request)`, and `clearAuthCookie(response, options, request)`; omitting it throws `CookieDomainRequestRequiredError` rather than issuing or clearing a host-only cookie.
+
+### Notes
+
+- A page session configured with multiple `userTypes` cannot renew its cookie: the resolver only supplies a renewal user type when exactly one type is allowed, so it reads the session but skips automatic renewal.
+
+## 5.25.0 - 2026-09-28
+
+### Fixed
+
+- `authMiddleware` now returns its normal `401` missing-credential response for an unsafe dual-source request that presents neither access nor refresh cookies, instead of treating the configured refresh descriptor as a presented credential and rejecting its Origin with `403`.
+- Token-pair issuance now ensures its durable token family once, and repeated ensures return the existing family without another upsert.
+
+## 5.24.0 - 2026-09-27
+
+### Changed
+
+- Lockstep release; package APIs are unchanged.
+
+## 5.23.2 - 2026-09-26
+
+### Changed
+
+- Lockstep patch release; package APIs are unchanged.
+
+## 5.23.1 - 2026-09-26
+
+### Changed
+
+- Lockstep patch release; package APIs are unchanged.
+
+## 5.23.0 - 2026-09-25
+
+### Upgrading
+
+- Replace any `CookieWriter` type import: auth's cookie helpers now take core's `Response`, and your own helpers can take `{ cookie: (...args: Parameters<Response["cookie"]>) => unknown }`.
+
+### Removed
+
+- **BREAKING:** `CookieWriter` is removed. `setSessionCookies`, `clearSessionCookies`, `setAuthCookie`, `clearAuthCookie` and `loginWithSessionCookies` take core's `Response` (only its `cookie` and `clearCookie`), so a page action's `response` still works without a cast. An app helper that was typed as `CookieWriter` can take `{ cookie: (...args: Parameters<Response["cookie"]>) => unknown }` instead.
+
+## 5.22.1 - 2026-09-25
+
+### Changed
+
+- Lockstep patch release; package APIs are unchanged.
+
+## 5.22.0 - 2026-09-25
+
+### Fixed
+
+- `setSessionCookies`, `clearSessionCookies`, `setAuthCookie`, `clearAuthCookie` and `loginWithSessionCookies` take a `CookieWriter` (any object with `cookie()` and `clearCookie()`), so a page action's `response` works without a cast.
+
+## 5.21.0 - 2026-09-25
+
+### Added
+
+- Page sessions: `pageSession` / `sessionMiddleware` give pages a renewing session (renewal on by default). `session.maxAge` bounds the token family from its creation (default `"30d"`); a family past it is revoked and renewal returns `null`.
+- `setSessionCookies` / `clearSessionCookies` write HttpOnly, SameSite=Lax, `Path=/` cookies, ignoring `auth.cookie.path`. `authService.loginWithSessionCookies()` logs in and sets them.
+- `resolveRequestUser` memoizes on `request.locals.session`: repeat or concurrent callers in one request share a single verify, DB lookup and renewal (the first caller's options win).
+
+### Changed
+
+- **BREAKING:** `loginWithSessionCookies()` requires a same-origin `Origin`/`Referer` even with no cookies, otherwise it throws `CsrfOriginMismatchError`. Send the header from non-browser clients.
+- **BREAKING:** `authMiddleware` takes an ordered header/cookie `sources` list; a present Authorization header always wins and never falls back to the cookie, so an invalid header now returns `401`.
+- JWTs carry a random `jti`, so tokens issued in the same second differ.
+
+### Changed
+
+- Lockstep release maintenance and dependency refresh.
+
+## 5.20.0 - 2026-09-24
+
+### Changed
+
+- `loginThrottleMiddleware` now counts failures with an atomic `cache.increment`. The first failure opens the window with a create-only `cache.set` carrying the TTL, so counts are exact across servers on the redis/pg cache drivers (concurrent failures are no longer lost to a read-modify-write). Thresholds, window and lockout behaviour are unchanged. The memory cache driver is per-process, so counts there are per-process too.
+
+## 5.19.0 - 2026-09-23
+
+### Added
+
+- `authMiddleware()` now uses `auth.defaultUserType` (or the sole configured user type), and the object overload accepts `{ source, key, optional, refresh, redirect }`. A page-local `redirect` changes only page-route authentication failures; APIs retain `401`. Legacy `authMiddleware(userType, "header" | "cookie:name")` calls remain supported.
+- Durable token families: token pairs associate access and refresh rows with `AuthTokenFamily`; family revoke atomically stamps the family, revokes its refresh rows, and removes its associated access rows. During the additive upgrade, unassociated legacy access rows are revoked conservatively only for the same user and type. Register `authMigrations` and run pending migrations.
+- Automatic cookie renewal is opt-in through the middleware `refresh` descriptor. The finalized coordinator permits only an exact, immediately active successor pair during a bounded duplicate window (default five seconds; configurable from zero through ten seconds). It does not broaden legacy `authService.refreshTokens` replay behavior. A duplicate within that window is tolerated deliberately; after it, old-token reuse remains a replay and revokes the family. Family logout makes late cookies unusable. This does not claim to solve arbitrary out-of-order HTTP cookie delivery.
+
+### Changed
+
+- Refined package skill-discovery descriptions and regenerated the llms projections.
+
+### Fixed
+
+- Refresh attempts emit token notifications after their owned transaction commits, discarding notifications from rolled-back retries.
+- Issuing into an explicitly reused token family now shares its durable revocation boundary, preventing credentials from being written after concurrent logout.
+
+## 5.17.0 - 2026-09-21
+
+### Security
+
+- The CSRF Origin/Referer check `authMiddleware("cookie:*")` runs (`assertCsrfOriginAllowed`) now delegates its same-origin/`auth.csrf.allowedOrigins` comparison to `@warlock.js/core`'s `resolveCsrfOriginVerdict`, shared with core's new default CSRF-Origin guard (card 8a752ab2, see `@warlock.js/core`'s 5.17.0 changelog) so the two checks can never drift apart. Behaviour is unchanged for routes already using `authMiddleware("cookie:*")`.
+
+### Fixed
+
+- The `pageAuth` login redirect now carries the request's locale prefix when `@warlock.js/web`'s `web.localeRouting.strategy` is active. Before, an anonymous request to a locale-prefixed page (e.g. `/ar/admin`) always redirected to the bare `auth.pageAuth.loginPath` (e.g. `/login?returnUrl=%2Far%2Fadmin`), dropping the locale even though `returnUrl` kept it. It now redirects to the locale-prefixed login path (`/ar/login?returnUrl=%2Far%2Fadmin`) — reading `web.localeRouting.strategy` / `app.localeCodes` / `app.localeCode` from config directly (`auth` has no dependency on `web`, in either direction). Left unchanged when `loginPath` is absolute (`http…`) or already locale-prefixed.
+
+## 5.16.0 - 2026-09-18
+
+### Added
+
+- Six new login providers: GitHub, Discord, LinkedIn, Apple, Facebook and X, configured under `auth.providers.<name>` and used through `startProviderLogin` / `completeProviderLogin`. Apple and LinkedIn verify their id_token with `jose`. The other four use plain OAuth 2.
+- `AuthProvider.callbackMode` (`"query"` | `"form_post"`). Apple uses `form_post`, so its state cookie is written with `SameSite=None; Secure` (HTTPS required). Query-mode providers keep `SameSite=Lax`.
+
+### Fixed
+
+- Provider names now resolve only from `auth.providers`' own keys, so a name inherited from the object prototype, such as `toString`, is never treated as a provider.
+- The Set-Cookie that clears the provider state cookie now repeats the attributes the cookie was written with.
+
+## 5.13.0 - 2026-09-17
+
+### Added
+
+- **Email verification and password reset.** `sendEmailVerification(user)`, `verifyEmail(token)`, `requestPasswordReset(Model, email)` and `resetPassword(token, newPassword)`. Tokens are 32 random bytes, stored only as a SHA-256 hash, single-use (consumed with a conditional update, so of two concurrent uses exactly one succeeds), expiring (`auth.verification.expiresIn` default `"24h"`, `auth.passwordReset.expiresIn` default `"60m"`) and purpose-bound. A new reset request invalidates the user's earlier unused reset tokens. `requestPasswordReset` answers the same for unknown emails. `resetPassword` revokes every access token, refresh token and cookie session through `authService.revokeAllTokens`. Rejected tokens throw `InvalidOneTimeTokenError` (`400`, `EC008`).
+- New `one_time_tokens` table (`OneTimeToken` model, overridable via `auth.oneTimeToken.model`), shipped in `authMigrations`. **Run your migrations.**
+- Delivery goes through `@warlock.js/notifications`, now an **optional peer dependency**. Default mail notifications can be replaced via `auth.verification.notification` / `auth.passwordReset.notification`, and link builders set via `.url`. If the package is not installed or not configured, calls throw `NotificationsUnavailableError` before any token is issued.
+- `requireVerifiedEmail()` middleware — rejects users without `auth.verification.field` (default `emailVerifiedAt`) with `EmailNotVerifiedError` (`403`, `EC007`). `isEmailVerified(user)` helper.
+- `tokenIssueThrottleMiddleware()` (every request counts, per email + IP, 3/1h) and `tokenConsumeThrottleMiddleware()` (failures, per IP, 10/15m), both built on `loginThrottleMiddleware`.
+- `AuthErrorCodes.EmailNotVerified` (`"EC007"`) and `AuthErrorCodes.InvalidOneTimeToken` (`"EC008"`).
+- **Login with Google, passkeys and phone codes** (skill `login-with-providers`). Every method ends in the new `authService.completeLogin(user, deviceInfo?)`, which applies `auth.canAuthenticate` and then issues exactly what `authService.login` issues (same tokens, rows and `login.success` event). `login` now shares that ending.
+  - **Google:** `startProviderLogin(response, "google")` / `completeProviderLogin(Model, "google", request, response)`. Uses the OIDC authorization code flow with PKCE (S256), `state` and `nonce`, kept in a signed 10-minute HttpOnly cookie. The code is exchanged with `fetch`, and the id_token is verified with `jose` against Google's JWKS (signature, `iss`, `aud`, `exp`, `nonce`). Configure it under `auth.providers.google`. Other providers implement the `AuthProvider` contract and register under `auth.providers.custom`.
+  - **Account linking:** new `provider_accounts` table (`ProviderAccount`). A link always decides the user. Without one, only a provider-**verified** email links an existing user or creates a new one; an unverified email throws `ProviderEmailNotVerifiedError` (`403`, `EC010`). Callback rejections throw `InvalidProviderCallbackError` (`400`, `EC009`).
+  - **Passkeys:** `generatePasskeyRegistrationOptions` / `verifyPasskeyRegistration` / `generatePasskeyAuthenticationOptions` / `verifyPasskeyAuthentication`, built on `@simplewebauthn/server`. Challenges are stored hashed in `one_time_tokens`, expire, and are used once (consumed even when verification fails). The request `Origin` must be in `auth.passkeys.origin`, and a signature counter that does not advance is rejected. Credentials are stored in the new `passkey_credentials` table (`PasskeyCredential`). Rejections throw `InvalidPasskeyError` (`400`, `EC011`).
+  - **Phone OTP:** `requestOtp(Model, phone, { channel })` / `verifyOtp(Model, phone, code)`. Codes have 6 digits, are stored as a salted HMAC in `one_time_tokens` (purpose `otp`), expire after 5 minutes, and are invalidated after 5 attempts (counted atomically). Unknown phones get the same answer. Codes are delivered through the `@warlock.js/notifications` channel you configure (`auth.otp.channel`, default `"sms"`) or `auth.otp.send`; auth ships no SMS/WhatsApp driver. New `otpRequestThrottleMiddleware()` / `otpVerifyThrottleMiddleware()` presets are built on `loginThrottleMiddleware`.
+  - `jose` and `@simplewebauthn/server` are new **optional peer dependencies**, loaded lazily. When one is missing, the call throws `AuthProviderSdkMissingError`, whose message names `warlock add auth-google` / `warlock add auth-passkeys`.
+- `one_time_tokens` gains an `attempts` column, and `user_id` becomes nullable (passkey login challenges have no user yet). `authMigrations` now includes `ProviderAccountMigration` and `PasskeyCredentialMigration`. **Run your migrations.**
+- `auth.cleanup` / `authService.cleanupExpiredTokens()` also hard-deletes expired and consumed `one_time_tokens` rows via the new `OneTimeToken.purgeSpent()`. The delete is permanent on every driver, so MongoDB's default "trash" strategy does not copy token hashes into `one_time_tokensTrash`.
+- Local real-database integration suites (`tests/integration/local`, skipped unless `LOCAL_MONGO_*` / `LOCAL_PG_*` are set) prove on MongoDB and Postgres: a one-time token consumed 20 times concurrently succeeds once, 20 concurrent wrong OTP guesses count at most 5 attempts and invalidate the code, a passkey login challenge with no user persists and is consumed, the counter compare-and-set and regression rejection hold, and `provider_accounts` allows one link per identity.
+- Passkey specs now also run the real `@simplewebauthn/server` against a `node:crypto` software authenticator (`none` attestation, ES256 assertions).
+- `AuthErrorCodes.InvalidProviderCallback` (`"EC009"`), `AuthErrorCodes.ProviderEmailNotVerified` (`"EC010"`) and `AuthErrorCodes.InvalidPasskey` (`"EC011"`).
+
+### Security
+
+- **Access and refresh tokens (and one-time tokens, and passkey credentials) are no longer copied into MongoDB trash collections on delete.** `AccessToken`, `RefreshToken`, `OneTimeToken` and `PasskeyCredential` now declare `static deleteStrategy = "permanent"`, overriding the MongoDB driver's default `"trash"` strategy. Previously, `AccessToken.purgeExpired()`, `RefreshToken.purgeExpired()`/`purgeNeverExpiring()`, and `authMiddleware`'s expired-token cleanup all called `destroy()` without a strategy override, so on MongoDB every purge or invalidation copied the live JWT into `access_tokensTrash` / `refresh_tokensTrash` before deleting the original — leaving usable credential material behind after "revocation". `OneTimeToken.purgeSpent()` already forced `"permanent"` per-call (5.13.0 above); that override is now redundant and has been removed in favor of the model-level default. Apps that have been running on MongoDB may want to drop the `access_tokensTrash`, `refresh_tokensTrash` and `one_time_tokensTrash` collections, which may hold copies of now-revoked credentials.
+
+### Fixed
+
+- `verifyPasskeyAuthentication` reported a cloned authenticator as `reason: "authentication-verification-failed"`, because `@simplewebauthn/server` rejects a non-advancing counter itself before auth's own check runs. It now reports `"counter-regression"`. The response (`400`, `EC011`) is unchanged.
+
+## 5.12.0 - 2026-09-16
+
+### Added
+
+- `authService.setAuthCookie(response, token, options?)` and `authService.clearAuthCookie(response, options?)` — the write side of the `cookie:<name>` token source `authMiddleware([], "cookie:<name>")` has accepted since 5.0.0 (card 50bf4f1a). `setAuthCookie` accepts a raw token string or an `AccessTokenOutput` (deriving `Max-Age` from `expiresAt` automatically); both are explicit app-controller calls — `login`/`logout` never set cookies implicitly, so upgrading never starts emitting `Set-Cookie` for an existing bearer-only app. Cookie name/path are configurable via the new `auth.cookie` config block (defaults: `"access_token"` / `"/"`); attribute flags (`HttpOnly`, `SameSite=Lax`, `Secure` outside dev) are not — they come from core's `secureCookieDefaults()`, the framework-wide floor.
+
+### Security
+
+- **CSRF Origin check for cookie-authenticated writes.** `authMiddleware` now automatically rejects, with `403` (`AuthErrorCodes.CsrfOriginMismatch`, `"EC006"`), any request whose credential came from a `cookie:` source and whose method is unsafe (`POST`/`PUT`/`PATCH`/`DELETE`) unless `Origin` (or, absent that, `Referer`) names the request's own origin or an entry in the new `auth.csrf.allowedOrigins` config (default `[]`). A request with neither header is rejected, fail-closed. Header-token authentication and safe methods (`GET`/`HEAD`/`OPTIONS`) are completely unaffected. This closes the residual CSRF gap `SameSite=Lax` alone leaves open for cookie auth (a same-site GET redirect chain, or a client that ignores `SameSite`); a double-submit token mechanism is deferred to a later release.
+- The CSRF Origin check's own-origin comparison includes the request's port (read from the `Host` header, since core's `request.hostname` never carries one), with default ports (`:80` on `http`, `:443` on `https`) normalised as equivalent to no port. A same-origin cookie-authenticated write on a non-default port — e.g. every `warlock dev` session — is now correctly allowed instead of being rejected with `403 EC006`.
+
+### Changed
+
+- **BREAKING:** the authenticated user now lives at `request.locals.user`, declared by `@warlock.js/auth`. `request.user` is removed (in development it throws with the new location). `@warlock.js/auth`'s middleware writes `request.locals.user` after a successful token resolution and clears it (`= undefined`) on a forged, malformed, expired, or wrong-type token; `RequestUser` — the augmentable, empty-by-default interface apps narrow to their own model — moved from `@warlock.js/core` into `@warlock.js/auth` alongside it.
+
+  ```typescript
+  // Before (removed)
+  declare module "@warlock.js/core" {
+    interface RequestUser {
+      id: string | number;
+    }
+  }
+  const user = request.user;
+
+  // After
+  declare module "@warlock.js/auth" {
+    interface RequestUser {
+      id: string | number;
+    }
+  }
+  const user = request.locals.user;
+  ```
+
+  A typed `currentUser<UserType extends Auth>()` helper is also exported, wrapping core's `useCurrentUser()` for callers that want `Auth`-derived typing without repeating the assertion at every call site.
+
+## 5.11.0 - 2026-09-14
+
+_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.11.0._
+
+## 5.10.0 - 2026-09-14
+
+_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.10.0._
+
+## 5.9.0 - 2026-09-13
+
+_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.9.0._
+
+## 5.8.0 - 2026-09-13
+
+### Added
+
+- Guarded page routes can redirect a logged-out browser to a configurable login path instead of returning a raw JSON 401 — opt-in via `auth.pageAuth.loginPath` (API routes still return the JSON 401).
+
+### Fixed
+
+- The `access_tokens` / `refresh_tokens` migrations now derive the `user_id` column type from the user model's primary key (via `foreignId`), so a fresh app with an integer-PK user can log in — the hardcoded `uuid` `user_id` previously failed the first login with no diagnostic.
+
+## 5.5.0 - 2026-09-07
+
+### Fixed
+
+- Documentation shipped in this package's `skills/` told users to run `pnpm`-specific commands. `pnpm <binary>` has no npm equivalent, so those instructions failed outright for anyone not using pnpm. Commands are now package-manager neutral.
+
+## 5.2.3 - 2026-09-02
+
+### Fixed
+
+- Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3.
+
+## 5.2.2
+
+- `package.json` now declares `"warlock": { "environment": "server" }` — build-boundary metadata `@warlock.js/web` uses to refuse value-imports of this package from app client code (type-only imports are still allowed; server loaders/controllers/modules are unaffected).
+
+## 5.1.0
+
+No changes to `@warlock.js/auth`. Released in lockstep with the `@warlock.js/web`
+React-execution fix and the `@warlock.js/core` CLI additions — see those packages'
+changelogs.
+
+## 5.0.2 - 2026-08-25
+
+No changes to `@warlock.js/auth`. Released in lockstep with the `@warlock.js/web` SSR
+fix (`ssr.noExternal`) — see that package's changelog.
+
+## 5.0.1 - 2026-08-25
+
+No changes to `@warlock.js/auth`. Released in lockstep with the `create-warlock` vite
+resolution pin and the `@warlock.js/web` peer narrowing — see those packages'
+changelogs.
+
+## 5.0.0 - 2026-08-25
+
+### Changed
+
+- Authentication can now use an explicit header or named-cookie credential source and a configurable `canAuthenticate` policy; invalid credentials are distinguished from server and configuration failures instead of turning every verification error into a 401.
+
+## 4.16.0 - 2026-08-18
+
+### Security
+
+- **Login credential lookups are no longer vulnerable to NoSQL operator injection.** `authService.attemptLogin` forwards the request's credential fields (e.g. `email`, `phoneNumber`) into `Model.first(...)` to find the user, so a caller that passed request JSON straight through could smuggle a MongoDB operator object — `{ email: { $ne: null } }`, `{ email: { $regex: "^a" } }` — into the user-lookup filter, breaking its intended equality semantics and enabling account enumeration / targeted-lookup attacks (the password is still verified separately with bcrypt, so this was never a full bypass on its own). The fix lands in `@warlock.js/cascade` 4.16.0, whose query builder now rejects `$`-prefixed keys in equality position (`UnsafeFilterError`); because `attemptLogin`'s lookup routes through cascade, upgrading the family to 4.16.0 closes this with no change to your auth code. If you build user lookups by hand, keep passing scalars — or use the explicit operator API — rather than forwarding raw request objects.
+
+### Dependencies
+
+- Bumped `@mongez/events` to `^2.2.7` (no breaking changes) and `@mongez/reinforcements` to `^4.0.1`. The reinforcements major makes `Random.string/nanoid/id/token/uuid` CSPRNG-backed (WebCrypto) and removes `Random.seed()` support. This package calls `Random.string(32)` (device `familyId` fallback) and `Random.token(32)` (JWT secret generation) — both are exactly the security-sensitive uses the CSPRNG backing is meant to strengthen, and neither relied on seeding; audited for `Random.seed(` with no hits, so no code changes were needed.
+
+## 4.12.0
+
+### Security
+
+> **If you ran 4.11.0 or earlier with an invalid `accessToken.expiresIn` / `refreshToken.expiresIn`, tokens issued in that window may never expire and are still live.** Upgrading stops new ones being minted and stops old ones being accepted — but the rows are still in your database. Run `warlock auth.purge-never-expiring --dry-run` to see them; see **Remediation** below.
+
+- **A token with no `exp` claim is now rejected instead of being accepted forever.** `fast-jwt` has no deadline to check on such a token, so verification simply succeeds — measured against `fast-jwt@6.2.4`, a token with no `exp` verifies unchanged at `clockTimestamp` + 100 years. Both `jwt.verify` and `jwt.verifyRefreshToken` now require an `exp` claim.
+
+  This is deliberately on the _verify_ side rather than the issue side: the tokens that lack an `exp` were minted by a version that no longer runs, so a guard on issue would not reach a single one of them. A caller may add to `requiredClaims`, never subtract — `jwt.verify(token, { requiredClaims: ["iat"] })` still requires `exp` too.
+
+- **The persisted `expires_at` is now enforced on every request.** `authMiddleware` previously checked only that the access-token row _existed_; a row whose own expiry had passed still opened the gate, because nothing ever asked. The row is now checked against the clock and deleted on rejection.
+
+  These are two independent defences. The first catches a token whose _claims_ carry no deadline; the second catches a token whose _row_ says the deadline has passed (a logged-out or expired session whose JWT is still within its own lifetime). Neither subsumes the other.
+
+### Added
+
+- **`warlock auth.purge-never-expiring`** — remediation for rows written by the `expiresIn` defect below. Finds every access- and refresh-token row that can never retire itself, on two independent signals: an `expires_at` that is missing or unparseable, and a persisted token carrying no `exp` claim. Reports `id`, `user_id`, `user_type` and `expires_at` per row (never the token string — it is a live credential until the command removes it), then deletes them. Pass `--dry-run` to report without deleting.
+
+  `auth.cleanup` cannot find these rows and never could: its predicate is `expires_at < now`, and an `Invalid Date` compares `false` against _every_ date, so such a row satisfies neither `< now` nor `> now`. It is outside the reach of every date predicate rather than merely wrong. The "no `exp` claim" signal is not in a column at all.
+
+  Exposed programmatically as `authService.findNeverExpiringTokens()` (read-only) and `authService.purgeNeverExpiringTokens()`, and per model as `findNeverExpiring()` / `purgeNeverExpiring()`.
+
+### Remediation — what to run if you were affected
+
+**You were affected if** any deployment ran 4.11.0 or earlier with an `accessToken.expiresIn` / `refreshToken.expiresIn` that `ms` could not parse to a positive number (`"30dayz"`, `"thirty days"`, `"0d"`, `""`, a bare number such as `2592000`). The valid values — `"1h"`, `"7d"`, `"30 days"`, `NO_EXPIRATION`, and the `1h` / `7d` defaults — were never affected.
+
+After upgrading:
+
+```bash
+warlock auth.purge-never-expiring --dry-run   # look first
+warlock auth.purge-never-expiring             # then revoke
+```
+
+Affected users must log in again. To check **without deploying anything**, the row-level shape is visible directly — note that what the bad value lands as depends on the store, and both were measured:
+
+- **MongoDB** — `bson` serialises an `Invalid Date` to **epoch 0**, so the row reads `1970-01-01T00:00:00Z` rather than an invalid value:
+
+  ```js
+  db.access_tokens.find({ expires_at: { $lte: new Date(0) } });
+  db.refresh_tokens.find({ expires_at: { $lte: new Date(0) } });
+  ```
+
+- **PostgreSQL** — `pg` serialises an `Invalid Date` to the literal `0NaN-NaN-NaNTNaN:NaN:NaN.NaN+NaN:NaN`, which a `timestamp` column rejects, so the `INSERT` most likely failed and no row was written (the token was still signed and returned to the client — it is then rejected by the row check, since it has no row). Any rows that did land are visible as:
+
+  ```sql
+  SELECT id, user_id, user_type, expires_at FROM access_tokens WHERE expires_at IS NULL OR expires_at <= 'epoch';
+  SELECT id, user_id, user_type, expires_at FROM refresh_tokens WHERE expires_at IS NULL OR expires_at <= 'epoch';
+  ```
+
+These queries find the row-level shape only. The definitive test — _does the stored token carry an `exp` claim at all_ — reads the JWT rather than a column, which is why the command exists and why it is the recommended path.
+
+### Fixed
+
+- **An `expiresIn` the `ms` package cannot parse no longer mints a credential that never expires.** `accessToken.expiresIn: "30dayz"` (or `"thirty days"`, or any truthy-but-unparseable value) made `ms()` return `undefined`, which the signer emitted as a JWT with **no `exp` claim**, alongside a token row whose `expires_at` was `Invalid Date`. The old guard tested the raw config string for truthiness, so the `1h` fallback was unreachable in exactly the case it existed for. `refreshToken.expiresIn` had no fallback at all.
+
+  Both lifetimes are now validated and throw naming the key — before anything is signed, persisted, or capped:
+
+  ```
+  auth.accessToken.expiresIn: "30dayz" is not a valid ms duration — use a positive duration string such as "1h", "7d", or NO_EXPIRATION.
+  ```
+
+  A silent substitution of the default was deliberately not chosen: it trades one lifetime nobody chose for another, just as quietly.
+
+- **`expiresIn: "0d"` (and any non-positive duration) is rejected too.** It is truthy and parses cleanly to `0`, so it survived any guard that only rejects `undefined` — and `fast-jwt` skips its own validation for `0`, emitting a token with **no `exp` claim** while the persisted row claims it expired immediately.
+
+- A bare number (`expiresIn: 2592000`) is now rejected instead of silently corrupting the expiry. `ms` _formats_ numbers rather than parsing them (`2592000` ⇒ `"43m"`), which then poisoned `Date.now() + expiresIn` into `Invalid Date`. Write `"30d"`.
+
+### Changed
+
+- **Potentially breaking:** a JWT with no `exp` claim is rejected by `jwt.verify` / `jwt.verifyRefreshToken`. No supported configuration produces one: an app that wants a token that effectively never expires sets `expiresIn: NO_EXPIRATION` (`"100y"`), which mints a **real** `exp` about a century out (`ms("100y")` ⇒ `3155760000000`; `exp - iat` ⇒ `3155760000` seconds). "No deadline" and "a distant deadline" are different things, and only the second was ever asked for. If you sign tokens with your own signer and feed them to this package's verifier, they must carry `exp`.
+- **Potentially breaking:** `RefreshToken.isExpired` now answers `true` for a missing or unparseable `expires_at`; it previously answered `false` ("no expiry recorded ⇒ never expires"). That reading handed an unlimited life to precisely the malformed rows. `expires_at` is `required` in the schema — a row that cannot say when it dies is malformed, not immortal. `AccessToken.isExpired` is new and fails closed the same way.
+- **Potentially breaking:** an invalid `accessToken.expiresIn` / `refreshToken.expiresIn` now throws on token issue instead of producing a token with a wrong or absent expiry. Valid configuration is unaffected — `"1h"`, `"7d"`, `"30 days"`, `NO_EXPIRATION` (`"100y"`), the `1h` access default when the key is absent, and the `7d` refresh default all behave exactly as before. An **empty string** (e.g. `env("JWT_TTL")` with the variable unset) now throws rather than falling back; give the env read an explicit default.
+- `authConfig.accessToken.expiresInMs()` / `authConfig.refreshToken.expiresInMs()` are the validated accessors token issuers must use; the raw `expiresIn()` accessors are unchanged.
+- Removed the `as ms.StringValue` casts on both call sites. They were what let arbitrary config text compile against `ms`'s template-literal type and reach the signer as `undefined`.
+- Declares its own test runner and pins it to an exact version (`vitest@4.1.10`). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to
+
+## 4.10.0
+
+### Changed
+
+- `protect-routes` documents two things that were previously only discoverable by reading source: that `authMiddleware` gates on **user type by flat string match** and cannot express a permission matrix, role hierarchy, or who-may-act-on-whom — with a worked pointer to `@warlock.js/access` (`gate`, `can`, `definePolicy`) for exactly that; and that auth is **bearer-token by design**, with cookie sessions and CSRF being app-level work rather than an omission
+
+## 4.2.11
+
+### Changed
+
+- Bumped `@mongez/reinforcements` to 3.3.0
+
+## 4.2.10
+
+### Fixed
+
+- `@mongez/copper`, `@mongez/events`, and `@mongez/reinforcements` are now regular `dependencies` instead of `peerDependencies` — they're framework-internal utilities your app never imports, so declaring them as peers produced `unmet peer dependency` warnings on install.
+
+## 4.2.0
+
+### Added
+
+- `loginThrottleMiddleware` — failure-aware brute-force / credential-stuffing protection: counts only failed logins, locks per-account and per-IP, and rejects pre-controller with `429` (cache-backed, fails open). Adds `AuthErrorCodes.TooManyAttempts` (`EC004`).
+- `accessToken` / `refreshToken` configuration blocks, making a separate refresh-token secret first-class.
+- Overridable token storage — register a custom model under `config.auth.accessToken.model` / `refreshToken.model` and `.extend()` the exported schemas to add columns (e.g. a multi-tenant `organization_id`).
+- `tokenType` (`access` | `refresh`) claim, stamped on issue and verified on read, so an access token can't be presented as a refresh token.
+- `expires_at` on access tokens; `warlock auth.cleanup` now purges expired access tokens too.
+
+### Fixed
+
+- Default access-token lifetime was ~3.6 seconds (a numeric `expiresIn` read as milliseconds) and is now **1 hour**.
+- Targeted revocation queried `userId` instead of the `user_id` column, so logout / refresh-token removal threw on Postgres and silently no-oped on MongoDB; token queries now route through named model statics.
+- Token deletions were fire-and-forget (false success for callers, uncatchable rejections) and are now awaited.
+- The route middleware matched on `userType` instead of the `user_type` column.
+- `revokeAllTokens` / `revokeTokenFamily` reported an empty set, so `token.revoked` / `token.familyRevoked` never fired; the revoked rows are now captured before revocation.
+- A throwing synchronous auth-event listener no longer turns a completed login into a `500`.
+
+### Security
+
+- `warlock jwt.generate` now derives `JWT_SECRET` / `JWT_REFRESH_SECRET` from a CSPRNG (`Random.token`) instead of `Math.random()`.
+- Refresh-token rotation is atomic — a guarded conditional `UPDATE` means two concurrent rotations can't both succeed, and a replayed token revokes its entire family.
+
+### Deprecated
+
+- The `auth.jwt.*` configuration block. Use `accessToken` / `refreshToken` instead — the legacy shape is still read and mapped forward with a one-time deprecation warning.
+
+### Removed
+
+- Unread `access_tokens` columns `is_active` and `last_access`.
+- The unused `auth.password.salt` configuration key.
+
+## 4.1.15
+
+- Baseline — per-package changelog tracking starts at this version.

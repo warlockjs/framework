@@ -1,0 +1,120 @@
+---
+name: auth-basics
+description: "Start here for @warlock.js/auth configuration, user models, credentials, and application session flows."
+---
+
+# Auth basics
+
+JWT-based authentication for Warlock. `Auth` base model + `authMiddleware` gate + `authService` for login/logout/refresh + `AccessToken` / `RefreshToken` persistence + multi-user-type support.
+
+> This skill is the auth **map** — read it first, then load the specific skill for the task.
+
+## Install
+
+```bash
+npm install @warlock.js/auth
+```
+
+## Foundations
+
+1. **Users extend `Auth`.** Your `User`, `Admin`, etc. extend the shared base model that knows how to issue tokens and verify passwords. Multiple user types coexist (see the `customize-user-type` topic).
+2. **`auth.userType.<name>` config maps a user-type slug to the model class.** The middleware uses this to hydrate the right model from a token.
+3. **Tokens persist.** Both `AccessToken` and `RefreshToken` are Cascade models — issuing a token writes a row; logout / revoke deletes or marks-revoked. Stateless JWT verification + stateful revocation list.
+4. **`authMiddleware` gates or resolves routes.** Use `authMiddleware("user")` for a typed hard gate, `authMiddleware()` for the configured/default user type, or `authMiddleware({ source: "cookie", key: "token", optional: true })` for a public route that receives a valid user when present. The object form can set a page-local login redirect. Legacy `authMiddleware(userType, "cookie:name")` remains valid.
+5. **`authService.login(Model, credentials, deviceInfo?)` is the full happy path.** Verifies credentials, creates token pair (access + refresh), emits events, returns `{ user, tokens }`.
+6. **Refresh-token rotation is on by default.** Each refresh consumes the old token and issues new ones from the same "family" — replay detection revokes the family.
+7. **JWT secret lives in the env.** Generate with `warlock jwt.generate` (see the `run-auth-commands` topic).
+
+## Minimal wire-up
+
+```ts title="src/app/users/models/user/user.model.ts"
+import { Auth } from "@warlock.js/auth";
+import { RegisterModel } from "@warlock.js/cascade";
+
+@RegisterModel()
+export class User extends Auth {
+  public static table = "users";
+
+  public get userType(): string {
+    return "user";
+  }
+}
+```
+
+```ts title="warlock.config.ts"
+import {
+  authMigrations,
+  registerAuthCleanupCommand,
+  registerJWTSecretGeneratorCommand,
+} from "@warlock.js/auth";
+import { defineConfig } from "@warlock.js/core";
+
+export default defineConfig({
+  cli: {
+    commands: [
+      registerJWTSecretGeneratorCommand(),
+      registerAuthCleanupCommand(),
+    ],
+  },
+  database: {
+    migrations: authMigrations,
+  },
+});
+```
+
+```ts title="src/config/auth.ts"
+import { env } from "@warlock.js/core";
+import { User } from "app/users/models/user/user.model";
+
+export default {
+  userType: {
+    user: User,
+    // admin: Admin,  // for multi-user-type
+  },
+  defaultUserType: "user", // needed for authMiddleware() when multiple types exist
+  accessToken: {
+    secret: env("JWT_SECRET"),
+    expiresIn: "1h",
+  },
+  refreshToken: {
+    secret: env("JWT_REFRESH_SECRET"), // recommended: a separate refresh secret
+    enabled: true,
+    expiresIn: "30d",
+    rotation: true,
+    maxPerUser: 5,
+  },
+};
+```
+
+### Token lifetimes are validated — a bad one throws
+
+`expiresIn` (both blocks) must be a duration string the [`ms`](https://github.com/vercel/ms) package parses to a **positive** number: `"1h"`, `"30m"`, `"7d"`, `"30 days"`, or `NO_EXPIRATION` (`"100y"`). Anything else throws on the first token issue, naming the key:
+
+```
+auth.accessToken.expiresIn: "30dayz" is not a valid ms duration — use a positive duration string such as "1h", "7d", or NO_EXPIRATION.
+```
+
+That is deliberate. `ms` answers `undefined` for a string it can't parse (`"30dayz"`, `"thirty days"`) and `0` for `"0d"`, and a signer given either emits a JWT with **no `exp` claim** — a credential that never expires. A typo must not be able to produce that quietly, so it fails loudly instead of falling back to a default nobody asked for. Defaults still apply when the key is **absent**: `1h` for access, `7d` for refresh.
+
+Two values that look right and are not:
+
+- `expiresIn: 2592000` — a bare number. `ms` *formats* numbers instead of parsing them, so this is rejected; write `"30d"`.
+- `expiresIn: env("JWT_TTL")` where the variable is unset — resolves to `""` and is rejected. Give the env read a default: `env("JWT_TTL") || "1h"`.
+
+## Pick a skill
+
+| If the task is about… | Load |
+| --- | --- |
+| Gating routes with `authMiddleware(allowedUserType)`, any-authenticated vs typed access | The `protect-routes` topic |
+| `authService.login(...)`, `attemptLogin`, full credentials-to-tokens flow + logout | The `handle-login-and-logout` topic |
+| Token lifecycle — `generateAccessToken`, `createRefreshToken`, rotation, family revocation, max-per-user | The `manage-tokens` topic |
+| Register a new user + issue tokens in one flow | The `register-user` topic |
+| Multi-user-type apps (`user`, `admin`, `client`), `config.auth.userType.<name>` mapping | The `customize-user-type` topic |
+| `warlock jwt.generate` + `warlock auth.cleanup` CLI commands | The `run-auth-commands` topic |
+
+## Things NOT to do
+
+- Don't write your own JWT signing logic — use `authService` / `jwt` from this package so signature/secret/expiry stay consistent.
+- Don't store the JWT secret in the model layer or anywhere user-modifiable. It lives in `.env` only.
+- Don't return the raw `User` from a login endpoint without shaping output. Configure `static toJsonColumns` or `static resource` (see the `define-model` topic of the `warlock-js-cascade` skill).
+- Don't run `auth.cleanup` from app boot. Schedule it (cron, scheduler) as a periodic task — see the `scheduler-basics` topic of the `warlock-js-scheduler` skill.
