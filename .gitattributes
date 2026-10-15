@@ -1,0 +1,6 @@
+# Store every file exactly as it is on disk: no line-ending translation.
+#
+# The package histories were imported byte for byte, and several gates hash
+# what they ship (tarball SHA-256, the lockfile). Normalising CRLF/LF here would
+# turn every Windows checkout into a wall of phantom modifications.
+* -text

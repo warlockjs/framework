@@ -1,0 +1,21 @@
+node_modules/
+dist/
+esm/
+cjs/
+coverage/
+.astro/
+pnpm-lock.yaml
+package-lock.json
+
+# Release tooling has its own formatting conventions and generated sources.
+tools/release/
+
+# The scaffold template declares `prettier-plugin-organize-imports`, which is only
+# installed inside a SCAFFOLDED app, never in this monorepo, so including it here
+# aborts the whole run with "Cannot find package". It has its own gate:
+# packages/create-warlock/scripts/format-check-template.mjs.
+packages/create-warlock/
+
+# Scratch output and the skill-snippet compile gate's transient blocks.
+temp/
+.skill-snippet-gate-tmp/

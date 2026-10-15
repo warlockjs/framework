@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build and test output
+dist/
+esm/
+cjs/
+coverage/
+*.tsbuildinfo
+.astro/
+
+# Release tooling output (see tools/release)
+tools/release/builds/
+tools/release/release-artifacts/
+tools/release/release-handoffs/
+
+# Scratch
+temp/
+.skill-snippet-gate-tmp/
+
+# Environment and logs
+.env
+.env.*
+!.env.example
+*.log
+
+# Editors and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
