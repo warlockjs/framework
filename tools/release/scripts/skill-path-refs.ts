@@ -25,8 +25,10 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/** builder/scripts -> builder -> workspace root. */
-export const REPO_ROOT = path.resolve(__dirname, "..", "..");
+/** The monorepo root (tools/release/scripts -> ../../..). */
+export const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
+/** Every shipped package is a direct child of this directory. */
+export const PACKAGES_ROOT = path.join(REPO_ROOT, "packages");
 
 export type SkillPathRef = {
   /** Workspace-relative, posix-separated. */
@@ -102,7 +104,7 @@ export function runSkillPathRefsGate(repoRoot: string): SkillPathRef[] {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
-  const refs = runSkillPathRefsGate(REPO_ROOT);
+  const refs = runSkillPathRefsGate(PACKAGES_ROOT);
 
   if (refs.length === 0) {
     console.log("skill-path-refs: no path-style SKILL.md references in any package's skills");

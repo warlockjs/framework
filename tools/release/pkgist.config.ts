@@ -1,5 +1,5 @@
 /**
- * @warlock.js/builder release config — a static package registry.
+ * Warlock.js release config (tools/release) — a static package registry.
  *
  * The version bump and commit message come from the CLI per release:
  *   npx pkgist build @mongez/<pkg>          --bump <patch|minor|major|x.y.z> --commit "<msg>"
@@ -55,7 +55,7 @@ export default defineConfig({
       packages: [
         {
           name: "@warlock.js/ai",
-          root: "../ai",
+          root: "../../packages/ai",
           clone: [
             "README.md",
             "LICENSE",
@@ -67,7 +67,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/ai-panoptic",
-          root: "../ai-panoptic",
+          root: "../../packages/ai-panoptic",
           clone: [
             "README.md",
             "LICENSE",
@@ -79,7 +79,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/ai-anthropic",
-          root: "../ai-anthropic",
+          root: "../../packages/ai-anthropic",
           clone: [
             "README.md",
             "LICENSE",
@@ -91,7 +91,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/ai-bedrock",
-          root: "../ai-bedrock",
+          root: "../../packages/ai-bedrock",
           clone: [
             "README.md",
             "LICENSE",
@@ -103,7 +103,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/ai-google",
-          root: "../ai-google",
+          root: "../../packages/ai-google",
           clone: [
             "README.md",
             "LICENSE",
@@ -115,7 +115,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/ai-ollama",
-          root: "../ai-ollama",
+          root: "../../packages/ai-ollama",
           clone: [
             "README.md",
             "LICENSE",
@@ -127,7 +127,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/ai-openai",
-          root: "../ai-openai",
+          root: "../../packages/ai-openai",
           clone: [
             "README.md",
             "LICENSE",
@@ -139,7 +139,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/ai-live",
-          root: "../ai-live",
+          root: "../../packages/ai-live",
           clone: [
             "README.md",
             "LICENSE",
@@ -151,7 +151,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/ai-mistral",
-          root: "../ai-mistral",
+          root: "../../packages/ai-mistral",
           clone: [
             "README.md",
             "LICENSE",
@@ -163,7 +163,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/ai-groq",
-          root: "../ai-groq",
+          root: "../../packages/ai-groq",
           clone: [
             "README.md",
             "LICENSE",
@@ -175,7 +175,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/ai-deepseek",
-          root: "../ai-deepseek",
+          root: "../../packages/ai-deepseek",
           clone: [
             "README.md",
             "LICENSE",
@@ -187,7 +187,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/ai-xai",
-          root: "../ai-xai",
+          root: "../../packages/ai-xai",
           clone: [
             "README.md",
             "LICENSE",
@@ -199,7 +199,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/ai-tools",
-          root: "../ai-tools",
+          root: "../../packages/ai-tools",
           clone: [
             "README.md",
             "LICENSE",
@@ -211,7 +211,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/ai-workspace",
-          root: "../ai-workspace",
+          root: "../../packages/ai-workspace",
           clone: [
             "README.md",
             "LICENSE",
@@ -223,7 +223,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/auth",
-          root: "../auth",
+          root: "../../packages/auth",
           mainType: "esm",
           formats: ["esm"],
           clone: [
@@ -237,7 +237,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/cache",
-          root: "../cache",
+          root: "../../packages/cache",
           clone: [
             "README.md",
             "LICENSE",
@@ -249,7 +249,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/cascade",
-          root: "../cascade",
+          root: "../../packages/cascade",
           clone: [
             "bin",
             "README.md",
@@ -262,7 +262,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/context",
-          root: "../context",
+          root: "../../packages/context",
           clone: [
             "README.md",
             "LICENSE",
@@ -274,7 +274,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/core",
-          root: "../core",
+          root: "../../packages/core",
           mainType: "esm",
           entries: [
             "index.ts",
@@ -306,7 +306,7 @@ export default defineConfig({
         },
         {
           name: "create-warlock",
-          root: "../create-warlock",
+          root: "../../packages/create-warlock",
           mainType: "esm",
           formats: ["esm"],
           clone: [
@@ -322,7 +322,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/fs",
-          root: "../fs",
+          root: "../../packages/fs",
           clone: [
             "README.md",
             "LICENSE",
@@ -334,7 +334,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/herald",
-          root: "../herald",
+          root: "../../packages/herald",
           clone: [
             "README.md",
             "LICENSE",
@@ -346,7 +346,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/logger",
-          root: "../logger",
+          root: "../../packages/logger",
           clone: [
             "README.md",
             "LICENSE",
@@ -358,7 +358,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/scheduler",
-          root: "../scheduler",
+          root: "../../packages/scheduler",
           clone: [
             "README.md",
             "LICENSE",
@@ -370,7 +370,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/seal",
-          root: "../seal",
+          root: "../../packages/seal",
           entries: ["index.ts", "object.ts", "string.ts"],
           clone: [
             "README.md",
@@ -383,7 +383,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/notifications",
-          root: "../notifications",
+          root: "../../packages/notifications",
           clone: [
             "README.md",
             "LICENSE",
@@ -401,7 +401,7 @@ export default defineConfig({
            * cannot work until this ships once.
            */
           name: "@warlock.js/web",
-          root: "../web",
+          root: "../../packages/web",
           mainType: "esm",
           /**
            * Every subpath from `web/package.json`'s own `exports` map. Only
@@ -504,7 +504,7 @@ export default defineConfig({
         },
         {
           name: "@warlock.js/access",
-          root: "../access",
+          root: "../../packages/access",
           clone: [
             "README.md",
             "LICENSE",
@@ -521,7 +521,7 @@ export default defineConfig({
            * entry so the root barrel never pulls `@warlock.js/notifications`.
            */
           name: "@warlock.js/queue",
-          root: "../queue",
+          root: "../../packages/queue",
           entries: ["index.ts"],
           clone: [
             "README.md",
@@ -535,7 +535,7 @@ export default defineConfig({
         {
           /** Runtime `sitemap.xml` generation, new in 5.15. No subpath exports. */
           name: "@warlock.js/sitemap",
-          root: "../sitemap",
+          root: "../../packages/sitemap",
           clone: [
             "README.md",
             "LICENSE",
@@ -553,7 +553,7 @@ export default defineConfig({
            * `resolveUiRoot()` walks up from the built module to find it.
            */
           name: "@warlock.js/devtools",
-          root: "../devtools",
+          root: "../../packages/devtools",
           entries: ["index.ts"],
           clone: [
             "README.md",

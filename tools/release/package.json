@@ -2,7 +2,7 @@
   "name": "warlock-release-runner",
   "version": "0.0.0",
   "private": true,
-  "description": "Local release harness for the @warlock.js (and @mongez) monorepos, run from inside @warlock.js. Installs @mongez/pkgist and holds pkgist.config.ts â€” the release registry for every package. Not published.",
+  "description": "Release runner for the Warlock.js monorepo (tools/release): installs @mongez/pkgist and holds pkgist.config.ts, the release registry for every package under packages/. Not published.",
   "type": "module",
   "scripts": {
     "release": "node --import tsx scripts/release-family.ts gate",

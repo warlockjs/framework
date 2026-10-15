@@ -18,8 +18,8 @@ import {
   resolveLocalPackageScript,
   resolvePublishedSurface,
   runReleaseFamily,
-  tagAndPushAllMembers,
-  tagAndPushMember,
+  tagAndPushFamily,
+  tagAndPushRelease,
   type CommandRequest,
   type ReleaseFamilyDependencies,
   type ReleaseHandoff,
@@ -137,6 +137,15 @@ function fixture(overrides: Partial<ReleaseFamilyDependencies> = {}): {
         // Innocent case: every member is checked out on the same branch
         // origin's default resolves to below.
         return { stdout: "main\n", stderr: "" };
+      }
+      if (
+        request.command === "git" &&
+        request.args[0] === "rev-parse" &&
+        request.args[1] === "--show-prefix"
+      ) {
+        // Fixture members sit at the repository root, so porcelain paths are
+        // already member-relative. The prefix-stripping case has its own test.
+        return { stdout: "\n", stderr: "" };
       }
       if (request.command === "git" && request.args[0] === "rev-parse") {
         return { stdout: `${"a".repeat(40)}\n`, stderr: "" };
@@ -954,11 +963,13 @@ describe("per-member lockfile regeneration (the create-warlock / 5.6.0 defect)",
   });
 });
 
-describe("per-member release commit (card D1a)", () => {
+describe("family release commit (one repository, one commit)", () => {
   const notificationsRoot = FAMILY.members[0].root; // "@warlock.js/notifications" — no lockfile
   const createWarlockRoot = FAMILY.members[1].root; // "create-warlock" — has one
 
   const PNPM_MARKER = path.resolve("pnpm", "bin", "pnpm.mjs");
+  const PRE_RELEASE_HEAD = "a".repeat(40);
+  const RELEASE_COMMIT = "b".repeat(40);
 
   function commitFixture(
     outcomes: {
@@ -975,21 +986,17 @@ describe("per-member release commit (card D1a)", () => {
         path.dirname(filePath) === createWarlockRoot,
     });
     const baseRunCommand = control.dependencies.runCommand!;
-    const revCounts = new Map<string, number>();
+    // HEAD is the pre-release commit until a release commit succeeds, and the
+    // release commit after -- one repository, so one answer for every cwd.
+    let committed = false;
     control.dependencies.runCommand = async (request) => {
       if (
         request.command === "git" &&
         request.args[0] === "rev-parse" &&
-        request.args[1] !== "--abbrev-ref"
+        request.args[1] === "HEAD"
       ) {
         control.commands.push(request);
-        const count = (revCounts.get(request.cwd) ?? 0) + 1;
-        revCounts.set(request.cwd, count);
-        // First call per member (pre-bump gitHead) vs. every call after the
-        // release commit (releaseCommitSha) return distinct shas, so a test
-        // can tell them apart.
-        const sha = count === 1 ? "a".repeat(40) : "b".repeat(40);
-        return { stdout: `${sha}\n`, stderr: "" };
+        return { stdout: `${committed ? RELEASE_COMMIT : PRE_RELEASE_HEAD}\n`, stderr: "" };
       }
       if (
         request.command === "git" &&
@@ -998,6 +1005,7 @@ describe("per-member release commit (card D1a)", () => {
         control.commands.push(request);
         const outcome = outcomes.commit?.(request) ?? { stdout: "", stderr: "" };
         if (outcome instanceof Error) throw outcome;
+        if (request.args[0] === "commit") committed = true;
         return outcome;
       }
       if (request.command === "git" && request.args[0] === "status") {
@@ -1013,14 +1021,7 @@ describe("per-member release commit (card D1a)", () => {
         control.commands.push(request);
         const separator = request.args.indexOf("--");
         const paths = separator === -1 ? [] : request.args.slice(separator + 1);
-        const stdout =
-          outcomes.staged?.(request) ??
-          paths
-            .map(
-              (entry) => `${entry}
-`,
-            )
-            .join("");
+        const stdout = outcomes.staged?.(request) ?? paths.map((entry) => `${entry}\n`).join("");
         return { stdout, stderr: "" };
       }
       return await baseRunCommand(request);
@@ -1028,11 +1029,14 @@ describe("per-member release commit (card D1a)", () => {
     return control;
   }
 
-  function gitCommandsFor(control: ReturnType<typeof fixture>, root: string): CommandRequest[] {
-    return control.commands.filter((command) => command.command === "git" && command.cwd === root);
-  }
+  const isGit = (command: CommandRequest, verb: string) =>
+    command.command === "git" && command.args[0] === verb;
 
-  it("commits after the lockfile step and before the pack, staging ONLY the paths this release wrote", async () => {
+  /** Repository-relative POSIX path of one member file, the way the commit names it. */
+  const commitPathEndsWith = (args: readonly string[], memberRoot: string, file: string) =>
+    args.some((arg) => arg.endsWith(`${path.basename(memberRoot)}/${file}`));
+
+  it("builds every member, then makes ONE release commit, then packs -- staging ONLY the paths this release wrote", async () => {
     const control = commitFixture();
     const handoff = await runReleaseFamily(
       { mode: "gate", version: VERSION, ...FULL_MATRIX },
@@ -1040,63 +1044,47 @@ describe("per-member release commit (card D1a)", () => {
     );
     assert.ok(handoff);
 
-    const cwCommands = control.commands.filter(
-      (command) =>
-        (command.args[1] === "build" && command.args[2] === "create-warlock") ||
-        command.args[0] === PNPM_MARKER ||
-        (command.command === "git" &&
-          command.cwd === createWarlockRoot &&
-          (command.args[0] === "add" || command.args[0] === "commit")) ||
-        (command.args[1] === "pack" && String(command.args[2]).includes("create-warlock")),
-    );
-    const orderedKinds = cwCommands.map((command) => {
-      if (command.args[1] === "build") return "build";
-      if (command.args[0] === PNPM_MARKER && command.args.includes("--lockfile-only"))
-        return "lockfile-only";
-      if (command.args[0] === PNPM_MARKER && command.args.includes("--frozen-lockfile"))
-        return "frozen-lockfile";
-      if (command.command === "git" && command.args[0] === "add") return "add";
-      if (command.command === "git" && command.args[0] === "commit") return "commit";
-      if (command.args[1] === "pack") return "pack";
-      return "other";
-    });
+    const commits = control.commands.filter((command) => isGit(command, "commit"));
+    assert.equal(commits.length, 1, "one release is one commit");
+    const commitArgs = commits[0]!.args;
+    assert.deepEqual(commitArgs.slice(0, 3), ["commit", "-m", `release: v${VERSION}`]);
+    const commitPaths = commitArgs.slice(commitArgs.indexOf("--") + 1);
+    assert.equal(commitPaths.length, 3);
+    assert.ok(commitPathEndsWith(commitPaths, notificationsRoot, "package.json"));
+    assert.ok(commitPathEndsWith(commitPaths, createWarlockRoot, "package.json"));
+    assert.ok(commitPathEndsWith(commitPaths, createWarlockRoot, "pnpm-lock.yaml"));
 
-    assert.deepEqual(orderedKinds, [
-      "build",
-      "lockfile-only",
-      "frozen-lockfile",
-      "add",
-      "commit",
-      "pack",
-    ]);
+    // Each member's own paths are staged from its own directory.
+    const adds = control.commands.filter((command) => isGit(command, "add"));
+    assert.deepEqual(
+      adds.map((command) => [command.cwd, command.args.slice(2).sort()]),
+      [
+        [notificationsRoot, ["package.json"]],
+        [createWarlockRoot, ["package.json", "pnpm-lock.yaml"]],
+      ],
+    );
+
+    // Order: every build and lockfile step, then the commit, then every pack.
+    const index = (predicate: (command: CommandRequest) => boolean, last = false) => {
+      const indexes = control.commands
+        .map((command, position) => (predicate(command) ? position : -1))
+        .filter((position) => position >= 0);
+      return last ? indexes[indexes.length - 1]! : indexes[0]!;
+    };
+    const lastBuild = index((command) => command.args[1] === "build", true);
+    const lastLockfile = index((command) => command.args[0] === PNPM_MARKER, true);
+    const commit = index((command) => isGit(command, "commit"));
+    const firstPack = index((command) => command.args[1] === "pack");
+    assert.ok(lastBuild < commit && lastLockfile < commit, "commit must follow every build");
+    assert.ok(commit < firstPack, "commit must precede every pack");
 
     const lockfileCommands = control.commands.filter((command) => command.args[0] === PNPM_MARKER);
     assert.ok(lockfileCommands.every((command) => command.cwd !== createWarlockRoot));
-    assert.ok(lockfileCommands.every((command) => !command.args.includes("--ignore-workspace")));
     assert.ok(lockfileCommands.every((command) => command.args.includes("--ignore-scripts")));
-
-    // create-warlock regenerated a lockfile this run: both package.json and
-    // its lockfile are staged and committed, nothing else.
-    const cwGit = gitCommandsFor(control, createWarlockRoot).filter(
-      (command) => command.args[0] === "add" || command.args[0] === "commit",
-    );
-    for (const command of cwGit) {
-      assert.deepEqual([...command.args].slice(-2).sort(), ["package.json", "pnpm-lock.yaml"]);
-    }
-
-    // notifications has no lockfile: only its package.json is staged.
-    const notifGit = gitCommandsFor(control, notificationsRoot).filter(
-      (command) => command.args[0] === "add" || command.args[0] === "commit",
-    );
-    assert.ok(notifGit.length > 0);
-    for (const command of notifGit) {
-      assert.deepEqual([...command.args].slice(-1), ["package.json"]);
-    }
 
     // Never a sweep.
     for (const command of control.commands) {
-      if (command.command !== "git") continue;
-      if (command.args[0] === "add" || command.args[0] === "commit") {
+      if (isGit(command, "add") || isGit(command, "commit")) {
         assert.ok(!command.args.includes("-a"));
         assert.ok(!command.args.includes("-A"));
         assert.ok(!command.args.includes("."));
@@ -1119,20 +1107,19 @@ describe("per-member release commit (card D1a)", () => {
     );
     assert.ok(handoff, "a surface-external dirty file must not block the release");
 
-    const notifGit = gitCommandsFor(control, notificationsRoot).filter(
-      (command) => command.args[0] === "add" || command.args[0] === "commit",
+    const writes = control.commands.filter(
+      (command) => isGit(command, "add") || isGit(command, "commit"),
     );
-    assert.ok(notifGit.length > 0, "the release commit must still happen");
-    for (const command of notifGit) {
+    assert.ok(writes.some((command) => isGit(command, "commit")), "the release commit must still happen");
+    for (const command of writes) {
       assert.ok(
         !command.args.some((arg) => arg.includes("somebody-elses-file")),
         `must never stage a path outside the published surface; got: ${command.args.join(" ")}`,
       );
-      assert.deepEqual([...command.args].slice(-1), ["package.json"]);
     }
   });
 
-  it("records the new release-commit sha in provenance, distinct from the pre-bump gitHead", async () => {
+  it("records the SAME release commit for every member, distinct from the shared pre-bump gitHead", async () => {
     let capturedProvenance: unknown;
     const control = commitFixture();
     control.dependencies.writeTextFile = async (filePath, contents) => {
@@ -1149,18 +1136,18 @@ describe("per-member release commit (card D1a)", () => {
       members: Array<{ name: string; gitHead: string; releaseCommitSha: string }>;
     };
     assert.ok(provenance, "provenance must be written");
+    assert.equal(provenance.members.length, FAMILY.members.length);
     for (const entry of provenance.members) {
-      assert.equal(entry.gitHead, "a".repeat(40));
-      assert.equal(entry.releaseCommitSha, "b".repeat(40));
-      assert.notEqual(entry.gitHead, entry.releaseCommitSha);
+      assert.equal(entry.gitHead, PRE_RELEASE_HEAD);
+      assert.equal(entry.releaseCommitSha, RELEASE_COMMIT);
     }
   });
 
-  it("RED CONTROL: a member whose release commit fails is refused alone; the others still build; the run throws once", async () => {
+  it("RED CONTROL: a failed release commit refuses the release, names every built member, and packs nothing", async () => {
     const control = commitFixture({
       commit: (request) =>
-        request.args[0] === "commit" && request.cwd === createWarlockRoot
-          ? new Error(`${process.execPath} exited 1: nothing to commit? or hook refused`)
+        request.args[0] === "commit"
+          ? new Error(`${process.execPath} exited 1: hook refused`)
           : { stdout: "", stderr: "" },
     });
 
@@ -1168,25 +1155,14 @@ describe("per-member release commit (card D1a)", () => {
       runReleaseFamily({ mode: "gate", version: VERSION, ...FULL_MATRIX }, control.dependencies),
       (error) => {
         const message = (error as Error).message;
-        assert.match(message, /Refusing to pack create-warlock/);
+        assert.match(message, /Refusing to pack @warlock\.js\/notifications, create-warlock/);
         assert.match(message, /release edits could not be committed/);
         return true;
       },
     );
 
-    const cwPacks = control.commands.filter(
-      (command) => command.args[1] === "pack" && String(command.args[2]).includes("create-warlock"),
-    );
-    assert.equal(cwPacks.length, 0, "member whose release commit failed must not be packed");
-
-    const notifBuilds = control.commands.filter(
-      (command) => command.args[1] === "build" && command.args[2] === "@warlock.js/notifications",
-    );
-    const notifPacks = control.commands.filter(
-      (command) => command.args[1] === "pack" && String(command.args[2]).includes("notifications"),
-    );
-    assert.equal(notifBuilds.length, 1, "unaffected sibling must still build");
-    assert.equal(notifPacks.length, 1, "unaffected sibling must still pack");
+    const packs = control.commands.filter((command) => command.args[1] === "pack");
+    assert.equal(packs.length, 0, "nothing may be packed without a release commit describing it");
 
     // Restore: a succeeding commit passes green again.
     const cleanControl = commitFixture();
@@ -1195,6 +1171,28 @@ describe("per-member release commit (card D1a)", () => {
       cleanControl.dependencies,
     );
     assert.ok(handoff);
+  });
+
+  it("a member refused before its build is left out of the release commit; the others still commit and pack", async () => {
+    const control = commitFixture({
+      gitStatus: new Map([[createWarlockRoot, " M src/index.ts\n"]]),
+    });
+
+    await assert.rejects(
+      runReleaseFamily({ mode: "gate", version: VERSION, ...FULL_MATRIX }, control.dependencies),
+      /Refusing to pack create-warlock/,
+    );
+
+    const commits = control.commands.filter((command) => isGit(command, "commit"));
+    assert.equal(commits.length, 1);
+    assert.ok(commitPathEndsWith(commits[0]!.args, notificationsRoot, "package.json"));
+    assert.ok(
+      !commits[0]!.args.some((arg) => arg.includes("create-warlock")),
+      "a refused member's edits must never be committed",
+    );
+    const packs = control.commands.filter((command) => command.args[1] === "pack");
+    assert.equal(packs.length, 1);
+    assert.ok(String(packs[0]!.args[2]).includes("notifications"));
   });
 
   it("a manifest already committed at the release version (nothing staged) is NOT refused: no commit is attempted, and HEAD is the release commit", async () => {
@@ -1215,9 +1213,7 @@ describe("per-member release commit (card D1a)", () => {
     );
     assert.ok(handoff, "a no-op release edit must not refuse the release");
 
-    const commits = control.commands.filter(
-      (command) => command.command === "git" && command.args[0] === "commit",
-    );
+    const commits = control.commands.filter((command) => isGit(command, "commit"));
     assert.equal(
       commits.length,
       0,
@@ -1229,11 +1225,7 @@ describe("per-member release commit (card D1a)", () => {
     };
     assert.ok(provenance, "provenance must be written");
     for (const entry of provenance.members) {
-      assert.match(
-        entry.releaseCommitSha,
-        /^[0-9a-f]{40}$/,
-        `${entry.name} must record HEAD as its release commit`,
-      );
+      assert.equal(entry.releaseCommitSha, PRE_RELEASE_HEAD, `${entry.name} must record HEAD`);
     }
   });
 });
@@ -1600,25 +1592,56 @@ describe("parseGitPorcelain", () => {
 });
 
 describe("checkPackageTreeIsClean", () => {
-  it("runs git status scoped to the member's own package root", async () => {
-    const seenCwds: string[] = [];
-    const runtimeStub = {
+  const member = {
+    name: "@warlock.js/notifications",
+    root: path.resolve("packages", "notifications"),
+    configuredRoot: path.resolve("packages", "notifications"),
+    version: VERSION,
+  };
+
+  /** A monorepo stand-in: git reports the member's prefix and repository-root-relative porcelain paths. */
+  function monorepoGit(porcelain: string) {
+    const requests: CommandRequest[] = [];
+    return {
+      requests,
       runCommand: async (request: CommandRequest) => {
-        seenCwds.push(request.cwd);
+        requests.push(request);
         assert.equal(request.command, "git");
-        assert.deepEqual(request.args, ["status", "--porcelain=v1", "--untracked-files=all"]);
-        return { stdout: "", stderr: "" };
+        if (request.args[0] === "rev-parse" && request.args[1] === "--show-prefix") {
+          return { stdout: "packages/notifications/\n", stderr: "" };
+        }
+        if (request.args[0] === "status") return { stdout: porcelain, stderr: "" };
+        throw new Error(`unexpected git ${request.args.join(" ")}`);
       },
     };
-    const member = {
-      name: "@warlock.js/notifications",
-      root: path.resolve("notifications"),
-      configuredRoot: path.resolve("notifications"),
-      version: VERSION,
-    };
-    const result = await checkPackageTreeIsClean(member, runtimeStub as never);
+  }
+
+  it("runs git status scoped to the member's own directory, from that directory", async () => {
+    const git = monorepoGit("");
+    const result = await checkPackageTreeIsClean(member, git as never);
     assert.equal(result.clean, true);
-    assert.deepEqual(seenCwds, [member.root]);
+    assert.ok(git.requests.every((request) => request.cwd === member.root));
+    const status = git.requests.find((request) => request.args[0] === "status");
+    assert.deepEqual(status?.args, ["status", "--porcelain=v1", "--untracked-files=all", "--", "."]);
+  });
+
+  it("reads repository-root-relative porcelain paths as member-relative, so the published surface still applies", async () => {
+    // Without the prefix strip, "packages/notifications/src/index.ts" is not
+    // under "src" and would be WAIVED as outside the surface -- a dirty
+    // shipped file sailing through the gate.
+    const git = monorepoGit(
+      " M packages/notifications/src/index.ts\n?? packages/notifications/tests/new.ts\n",
+    );
+    const result = await checkPackageTreeIsClean(member, git as never);
+    assert.equal(result.clean, false);
+    assert.deepEqual(result.dirtyInSurface, [{ path: "src/index.ts", status: " M" }]);
+    assert.deepEqual(result.waivedOutsideSurface, [{ path: "tests/new.ts", status: "??" }]);
+    assert.match(result.refusalMessage, /src\/index\.ts/);
+  });
+
+  it("refuses a status line outside the member's own directory instead of guessing its owner", async () => {
+    const git = monorepoGit(" M packages/core/src/index.ts\n");
+    await assert.rejects(checkPackageTreeIsClean(member, git as never), /outside its own directory/);
   });
 });
 
@@ -1845,7 +1868,8 @@ describe("--reuse-artifacts", () => {
       if (
         request.command === "git" &&
         request.args[0] === "rev-parse" &&
-        request.args[1] !== "--abbrev-ref"
+        request.args[1] !== "--abbrev-ref" &&
+        request.args[1] !== "--show-prefix"
       ) {
         control.commands.push(request);
         const recorded = request.cwd === notificationsRoot ? RECORDED_HEAD_NOTIF : RECORDED_HEAD_CW;
@@ -2268,13 +2292,14 @@ function provenanceReadTextFile(
   };
 }
 
-describe("tagAndPushMember (D1b)", () => {
+const REPOSITORY = { name: "warlockjs/framework", root: path.resolve("tag-push-repository") };
+
+describe("tagAndPushRelease (D1b)", () => {
   it("tags at the recorded releaseCommitSha, never at HEAD", async () => {
-    const member = makeMember("@warlock.js/notifications", "tag-push-notifications-1");
     const sha = "b".repeat(40);
     const runtime = fakeGitRuntime({ branch: "main" });
 
-    const outcome = await tagAndPushMember(member, VERSION, sha, runtime as never);
+    const outcome = await tagAndPushRelease(REPOSITORY, VERSION, sha, runtime as never);
 
     assert.equal(outcome.refused, false);
     const tagCommand = runtime.commands.find((command) => command.args[0] === "tag");
@@ -2287,11 +2312,10 @@ describe("tagAndPushMember (D1b)", () => {
   });
 
   it("an existing local tag at the SAME sha is success, not re-created", async () => {
-    const member = makeMember("@warlock.js/notifications", "tag-push-notifications-2");
     const sha = "b".repeat(40);
     const runtime = fakeGitRuntime({ branch: "main", localTagSha: sha });
 
-    const outcome = await tagAndPushMember(member, VERSION, sha, runtime as never);
+    const outcome = await tagAndPushRelease(REPOSITORY, VERSION, sha, runtime as never);
 
     assert.equal(outcome.refused, false);
     assert.equal(outcome.alreadyTagged, true);
@@ -2303,15 +2327,14 @@ describe("tagAndPushMember (D1b)", () => {
   });
 
   it("an existing local tag at a DIFFERENT sha is a refusal, and --force is never passed", async () => {
-    const member = makeMember("@warlock.js/notifications", "tag-push-notifications-3");
     const sha = "b".repeat(40);
     const runtime = fakeGitRuntime({ branch: "main", localTagSha: "d".repeat(40) });
 
-    const outcome = await tagAndPushMember(member, VERSION, sha, runtime as never);
+    const outcome = await tagAndPushRelease(REPOSITORY, VERSION, sha, runtime as never);
 
     assert.equal(outcome.refused, true);
     assert.match(outcome.refusalMessage, /already exists locally/);
-    assert.match(outcome.refusalMessage, new RegExp(member.name.replace(/[/.]/g, "\\$&")));
+    assert.match(outcome.refusalMessage, /warlockjs\/framework/);
     assert.equal(
       runtime.commands.some((command) => command.args.includes("--force")),
       false,
@@ -2319,11 +2342,10 @@ describe("tagAndPushMember (D1b)", () => {
   });
 
   it("an existing origin tag at a DIFFERENT sha is a refusal, and --force is never passed", async () => {
-    const member = makeMember("@warlock.js/notifications", "tag-push-notifications-4");
     const sha = "b".repeat(40);
     const runtime = fakeGitRuntime({ branch: "main", originTagSha: "e".repeat(40) });
 
-    const outcome = await tagAndPushMember(member, VERSION, sha, runtime as never);
+    const outcome = await tagAndPushRelease(REPOSITORY, VERSION, sha, runtime as never);
 
     assert.equal(outcome.refused, true);
     assert.match(outcome.refusalMessage, /already exists there/);
@@ -2333,12 +2355,11 @@ describe("tagAndPushMember (D1b)", () => {
     );
   });
 
-  it("a fully outstanding member is tagged locally, tagged at origin, and pushed at the recorded sha", async () => {
-    const member = makeMember("@warlock.js/notifications", "tag-push-notifications-5");
+  it("a fully outstanding release is tagged locally, tagged at origin, and pushed at the recorded sha", async () => {
     const sha = "b".repeat(40);
     const runtime = fakeGitRuntime({ branch: "main" });
 
-    const outcome = await tagAndPushMember(member, VERSION, sha, runtime as never);
+    const outcome = await tagAndPushRelease(REPOSITORY, VERSION, sha, runtime as never);
 
     assert.equal(outcome.refused, false);
     assert.equal(outcome.tagged, true);
@@ -2356,126 +2377,148 @@ describe("tagAndPushMember (D1b)", () => {
   });
 });
 
-describe("tagAndPushAllMembers (D1b)", () => {
-  it("refuses a member whose origin/<branch> is not an ancestor of the recorded sha, naming it, without stopping the others", async () => {
-    const notif = makeMember("@warlock.js/notifications", "tag-push-family-notifications");
-    const cw = makeMember("create-warlock", "tag-push-family-create-warlock");
-    const notifSha = "b".repeat(40);
-    const cwSha = "c".repeat(40);
-    const runtime = fakeGitRuntimeByRoot(
-      new Map([
-        [
-          notif.root,
-          {
-            branch: "main",
-            originBranchTip: "f".repeat(40),
-            ancestorOk: false,
-            logLines: ["f000000 an origin commit this release does not account for"],
-          },
-        ],
-        [cw.root, { branch: "main" }],
-      ]),
-    );
-    const family: WarlockFamily = { name: "warlock", version: VERSION, members: [notif, cw] };
-    const handoff = { subjects: [notif.name, cw.name] } as unknown as ReleaseHandoff;
+describe("tagAndPushFamily (one tag for the monorepo)", () => {
+  const notif = makeMember("@warlock.js/notifications", "tag-push-family-notifications");
+  const cw = makeMember("create-warlock", "tag-push-family-create-warlock");
+  const family: WarlockFamily = { name: "warlock", version: VERSION, members: [notif, cw] };
+  const handoff = { subjects: [notif.name, cw.name] } as unknown as ReleaseHandoff;
+  const sha = "b".repeat(40);
 
-    await assert.rejects(
-      tagAndPushAllMembers(family, handoff, VERSION, {
+  const writes = (commands: readonly CommandRequest[]) =>
+    commands.filter((command) => command.args[0] === "tag" || command.args[0] === "push");
+
+  it("tags v<version> ONCE and pushes the tag and the branch ONCE, in the repository, at the shared release commit", async () => {
+    const runtime = fakeGitRuntimeByRoot(new Map([[REPOSITORY.root, { branch: "main" }]]));
+
+    const outcome = await tagAndPushFamily(
+      family,
+      handoff,
+      VERSION,
+      {
         runCommand: runtime.runCommand,
         readTextFile: provenanceReadTextFile([
-          { name: notif.name, releaseCommitSha: notifSha },
-          { name: cw.name, releaseCommitSha: cwSha },
+          { name: notif.name, releaseCommitSha: sha },
+          { name: cw.name, releaseCommitSha: sha },
         ]),
-      } as never),
+      } as never,
+      REPOSITORY,
+    );
+
+    assert.equal(outcome.tagged, true);
+    assert.deepEqual(
+      writes(runtime.commands).map((command) => command.args),
+      [
+        ["tag", releaseTagName(VERSION), sha],
+        ["push", "origin", `refs/tags/${releaseTagName(VERSION)}`],
+        ["push", "origin", `${sha}:refs/heads/main`],
+      ],
+    );
+    assert.ok(runtime.commands.every((command) => command.cwd === REPOSITORY.root));
+  });
+
+  it("refuses, before any tag or push, when members recorded different release commits", async () => {
+    const runtime = fakeGitRuntime({ branch: "main" });
+
+    await assert.rejects(
+      tagAndPushFamily(
+        family,
+        handoff,
+        VERSION,
+        {
+          runCommand: runtime.runCommand,
+          readTextFile: provenanceReadTextFile([
+            { name: notif.name, releaseCommitSha: sha },
+            { name: cw.name, releaseCommitSha: "c".repeat(40) },
+          ]),
+        } as never,
+        REPOSITORY,
+      ),
       (error: Error) => {
-        assert.match(error.message, /@warlock\.js\/notifications/);
+        assert.match(error.message, /2 different release commits/);
+        assert.match(error.message, /create-warlock: c{40}/);
+        return true;
+      },
+    );
+    assert.equal(runtime.commands.length, 0, "no git command may run on a refused provenance");
+  });
+
+  it("refuses, before any tag or push, when a subject has no recorded release commit", async () => {
+    const runtime = fakeGitRuntime({ branch: "main" });
+
+    await assert.rejects(
+      tagAndPushFamily(
+        family,
+        handoff,
+        VERSION,
+        {
+          runCommand: runtime.runCommand,
+          readTextFile: provenanceReadTextFile([{ name: notif.name, releaseCommitSha: sha }]),
+        } as never,
+        REPOSITORY,
+      ),
+      /no recorded release-commit sha .* for: create-warlock/,
+    );
+    assert.equal(runtime.commands.length, 0);
+  });
+
+  it("refuses when origin/<branch> is not an ancestor of the release commit, naming the commits", async () => {
+    const runtime = fakeGitRuntime({
+      branch: "main",
+      originBranchTip: "f".repeat(40),
+      ancestorOk: false,
+      logLines: ["f000000 an origin commit this release does not account for"],
+    });
+
+    await assert.rejects(
+      tagAndPushFamily(
+        family,
+        handoff,
+        VERSION,
+        {
+          runCommand: runtime.runCommand,
+          readTextFile: provenanceReadTextFile([
+            { name: notif.name, releaseCommitSha: sha },
+            { name: cw.name, releaseCommitSha: sha },
+          ]),
+        } as never,
+        REPOSITORY,
+      ),
+      (error: Error) => {
+        assert.match(error.message, /warlockjs\/framework/);
         assert.match(error.message, /main/);
         assert.match(error.message, /an origin commit this release does not account for/);
         return true;
       },
     );
-
-    const cwWrites = runtime.commands.filter(
-      (command) =>
-        command.cwd === cw.root && (command.args[0] === "tag" || command.args[0] === "push"),
-    );
-    assert.ok(
-      cwWrites.length > 0,
-      "create-warlock must still be tagged and pushed even though notifications was refused",
-    );
-    const notifWrites = runtime.commands.filter(
-      (command) =>
-        command.cwd === notif.root && (command.args[0] === "tag" || command.args[0] === "push"),
-    );
-    assert.equal(notifWrites.length, 0, "the refused member must never be tagged or pushed");
+    assert.equal(writes(runtime.commands).length, 0, "a refused release is never tagged or pushed");
   });
 
-  it("re-running after a partial push tags/pushes only the outstanding members (idempotent)", async () => {
-    const notif = makeMember("@warlock.js/notifications", "tag-push-rerun-notifications");
-    const cw = makeMember("create-warlock", "tag-push-rerun-create-warlock");
-    const notifSha = "b".repeat(40);
-    const cwSha = "c".repeat(40);
-    // notifications was fully tagged + pushed in a prior run; create-warlock is outstanding.
-    const runtime = fakeGitRuntimeByRoot(
-      new Map([
-        [
-          notif.root,
-          {
-            branch: "main",
-            localTagSha: notifSha,
-            originTagSha: notifSha,
-            originBranchTip: notifSha,
-          },
-        ],
-        [cw.root, { branch: "main" }],
-      ]),
-    );
-    const family: WarlockFamily = { name: "warlock", version: VERSION, members: [notif, cw] };
-    const handoff = { subjects: [notif.name, cw.name] } as unknown as ReleaseHandoff;
+  it("re-running after a completed push issues no write commands (idempotent)", async () => {
+    const runtime = fakeGitRuntime({
+      branch: "main",
+      localTagSha: sha,
+      originTagSha: sha,
+      originBranchTip: sha,
+    });
 
-    const results = await tagAndPushAllMembers(family, handoff, VERSION, {
-      runCommand: runtime.runCommand,
-      readTextFile: provenanceReadTextFile([
-        { name: notif.name, releaseCommitSha: notifSha },
-        { name: cw.name, releaseCommitSha: cwSha },
-      ]),
-    } as never);
-
-    assert.deepEqual(
-      results.map((result) => ({
-        name: result.name,
-        tagged: result.tagged,
-        alreadyTagged: result.alreadyTagged,
-        pushed: result.pushed,
-        alreadyPushed: result.alreadyPushed,
-      })),
-      [
-        {
-          name: notif.name,
-          tagged: false,
-          alreadyTagged: true,
-          pushed: false,
-          alreadyPushed: true,
-        },
-        { name: cw.name, tagged: true, alreadyTagged: false, pushed: true, alreadyPushed: false },
-      ],
+    const outcome = await tagAndPushFamily(
+      family,
+      handoff,
+      VERSION,
+      {
+        runCommand: runtime.runCommand,
+        readTextFile: provenanceReadTextFile([
+          { name: notif.name, releaseCommitSha: sha },
+          { name: cw.name, releaseCommitSha: sha },
+        ]),
+      } as never,
+      REPOSITORY,
     );
 
-    const notifWrites = runtime.commands.filter(
-      (command) =>
-        command.cwd === notif.root && (command.args[0] === "tag" || command.args[0] === "push"),
-    );
-    assert.equal(
-      notifWrites.length,
-      0,
-      "an already-tagged-and-pushed member must issue no write commands on re-run",
-    );
-
-    const cwWrites = runtime.commands.filter(
-      (command) =>
-        command.cwd === cw.root && (command.args[0] === "tag" || command.args[0] === "push"),
-    );
-    assert.ok(cwWrites.length > 0, "the outstanding member must still be tagged/pushed");
+    assert.equal(outcome.alreadyTagged, true);
+    assert.equal(outcome.tagAlreadyPushed, true);
+    assert.equal(outcome.alreadyPushed, true);
+    assert.equal(writes(runtime.commands).length, 0);
   });
 });
 

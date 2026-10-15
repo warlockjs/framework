@@ -59,11 +59,12 @@ jobs:
           fi
           mkdir -p "$LOGS"
 
-      - name: Checkout release tooling
+      - name: Checkout the blog check
         uses: actions/checkout@v4
         with:
           path: tooling
           persist-credentials: false
+          sparse-checkout: tools/release/ci
 
       - uses: actions/setup-node@v4
         with:
@@ -103,7 +104,7 @@ jobs:
           EVIDENCE_PATH: ${{ github.workspace }}/logs/blog-${{ inputs.mode }}.json
         run: |
           set -o pipefail
-          node tooling/ci/blog-check.mjs 2>&1 | tee "$LOGS/blog-${{ inputs.mode }}.log"
+          node tooling/tools/release/ci/blog-check.mjs 2>&1 | tee "$LOGS/blog-${{ inputs.mode }}.log"
 
       - name: Keep the logs
         if: always()

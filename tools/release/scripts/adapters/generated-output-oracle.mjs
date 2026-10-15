@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * WARLOCK_GENERATED_OUTPUT_ORACLE — adapter 2 of 3 for the zero-edit
- * generator gate (`builder/scripts/zero-edit-generator-gate.ts`).
+ * generator gate (`tools/release/scripts/zero-edit-generator-gate.ts`).
  *
  * Invoked by the gate as a plain child process, once per feature-matrix row
  * (`zero-edit-generator-gate.ts:253-259`, args built at `:487-489`):

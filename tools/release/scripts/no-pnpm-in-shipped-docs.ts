@@ -41,8 +41,10 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/** builder/scripts -> builder -> repo root. */
-export const REPO_ROOT = path.resolve(__dirname, "..", "..");
+/** The monorepo root (tools/release/scripts -> ../../..). */
+export const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
+/** Every shipped package is a direct child of this directory. */
+export const PACKAGES_ROOT = path.join(REPO_ROOT, "packages");
 
 export interface DocFile {
   /** Absolute path to the file. */
@@ -253,7 +255,7 @@ function formatReport(report: GateReport): { text: string; failed: boolean } {
 }
 
 async function main(): Promise<number> {
-  const report = runNoPnpmInShippedDocsGate(REPO_ROOT);
+  const report = runNoPnpmInShippedDocsGate(PACKAGES_ROOT);
   const { text, failed } = formatReport(report);
   console.log(text);
   return failed ? 1 : 0;

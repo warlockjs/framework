@@ -37,11 +37,10 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseFeatureCatalog } from "../zero-edit-generator-gate.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(HERE, "..", "..", "..");
+const TOOLING_ROOT = path.resolve(HERE, "..", "..");
 const ADAPTER = path.resolve(HERE, "..", "adapters", "feature-catalog-adapter.mjs");
 const LOCAL_TARBALL = path.resolve(
-  REPO_ROOT,
-  "builder",
+  TOOLING_ROOT,
   "release-artifacts",
   "5.3.2",
   "warlock.js-core-5.3.2.tgz",

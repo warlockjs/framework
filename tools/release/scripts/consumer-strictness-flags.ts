@@ -28,8 +28,8 @@ import ts from "typescript";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const REPO_ROOT = path.resolve(__dirname, "..", "..");
-export const CONSUMER_TSCONFIG_PATH = path.join(REPO_ROOT, "create-warlock", "templates", "warlock", "tsconfig.json");
+const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
+export const CONSUMER_TSCONFIG_PATH = path.join(REPO_ROOT, "packages", "create-warlock", "templates", "warlock", "tsconfig.json");
 
 /**
  * Boolean type-checking compiler options this module will ever surface from

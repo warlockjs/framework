@@ -34,8 +34,12 @@ export const NPM_ORIGIN = "https://registry.npmjs.org";
 export const EXACT_VERSION =
   /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
+/** `tools/release` -- this tooling, its builds and its release artifacts. */
 const BUILDER_ROOT = path.resolve(import.meta.dirname, "..");
-const WORKSPACE_ROOT = path.resolve(BUILDER_ROOT, "..");
+/** The monorepo root: one git repository holding every family member. */
+const REPO_ROOT = path.resolve(BUILDER_ROOT, "..", "..");
+/** Every family member is a direct child of this directory. */
+const PACKAGES_ROOT = path.join(REPO_ROOT, "packages");
 const BUILD_ROOT = path.join(BUILDER_ROOT, "builds");
 const ARTIFACT_ROOT = path.join(BUILDER_ROOT, "release-artifacts");
 const HANDOFF_ROOT = path.join(BUILDER_ROOT, "release-handoffs");
@@ -145,27 +149,26 @@ export interface BuildProvenanceEntry {
   version: string;
   tarballPath: string;
   sha256: string;
-  /** Full 40-char lowercase git commit hash, from that package's own repo, captured BEFORE the version bump. */
+  /** Full 40-char lowercase git commit hash of the monorepo's HEAD, captured BEFORE the version bump. */
   gitHead: string;
   /**
    * Full 40-char lowercase git commit hash of the commit this member's tarball
-   * was actually built from: the version bump and (when regenerated) the
-   * lockfile, committed in that member's own repo immediately before packing.
-   * `gitHead` above is its parent -- kept because something downstream may
-   * still want it -- but THIS is what a later phase tags.
+   * was actually built from: the family's ONE release commit (every member's
+   * bumped manifest and, when regenerated, lockfile), made immediately before
+   * packing. Identical for every member of a run. `gitHead` above is its
+   * parent -- kept because something downstream may still want it -- but THIS
+   * is what a later phase tags.
    */
   releaseCommitSha: string;
-  /** Full `git status --porcelain` for that package's repo, captured at build time -- not scoped to the published surface. */
+  /** Full `git status --porcelain` scoped to this member's directory (member-relative paths), captured at build time -- not scoped to the published surface. */
   gitDirtyEntries: readonly DirtyPathEntry[];
-  /** The branch this member's own repo was checked out on when it was built -- see `remoteDefaultBranch`. */
+  /** The branch the monorepo was checked out on when this member was built -- see `remoteDefaultBranch`. */
   checkedOutBranch: string;
   /**
-   * Origin's default branch for this member's repo, resolved with
-   * `git ls-remote --symref origin HEAD` -- never hardcoded, never guessed
-   * from a fixed list, since these are 28 independent repositories. Recorded
-   * alongside `checkedOutBranch` so a later phase (the confirm/tag-and-push
-   * step) never has to re-derive the fact that gated this build; it reads it
-   * back exactly as it already reads `releaseCommitSha`.
+   * Origin's default branch, resolved with `git ls-remote --symref origin HEAD`
+   * -- never hardcoded. Recorded alongside `checkedOutBranch` so a later phase
+   * (the confirm/tag-and-push step) never has to re-derive the fact that gated
+   * this build; it reads it back exactly as it already reads `releaseCommitSha`.
    */
   remoteDefaultBranch: string;
   builtAt: string;
@@ -313,10 +316,10 @@ export async function runReleaseFamily(
   }
 
   // Tagging and pushing happen ONLY after origin confirmation has fully
-  // succeeded (see `tagAndPushAllMembers`) -- a tag or push that exists
+  // succeeded (see `tagAndPushFamily`) -- a tag or push that exists
   // before the registry confirms is a claim the release has not earned.
   await confirmAtOrigin(handoff, runtime);
-  await tagAndPushAllMembers(family, handoff, options.version, runtime);
+  await tagAndPushFamily(family, handoff, options.version, runtime);
 }
 
 export interface PrepareAndGateOptions {
@@ -605,6 +608,15 @@ async function runStrictnessRatchet(
   );
 }
 
+/** A member that passed every pre-pack check and was built, waiting for the family release commit. */
+interface BuiltMember {
+  member: WarlockFamilyMember;
+  gitHead: string;
+  lockfileRegenerated: boolean;
+  cleanliness: PackageCleanlinessResult;
+  branchCheck: PackageBranchResult;
+}
+
 async function buildAndPackAllMembers(
   family: WarlockFamily,
   version: string,
@@ -620,43 +632,41 @@ async function buildAndPackAllMembers(
   const lockfileRefusals: string[] = [];
   const commitRefusals: string[] = [];
   const allowedBranchOverrides = new Set(allowNonDefaultBranchFor);
+  const built: BuiltMember[] = [];
 
   for (const member of family.members) {
-    // Adjacent to the pack, per-member, not a sweep somewhere upstream: a
-    // clean check run once, earlier, in one repo says nothing about the other
-    // 27 — and by the time this loop reaches a later member, a teammate could
-    // have re-dirtied an earlier one. Checking immediately before that
-    // member's own build+pack is the only place the check cannot go stale
-    // between "checked" and "used".
+    // Adjacent to the build, per-member, not a sweep somewhere upstream: a
+    // clean check run once, earlier, says nothing about a member a teammate
+    // re-dirtied since. Checking immediately before that member's own build
+    // is the only place the check cannot go stale between "checked" and
+    // "used". Scoped to the member's own directory: one repository holds the
+    // whole family, and a dirty sibling is that sibling's refusal, not this one's.
     const cleanliness = await checkPackageTreeIsClean(member, runtime);
     if (!cleanliness.clean) {
       dirtyTreeRefusals.push(cleanliness.refusalMessage);
       // Do NOT build or pack this member — but keep going. A dirty package
-      // must refuse alone; it must never take the other 27 down with it.
+      // must refuse alone; it must never take the other members down with it.
       continue;
     }
 
     // Same call site, same shape: the gate proves the family graph, the
     // pins, and a clean tree per member, but none of that says the
-    // package's OWN test script is green — a package can be red
-    // in its own repository and still sail through everything above. Check
-    // it here, immediately before this member's own build+pack, so a red
-    // suite refuses ONLY this member and the other 27 keep going.
+    // package's OWN test script is green. Check it here, immediately before
+    // this member's own build, so a red suite refuses ONLY this member and
+    // the others keep going.
     const quality = await checkPackageOwnQuality(member, runtime);
     if (!quality.passed) {
       qualityRefusals.push(quality.refusalMessage);
       continue;
     }
 
-    // A release pushes to whatever branch a member's own repo is parked on
-    // (see `tagAndPushMember`) -- these are 28 independent repositories, so
-    // nothing here may hardcode or guess a default branch name. Checked here,
-    // adjacent to the other per-member gates and BEFORE this member's tree is
-    // touched, so a member parked off its default branch refuses alone, at
-    // the gate, instead of tagging and pushing to the wrong place after
-    // publication -- which is exactly what happened to `create-warlock`
-    // (measured parked on `fix/scaffold-npm-arborist`) and would have passed
-    // every other check unnoticed.
+    // A release pushes the release commit to the branch the monorepo is
+    // checked out on (see `tagAndPushRelease`), so that branch must be
+    // origin's default -- asked of the remote, never hardcoded. Checked here,
+    // BEFORE this member's tree is touched, so a checkout parked off the
+    // default refuses at the gate instead of pushing to the wrong place after
+    // publication. (Measured for real in the per-repo era: `create-warlock`
+    // parked on `fix/scaffold-npm-arborist` passed every other check.)
     const branchCheck = await checkPackageBranchMatchesOrigin(
       member,
       allowedBranchOverrides,
@@ -674,8 +684,9 @@ async function buildAndPackAllMembers(
       );
     }
 
-    // Captured BEFORE `pkgist build` touches this member's tree, so it stays
-    // the pre-bump commit even though the commit step below moves HEAD.
+    // Captured BEFORE `pkgist build` touches this member's tree. No commit
+    // happens until every member is built, so this is the same pre-release
+    // HEAD for every member of the run.
     const gitHead = await getGitHead(member, runtime);
 
     await runtime.runCommand({
@@ -700,25 +711,44 @@ async function buildAndPackAllMembers(
     // intra-family pins -- and any lockfile that member carries now describes
     // a manifest that no longer exists. Checked here, immediately after the
     // rewrite and before this member is packed, so a stale lockfile refuses
-    // ONLY this member; a sweep afterwards could regenerate a lockfile that
-    // then goes stale again before it is ever packed.
+    // ONLY this member.
     const lockfile = await regenerateMemberLockfile(member, runtime);
     if (!lockfile.passed) {
       lockfileRefusals.push(lockfile.refusalMessage);
       continue;
     }
 
-    // Commit THIS member's release edits -- the bumped manifest and, when
-    // regenerated, its lockfile -- in its own repo, immediately before it is
-    // packed. Same call site as the checks above, same reason: the tarball is
-    // built from this member's working tree, and until this commit exists
-    // nothing in git describes what was actually packed.
-    const commit = await commitMemberReleaseEdits(member, version, lockfile.regenerated, runtime);
-    if (!commit.committed) {
-      commitRefusals.push(commit.refusalMessage);
-      continue;
-    }
+    built.push({
+      member,
+      gitHead,
+      lockfileRegenerated: lockfile.regenerated,
+      cleanliness,
+      branchCheck,
+    });
+  }
 
+  // ONE release commit for the whole family, made before anything is packed:
+  // every member lives in the same repository, so per-member commits would
+  // only stack one commit per member for a single release. The tarballs are
+  // built from the working tree, and until this commit exists nothing in git
+  // describes what is about to be packed. A refused member's edits are never
+  // in it.
+  let releaseCommitSha = "";
+  if (built.length > 0) {
+    const commit = await commitFamilyReleaseEdits(
+      built.map((entry) => ({ member: entry.member, includeLockfile: entry.lockfileRegenerated })),
+      version,
+      runtime,
+    );
+    if (commit.committed) {
+      releaseCommitSha = commit.sha;
+    } else {
+      commitRefusals.push(commit.refusalMessage);
+    }
+  }
+
+  for (const entry of releaseCommitSha ? built : []) {
+    const { member } = entry;
     const buildDirectory = path.join(BUILD_ROOT, ...member.name.split("/"), version);
     const packed = await runtime.runCommand({
       command: process.execPath,
@@ -748,11 +778,14 @@ async function buildAndPackAllMembers(
       version,
       tarballPath,
       sha256,
-      gitHead,
-      releaseCommitSha: commit.sha,
-      gitDirtyEntries: [...cleanliness.dirtyInSurface, ...cleanliness.waivedOutsideSurface],
-      checkedOutBranch: branchCheck.checkedOutBranch,
-      remoteDefaultBranch: branchCheck.remoteDefaultBranch,
+      gitHead: entry.gitHead,
+      releaseCommitSha,
+      gitDirtyEntries: [
+        ...entry.cleanliness.dirtyInSurface,
+        ...entry.cleanliness.waivedOutsideSurface,
+      ],
+      checkedOutBranch: entry.branchCheck.checkedOutBranch,
+      remoteDefaultBranch: entry.branchCheck.remoteDefaultBranch,
       builtAt: runtime.now().toISOString(),
     });
   }
@@ -764,9 +797,9 @@ async function buildAndPackAllMembers(
     lockfileRefusals.length > 0 ||
     commitRefusals.length > 0
   ) {
-    // Every clean, green member above still built and packed (see the
-    // `continue`s above) — this refuses the release as a whole only now,
-    // after every member has had its own independent chance, never before.
+    // Every clean, green member above still built, was committed and packed
+    // (see the `continue`s above) — this refuses the release as a whole only
+    // now, after every member has had its own independent chance, never before.
     throw new Error(
       [
         ...dirtyTreeRefusals,
@@ -905,7 +938,7 @@ export async function attemptArtifactReuse(
       };
     }
 
-    const currentDirtyEntries = await getRawGitStatus(member, runtime);
+    const currentDirtyEntries = await getMemberGitStatus(member, runtime);
     if (!sameDirtyEntries(currentDirtyEntries, entry.gitDirtyEntries)) {
       return {
         reusable: false,
@@ -923,32 +956,65 @@ export async function attemptArtifactReuse(
 }
 
 async function getGitHead(member: WarlockFamilyMember, runtime: Runtime): Promise<string> {
+  return await resolveHeadAt(member.root, member.name, runtime);
+}
+
+/** HEAD of the repository containing `cwd`, as a full lowercase sha. */
+async function resolveHeadAt(cwd: string, label: string, runtime: Runtime): Promise<string> {
   const result = await runtime.runCommand({
     command: "git",
     args: ["rev-parse", "HEAD"],
-    cwd: member.root,
+    cwd,
     env: { ...process.env },
   });
   const head = result.stdout.trim().toLowerCase();
   if (!/^[0-9a-f]{40}$/.test(head)) {
     throw new Error(
-      `Cannot resolve git HEAD for ${member.name}: unexpected output "${result.stdout.trim()}".`,
+      `Cannot resolve git HEAD for ${label}: unexpected output "${result.stdout.trim()}".`,
     );
   }
   return head;
 }
 
-async function getRawGitStatus(
+/**
+ * `git status` for ONE member's directory, with paths relative to that member.
+ *
+ * Every member lives in the same repository, and porcelain v1 always prints
+ * paths relative to the repository root -- never to the current directory.
+ * So the status is scoped with a `.` pathspec (a dirty sibling is that
+ * sibling's business) and the member's own prefix, as git reports it with
+ * `rev-parse --show-prefix`, is stripped. A path outside that prefix cannot
+ * appear under the pathspec; if one does, it is refused, never kept as-is.
+ */
+export async function getMemberGitStatus(
   member: WarlockFamilyMember,
   runtime: Runtime,
 ): Promise<DirtyPathEntry[]> {
-  const result = await runtime.runCommand({
+  const prefixResult = await runtime.runCommand({
     command: "git",
-    args: ["status", "--porcelain=v1", "--untracked-files=all"],
+    args: ["rev-parse", "--show-prefix"],
     cwd: member.root,
     env: { ...process.env },
   });
-  return parseGitPorcelain(result.stdout);
+  const prefix = normalizeRelative(prefixResult.stdout.trim());
+
+  const result = await runtime.runCommand({
+    command: "git",
+    args: ["status", "--porcelain=v1", "--untracked-files=all", "--", "."],
+    cwd: member.root,
+    env: { ...process.env },
+  });
+
+  return parseGitPorcelain(result.stdout).map((entry) => {
+    if (!prefix) return entry;
+    if (!entry.path.startsWith(`${prefix}/`)) {
+      throw new Error(
+        `git status for ${member.name} reported "${entry.path}", which is outside its own directory ` +
+          `"${prefix}" -- refusing to guess which package it belongs to.`,
+      );
+    }
+    return { ...entry, path: entry.path.slice(prefix.length + 1) };
+  });
 }
 
 function sameDirtyEntries(
@@ -963,7 +1029,7 @@ function sameDirtyEntries(
 }
 
 export interface DirtyPathEntry {
-  /** Path relative to the package's own git repository root, forward-slash normalized. */
+  /** Path relative to the package's own directory, forward-slash normalized. */
   path: string;
   /** Two-character `git status --porcelain` code, e.g. "M ", "??", " M". */
   status: string;
@@ -1074,13 +1140,7 @@ export async function checkPackageTreeIsClean(
   member: WarlockFamilyMember,
   runtime: Runtime,
 ): Promise<PackageCleanlinessResult> {
-  const status = await runtime.runCommand({
-    command: "git",
-    args: ["status", "--porcelain=v1", "--untracked-files=all"],
-    cwd: member.root,
-    env: { ...process.env },
-  });
-  const entries = parseGitPorcelain(status.stdout);
+  const entries = await getMemberGitStatus(member, runtime);
   const surface = resolvePublishedSurface(resolveFamilyPackageConfig(member.name));
 
   const dirtyInSurface: DirtyPathEntry[] = [];
@@ -1112,7 +1172,7 @@ export async function checkPackageTreeIsClean(
     }`,
     "Offending paths:",
     ...dirtyInSurface.map((entry) => `  - ${entry.path} (git "${entry.status}")`),
-    `Fix: commit or revert these paths in ${member.name}'s own git repository before releasing this ` +
+    `Fix: commit or revert these paths in ${member.name}'s directory before releasing this ` +
       `family. If a path genuinely never ships, exclude it from the published surface (srcDir/clone in ` +
       `pkgist.config.ts) instead of releasing over it.`,
   ].join("\n");
@@ -1140,7 +1200,7 @@ export interface PackageOwnQualityResult {
  * -Core install, generated-app typecheck, boot, build, start, and browser
  * assertions against a staged local registry — a great deal. None of it runs
  * a member's own test suite or typechecks its own source: a package can be
- * red in its own repository, at HEAD, with a clean working tree, and still
+ * red at HEAD, with a clean working tree, and still
  * reach every one of those checks unexamined. That happened for real (`web`
  * failed 3 test files / 9 tests and its typecheck exited 2, and both shipped
  * in 5.3.0 and 5.3.1) before this check existed.
@@ -1237,8 +1297,7 @@ async function checkPackageQualityScripts(
     `Package root: ${member.root}`,
     "Failing scripts:",
     ...failures.map((failure) => `  - ${failure}`),
-    `Fix: make ${member.name}'s own failing script(s) pass in its own repository before ` +
-      `releasing this family.`,
+    `Fix: make ${member.name}'s own failing script(s) pass before releasing this family.`,
   ].join("\n");
 
   return { passed: false, refusalMessage, skipped };
@@ -1254,22 +1313,20 @@ export interface PackageBranchResult {
 }
 
 /**
- * Prove that this member's checked-out branch is origin's default branch --
- * or that this run explicitly authorised releasing it from wherever it is
- * parked -- immediately before it is built and packed.
+ * Prove that the checked-out branch is origin's default branch -- or that
+ * this run explicitly authorised releasing this member from wherever the
+ * checkout is parked -- immediately before the member is built and packed.
  *
- * `tagAndPushMember` reads each member's checked-out branch per repo and
- * pushes there, correctly: these are 28 independent repositories and
- * hardcoding "main" would be the wrong rule. But nothing previously checked
- * that branch AGAINST anything, so a member parked off its default branch
- * (measured for real: `create-warlock` on `fix/scaffold-npm-arborist`, all 27
- * others on `main`/`master`) would tag and push the release there instead --
+ * `tagAndPushRelease` pushes the release commit to the checked-out branch,
+ * so that branch must be checked AGAINST origin's default. In the per-repo
+ * era a member parked off its default (measured for real: `create-warlock`
+ * on `fix/scaffold-npm-arborist`) would have been tagged and pushed there --
  * discovered only after publication, because every other check (clean tree,
  * correct sha, genuine ancestor, package live at the origin) still passes
  * against the wrong branch just as well as the right one.
  *
  * Refusing here, at the gate, is a control; refusing at the push (as
- * `tagAndPushMember` already does for a divergent origin tip) is an apology
+ * `tagAndPushRelease` already does for a divergent origin tip) is an apology
  * that arrives after the release is already public.
  */
 export async function checkPackageBranchMatchesOrigin(
@@ -1336,11 +1393,11 @@ export async function checkPackageBranchMatchesOrigin(
     `Refusing to release ${member.name}: it is checked out on "${checkedOutBranch}", but origin's ` +
       `default branch is "${remoteDefaultBranch}".`,
     `Package root: ${member.root}`,
-    `A release tags and pushes to whatever branch a member's own repo is parked on -- releasing ` +
-      `here would tag and push to "${checkedOutBranch}" instead of "${remoteDefaultBranch}", and every ` +
+    `A release pushes its commit and tag to whatever branch the repository is checked out on -- ` +
+      `releasing here would push to "${checkedOutBranch}" instead of "${remoteDefaultBranch}", and every ` +
       `other check (clean tree, own quality, genuine ancestor, package live at the origin) would still pass.`,
-    `Fix: check out "${remoteDefaultBranch}" in ${member.name}'s own repository before releasing this ` +
-      `family, or pass --allow-branch ${member.name} to explicitly authorise this deliberate branch release.`,
+    `Fix: check out "${remoteDefaultBranch}" before releasing this family, or pass ` +
+      `--allow-branch ${member.name} to explicitly authorise this deliberate branch release.`,
   ].join("\n");
 
   return {
@@ -1461,80 +1518,102 @@ export async function regenerateMemberLockfile(
   }
 }
 
-export interface MemberCommitResult {
+export interface FamilyCommitResult {
   committed: boolean;
   refusalMessage: string;
-  /** Full 40-char lowercase sha of the new commit -- empty when `committed` is false. */
+  /** Full 40-char lowercase sha of the release commit (or of HEAD when nothing was staged) -- empty when `committed` is false. */
   sha: string;
 }
 
+/** One built member's release edits: its bumped manifest and, when regenerated, its lockfile. */
+export interface MemberReleaseEdit {
+  member: WarlockFamilyMember;
+  includeLockfile: boolean;
+}
+
+/** The files a member's release edits touched, relative to that member's directory. */
+function releaseEditPaths(includeLockfile: boolean): string[] {
+  return includeLockfile ? ["package.json", PNPM_LOCKFILE_NAME] : ["package.json"];
+}
+
 /**
- * Commit one family member's release edits -- its bumped `package.json` and,
- * when this run regenerated one, its `pnpm-lock.yaml` -- in that member's own
- * repo, immediately before it is packed.
+ * Commit every built member's release edits -- each bumped `package.json`
+ * and, when this run regenerated one, its `pnpm-lock.yaml` -- as ONE commit
+ * in the monorepo, immediately before anything is packed.
  *
  * Path-scoped, explicit paths only. Never `git commit -a`, `git add -A` or
  * `git add .`: `checkPackageTreeIsClean` WAIVES (and merely logs) an
- * uncommitted change OUTSIDE this member's published surface, so a
- * teammate's unrelated in-progress file can legitimately be sitting in this
- * tree right now. A sweep would pull it into a release commit; naming exactly
- * the paths this release wrote is what keeps that impossible.
+ * uncommitted change OUTSIDE a member's published surface, and a teammate's
+ * unrelated in-progress file can legitimately be sitting anywhere in the
+ * repository right now. A sweep would pull it into a release commit; naming
+ * exactly the paths this release wrote is what keeps that impossible.
+ *
+ * Each member's paths are staged from that member's own directory; the
+ * commit itself runs at the repository root with every path repo-relative,
+ * and `git commit -- <paths>` commits only those paths whatever else is
+ * staged.
  */
-export async function commitMemberReleaseEdits(
-  member: WarlockFamilyMember,
+export async function commitFamilyReleaseEdits(
+  edits: readonly MemberReleaseEdit[],
   version: string,
-  includeLockfile: boolean,
   runtime: Runtime,
-): Promise<MemberCommitResult> {
-  const paths = includeLockfile ? ["package.json", PNPM_LOCKFILE_NAME] : ["package.json"];
+): Promise<FamilyCommitResult> {
+  const repoPaths = edits.flatMap(({ member, includeLockfile }) =>
+    releaseEditPaths(includeLockfile).map((file) =>
+      path.relative(REPO_ROOT, path.join(member.root, file)).split(path.sep).join("/"),
+    ),
+  );
 
   try {
-    await runtime.runCommand({
-      command: "git",
-      args: ["add", "--", ...paths],
-      cwd: member.root,
-      env: { ...process.env },
-    });
+    for (const { member, includeLockfile } of edits) {
+      await runtime.runCommand({
+        command: "git",
+        args: ["add", "--", ...releaseEditPaths(includeLockfile)],
+        cwd: member.root,
+        env: { ...process.env },
+      });
+    }
 
     // The gate reconciles the family version from SOURCE, so a release run
     // always starts from manifests already committed at `version` -- and
     // pkgist's rewrite of an already-bumped manifest is then a no-op. That
     // is not a failure: there is nothing to commit, and HEAD is already the
-    // commit the tarball is built from. Asked explicitly rather than inferred
-    // from `git commit` failing, because a refused hook fails the same way
-    // and must still refuse this member.
+    // commit the tarballs are built from. Asked explicitly rather than
+    // inferred from `git commit` failing, because a refused hook fails the
+    // same way and must still refuse the release.
     const staged = await runtime.runCommand({
       command: "git",
-      args: ["diff", "--cached", "--name-only", "--", ...paths],
-      cwd: member.root,
+      args: ["diff", "--cached", "--name-only", "--", ...repoPaths],
+      cwd: REPO_ROOT,
       env: { ...process.env },
     });
 
     if (staged.stdout.trim().length === 0) {
-      const head = await getGitHead(member, runtime);
+      const head = await resolveHeadAt(REPO_ROOT, "the repository", runtime);
       return { committed: true, refusalMessage: "", sha: head };
     }
 
     await runtime.runCommand({
       command: "git",
-      args: ["commit", "-m", `release: ${member.name}@${version}`, "--", ...paths],
-      cwd: member.root,
+      args: ["commit", "-m", `release: v${version}`, "--", ...repoPaths],
+      cwd: REPO_ROOT,
       env: { ...process.env },
     });
   } catch (error) {
     return {
       committed: false,
       refusalMessage: [
-        `Refusing to pack ${member.name}: its release edits could not be committed.`,
-        `Package root: ${member.root}`,
-        `Paths: ${paths.join(", ")}`,
+        `Refusing to pack ${edits.map(({ member }) => member.name).join(", ")}: the family's release ` +
+          "edits could not be committed.",
+        `Repository root: ${REPO_ROOT}`,
+        `Paths: ${repoPaths.join(", ")}`,
         `git commit: ${formatError(error)}`,
       ].join("\n"),
       sha: "",
     };
   }
 
-  const sha = await getGitHead(member, runtime);
+  const sha = await resolveHeadAt(REPO_ROOT, "the repository", runtime);
   return { committed: true, refusalMessage: "", sha };
 }
 
@@ -2050,12 +2129,21 @@ async function confirmAtOrigin(handoff: ReleaseHandoff, runtime: Runtime): Promi
   }
 }
 
-/** `v<version>` -- the format every family member's own repo already uses for its release tags (verified against each member's existing `git tag` output, e.g. `v5.6.0`). */
+/** `v<version>` -- one tag per release on the monorepo, the format the family has always used (e.g. `v5.6.0`). */
 export function releaseTagName(version: string): string {
   return `v${version}`;
 }
 
-export interface MemberTagPushOutcome {
+/** The repository a release is tagged and pushed in: a label for messages, and any directory inside it. */
+export interface ReleaseRepository {
+  name: string;
+  root: string;
+}
+
+/** The monorepo every family member lives in. */
+export const FAMILY_REPOSITORY: ReleaseRepository = { name: "warlockjs/framework", root: REPO_ROOT };
+
+export interface ReleaseTagPushOutcome {
   name: string;
   tag: string;
   /** Undefined only when the branch itself could not be resolved (refused). */
@@ -2073,7 +2161,7 @@ export interface MemberTagPushOutcome {
   /** True when origin's branch ref was already at the recorded sha -- a no-op success. */
   alreadyPushed: boolean;
   refused: boolean;
-  /** Names this member, the branch, and the offending commits/shas -- empty when not refused. */
+  /** Names the repository, the branch, and the offending commits/shas -- empty when not refused. */
   refusalMessage: string;
 }
 
@@ -2082,7 +2170,7 @@ function refusedTagPushOutcome(
   tag: string,
   refusalMessage: string,
   branch?: string,
-): MemberTagPushOutcome {
+): ReleaseTagPushOutcome {
   return {
     name,
     tag,
@@ -2099,23 +2187,22 @@ function refusedTagPushOutcome(
 }
 
 /**
- * Resolve the branch currently checked out in one member's OWN repo.
- *
- * These are 28 independent repositories -- nothing here may assume a branch
- * name (e.g. "main"). `create-warlock` today is checked out on a feature
- * branch, not "main", which is exactly the case a hard-coded name would miss.
+ * Resolve the branch currently checked out in the repository containing
+ * `target.root`. Nothing here may assume a branch name (e.g. "main"): a
+ * checkout parked on a feature branch is exactly the case a hard-coded name
+ * would miss.
  */
-async function resolveMemberBranch(member: WarlockFamilyMember, runtime: Runtime): Promise<string> {
+async function resolveMemberBranch(target: ReleaseRepository, runtime: Runtime): Promise<string> {
   const result = await runtime.runCommand({
     command: "git",
     args: ["rev-parse", "--abbrev-ref", "HEAD"],
-    cwd: member.root,
+    cwd: target.root,
     env: { ...process.env },
   });
   const branch = result.stdout.trim();
   if (!branch || branch === "HEAD") {
     throw new Error(
-      `Cannot resolve a branch for ${member.name}: HEAD is detached (got "${branch}").`,
+      `Cannot resolve a branch for ${target.name}: HEAD is detached (got "${branch}").`,
     );
   }
   return branch;
@@ -2123,30 +2210,28 @@ async function resolveMemberBranch(member: WarlockFamilyMember, runtime: Runtime
 
 /**
  * Ask the remote what its default branch is -- never hardcode a name, never
- * guess from a fixed list ("main", "master", ...). These are 28 independent
- * repositories; a hardcoded guess is exactly the wrong rule this check exists
- * to avoid.
+ * guess from a fixed list ("main", "master", ...).
  *
  * `git symbolic-ref refs/remotes/origin/HEAD` is only a LOCAL cache of the
  * answer: it can be unset (never recorded by a plain clone) or stale (set
  * once, never refreshed if the remote's default branch later changes), and
  * this file already refuses to trust a local cache for origin state --
- * `resolveOriginRefSha` above uses `ls-remote` for the same reason, recorded
- * in canon `75a5376f`: a stale remote-tracking ref reports success while
- * being frozen. `git ls-remote --symref origin HEAD` asks the remote
- * directly and requires no local fetch.
+ * `resolveOriginRefSha` below uses `ls-remote` for the same reason: a stale
+ * remote-tracking ref reports success while being frozen.
+ * `git ls-remote --symref origin HEAD` asks the remote directly and requires
+ * no local fetch.
  *
  * Returns `undefined` when the answer cannot be resolved -- the caller
  * refuses on that, it never assumes a default.
  */
 async function resolveOriginDefaultBranch(
-  member: WarlockFamilyMember,
+  target: ReleaseRepository,
   runtime: Runtime,
 ): Promise<string | undefined> {
   const result = await runtime.runCommand({
     command: "git",
     args: ["ls-remote", "--symref", "origin", "HEAD"],
-    cwd: member.root,
+    cwd: target.root,
     env: { ...process.env },
   });
   const symrefLine = result.stdout.split(/\r?\n/).find((line) => line.startsWith("ref:"));
@@ -2156,14 +2241,14 @@ async function resolveOriginDefaultBranch(
 
 /** The commit a remote ref (a branch or a tag) currently points at, or undefined when the ref does not exist at origin. Never requires a local fetch. */
 async function resolveOriginRefSha(
-  member: WarlockFamilyMember,
+  target: ReleaseRepository,
   ref: string,
   runtime: Runtime,
 ): Promise<string | undefined> {
   const result = await runtime.runCommand({
     command: "git",
     args: ["ls-remote", "origin", ref],
-    cwd: member.root,
+    cwd: target.root,
     env: { ...process.env },
   });
   const line = result.stdout.split(/\r?\n/).find((value) => value.trim().length > 0);
@@ -2171,14 +2256,14 @@ async function resolveOriginRefSha(
   const sha = line.split(/\s+/)[0]?.toLowerCase();
   if (!sha || !/^[0-9a-f]{40}$/.test(sha)) {
     throw new Error(
-      `Cannot parse "git ls-remote origin ${ref}" output for ${member.name}: "${line}".`,
+      `Cannot parse "git ls-remote origin ${ref}" output for ${target.name}: "${line}".`,
     );
   }
   return sha;
 }
 
 async function isAncestorCommit(
-  member: WarlockFamilyMember,
+  target: ReleaseRepository,
   ancestorSha: string,
   descendantSha: string,
   runtime: Runtime,
@@ -2187,7 +2272,7 @@ async function isAncestorCommit(
     await runtime.runCommand({
       command: "git",
       args: ["merge-base", "--is-ancestor", ancestorSha, descendantSha],
-      cwd: member.root,
+      cwd: target.root,
       env: { ...process.env },
     });
     return true;
@@ -2198,7 +2283,7 @@ async function isAncestorCommit(
 
 /** Best-effort: the offending commits are for the refusal message, never load-bearing to the refusal itself. */
 async function listCommitsBetween(
-  member: WarlockFamilyMember,
+  target: ReleaseRepository,
   fromExclusiveSha: string,
   toInclusiveSha: string,
   runtime: Runtime,
@@ -2207,7 +2292,7 @@ async function listCommitsBetween(
     const result = await runtime.runCommand({
       command: "git",
       args: ["log", "--oneline", `${fromExclusiveSha}..${toInclusiveSha}`],
-      cwd: member.root,
+      cwd: target.root,
       env: { ...process.env },
     });
     return result.stdout.split(/\r?\n/).filter((line) => line.trim().length > 0);
@@ -2218,7 +2303,7 @@ async function listCommitsBetween(
 
 /** The local tag's sha, or undefined when no such tag exists locally yet. */
 async function resolveLocalTagSha(
-  member: WarlockFamilyMember,
+  target: ReleaseRepository,
   tag: string,
   runtime: Runtime,
 ): Promise<string | undefined> {
@@ -2226,7 +2311,7 @@ async function resolveLocalTagSha(
     const result = await runtime.runCommand({
       command: "git",
       args: ["rev-parse", "--verify", `refs/tags/${tag}^{commit}`],
-      cwd: member.root,
+      cwd: target.root,
       env: { ...process.env },
     });
     return result.stdout.trim().toLowerCase();
@@ -2236,43 +2321,44 @@ async function resolveLocalTagSha(
 }
 
 /**
- * Tag and push ONE family member at its recorded `releaseCommitSha` -- never
- * at HEAD, which may have moved since the build.
+ * Tag the release commit `v<version>` and push the tag and the branch -- once,
+ * for the whole family -- at the recorded `releaseCommitSha`, never at HEAD,
+ * which may have moved since the build.
  *
  * Idempotent by construction: a tag that already exists at the SAME sha, or
  * a branch/tag ref already at the recorded sha at origin, is reported as a
  * no-op success, never redone. A tag or ref that exists at a DIFFERENT sha is
  * a refusal -- this never passes `--force`.
  */
-export async function tagAndPushMember(
-  member: WarlockFamilyMember,
+export async function tagAndPushRelease(
+  target: ReleaseRepository,
   version: string,
   releaseCommitSha: string,
   runtime: Runtime,
-): Promise<MemberTagPushOutcome> {
+): Promise<ReleaseTagPushOutcome> {
   const sha = releaseCommitSha.toLowerCase();
   const tag = releaseTagName(version);
 
   let branch: string;
   try {
-    branch = await resolveMemberBranch(member, runtime);
+    branch = await resolveMemberBranch(target, runtime);
   } catch (error) {
-    return refusedTagPushOutcome(member.name, tag, formatError(error));
+    return refusedTagPushOutcome(target.name, tag, formatError(error));
   }
 
   // Refuse rather than push something unexpected: origin's current branch
   // tip must be an ancestor of (or equal to) the recorded release commit. If
   // it is not, origin carries commits this release does not account for.
-  const originBranchTip = await resolveOriginRefSha(member, `refs/heads/${branch}`, runtime);
+  const originBranchTip = await resolveOriginRefSha(target, `refs/heads/${branch}`, runtime);
   if (originBranchTip && originBranchTip !== sha) {
-    const isAncestor = await isAncestorCommit(member, originBranchTip, sha, runtime);
+    const isAncestor = await isAncestorCommit(target, originBranchTip, sha, runtime);
     if (!isAncestor) {
-      const offending = await listCommitsBetween(member, sha, originBranchTip, runtime);
+      const offending = await listCommitsBetween(target, sha, originBranchTip, runtime);
       return refusedTagPushOutcome(
-        member.name,
+        target.name,
         tag,
         [
-          `Refusing to push ${member.name}: origin/${branch} (${originBranchTip}) is not an ` +
+          `Refusing to push ${target.name}: origin/${branch} (${originBranchTip}) is not an ` +
             `ancestor of the recorded release commit ${sha}.`,
           `Branch: ${branch}`,
           offending.length > 0
@@ -2287,13 +2373,13 @@ export async function tagAndPushMember(
 
   let tagged = false;
   let alreadyTagged = false;
-  const localTagSha = await resolveLocalTagSha(member, tag, runtime);
+  const localTagSha = await resolveLocalTagSha(target, tag, runtime);
   if (localTagSha) {
     if (localTagSha !== sha) {
       return refusedTagPushOutcome(
-        member.name,
+        target.name,
         tag,
-        `Refusing to move tag ${tag} for ${member.name}: it already exists locally at ` +
+        `Refusing to move tag ${tag} in ${target.name}: it already exists locally at ` +
           `${localTagSha}, not the recorded release commit ${sha}. Never moved with --force.`,
         branch,
       );
@@ -2303,7 +2389,7 @@ export async function tagAndPushMember(
     await runtime.runCommand({
       command: "git",
       args: ["tag", tag, sha],
-      cwd: member.root,
+      cwd: target.root,
       env: { ...process.env },
     });
     tagged = true;
@@ -2311,13 +2397,13 @@ export async function tagAndPushMember(
 
   let tagPushed = false;
   let tagAlreadyPushed = false;
-  const originTagSha = await resolveOriginRefSha(member, `refs/tags/${tag}`, runtime);
+  const originTagSha = await resolveOriginRefSha(target, `refs/tags/${tag}`, runtime);
   if (originTagSha) {
     if (originTagSha !== sha) {
       return refusedTagPushOutcome(
-        member.name,
+        target.name,
         tag,
-        `Refusing to move tag ${tag} for ${member.name} at origin: it already exists there at ` +
+        `Refusing to move tag ${tag} in ${target.name} at origin: it already exists there at ` +
           `${originTagSha}, not the recorded release commit ${sha}. Never moved with --force.`,
         branch,
       );
@@ -2327,7 +2413,7 @@ export async function tagAndPushMember(
     await runtime.runCommand({
       command: "git",
       args: ["push", "origin", `refs/tags/${tag}`],
-      cwd: member.root,
+      cwd: target.root,
       env: { ...process.env },
     });
     tagPushed = true;
@@ -2343,14 +2429,14 @@ export async function tagAndPushMember(
     await runtime.runCommand({
       command: "git",
       args: ["push", "origin", `${sha}:refs/heads/${branch}`],
-      cwd: member.root,
+      cwd: target.root,
       env: { ...process.env },
     });
     pushed = true;
   }
 
   return {
-    name: member.name,
+    name: target.name,
     tag,
     branch,
     tagged,
@@ -2365,68 +2451,73 @@ export async function tagAndPushMember(
 }
 
 /**
- * Tag and push every family member named in the handoff, at each member's
- * own `releaseCommitSha` recorded in `build-provenance.json` -- read back
- * here rather than threaded through the handoff, exactly as `confirmAtOrigin`
- * reads the handoff rather than re-deriving it.
+ * Tag and push the release ONCE for the whole family, at the release commit
+ * recorded in `build-provenance.json` -- read back here rather than threaded
+ * through the handoff, exactly as `confirmAtOrigin` reads the handoff rather
+ * than re-deriving it.
  *
- * One member's refusal never stops the other 27: every member gets its own
- * independent attempt, and this throws once at the end with every refusal
- * joined -- the same shape as the gate's own per-member refusals.
+ * Every subject must have a recorded entry, and every entry must name the SAME
+ * release commit: the family is one repository and one commit. Anything else
+ * means the provenance does not describe this layout, and is refused before
+ * any tag or push.
  */
-export async function tagAndPushAllMembers(
+export async function tagAndPushFamily(
   family: WarlockFamily,
   handoff: ReleaseHandoff,
   version: string,
   runtime: Runtime,
-): Promise<readonly MemberTagPushOutcome[]> {
+  repository: ReleaseRepository = FAMILY_REPOSITORY,
+): Promise<ReleaseTagPushOutcome> {
   const artifactDirectory = path.join(ARTIFACT_ROOT, version);
   const provenance = await readProvenance(artifactDirectory, version, runtime);
   if (!provenance) {
     throw new Error(
       `Refusing to tag/push: no build-provenance.json for version ${version} in ` +
-        `${artifactDirectory} -- cannot recover each member's recorded release commit.`,
+        `${artifactDirectory} -- cannot recover the recorded release commit.`,
     );
   }
   const provenanceByName = new Map(provenance.members.map((entry) => [entry.name, entry]));
-  const membersByName = new Map(family.members.map((member) => [member.name, member]));
+  const familyNames = new Set(family.members.map((member) => member.name));
 
-  const results: MemberTagPushOutcome[] = [];
-  const refusals: string[] = [];
-
-  for (const name of handoff.subjects) {
-    const member = membersByName.get(name);
-    const entry = provenanceByName.get(name);
-    if (!member || !entry) {
-      const message =
-        `Refusing to tag/push ${name}: no recorded release-commit sha in build-provenance.json ` +
-        `for version ${version}.`;
-      console.warn(`[release-family] REFUSED (tag/push) ${name}: ${message}`);
-      refusals.push(message);
-      continue;
-    }
-
-    const outcome = await tagAndPushMember(member, version, entry.releaseCommitSha, runtime);
-    results.push(outcome);
-
-    if (outcome.refused) {
-      console.warn(`[release-family] REFUSED (tag/push) ${name}: ${outcome.refusalMessage}`);
-      refusals.push(outcome.refusalMessage);
-    } else {
-      console.warn(
-        `[release-family] ${name} @ ${entry.releaseCommitSha}: tag ${outcome.tag} ` +
-          `${outcome.alreadyTagged ? "already existed locally" : "created"}, ` +
-          `${outcome.tagAlreadyPushed ? "already at origin" : "pushed to origin"}; ` +
-          `branch ${outcome.branch} ${outcome.alreadyPushed ? "already at that commit" : "pushed"}.`,
-      );
-    }
+  const missing = handoff.subjects.filter(
+    (name) => !familyNames.has(name) || !provenanceByName.has(name),
+  );
+  if (missing.length > 0) {
+    throw new Error(
+      `Refusing to tag/push: no recorded release-commit sha in build-provenance.json for version ` +
+        `${version} for: ${missing.join(", ")}.`,
+    );
   }
 
-  if (refusals.length > 0) {
-    throw new Error(refusals.join("\n\n"));
+  const shas = new Set(
+    handoff.subjects.map((name) => provenanceByName.get(name)!.releaseCommitSha.toLowerCase()),
+  );
+  if (shas.size !== 1) {
+    throw new Error(
+      [
+        `Refusing to tag/push: the family's members recorded ${shas.size} different release commits ` +
+          `for version ${version}; one release is one commit.`,
+        ...handoff.subjects.map(
+          (name) => `  - ${name}: ${provenanceByName.get(name)!.releaseCommitSha}`,
+        ),
+      ].join("\n"),
+    );
+  }
+  const [releaseCommitSha] = [...shas];
+
+  const outcome = await tagAndPushRelease(repository, version, releaseCommitSha!, runtime);
+  if (outcome.refused) {
+    console.warn(`[release-family] REFUSED (tag/push) ${repository.name}: ${outcome.refusalMessage}`);
+    throw new Error(outcome.refusalMessage);
   }
 
-  return results;
+  console.warn(
+    `[release-family] ${repository.name} @ ${releaseCommitSha}: tag ${outcome.tag} ` +
+      `${outcome.alreadyTagged ? "already existed locally" : "created"}, ` +
+      `${outcome.tagAlreadyPushed ? "already at origin" : "pushed to origin"}; ` +
+      `branch ${outcome.branch} ${outcome.alreadyPushed ? "already at that commit" : "pushed"}.`,
+  );
+  return outcome;
 }
 
 function assertGeneratedPins(manifest: BuiltManifest, version: string): void {
@@ -2738,7 +2829,7 @@ function parsePackedTarball(stdout: string, directory: string, name: string): st
 
 function withDefaults(dependencies: ReleaseFamilyDependencies): Runtime {
   return {
-    loadFamily: dependencies.loadFamily ?? (() => loadAuthoritativeWarlockFamily(WORKSPACE_ROOT)),
+    loadFamily: dependencies.loadFamily ?? (() => loadAuthoritativeWarlockFamily(PACKAGES_ROOT)),
     runCommand: dependencies.runCommand ?? defaultRunCommand,
     readTextFile: dependencies.readTextFile ?? ((filePath) => readFile(filePath, "utf8")),
     writeTextFile:

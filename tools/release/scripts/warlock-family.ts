@@ -49,20 +49,20 @@ type PackageManifest = {
 /**
  * Discover the release family independently of pkgist.
  *
- * Only direct children of the workspace are inspected. The public scoped
- * packages and the unscoped scaffolder are members; private docs/builder
- * packages and nested fixtures are not.
+ * Only direct children of `packagesRoot` (the monorepo's `packages/`) are
+ * inspected. The public scoped packages and the unscoped scaffolder are
+ * members; private packages and nested fixtures are not.
  */
 export async function scanTopLevelPublishableManifests(
-  workspaceRoot: string,
+  packagesRoot: string,
 ): Promise<PublishableManifest[]> {
-  const entries = await readdir(workspaceRoot, { withFileTypes: true });
+  const entries = await readdir(packagesRoot, { withFileTypes: true });
   const manifests: PublishableManifest[] = [];
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
 
-    const root = path.resolve(workspaceRoot, entry.name);
+    const root = path.resolve(packagesRoot, entry.name);
     const manifestPath = path.join(root, "package.json");
     let source: string;
 
@@ -190,7 +190,7 @@ export async function deriveWarlockFamily({
 
 /** Load and reconcile the real `warlock` declaration from pkgist.config.ts. */
 export async function loadAuthoritativeWarlockFamily(
-  workspaceRoot: string = path.resolve(import.meta.dirname, "../.."),
+  packagesRoot: string = path.resolve(import.meta.dirname, "../../../packages"),
 ): Promise<WarlockFamily> {
   const configDir = path.resolve(import.meta.dirname, "..");
   const declaration = pkgistConfig.families?.find(
@@ -201,7 +201,7 @@ export async function loadAuthoritativeWarlockFamily(
     throw new Error(`pkgist.config.ts has no ${JSON.stringify(WARLOCK_FAMILY_NAME)} family.`);
   }
 
-  return deriveWarlockFamily({ workspaceRoot, configDir, declaration });
+  return deriveWarlockFamily({ workspaceRoot: packagesRoot, configDir, declaration });
 }
 
 function isWarlockPackageName(name: unknown): name is string {

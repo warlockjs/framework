@@ -40,8 +40,8 @@
  * pass named two of the three lists and reported three phantom missing keys. So
  * every exported array of `{ key }` objects counts, whatever it is called.
  */
-import { featuresMap } from "../../core/src/generations/features/index";
-import * as scaffolderMap from "../../create-warlock/src/features/features-map";
+import { featuresMap } from "../../../packages/core/src/generations/features/index";
+import * as scaffolderMap from "../../../packages/create-warlock/src/features/features-map";
 
 /**
  * Core keys that are deliberately NOT offered by the scaffolder.

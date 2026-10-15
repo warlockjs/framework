@@ -1,7 +1,7 @@
 // The release's blog check: installs the Warlock.js family into the blog test
 // app, then proves it end to end on a GitHub Actions ubuntu runner.
 //
-//   node ci/blog-check.mjs          (from builder/, after the family gate)
+//   node tools/release/ci/blog-check.mjs   (after the family gate)
 //
 // Steps, in order, all inside $BLOG_DIR:
 //   1. point every @warlock.js/* at the gate tarballs (MODE=tarballs) or the

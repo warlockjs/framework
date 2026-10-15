@@ -18,7 +18,8 @@ import { consumerStrictnessFlags } from "./consumer-strictness-flags";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-export const REPO_ROOT = path.resolve(__dirname, "..", "..");
+/** The monorepo root (tools/release/scripts -> ../../..). */
+export const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 const ALLOWANCES_PATH = path.join(__dirname, "strictness-allowances.jsonc");
 const STRICTNESS_CONTRACT_PATH = path.join(REPO_ROOT, "tsconfig.base.json");
 const TSC_PATH = path.join(REPO_ROOT, "node_modules", ".pnpm", "typescript@5.9.3", "node_modules", "typescript", "bin", "tsc");
@@ -32,10 +33,17 @@ function isDirectory(filePath: string): boolean {
   try { return statSync(filePath).isDirectory(); } catch { return false; }
 }
 
-/** Every source package with a TypeScript config; builder is deliberately absent. */
+/**
+ * Every source package with a TypeScript config: each `packages/<name>`, plus
+ * any top-level project such as `docs`. Keyed by directory name, which is
+ * what the allowances file records. The release tooling is deliberately
+ * absent (it has no `src`).
+ */
 export function discoverPackages(repoRoot = REPO_ROOT): WorkspacePackage[] {
-  return readdirSync(repoRoot)
-    .map((dir) => ({ dir, path: path.join(repoRoot, dir) }))
+  const packagesRoot = path.join(repoRoot, "packages");
+  const parents = isDirectory(packagesRoot) ? [packagesRoot, repoRoot] : [repoRoot];
+  return parents
+    .flatMap((parent) => readdirSync(parent).map((dir) => ({ dir, path: path.join(parent, dir) })))
     .filter((pkg) => isDirectory(pkg.path) && existsSync(path.join(pkg.path, "src")) && existsSync(path.join(pkg.path, "tsconfig.json")))
     .sort((a, b) => a.dir.localeCompare(b.dir));
 }

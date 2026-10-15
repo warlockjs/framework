@@ -1,18 +1,19 @@
 name: release
 
 # Builds, gates and (optionally) publishes the whole @warlock.js family at one
-# version. Owner ruling 2026-09-29 (canon 32884462): releases run here, not on
-# a developer machine.
+# version. Owner ruling 2026-09-29: releases run here, not on a developer
+# machine.
 #
 # One job on purpose: the handoff records ABSOLUTE tarball paths and the gate's
-# local release commits, so gate, publish and confirm must share one filesystem.
+# release commit, so gate, publish and confirm must share one filesystem.
 #
 #   publish=false  full check (strictness, every member's tests + typecheck,
 #                  build, local-registry install, blog on the tarballs); stops
 #                  before npm.
 #   publish=true   the same, then npm publish, confirm at npm origin (install,
-#                  import, create-warlock), tag + push v<version> in every
-#                  member repo, and the blog again from the registry.
+#                  import, create-warlock), tag v<version> once on this
+#                  repository and push it with the release commit, and the
+#                  blog again from the registry.
 
 on:
   workflow_dispatch:
@@ -39,6 +40,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 350
+    permissions:
+      # The confirm step pushes the release commit and the v<version> tag.
+      contents: write
     services:
       # queue + notifications test suites need a real Redis on 6390; there is no skip path.
       redis:
@@ -59,9 +63,10 @@ jobs:
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
     env:
       WARLOCK_VERSION: ${{ inputs.version }}
-      WS: ${{ github.workspace }}/ws
-      BLOG_DIR: ${{ github.workspace }}/blog
-      LOGS: ${{ github.workspace }}/logs
+      # Outside the checkout: the blog runs its own install, which must not see
+      # this repository's pnpm-workspace.yaml above it.
+      BLOG_DIR: ${{ github.workspace }}/../blog
+      LOGS: ${{ github.workspace }}/.release-logs
       QUEUE_REDIS_HOST: 127.0.0.1
       QUEUE_REDIS_PORT: "6390"
       CI: "1"
@@ -74,10 +79,15 @@ jobs:
           fi
           mkdir -p "$LOGS"
 
-      - name: Checkout release tooling
+      # Full history and tags: `confirm` checks ancestry against origin and
+      # pushes the recorded release commit. No credential is persisted to
+      # .git/config -- the token is passed per step below, so nothing else in
+      # the job (package tests included) can read it from disk.
+      - name: Checkout the framework
         uses: actions/checkout@v4
         with:
-          path: ws/builder
+          fetch-depth: 0
+          fetch-tags: true
           persist-credentials: false
 
       - uses: actions/setup-node@v4
@@ -95,57 +105,64 @@ jobs:
           git config --global user.email "release@warlock.js.org"
           git config --global core.autocrlf false
           git config --global init.defaultBranch main
+          # The install marks bin files executable; the release's clean-tree
+          # check must not read that mode flip as an uncommitted change.
+          git config core.fileMode false
 
-      - name: Clone the family, docs and the blog
+      - name: Clone the blog
+        run: git clone --quiet --branch main https://github.com/warlockjs/blog-test.git "$BLOG_DIR"
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
-        run: |
-          bash ws/builder/ci/checkout-family.sh
-          cat "$RUNNER_TEMP/checked-out.md" >> "$GITHUB_STEP_SUMMARY"
+          # warlockjs/blog-test is private. Passed per command, never written to .git/config.
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: url.https://x-access-token:${{ secrets.RELEASE_GH_TOKEN }}@github.com/.insteadOf
+          GIT_CONFIG_VALUE_0: https://github.com/
 
-      - name: Assemble the workspace root
-        run: cp -a ws/builder/ci/workspace/. ws/
+      - name: Record what is being gated
+        run: |
+          {
+            echo "| repo | commit |"
+            echo "|---|---|"
+            echo "| warlockjs/framework | \`$(git rev-parse --short HEAD)\` ($(git rev-parse --abbrev-ref HEAD)) |"
+            echo "| warlockjs/blog-test | \`$(git -C "$BLOG_DIR" rev-parse --short HEAD)\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check every member is at the release version
-        working-directory: ws
         run: |
           bad=0
-          for d in $(grep -oE 'root: "\.\./[a-z0-9-]+"' builder/pkgist.config.ts | sed -E 's/.*\.\.\/([a-z0-9-]+)"/\1/'); do
-            v=$(node -p "require('./$d/package.json').version")
-            if [ "$v" != "$WARLOCK_VERSION" ]; then echo "::error::$d is at $v"; bad=1; fi
+          for d in $(grep -oE 'root: "\.\./\.\./packages/[a-z0-9-]+"' tools/release/pkgist.config.ts | sed -E 's/.*packages\/([a-z0-9-]+)"/\1/'); do
+            v=$(node -p "require('./packages/$d/package.json').version")
+            if [ "$v" != "$WARLOCK_VERSION" ]; then echo "::error::packages/$d is at $v"; bad=1; fi
           done
           exit $bad
 
       - name: Install the workspace
-        working-directory: ws
         run: pnpm install --frozen-lockfile
 
       - name: Install the release runner
-        working-directory: ws/builder
+        working-directory: tools/release
         run: npm ci --no-audit --no-fund
 
       - name: Test release scripts
-        working-directory: ws/builder
+        working-directory: tools/release
         run: npm run test:scripts
 
       - name: Skill cross-references name topics, not paths
         # agent-kit flattens skills into an app on install, so `../x/SKILL.md` breaks there.
-        working-directory: ws/builder
+        working-directory: tools/release
         run: npm run check:skill-path-refs
 
       - name: Generate the docs site's Astro types
         # `astro:content` types live in docs/.astro, which is generated and
         # gitignored; without it the strictness ratchet counts phantom errors.
-        working-directory: ws/docs
+        working-directory: docs
         run: node node_modules/astro/bin/astro.mjs sync
 
       - name: Gate (strictness, tests, typecheck, build, pack, local-registry install)
-        working-directory: ws/builder
-        # The branch check reads each member's default branch from GitHub, and
-        # 12 member repos are private.
+        working-directory: tools/release
+        # The branch check asks origin for its default branch.
         env:
           GIT_CONFIG_COUNT: "1"
-          GIT_CONFIG_KEY_0: url.https://x-access-token:${{ secrets.RELEASE_GH_TOKEN }}@github.com/.insteadOf
+          GIT_CONFIG_KEY_0: url.https://x-access-token:${{ github.token }}@github.com/.insteadOf
           GIT_CONFIG_VALUE_0: https://github.com/
         run: |
           set -o pipefail
@@ -157,27 +174,27 @@ jobs:
         with:
           name: warlock-${{ inputs.version }}-artifacts
           path: |
-            ws/builder/release-artifacts/${{ inputs.version }}
-            ws/builder/release-handoffs/warlock-${{ inputs.version }}.json
+            tools/release/release-artifacts/${{ inputs.version }}
+            tools/release/release-handoffs/warlock-${{ inputs.version }}.json
           if-no-files-found: ignore
           retention-days: 30
 
       - name: Install the browser for the blog check
-        run: node ws/web/node_modules/@playwright/test/cli.js install --with-deps chromium
+        run: node packages/web/node_modules/@playwright/test/cli.js install --with-deps chromium
 
       - name: Blog on the release tarballs
         env:
           MODE: tarballs
-          TARBALL_DIR: ${{ github.workspace }}/ws/builder/release-artifacts/${{ inputs.version }}
-          PLAYWRIGHT_MODULE: ${{ github.workspace }}/ws/web/node_modules/@playwright/test/index.mjs
-          EVIDENCE_PATH: ${{ github.workspace }}/logs/blog-tarballs.json
+          TARBALL_DIR: ${{ github.workspace }}/tools/release/release-artifacts/${{ inputs.version }}
+          PLAYWRIGHT_MODULE: ${{ github.workspace }}/packages/web/node_modules/@playwright/test/index.mjs
+          EVIDENCE_PATH: ${{ github.workspace }}/.release-logs/blog-tarballs.json
         run: |
           set -o pipefail
-          node ws/builder/ci/blog-check.mjs 2>&1 | tee "$LOGS/blog-tarballs.log"
+          node tools/release/ci/blog-check.mjs 2>&1 | tee "$LOGS/blog-tarballs.log"
 
       - name: Publish to npm
         if: inputs.publish
-        working-directory: ws/builder
+        working-directory: tools/release
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
@@ -186,10 +203,10 @@ jobs:
 
       - name: Confirm at npm, then tag and push
         if: inputs.publish
-        working-directory: ws/builder
+        working-directory: tools/release
         env:
           GIT_CONFIG_COUNT: "1"
-          GIT_CONFIG_KEY_0: url.https://x-access-token:${{ secrets.RELEASE_GH_TOKEN }}@github.com/.insteadOf
+          GIT_CONFIG_KEY_0: url.https://x-access-token:${{ github.token }}@github.com/.insteadOf
           GIT_CONFIG_VALUE_0: https://github.com/
         # A 404 right after publish is propagation lag: rerun confirm, never republish.
         run: |
@@ -207,18 +224,18 @@ jobs:
         if: inputs.publish
         env:
           MODE: registry
-          PLAYWRIGHT_MODULE: ${{ github.workspace }}/ws/web/node_modules/@playwright/test/index.mjs
-          EVIDENCE_PATH: ${{ github.workspace }}/logs/blog-registry.json
+          PLAYWRIGHT_MODULE: ${{ github.workspace }}/packages/web/node_modules/@playwright/test/index.mjs
+          EVIDENCE_PATH: ${{ github.workspace }}/.release-logs/blog-registry.json
         run: |
           set -o pipefail
           git -C "$BLOG_DIR" checkout -- . && git -C "$BLOG_DIR" clean -fdxq
-          node ws/builder/ci/blog-check.mjs 2>&1 | tee "$LOGS/blog-registry.log"
+          node tools/release/ci/blog-check.mjs 2>&1 | tee "$LOGS/blog-registry.log"
 
       - name: Keep the logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: warlock-${{ inputs.version }}-logs
-          path: logs
+          path: .release-logs
           if-no-files-found: ignore
           retention-days: 30

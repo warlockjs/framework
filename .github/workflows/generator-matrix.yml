@@ -1,0 +1,448 @@
+name: generator-matrix
+
+# OWNER-GATED (see skills/zero-edit-generator-matrix). The matrix is OFF by
+# default and never runs on push/PR; `workflow_dispatch` IS the authorisation
+# event, so `scope` and `authorisation` below must always be filled in honestly
+# by whoever dispatches this, not defaulted.
+#
+# It lives beside the release workflow because the orchestration it drives --
+# staging tarballs once, running one row, judging a SHA -- is exactly what
+# tools/release/scripts/release-family.ts and zero-edit-generator-gate.ts
+# implement. Every family member is in this repository, so one checkout at the
+# requested SHA pins all of them.
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: >-
+          Owner-authorised scope: "all" for every row (baseline + every
+          feature + composed), or a comma-separated row list (e.g.
+          "web,cache,composed"). Baseline always runs regardless. There is no
+          default — an unstated scope is refused, same as the local gate CLI.
+        required: true
+        type: string
+      version:
+        description: 'Exact semver of the release candidate under test (e.g. "5.16.0"). Never derived from source — matches release-family.ts.'
+        required: true
+        type: string
+      sha:
+        description: "Commit SHA of this repository to check out and validate (pins every family member at once)."
+        required: true
+        type: string
+      authorised_by:
+        description: "Name of the person who authorised this run (quoted into the verdict, mirrors the release runbook's --authorised-by)."
+        required: true
+        type: string
+      authorisation:
+        description: "The owner's own words authorising this run (quoted verbatim into the verdict, same as --authorisation on the local gate)."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  WARLOCK_VERSION: ${{ inputs.version }}
+  QUEUE_REDIS_HOST: 127.0.0.1
+  QUEUE_REDIS_PORT: "6390"
+  CI: "1"
+  NO_COLOR: "1"
+  # The gate's branch check asks origin for its default branch. Passed per
+  # command, never written to .git/config.
+  GIT_CONFIG_COUNT: "1"
+  GIT_CONFIG_KEY_0: url.https://x-access-token:${{ github.token }}@github.com/.insteadOf
+  GIT_CONFIG_VALUE_0: https://github.com/
+
+jobs:
+  artifacts:
+    name: stage tarballs (once)
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    outputs:
+      rows: ${{ steps.plan.outputs.rows }}
+      expected: ${{ steps.plan.outputs.expected }}
+    services:
+      # queue + notifications test suites need a real Redis on 6390.
+      redis:
+        image: redis:7
+        ports:
+          - 6390:6379
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - name: Checkout framework@${{ inputs.sha }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The gate refuses a detached HEAD: the release commit is pushed to the
+      # checked-out branch, which must be origin's default.
+      - name: Put the requested commit on the default branch
+        shell: bash
+        env:
+          SHA: ${{ inputs.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git checkout -B "$DEFAULT_BRANCH" "$SHA"
+          git config core.fileMode false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install pnpm beside node
+        shell: bash
+        run: npm install --global pnpm@11.24.0 && pnpm --version
+
+      - name: Install the workspace
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: Install the release runner
+        shell: bash
+        working-directory: tools/release
+        run: npm ci --no-audit --no-fund
+
+      - name: Generate the docs site's Astro types
+        shell: bash
+        working-directory: docs
+        run: node node_modules/astro/bin/astro.mjs sync
+
+      - name: Stage every tarball ONCE (matrix none — still builds + records the handoff)
+        shell: bash
+        working-directory: tools/release
+        run: |
+          node --import tsx scripts/release-family.ts gate \
+            --version "$WARLOCK_VERSION" \
+            --matrix none
+
+      - name: Resolve the scope into a row list (derived from the installed feature catalog, never hardcoded)
+        id: plan
+        shell: bash
+        working-directory: tools/release
+        env:
+          SCOPE: ${{ inputs.scope }}
+        run: |
+          if [ "$SCOPE" = "all" ]; then
+            core_root=$(node -e "console.log(require('path').resolve('builds/@warlock.js/core/${WARLOCK_VERSION}'))")
+            features=$(node scripts/adapters/feature-catalog-adapter.mjs --core-root "$core_root" --format json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>console.log(JSON.parse(s).features.join(',')))")
+            rows="baseline,${features},composed"
+          else
+            rows="$SCOPE"
+          fi
+          node -e "console.log(JSON.stringify(process.argv[1].split(',').map(s=>s.trim()).filter(Boolean)))" "$rows" > /tmp/rows.json
+          echo "rows=$(cat /tmp/rows.json)" >> "$GITHUB_OUTPUT"
+
+          # The EXPECTED row set the verdict job must see exactly one result
+          # for: every planned row on ubuntu-latest, plus the windows-canary
+          # baseline (which always runs, independent of scope). This is what
+          # closes the false-green hole where a matrix job dying before
+          # "Record row result" left verdict computing success over whatever
+          # files happened to survive.
+          node -e "
+            const rows = JSON.parse(require('fs').readFileSync('/tmp/rows.json', 'utf8'));
+            const expected = rows.map(row => ({ row, os: 'ubuntu-latest' }));
+            expected.push({ row: 'baseline', os: 'windows-latest' });
+            console.log(JSON.stringify(expected));
+          " > /tmp/expected.json
+          echo "expected=$(cat /tmp/expected.json)" >> "$GITHUB_OUTPUT"
+
+      # builds/ + release-artifacts/ + the handoff: everything --reuse-artifacts
+      # re-hashes in the row jobs. Their common parent is tools/release, which
+      # is where the row jobs download them back to.
+      - name: Upload staged tarballs + handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: generator-matrix-artifacts-${{ inputs.sha }}
+          path: |
+            tools/release/builds/@warlock.js/**
+            tools/release/builds/create-warlock/**
+            tools/release/release-artifacts/${{ inputs.version }}
+            tools/release/release-handoffs/warlock-${{ inputs.version }}.json
+          retention-days: 7
+
+  matrix:
+    name: row / ${{ matrix.row }}
+    needs: artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        row: ${{ fromJson(needs.artifacts.outputs.rows) }}
+    # queue's suite binds 6390 (not the BullMQ-doc-default 6379) to stay
+    # isolated from the cache row's own redis on this same job. cascade
+    # supports both postgres and mongodb drivers, so both are started. herald
+    # (RabbitMQ, pinned Erlang 28.5 per the zero-edit-generator-matrix skill)
+    # has NO service container here -- a generic `rabbitmq` image is not known
+    # to carry that exact Erlang build, so the herald row is expected to report
+    # BLOCKED, not PASS, until that is decided. These containers run for EVERY
+    # row, not only the rows that need them.
+    services:
+      redis-cache:
+        image: redis:7
+        ports:
+          - 6379:6379
+      redis-queue:
+        image: redis:7
+        ports:
+          - 6390:6379
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: warlock
+          POSTGRES_DB: warlock
+        ports:
+          - 5432:5432
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    steps:
+      - name: Checkout framework@${{ inputs.sha }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Put the requested commit on the default branch
+        shell: bash
+        env:
+          SHA: ${{ inputs.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git checkout -B "$DEFAULT_BRANCH" "$SHA"
+          git config core.fileMode false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install pnpm beside node
+        shell: bash
+        run: npm install --global pnpm@11.24.0 && pnpm --version
+
+      - name: Install the workspace
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: Install the release runner
+        shell: bash
+        working-directory: tools/release
+        run: npm ci --no-audit --no-fund
+
+      - name: Generate the docs site's Astro types
+        shell: bash
+        working-directory: docs
+        run: node node_modules/astro/bin/astro.mjs sync
+
+      - name: Download staged tarballs + handoff
+        uses: actions/download-artifact@v4
+        with:
+          name: generator-matrix-artifacts-${{ inputs.sha }}
+          path: tools/release
+
+      - name: Run row — ${{ matrix.row }}
+        id: run_row
+        shell: bash
+        working-directory: tools/release
+        continue-on-error: true
+        env:
+          ROW: ${{ matrix.row }}
+          AUTHORISED_BY: ${{ inputs.authorised_by }}
+          AUTHORISATION: ${{ inputs.authorisation }}
+        # Free-text inputs (AUTHORISATION especially) go through env vars,
+        # never inline `${{ }}` interpolation into the command string — an
+        # authorisation quoting a `"` would otherwise break the argument
+        # boundary (or worse, inject a command).
+        run: |
+          node --import tsx scripts/release-family.ts gate \
+            --version "$WARLOCK_VERSION" \
+            --matrix subset \
+            --only "$ROW" \
+            --reuse-artifacts \
+            --authorised-by "$AUTHORISED_BY" \
+            --authorisation-date "$(date -u +%F)" \
+            --authorisation "$AUTHORISATION"
+
+      - name: Record row result
+        if: always()
+        shell: bash
+        env:
+          ROW: ${{ matrix.row }}
+          SHA: ${{ inputs.sha }}
+          OUTCOME: ${{ steps.run_row.outcome }}
+        run: |
+          mkdir -p /tmp/results
+          node -e "
+            const fs = require('fs');
+            const row = { row: process.env.ROW, os: 'ubuntu-latest', sha: process.env.SHA, version: process.env.WARLOCK_VERSION, conclusion: process.env.OUTCOME };
+            fs.writeFileSync('/tmp/results/result-' + process.env.ROW + '-ubuntu.json', JSON.stringify(row, null, 2));
+          "
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: row-result-${{ matrix.row }}-ubuntu
+          path: /tmp/results/result-${{ matrix.row }}-ubuntu.json
+
+  windows-canary:
+    name: windows canary (baseline)
+    needs: artifacts
+    runs-on: windows-latest
+    timeout-minutes: 240
+    steps:
+      - name: Checkout framework@${{ inputs.sha }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Put the requested commit on the default branch
+        shell: bash
+        env:
+          SHA: ${{ inputs.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git checkout -B "$DEFAULT_BRANCH" "$SHA"
+          git config core.fileMode false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install pnpm beside node
+        shell: bash
+        run: npm install --global pnpm@11.24.0 && pnpm --version
+
+      - name: Install the workspace
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: Install the release runner
+        shell: bash
+        working-directory: tools/release
+        run: npm ci --no-audit --no-fund
+
+      - name: Generate the docs site's Astro types
+        shell: bash
+        working-directory: docs
+        run: node node_modules/astro/bin/astro.mjs sync
+
+      # Downloaded for symmetry with the Linux rows, but --reuse-artifacts
+      # re-hashes at the RECORDED ABSOLUTE PATH, which was captured on an
+      # ubuntu-latest runner and will not exist on this Windows one. The
+      # script's documented behaviour ("invalid ... doing a FULL REBUILD") makes
+      # this a graceful degrade rather than a failure: the canary rebuilds its
+      # own tarballs from the same checked-out SHA instead of reusing the Linux
+      # bytes. The "same artifact" here is the same SOURCE SHA, not the same
+      # built bytes.
+      - name: Download staged tarballs + handoff (best-effort — see note above)
+        uses: actions/download-artifact@v4
+        with:
+          name: generator-matrix-artifacts-${{ inputs.sha }}
+          path: tools/release
+
+      - name: Run baseline row
+        id: run_row
+        shell: bash
+        working-directory: tools/release
+        continue-on-error: true
+        env:
+          AUTHORISED_BY: ${{ inputs.authorised_by }}
+          AUTHORISATION: ${{ inputs.authorisation }}
+        run: |
+          node --import tsx scripts/release-family.ts gate \
+            --version "$WARLOCK_VERSION" \
+            --matrix subset \
+            --only baseline \
+            --reuse-artifacts \
+            --authorised-by "$AUTHORISED_BY" \
+            --authorisation-date "$(date -u +%F)" \
+            --authorisation "$AUTHORISATION"
+
+      - name: Record row result
+        if: always()
+        shell: bash
+        env:
+          SHA: ${{ inputs.sha }}
+          OUTCOME: ${{ steps.run_row.outcome }}
+        run: |
+          mkdir -p /tmp/results
+          node -e "
+            const fs = require('fs');
+            const row = { row: 'baseline', os: 'windows-latest', sha: process.env.SHA, version: process.env.WARLOCK_VERSION, conclusion: process.env.OUTCOME };
+            fs.writeFileSync('/tmp/results/result-baseline-windows.json', JSON.stringify(row, null, 2));
+          "
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: row-result-baseline-windows
+          path: /tmp/results/result-baseline-windows.json
+
+  verdict:
+    name: verdict
+    needs: [artifacts, matrix, windows-canary]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout framework@${{ inputs.sha }} (for the verdict script)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Download every row result
+        uses: actions/download-artifact@v4
+        with:
+          pattern: row-result-*
+          path: /tmp/results
+          merge-multiple: true
+
+      # Verdict is exact-coverage, not "whatever files survived": it fails
+      # unless every row the plan job promised (needs.artifacts.outputs.
+      # expected) has exactly one green result, with no missing, duplicate,
+      # or unexpected rows, and no upstream job reported failure/cancelled.
+      - name: Compose verdict for sha=${{ inputs.sha }}
+        shell: bash
+        env:
+          EXPECTED_ROWS: ${{ needs.artifacts.outputs.expected }}
+          RESULTS_DIR: /tmp/results
+          SHA: ${{ inputs.sha }}
+          VERSION: ${{ inputs.version }}
+          AUTHORISED_BY: ${{ inputs.authorised_by }}
+          AUTHORISATION: ${{ inputs.authorisation }}
+          NEEDS_ARTIFACTS_RESULT: ${{ needs.artifacts.result }}
+          NEEDS_MATRIX_RESULT: ${{ needs.matrix.result }}
+          NEEDS_WINDOWS_CANARY_RESULT: ${{ needs.windows-canary.result }}
+        run: node .github/scripts/matrix-verdict-cli.mjs
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: generator-matrix-verdict-${{ inputs.sha }}
+          path: /tmp/verdict.json
+
+# How the release runner consumes this (documented here AND in
+# skills/release-the-warlock-family/SKILL.md — keep both in sync):
+#
+#   gh run list --repo warlockjs/framework --workflow generator-matrix.yml \
+#     --json headSha,conclusion,url \
+#     --jq '[.[] | select(.headSha == "<exact-sha>")][0]'
+#
+# The release runner requires the returned `conclusion` to be exactly
+# "success" for the exact candidate SHA before treating "authorised run for
+# exact SHA" as satisfied. No row of `--json headSha,conclusion` gives
+# per-row detail — download the run's `generator-matrix-verdict-<sha>`
+# artifact for the row-by-row table.

@@ -1,21 +1,34 @@
-# @warlock.js/builder — release runner
+# tools/release — the Warlock.js release runner
 
-This folder is **not** pkgist. It is the local harness that *runs* pkgist for the
-`@warlock.js/*` family — 27 packages, released together in lockstep.
+This folder is **not** pkgist. It is the harness that *runs* pkgist for the
+`@warlock.js/*` family — every package under `packages/`, released together at
+one version. It is npm-managed (its own `package-lock.json`) and sits outside the
+pnpm workspace.
 
-- `pkgist.config.ts` — the static package registry (warlock family only). Never edit it for a release;
-  pass `--bump` / `--commit` on the CLI instead.
-- `builds/` and `sources/` — created on first build, artifacts only.
+- `pkgist.config.ts` — the static package registry (warlock family only). Member
+  roots are `../../packages/<name>`. Never edit it for a release.
+- `scripts/release-family.ts` — the release state machine: `gate`, `publish`, `confirm`.
+- `ci/blog-check.mjs` — the end-to-end check against the private blog app.
+- `builds/`, `sources/`, `release-artifacts/`, `release-handoffs/` — run output, gitignored.
+
+Releases run in GitHub Actions on this repository
+(`.github/workflows/release.yml`, dispatched with a version and `publish`):
+
+1. **gate** — strictness ratchet, every member's typecheck and tests, a clean
+   tree per member directory, pkgist build, ONE release commit for the family,
+   pack, local-registry install, generator matrix at the stated scope.
+2. **publish** — every tarball to npm, re-hashed immediately before each publish.
+3. **confirm** — install/import from the npm origin, then tag `v<version>` once on
+   the release commit and push the tag and the branch.
 
 ```bash
-npx pkgist validate
-npx pkgist build:family warlock --bump minor --commit "Release x.y.z — ..."
+npm ci
+npm run test:scripts
+node --import tsx scripts/release-family.ts gate --version <x.y.z> --matrix none
 ```
 
-The pkgist tool source lives at `../../@mongez/pkgist` and is released from the
-@mongez runner at `../../@mongez/builder`. The two registries are disjoint, so
-neither can release the other's packages. Keep their pinned `@mongez/pkgist`
-versions in step.
+The pkgist tool itself is `@mongez/pkgist` on npm, released separately; keep the
+pinned version in `package.json` in step with the @mongez runner.
 
 ---
 

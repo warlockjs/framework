@@ -58,10 +58,10 @@
  * ## Where compilation happens
  *
  * Each compiled skill gets an ISOLATED directory under
- * `<repoRoot>/.skill-snippet-gate-tmp/<package>/<skill-slug>/`, populated with
+ * `<packagesRoot>/.skill-snippet-gate-tmp/<package>/<skill-slug>/`, populated with
  * one real file per compiled block at its `title=` path (or a synthetic
  * `__untitled/block-N.ts` for untitled-but-import-bearing blocks). This
- * directory sits under the repo root so `@mongez/*` third-party types resolve
+ * directory sits inside the monorepo so `@mongez/*` third-party types resolve
  * through the ROOT `node_modules` (pnpm's `publicHoistPattern` hoists
  * `@mongez/*` and `@types/*` there — see `pnpm-workspace.yaml`).
  *
@@ -101,8 +101,10 @@ import ts from "typescript";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/** builder/scripts -> builder -> repo root. */
-export const REPO_ROOT = path.resolve(__dirname, "..", "..");
+/** The monorepo root (tools/release/scripts -> ../../..). */
+export const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
+/** Every shipped package is a direct child of this directory. */
+export const PACKAGES_ROOT = path.join(REPO_ROOT, "packages");
 export const GATE_TMP_DIR_NAME = ".skill-snippet-gate-tmp";
 /** The committed ratchet baseline the gate reads. */
 export const ALLOWANCES_PATH = path.join(__dirname, "skill-snippet-allowances.jsonc");
@@ -755,7 +757,7 @@ function formatRatchet(ratchet: RatchetReport): string {
 }
 
 async function main(): Promise<number> {
-  const report = runSkillSnippetGate(REPO_ROOT);
+  const report = runSkillSnippetGate(PACKAGES_ROOT);
   const { text } = formatReport(report);
   console.log(text);
   const ratchet = evaluateRatchet(report, readAllowances());

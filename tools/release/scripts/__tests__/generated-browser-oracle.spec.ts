@@ -198,7 +198,7 @@ describe("findIncrementMutationCandidate — real generated-app source", () => {
     // invented for this spec. Reading it here proves the adapter's mutation
     // selection works against real generated-app content, not a stand-in.
     const here = path.dirname(fileURLToPath(import.meta.url));
-    const stubsFile = path.resolve(here, "..", "..", "..", "core", "src", "generations", "stubs.ts");
+    const stubsFile = path.resolve(here, "..", "..", "..", "..", "packages", "core", "src", "generations", "stubs.ts");
     const stubsSource = await readFile(stubsFile, "utf8");
     const start = stubsSource.indexOf("export const webHomePageStub");
     assert.ok(start >= 0, "webHomePageStub not found in core/src/generations/stubs.ts — has it moved?");

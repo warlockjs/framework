@@ -47,7 +47,7 @@ import pkgistConfig from "../pkgist.config.ts";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/** builder/scripts -> builder. */
+/** tools/release/scripts -> tools/release. */
 export const BUILDER_ROOT = path.resolve(__dirname, "..");
 
 export interface AllowlistEntry {
