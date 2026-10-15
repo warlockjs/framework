@@ -1,0 +1,216 @@
+import { MemoryCacheDriver } from "@warlock.js/cache";
+import { describe, expect, it } from "vitest";
+import type {
+  EmbedderContract,
+  EmbeddingBatchResult,
+  EmbeddingResult,
+} from "../contracts/embedder.contract";
+import { EmbeddingVectorCountMismatchError } from "../errors";
+import { rag } from "./rag";
+import { FakeEmbedder, makeDocs } from "./test-support/make-docs";
+
+function makeStore(): MemoryCacheDriver {
+  const driver = new MemoryCacheDriver();
+  driver.setOptions({});
+  driver.setLoggingState(false);
+
+  return driver;
+}
+
+describe("rag — index → retrieve", () => {
+  it("indexes documents then retrieves cited chunks end-to-end", async () => {
+    const kb = rag({
+      name: "docs",
+      embedder: new FakeEmbedder(),
+      store: makeStore(),
+      chunk: { type: "recursive", size: 40, overlap: 0 },
+    });
+
+    const { chunks } = await kb.index(
+      makeDocs([
+        { id: "caching", text: "Caching configuration uses drivers and tags. ".repeat(3) },
+        { id: "weather", text: "The mountain weather is mild and sunny today. ".repeat(3) },
+      ]),
+    );
+
+    expect(chunks).toBeGreaterThan(0);
+
+    const result = await kb.retrieve("caching configuration drivers tags", {
+      topK: 3,
+      threshold: 0,
+    });
+
+    expect(result.chunks.length).toBeGreaterThan(0);
+    expect(result.chunks[0].citation.sourceId).toBe("caching");
+  });
+
+  it("batches embedding into one embedMany call per index batch", async () => {
+    const embedder = new FakeEmbedder();
+    const kb = rag({ name: "docs", embedder, store: makeStore(), chunk: { size: 1000 } });
+
+    await kb.index(makeDocs([{ id: "a", text: "one document body" }]));
+
+    expect(embedder.embedManyCalls).toBe(1);
+    expect(embedder.embedCalls).toBe(0);
+  });
+
+  it("rejects a provider response that leaves a record without a vector", async () => {
+    const embedder: EmbedderContract = {
+      name: "short-embedder",
+      provider: "short-provider",
+      dimensions: 0,
+      async embed(input): Promise<EmbeddingResult> {
+        return new FakeEmbedder().embed(input);
+      },
+      async embedMany(inputs): Promise<EmbeddingBatchResult> {
+        const result = await new FakeEmbedder().embedMany(inputs);
+
+        return { ...result, vectors: result.vectors.slice(0, -1) };
+      },
+    };
+    const kb = rag({ name: "docs", embedder, store: makeStore(), chunk: { size: 1000 } });
+
+    try {
+      await kb.index(
+        makeDocs([
+          { id: "first", text: "first document" },
+          { id: "missing", text: "missing document" },
+        ]),
+      );
+      throw new Error("Expected index() to reject a short embedding response");
+    } catch (error) {
+      expect(error).toBeInstanceOf(EmbeddingVectorCountMismatchError);
+      if (error instanceof EmbeddingVectorCountMismatchError) {
+        expect(error.provider).toBe("short-provider");
+        expect(error.expectedCount).toBe(2);
+        expect(error.receivedCount).toBe(1);
+        expect(error.record).toBe("ai.rag.docs.missing.0");
+      }
+    }
+  });
+
+  it("writes NOTHING when a provider response is short — no partial index", async () => {
+    // The sibling test above proves the right ERROR is raised. It does not
+    // prove WHERE, and that turns out to matter: rag.ts has two guards for
+    // this, a batch-level one before any upsert and a per-record one inside
+    // the `Promise.all` map. Delete the batch-level guard and that test still
+    // passes, because the per-record guard raises the identical error with the
+    // identical fields.
+    //
+    // What changes is what is left in the store. The map calls `store.upsert`
+    // for each position IN ORDER and only throws when it reaches the missing
+    // one — so every record before it has already been written. Measured, not
+    // assumed: with the batch-level guard 0 writes reach the store; with it
+    // removed, 1 does.
+    //
+    // A half-written index is worse than a failed one. It reports failure, so
+    // nobody trusts the run — but the store now holds records that look
+    // indexed, and a retry writes them again. The guard exists to make a short
+    // response leave the store untouched, and this is the only thing asserting
+    // that.
+    let writes = 0;
+    const store = makeStore();
+    const originalSet = store.set.bind(store);
+    (store as unknown as Record<string, unknown>).set = (...args: unknown[]) => {
+      writes += 1;
+
+      return (originalSet as (...args: unknown[]) => unknown)(...args);
+    };
+
+    const embedder: EmbedderContract = {
+      name: "short-embedder",
+      provider: "short-provider",
+      dimensions: 0,
+      async embed(input): Promise<EmbeddingResult> {
+        return new FakeEmbedder().embed(input);
+      },
+      async embedMany(inputs): Promise<EmbeddingBatchResult> {
+        const result = await new FakeEmbedder().embedMany(inputs);
+
+        return { ...result, vectors: result.vectors.slice(0, -1) };
+      },
+    };
+    const kb = rag({ name: "docs", embedder, store, chunk: { size: 1000 } });
+
+    await expect(
+      kb.index(
+        makeDocs([
+          { id: "first", text: "first document" },
+          { id: "missing", text: "missing document" },
+        ]),
+      ),
+    ).rejects.toBeInstanceOf(EmbeddingVectorCountMismatchError);
+
+    expect(writes).toBe(0);
+  });
+
+  it("returns { chunks: 0 } and writes nothing for an empty document", async () => {
+    const embedder = new FakeEmbedder();
+    const kb = rag({ name: "docs", embedder, store: makeStore() });
+
+    const result = await kb.index(makeDocs([{ id: "blank", text: "   " }]));
+
+    expect(result.chunks).toBe(0);
+    expect(embedder.embedManyCalls).toBe(0);
+  });
+
+  it("clear() drops everything under the rag namespace", async () => {
+    const kb = rag({
+      name: "docs",
+      embedder: new FakeEmbedder(),
+      store: makeStore(),
+      chunk: { size: 1000 },
+    });
+
+    await kb.index(makeDocs([{ id: "a", text: "alpha beta gamma" }]));
+    await kb.clear();
+
+    const result = await kb.retrieve("alpha beta gamma", { topK: 5, threshold: 0 });
+
+    expect(result.chunks).toHaveLength(0);
+  });
+
+  it("throws on a dimension mismatch between index and query embedders", async () => {
+    // An embedder that indexes at 8 dims but reports 12 dims at query time,
+    // simulating "indexed with model A, queried with model B".
+    const shifting: EmbedderContract = {
+      name: "shifting",
+      provider: "fake",
+      dimensions: 0,
+      async embed(): Promise<EmbeddingResult> {
+        return {
+          vector: new Array(12).fill(0).map((_, position) => (position === 0 ? 1 : 0)),
+          dimensions: 12,
+          usage: { promptTokens: 0, totalTokens: 0 },
+        };
+      },
+      async embedMany(inputs: string[]): Promise<EmbeddingBatchResult> {
+        return {
+          vectors: inputs.map(() =>
+            new Array(8).fill(0).map((_, position) => (position === 0 ? 1 : 0)),
+          ),
+          dimensions: 8,
+          usage: { promptTokens: 0, totalTokens: 0 },
+        };
+      },
+    };
+
+    const kb = rag({ name: "docs", embedder: shifting, store: makeStore(), chunk: { size: 1000 } });
+
+    await kb.index(makeDocs([{ id: "a", text: "alpha beta" }]));
+
+    await expect(kb.retrieve("alpha beta", { topK: 3, threshold: 0 })).rejects.toThrow(
+      /dimension/i,
+    );
+  });
+
+  it("throws at construction when no embedder is given", () => {
+    expect(() =>
+      rag({ embedder: undefined as unknown as EmbedderContract, store: makeStore() }),
+    ).toThrow(/embedder/);
+  });
+
+  it("throws at construction when no store resolves", () => {
+    expect(() => rag({ embedder: new FakeEmbedder() })).toThrow(/store/);
+  });
+});

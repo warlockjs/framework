@@ -1,0 +1,81 @@
+{
+  "name": "@warlock.js/ai",
+  "version": "5.29.0",
+  "type": "module",
+  "description": "Core @warlock.js AI framework — contracts, agent, workflow, supervisor",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "typings": "./src/index.ts",
+  "warlock": {
+    "environment": "server"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "format": "node ../node_modules/prettier/bin/prettier.cjs --write src",
+    "format:check": "node ../node_modules/prettier/bin/prettier.cjs --check src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "warlock",
+    "ai"
+  ],
+  "author": "Hasan Zohdy",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warlockjs/ai"
+  },
+  "dependencies": {
+    "@warlock.js/core": "workspace:^",
+    "@standard-schema/spec": "^1.0.0"
+  },
+  "devDependencies": {
+    "@warlock.js/ai-openai": "workspace:^",
+    "@warlock.js/cache": "workspace:^",
+    "@warlock.js/cascade": "workspace:^",
+    "@warlock.js/logger": "workspace:^",
+    "typescript": "^5.9.3",
+    "vitest": "4.1.10"
+  },
+  "peerDependencies": {
+    "@warlock.js/ai-openai": "*",
+    "@warlock.js/cache": "*",
+    "@warlock.js/cascade": "*",
+    "@warlock.js/logger": "*",
+    "langfuse": "*",
+    "openai": "*",
+    "pdf-parse": "*",
+    "pg": "*",
+    "redis": "*"
+  },
+  "peerDependenciesMeta": {
+    "@warlock.js/ai-openai": {
+      "optional": true
+    },
+    "@warlock.js/cache": {
+      "optional": true
+    },
+    "@warlock.js/cascade": {
+      "optional": true
+    },
+    "langfuse": {
+      "optional": true
+    },
+    "openai": {
+      "optional": true
+    },
+    "pdf-parse": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    },
+    "redis": {
+      "optional": true
+    }
+  },
+  "packageManager": "pnpm@11.24.0"
+}

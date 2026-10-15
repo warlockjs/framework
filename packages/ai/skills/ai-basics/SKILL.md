@@ -1,0 +1,108 @@
+---
+name: ai-basics
+description: "Start here for @warlock.js/ai application setup, provider configuration, and its core agent primitives."
+---
+
+# AI foundations
+
+Provider-agnostic core for building AI primitives in TypeScript. Adapters live in sibling packages — all five first-party adapters ship today: `@warlock.js/ai-openai`, `-anthropic`, `-bedrock`, `-google`, `-ollama`.
+
+Server-only: `package.json` declares `"warlock": { "environment": "server" }`. `@warlock.js/web`'s build refuses app client code that value-imports this package; type-only imports are allowed, and server loaders/controllers/modules are unaffected.
+
+> This skill is the AI **map** — read it first, then load the specific skill for the task.
+
+## The 4-primitive ladder
+
+```
+ai.agent()        →  single task, stateless                    [shipped]
+ai.workflow()     →  static predefined steps, resumable        [shipped]
+ai.supervisor()   →  multi-agent dynamic routing, resumable    [shipped]
+ai.orchestrator() →  durable session — state/history/resume    [shipped]
+```
+
+Each primitive is an escape hatch to the next level of complexity. Users start low, graduate upward only when needed. Every primitive returns the same result envelope — canonical destructure `{ data, error, usage, report }` (the shared `BaseResult` guarantees `usage` + optional `error`; each primitive adds `data` + `report`). Workflows, supervisors, and orchestrators expose `.asTool()` so an agent can call them inside its tool loop; raw executables also auto-adapt when dropped into an agent's `tools: []`. Compose freely.
+
+Beyond the ladder: `ai.planner()` (LLM-generated plans), `ai.memory()` (working + semantic recall), `ai.batch()` / `ai.fallbackModel()` / `ai.router()` / `ai.fanOut()` (DX helpers), `agent.eval()` (scoring), and the `ai.checkpoint.*` / `ai.snapshot.*` orchestrator stores.
+
+## Foundations
+
+1. **Public API is functional factories.** Use `ai.agent({...})`, `ai.tool({...})`, `ai.workflow({...})`, `ai.step({...})`, `ai.supervisor({...})`, `ai.systemPrompt()`, `ai.persona()`, `ai.instruction()`. Never `new Agent()`.
+2. **Adapter entry points are classes.** `new OpenAISDK({ apiKey })` from the `setup-openai` topic of the `warlock-js-ai-openai` skill.
+3. **Schemas everywhere are `StandardSchemaV1<T>`.** Recommended: `@warlock.js/seal` (the `seal-basics` topic of the `warlock-js-seal` skill) — `v.object({...})`. Zod, Valibot, hand-rolled all interop.
+4. **`execute()` never throws.** Errors funnel into `result.error` as a typed `AIError` subclass. Same for `stream.result`, `workflow.execute()` / `resume()`, `supervisor.execute()` / `resume()`. See the `handle-ai-errors` topic.
+5. **Each `execute()` call is isolated.** Fresh internal execution instance per call.
+6. **Every error is an `AIError`.** Plain `Error` never leaks. Branch on `error.code` (stable string), `error.category` (coarse), or `instanceof`.
+7. **Result shape is uniform.** `{ data, error, usage, report }` across every primitive. `report` is a recursive `BaseReport` tree.
+8. **Persistence is delegated** to `@warlock.js/cache`. See the `persist-ai-data` topic.
+9. **Logging is delegated** to `@warlock.js/logger`. See the `log-ai-calls` topic.
+10. **`name` on agents is optional.** Anonymous agents get a deterministic `anon_<provider>_<model>` fingerprint.
+11. **Every report carries lineage** — `rootRunId` + `parentRunId` + `reportSchemaVersion: 1`.
+12. **`version` is dev-curated, `sessionId` is caller-supplied** — both propagate through nested reports.
+13. **Cost is computed at emit time as a per-channel breakdown.** Set `pricing` on the model adapter; `Usage.cost` carries `{ input, output, cachedInput?, cachedOutput? }` per trip, rolled up bottom-up.
+14. **Every `AIError` carries a coarse `category`** for retry-policy dispatch (`rate-limit`, `auth`, `content-filter`, `schema`, etc.).
+
+## 30-second example
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
+const myAgent = ai.agent({ model: openai.model({ name: "gpt-4o-mini" }) });
+
+const { data, text, report, usage, error } = await myAgent.execute("Hello");
+
+if (error) /* typed AIError */ ;
+console.log(text, usage.total, report.duration);
+```
+
+## Pick a skill
+
+| If the task is about… | Load |
+| --- | --- |
+| `ai.agent({...})` — single-LLM-turn primitive, structured output, streaming, attachments, `spawnSubAgent` | the `run-ai-agent` topic |
+| `ai.tool({...})` — typed validated functions the model can call | the `define-ai-tool` topic |
+| `ai.systemPrompt()` / `ai.persona()` / `ai.instruction()` — composable prompts with placeholders | the `write-system-prompt` topic |
+| `ai.workflow({...})` — durable resumable pipelines with steps, routing, retry | the `run-ai-workflow` topic |
+| `ai.supervisor({...})` — multi-intent routing, fan-out, evaluate loops | the `run-supervisor` topic |
+| `ai.orchestrator({...})` — durable stateful sessions, drift, compaction, resume | the `run-orchestrator` topic |
+| `ai.planner({...})` — LLM-generated plans over registered capabilities | the `run-planner` topic |
+| `ai.memory({...})` — working + semantic recall for agents / sessions | the `use-ai-memory` topic |
+| `ai.checkpoint.*` / `ai.snapshot.*` — orchestrator session + run stores | the `manage-ai-stores` topic |
+| DX helpers — `batch` / `fallbackModel` / `eval` + matchers / SLO contracts / `fromFile` | the `ai-dx-helpers` topic |
+| `sdk.embedder({...})` — text-to-vector for RAG tools, vector ingest | the `embed-text` topic |
+| Agent + supervisor middleware — `budget` / `guardrail` / `semanticCache` + custom hooks | the `attach-ai-middleware` topic |
+| Snapshot resume + semantic cache via `@warlock.js/cache` | the `persist-ai-data` topic |
+| Configuring framework logging | the `log-ai-calls` topic |
+| `AIError` hierarchy, `error.code` / `error.category`, retry patterns (incl. `ORCHESTRATOR_*` / `PLANNER_*` families) | the `handle-ai-errors` topic |
+| Provider adapters + cost truth (pricing / cache + reasoning tokens / capabilities) | the `pick-ai-provider` topic |
+| Observability — `panoptic()` subscriber, queryable trace store, OTEL / Langfuse / console / file exporters | the `observe-with-panoptic` topic of the `warlock-js-ai-panoptic` skill |
+
+## Package layout
+
+```
+@warlock.js/ai               — agent, tool, workflow, supervisor, system-prompt, errors, middleware
+@warlock.js/ai-openai        — OpenAI SDK adapter (model + embedder); also OpenRouter / Azure via baseURL
+@warlock.js/ai-anthropic     — Anthropic / Claude adapter (Messages API)
+@warlock.js/ai-bedrock       — AWS Bedrock adapter (Converse API + Titan embeddings)
+@warlock.js/ai-google        — Google / Gemini adapter (@google/genai + batch embeddings)
+@warlock.js/ai-ollama        — Ollama adapter for local models
+@warlock.js/ai-panoptic      — observability sidecar: panoptic() subscriber → collector → queryable trace store + console / file / OTEL / Langfuse exporters
+```
+
+The observability sidecar is OPTIONAL and lives in its own package — it subscribes to the report tree every primitive already emits, so you wire `panoptic(...)` once and never touch primitive code. Load the `observe-with-panoptic` topic of the `warlock-js-ai-panoptic` skill for collecting / querying traces and the `export-traces` topic of the `warlock-js-ai-panoptic` skill for OTEL / Langfuse / console / file exporters.
+
+Runtime deps: `@warlock.js/cache` (persistence), `@warlock.js/logger` (logging), `@warlock.js/seal` (recommended schema lib).
+
+## When NOT to use this skill
+
+- Code importing `openai` / `@anthropic-ai/sdk` directly without going through `@warlock.js/ai` — those are raw provider SDKs.
+- Generic JS/TS questions unrelated to agent / tool / workflow / supervisor wiring.
+
+## Design references
+
+- `domains/ai/design/decisions.md` — locked architectural decisions with rationale
+- `domains/ai/design/workflow.md` — workflow spec
+- `domains/ai/design/supervisor.md` — supervisor spec
+- `domains/ai/design/execution-result.md` — unified `ExecuteResult` + recursive `BaseReport` tree
+- `domains/ai/conventions/errors.md` — framework-vs-consumer-app error split
