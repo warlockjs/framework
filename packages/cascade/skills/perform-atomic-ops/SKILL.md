@@ -1,0 +1,156 @@
+---
+name: perform-atomic-ops
+description: 'Avoid races on concurrent writes — `Model.increase(filter, field, n)` / `Model.decrease` for atomic counters, `Model.atomic(filter, ops, options?)` for arbitrary mutations (`$set` / `$inc` / `$push` / `$pull` / `$addToSet` / `$setOnInsert`, pipeline updates, `upsert`, `returnDocument`, `arrayFilters`, `trustedFilter`), `Model.createMany` / `Model.findAndUpdate` / `Model.delete` for bulk. `atomic()` / `findAndUpdate()` / `findOneAndUpdate()` / `findAndReplace()` / `findOneAndDelete()` sanitize their `filter` argument — `$`-prefixed keys throw `UnsafeFilterError`, same check as `where()`. Triggers: `Model.increase`, `Model.decrease`, `Model.atomic`, `Model.createMany`, `createMany bulk`, `batchSize`, `Model.findAndUpdate`, `Model.findOneAndUpdate`, `Model.findAndReplace`, `Model.findOneAndDelete`, `Model.delete`, `$inc`, `$set`, `UnsafeFilterError`, `UnsupportedUpdateOperationError`, `upsert`, `returnDocument`, `$setOnInsert`; "upsert a counter", "reserve quota atomically", "increment counter under concurrency", "bulk insert without N+1", "fast bulk insert", "insert thousands of rows", "atomic update without loading", "is atomic() safe with a request body filter"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: multi-row atomicity — the `manage-transactions` topic; competing patterns `mongoose findOneAndUpdate`, `pg` `UPDATE ... SET x = x + 1`.'
+---
+
+# Use atomic operations
+
+When two requests want to change the same row at the same time, you need atomicity — a guarantee that one operation completes before the other reads. For multi-document atomicity use transactions; for single-document atomic mutations these are the right tools.
+
+## Counters — `Model.increase` / `Model.decrease`
+
+```ts
+await Post.increase({ id: postId }, "views", 1);
+await Product.decrease({ id: productId }, "inventory", 1);
+```
+
+Signature: `Model.increase(filter, field, amount)` / `Model.decrease(filter, field, amount)` → `Promise<number>` (matched count). Atomic at the storage layer — no read-modify-write race even under high concurrency.
+
+## Arbitrary atomic mutations — `Model.atomic`
+
+```ts
+await User.atomic({ id: userId }, {
+  $set: { last_seen: new Date() },
+  $inc: { login_count: 1 },
+});
+```
+
+`Model.atomic(filter, operations)` → `Promise<number>`. Driver-flavored atomic mutation — MongoDB has `$set` / `$inc` / `$push` / `$pull` natively; the Postgres driver supports `$set` / `$unset` / `$inc` / `$dec` (and `$setOnInsert` on upsert) and throws `UnsupportedUpdateOperationError` for the rest. Use when you need to combine multiple field changes atomically without loading the model first.
+
+**`filter` is sanitized like `where()`.** `atomic()`, `findAndUpdate()`, `findOneAndUpdate()`, `findAndReplace()` and `findOneAndDelete()` all run their `filter` argument through the same `$`-prefixed-key check as `Model.where()` (see the `query-data` topic) and throw `UnsafeFilterError` on a key like `$ne`. Before this, these five bypassed `where()` entirely, so a filter forwarded straight from a request body — `User.atomic(req.body.filter, { $set: { role: "admin" } })` — could still smuggle an operator like `{ role: { $ne: "admin" } }` through as a live query even though `where()` itself was already guarded. Only the FILTER is checked — the update-operator object (`$set`/`$inc`/`$unset`/…) is untouched, since that's meant to carry `$` keys. If you legitimately need operator conditions in the filter, express them through `Model.query().where(...)`, or pass `{ trustedFilter: true }` for a code-authored filter (see below).
+
+## Upsert, returnDocument, pipelines — the options argument
+
+```ts
+// Counter: filter + $inc + $setOnInsert + upsert → the new document, one call
+const counter = await Counter.findOneAndUpdate(
+  { key: "signups" },
+  { $inc: { count: 1 }, $setOnInsert: { startedAt: new Date() } },
+  { upsert: true }, // returnDocument defaults to "after"
+);
+
+// Quota reservation: the conditional filter needs trustedFilter (code-authored only!)
+const granted = await Quota.atomic(
+  { id: quotaId, used: { $lt: 10 } },
+  { $inc: { used: 1 } },
+  { trustedFilter: true },
+); // 1 = reserved, 0 = quota full. 50 parallel calls → exactly 10 succeed
+
+// MongoDB only: pipeline update, $addToSet, arrayFilters
+await Post.findOneAndUpdate({ slug }, [{ $set: { score: { $add: ["$likes", "$shares"] } } }]);
+await Post.atomic({ slug }, { $set: { "grades.$[low].score": 50 } }, { arrayFilters: [{ "low.score": { $lt: 50 } }] });
+```
+
+- `atomic(filter, update, { upsert?, arrayFilters?, trustedFilter? })` → modified + upserted count.
+- `findOneAndUpdate(filter, update, { ...same, returnDocument?: "before" | "after" })`.
+- `findAndUpdate(filter, update, { upsert?, arrayFilters? })`. No `trustedFilter`, because it reads the rows back with `where(filter)`.
+
+**Postgres.** An upsert runs as `INSERT … ON CONFLICT (target) DO UPDATE … RETURNING *`. The target is the primary key, or a unique index, whose columns are ALL equality keys of the filter. Other filter conditions become `DO UPDATE … WHERE`. If the row exists and fails them, nothing is written and `findOneAndUpdate` returns `null`. The driver throws `UnsupportedUpdateOperationError` (`.operation`, `.driver`) for:
+- pipeline updates
+- `arrayFilters`
+- `$push`, `$pull`, `$addToSet` and unknown operators
+- `returnDocument: "before"` together with `upsert`
+- an upsert with no unique target it can find
+
+It never ignores one of these without throwing.
+
+## Bulk insert — `Model.createMany`
+
+```ts
+const created = await OrderItem.createMany([
+  { order_id, product_id: 1, quantity: 2 },
+  { order_id, product_id: 2, quantity: 1 },
+  { order_id, product_id: 3, quantity: 5 },
+]);
+// created: OrderItem[]
+```
+
+`Model.createMany(rows, options?)` → `Promise<TModel[]>`. `options` is `{ batchSize?: number; bulk?: boolean }`. Validation runs per row; wrap in a transaction if you need strict all-or-nothing semantics.
+
+### `batchSize` — chunking (both paths)
+
+A huge array is processed in sequential chunks so it can't flood the driver. `batchSize` sets the chunk size; the default is **500** (`DEFAULT_CREATE_MANY_BATCH_SIZE`). Each chunk completes before the next starts:
+
+```ts
+await OrderItem.createMany(millionRows, { batchSize: 1000 });
+```
+
+### `bulk: true` — native multi-row insert (10–100× faster)
+
+The default path persists each row through `save()`, so model hooks, lifecycle events (`saving` / `creating` / `created` / `saved`), casts, and generated ids are all preserved. Pass `bulk: true` to instead route each chunk to the driver's native multi-row `insertMany` for 10–100× throughput on large arrays:
+
+```ts
+const rows = await OrderItem.createMany(millionRows, { bulk: true, batchSize: 1000 });
+```
+
+**Tradeoff.** The bulk path SKIPS the per-row lifecycle — no `saving` / `creating` / `created` / `saved` events, no instance hooks, no sync. What it KEEPS: rows are still prepped through the writer pipeline, so validation, casts, timestamps, defaults, and id-generation still run and the persisted columns match the default path; driver-returned values (generated `_id`, timestamps, SQL `RETURNING *`) are merged back onto the returned models. Reach for `bulk: true` when inserting large batches where per-row events don't matter (seeders, imports, denormalization); stay on the default path when you need the hooks/events.
+
+## Bulk update — `Model.findAndUpdate(filter, operations)`
+
+```ts
+const updated = await User.findAndUpdate(
+  { status: "pending" },
+  { $set: { status: "active" } },
+);
+// updated: User[] — the matched-and-updated models
+```
+
+`Model.findAndUpdate(filter, operations)` takes **update operators** (`$set` / `$inc` / `$unset`), not a plain data object, and returns the updated models. For a single record there's `Model.findOneAndUpdate(filter, operations)` → `TModel | null`, and to update strictly by id, `Model.update(id, data)` → `Promise<number>`.
+
+**Important.** Per-instance lifecycle `saved` events do NOT fire for each row on `findAndUpdate`. If you need `saved` per row, iterate with `.get()` and `.save()` instead — slower but event-correct.
+
+## Bulk delete — `Model.delete(filter)`
+
+```ts
+await User.delete({ status: "spam" });      // delete all matching → count
+await User.deleteOne({ status: "spam" });   // delete the first match → count
+```
+
+`Model.delete(filter?)` and `Model.deleteOne(filter?)` both return `Promise<number>`. These bypass the per-instance delete strategy and `deleted` events — they are raw driver deletes.
+
+For per-row event-aware (and delete-strategy-aware) bulk delete, iterate:
+
+```ts
+const targets = await User.where("status", "spam").get();
+for (const user of targets) {
+  await user.destroy();
+}
+```
+
+## When to reach for what
+
+| Task | Reach for |
+| --- | --- |
+| Increment a counter | `Model.increase(filter, field, n)` |
+| Atomically change multiple fields on one record | `Model.atomic(filter, ops)` |
+| Insert N records | `Model.createMany(rows)` |
+| Insert a large batch fast (no per-row events) | `Model.createMany(rows, { bulk: true, batchSize })` |
+| Update many rows with operators | `Model.findAndUpdate(filter, { $set: {...} })` |
+| Update one record by id | `Model.update(id, data)` |
+| Delete many rows (raw) | `Model.delete(filter)` |
+| Multi-row read-modify-write | Wrap in a transaction (see the `manage-transactions` topic) |
+| Need lifecycle events / delete strategy per row | `Model.where(...).get()` + iterate + `.save()` / `.destroy()` |
+
+## Things NOT to do
+
+- Don't `const post = await Post.find(id); post.set("views", post.get<number>("views") + 1); await post.save();` for a counter. That's a lost-update race under concurrency. Use `Post.increase(filter, "views", 1)`.
+- Don't reach for `insertMany` / `updateMany` / `deleteMany` — those names don't exist on the model. Use `createMany` / `findAndUpdate` / `delete`.
+- Don't expect `findAndUpdate` / `delete` to fire per-row `saved` / `deleted` events or honor the delete strategy. They don't. Iterate if you need that.
+- Don't hand-roll chunking around `createMany` — it already chunks by `batchSize` (default 500). Tune `batchSize` instead of slicing the array yourself.
+- Don't assume `bulk: true` fires per-row `saving` / `created` / `saved` events or runs instance hooks — it doesn't. Casts/timestamps/defaults/ids still apply, but if you need the lifecycle, use the default path (or iterate with `.save()`).
+- Don't forward a raw request-body object as the `filter` to `atomic()`/`findAndUpdate()`/`findOneAndUpdate()`/`findAndReplace()`/`findOneAndDelete()` expecting it to be un-sanitized — it isn't, `$`-prefixed keys throw `UnsafeFilterError` — but don't rely on that as your only authorization check either; it blocks operator injection, not "does this caller own this row."
+
+## See also
+
+- The `manage-transactions` topic — multi-row atomicity
+- The `paginate-results` topic — `.chunk` for bulk-processing iteration

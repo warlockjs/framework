@@ -1,0 +1,988 @@
+import { v } from "@warlock.js/seal";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { DriverContract } from "../../../src/contracts/database-driver.contract";
+import type { DataSource } from "../../../src/data-source/data-source";
+import { Model } from "../../../src/model/model";
+import { DatabaseWriter } from "../../../src/writer/database-writer";
+import {
+  createMockDataSource,
+  createMockDriver,
+} from "../../utils/test-helpers";
+
+// Mock model class for testing
+class TestModel extends Model {
+  static table = "test_models";
+  static primaryKey = "id";
+  static autoGenerateId = false;
+  static createdAtColumn: string | false = "createdAt";
+  static updatedAtColumn: string | false = "updatedAt";
+}
+
+describe("DatabaseWriter", () => {
+  let mockDriver: DriverContract;
+  let mockDataSource: DataSource;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDriver = createMockDriver();
+    mockDataSource = createMockDataSource({ driver: mockDriver });
+
+    // Mock the static getDataSource method
+    vi.spyOn(TestModel, "getDataSource").mockReturnValue(mockDataSource);
+  });
+
+  describe("constructor", () => {
+    it("should initialize with model properties", () => {
+      const model = new TestModel({ name: "Test" });
+      const writer = new DatabaseWriter(model);
+
+      expect(writer).toBeInstanceOf(DatabaseWriter);
+    });
+  });
+
+  describe("save() - Insert Operations", () => {
+    it("should insert a new model", async () => {
+      const model = new TestModel({ name: "Test" });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      const result = await writer.save();
+
+      expect(result.success).toBe(true);
+      expect(result.isNew).toBe(true);
+      expect(mockDriver.insert).toHaveBeenCalledWith(
+        "test_models",
+        expect.objectContaining({
+          name: "Test",
+        }),
+      );
+    });
+
+    it("should merge returned document data after insert", async () => {
+      const model = new TestModel({ name: "Test 42" });
+      model.isNew = true;
+
+      (mockDriver.insert as any).mockResolvedValue({
+        document: { id: 42, _id: "mongo_id_123", name: "Test 42" },
+      });
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(model.get("id")).toBe(42);
+      expect(model.get("_id")).toBe("mongo_id_123");
+    });
+
+    it("should set isNew to false after successful insert", async () => {
+      const model = new TestModel({ name: "Test" });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(model.isNew).toBe(false);
+    });
+
+    it("should add createdAt and updatedAt timestamps on insert", async () => {
+      const model = new TestModel({ name: "Test" });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockDriver.insert).toHaveBeenCalledWith(
+        "test_models",
+        expect.objectContaining({
+          createdAt: expect.any(Date),
+          updatedAt: expect.any(Date),
+        }),
+      );
+    });
+  });
+
+  describe("save() - Update Operations", () => {
+    it("should update an existing model with changes", async () => {
+      const model = new TestModel({ id: 1, name: "Original" });
+      model.isNew = false;
+      model.set("name", "Updated");
+
+      const writer = new DatabaseWriter(model);
+      const result = await writer.save();
+
+      expect(result.success).toBe(true);
+      expect(result.isNew).toBe(false);
+      expect(mockDriver.update).toHaveBeenCalledWith(
+        "test_models",
+        { id: 1 },
+        expect.objectContaining({
+          $set: expect.objectContaining({
+            name: "Updated",
+          }),
+        }),
+      );
+    });
+
+    it("should skip save if no changes on existing model", async () => {
+      const model = new TestModel({ id: 1, name: "Test" });
+      model.isNew = false;
+      model.dirtyTracker.reset(); // Clear any dirty state
+
+      const writer = new DatabaseWriter(model);
+      const result = await writer.save();
+
+      expect(result.success).toBe(true);
+      expect(result.modifiedCount).toBe(0);
+      expect(mockDriver.update).not.toHaveBeenCalled();
+    });
+
+    it("should handle $unset operations for removed fields", async () => {
+      const model = new TestModel({ id: 1, name: "Test", tempField: "value" });
+      model.isNew = false;
+      model.dirtyTracker.reset();
+      model.unset("tempField");
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockDriver.update).toHaveBeenCalledWith(
+        "test_models",
+        { id: 1 },
+        expect.objectContaining({
+          $unset: { tempField: 1 },
+        }),
+      );
+    });
+
+    it("should update updatedAt timestamp on update", async () => {
+      const model = new TestModel({ id: 1, name: "Test" });
+      model.isNew = false;
+      model.set("name", "Updated");
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockDriver.update).toHaveBeenCalledWith(
+        "test_models",
+        { id: 1 },
+        expect.objectContaining({
+          $set: expect.objectContaining({
+            updatedAt: expect.any(Date),
+          }),
+        }),
+      );
+    });
+
+    it("should use replace mode when options.replace is true", async () => {
+      const model = new TestModel({ id: 1, name: "Test" });
+      model.isNew = false;
+      model.set("name", "Updated");
+
+      const writer = new DatabaseWriter(model);
+      await writer.save({ replace: true });
+
+      expect(mockDriver.replace).toHaveBeenCalledWith(
+        "test_models",
+        { id: 1 },
+        expect.any(Object),
+      );
+      expect(mockDriver.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("save() - Events", () => {
+    it("should emit saving event before validation", async () => {
+      const model = new TestModel({ name: "Test" });
+      model.isNew = true;
+      const savingListener = vi.fn();
+      model.on("saving", savingListener);
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(savingListener).toHaveBeenCalledWith(
+        model,
+        expect.objectContaining({
+          isInsert: true,
+          mode: "insert",
+        }),
+      );
+    });
+
+    it("should emit creating event for new models", async () => {
+      const model = new TestModel({ name: "Test" });
+      model.isNew = true;
+      const creatingListener = vi.fn();
+      model.on("creating", creatingListener);
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(creatingListener).toHaveBeenCalled();
+    });
+
+    it("should emit updating event for existing models", async () => {
+      const model = new TestModel({ id: 1, name: "Test" });
+      model.isNew = false;
+      model.set("name", "Updated");
+      const updatingListener = vi.fn();
+      model.on("updating", updatingListener);
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(updatingListener).toHaveBeenCalled();
+    });
+
+    it("should emit saved and created events after insert", async () => {
+      const model = new TestModel({ name: "Test" });
+      model.isNew = true;
+      const savedListener = vi.fn();
+      const createdListener = vi.fn();
+      model.on("saved", savedListener);
+      model.on("created", createdListener);
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(savedListener).toHaveBeenCalled();
+      expect(createdListener).toHaveBeenCalled();
+    });
+
+    it("should emit saved and updated events after update", async () => {
+      const model = new TestModel({ id: 1, name: "Test" });
+      model.isNew = false;
+      model.set("name", "Updated");
+      const savedListener = vi.fn();
+      const updatedListener = vi.fn();
+      model.on("saved", savedListener);
+      model.on("updated", updatedListener);
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(savedListener).toHaveBeenCalled();
+      expect(updatedListener).toHaveBeenCalled();
+    });
+
+    it("should skip events when skipEvents option is true", async () => {
+      const model = new TestModel({ name: "Test" });
+      model.isNew = true;
+      const savingListener = vi.fn();
+      model.on("saving", savingListener);
+
+      const writer = new DatabaseWriter(model);
+      await writer.save({ skipEvents: true });
+
+      expect(savingListener).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("save() - Options", () => {
+    it("should skip validation when skipValidation is true", async () => {
+      // Create a model with schema that would fail
+      class ValidatedModel extends Model {
+        static table = "validated_models";
+        static primaryKey = "id";
+      }
+      vi.spyOn(ValidatedModel, "getDataSource").mockReturnValue(mockDataSource);
+
+      const model = new ValidatedModel({ invalidField: "value" });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      // Should not throw even if validation would fail
+      const result = await writer.save({ skipValidation: true });
+
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("Dirty Tracking Integration", () => {
+    it("should reset dirty tracker after successful save", async () => {
+      const model = new TestModel({ id: 1, name: "Test" });
+      model.isNew = false;
+      model.set("name", "Updated");
+
+      expect(model.hasChanges()).toBe(true);
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(model.hasChanges()).toBe(false);
+    });
+
+    it("should track multiple field changes in $set", async () => {
+      const model = new TestModel({
+        id: 1,
+        name: "Test",
+        email: "old@test.com",
+      });
+      model.isNew = false;
+      model.dirtyTracker.reset();
+      model.set("name", "Updated");
+      model.set("email", "new@test.com");
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockDriver.update).toHaveBeenCalledWith(
+        "test_models",
+        { id: 1 },
+        expect.objectContaining({
+          $set: expect.objectContaining({
+            name: "Updated",
+            email: "new@test.com",
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("ID Generation", () => {
+    it("should generate ID using idGenerator on insert", async () => {
+      class AutoIdModel extends Model {
+        static table = "auto_id_models";
+        static primaryKey = "id";
+        static autoGenerateId = true;
+      }
+
+      const mockIdGenerator = {
+        resolveInitialId: vi.fn().mockResolvedValue(0),
+        generateNextId: vi.fn().mockResolvedValue(42),
+      };
+
+      const dataSourceWithIdGen = createMockDataSource({
+        driver: mockDriver,
+        idGenerator: mockIdGenerator,
+      });
+
+      vi.spyOn(AutoIdModel, "getDataSource").mockReturnValue(
+        dataSourceWithIdGen,
+      );
+
+      const model = new AutoIdModel({ name: "Test using idGenerator" });
+      model.isNew = true;
+
+      // Make driver mock return the data it received, including the generated ID
+      (mockDriver.insert as any).mockImplementation(
+        (_table: string, data: any) => {
+          return Promise.resolve({
+            document: { ...data, _id: "mock_mongo_id" },
+          });
+        },
+      );
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockIdGenerator.generateNextId).toHaveBeenCalledWith(
+        {
+          table: "auto_id_models",
+          initialId: 1,
+          incrementIdBy: 1,
+        },
+      );
+      expect(model.get("id")).toBe(42);
+    });
+
+    it("should not generate ID if already set", async () => {
+      class AutoIdModel extends Model {
+        static table = "auto_id_models";
+        static primaryKey = "id";
+        static autoGenerateId = true;
+      }
+
+      const mockIdGenerator = {
+        generateNextId: vi.fn().mockResolvedValue(99),
+      };
+
+      const dataSourceWithIdGen = createMockDataSource({
+        driver: mockDriver,
+        idGenerator: mockIdGenerator,
+      });
+
+      vi.spyOn(AutoIdModel, "getDataSource").mockReturnValue(
+        dataSourceWithIdGen,
+      );
+
+      const model = new AutoIdModel({ id: 100, name: "Test II" });
+      model.isNew = true;
+
+      // Make driver mock return the data it received
+      (mockDriver.insert as any).mockImplementation(
+        (_table: string, data: any) => {
+          return Promise.resolve({
+            document: { ...data, _id: "mock_mongo_id" },
+          });
+        },
+      );
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      // Should not call generator since ID is already set
+      expect(mockIdGenerator.generateNextId).not.toHaveBeenCalled();
+      expect(model.id).toBe(100);
+    });
+
+    it("should use initialId from model config", async () => {
+      class CustomIdModel extends Model {
+        static table = "custom_id_models";
+        static primaryKey = "id";
+        static autoGenerateId = true;
+        static initialId = 1000;
+      }
+
+      const mockIdGenerator = {
+        generateNextId: vi.fn().mockResolvedValue(1000),
+      };
+
+      const dataSourceWithIdGen = createMockDataSource({
+        driver: mockDriver,
+        idGenerator: mockIdGenerator,
+      });
+
+      vi.spyOn(CustomIdModel, "getDataSource").mockReturnValue(
+        dataSourceWithIdGen,
+      );
+
+      const model = new CustomIdModel({ name: "Test" });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockIdGenerator.generateNextId).toHaveBeenCalledWith(
+        expect.objectContaining({
+          initialId: 1000,
+        }),
+      );
+    });
+
+    it.skip("should use randomInitialId when configured as true", async () => {
+      class RandomIdModel extends Model {
+        static table = "random_id_models";
+        static primaryKey = "id";
+        static autoGenerateId = true;
+        static randomInitialId = true;
+      }
+
+      const mockIdGenerator = {
+        generateNextId: vi.fn().mockResolvedValue(12345),
+      };
+
+      const dataSourceWithIdGen = createMockDataSource({
+        driver: mockDriver,
+        idGenerator: mockIdGenerator,
+      });
+
+      vi.spyOn(RandomIdModel, "getDataSource").mockReturnValue(
+        dataSourceWithIdGen,
+      );
+
+      const model = new RandomIdModel({ name: "Test" });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      // initialId should be a random number between 10000 and 499999
+      expect(mockIdGenerator.generateNextId).toHaveBeenCalledWith(
+        expect.objectContaining({
+          initialId: expect.any(Number),
+        }),
+      );
+    });
+
+    it.skip("should use randomInitialId function when provided", async () => {
+      class FnIdModel extends Model {
+        static table = "fn_id_models";
+        static primaryKey = "id";
+        static autoGenerateId = true;
+        static randomInitialId = () => 5000;
+      }
+
+      const mockIdGenerator = {
+        generateNextId: vi.fn().mockResolvedValue(5000),
+      };
+
+      const dataSourceWithIdGen = createMockDataSource({
+        driver: mockDriver,
+        idGenerator: mockIdGenerator,
+      });
+
+      vi.spyOn(FnIdModel, "getDataSource").mockReturnValue(dataSourceWithIdGen);
+
+      const model = new FnIdModel({ name: "Test" });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockIdGenerator.generateNextId).toHaveBeenCalledWith(
+        expect.objectContaining({
+          initialId: 5000,
+        }),
+      );
+    });
+
+    it("should use incrementIdBy from model config", async () => {
+      class IncrementModel extends Model {
+        static table = "increment_models";
+        static primaryKey = "id";
+        static autoGenerateId = true;
+        static incrementIdBy = 5;
+      }
+
+      const mockIdGenerator = {
+        generateNextId: vi.fn().mockResolvedValue(6),
+      };
+
+      const dataSourceWithIdGen = createMockDataSource({
+        driver: mockDriver,
+        idGenerator: mockIdGenerator,
+      });
+
+      vi.spyOn(IncrementModel, "getDataSource").mockReturnValue(
+        dataSourceWithIdGen,
+      );
+
+      const model = new IncrementModel({ name: "Test" });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockIdGenerator.generateNextId).toHaveBeenCalledWith(
+        expect.objectContaining({
+          incrementIdBy: 5,
+        }),
+      );
+    });
+
+    it.skip("should use randomIncrement when configured as true", async () => {
+      class RandomIncrModel extends Model {
+        static table = "random_incr_models";
+        static primaryKey = "id";
+        static autoGenerateId = true;
+        static randomIncrement = true;
+      }
+
+      const mockIdGenerator = {
+        generateNextId: vi.fn().mockResolvedValue(10),
+      };
+
+      const dataSourceWithIdGen = createMockDataSource({
+        driver: mockDriver,
+        idGenerator: mockIdGenerator,
+      });
+
+      vi.spyOn(RandomIncrModel, "getDataSource").mockReturnValue(
+        dataSourceWithIdGen,
+      );
+
+      const model = new RandomIncrModel({ name: "Test" });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockIdGenerator.generateNextId).toHaveBeenCalledWith(
+        expect.objectContaining({
+          incrementIdBy: expect.any(Number),
+        }),
+      );
+    });
+
+    it.skip("should use randomIncrement function when provided", async () => {
+      class FnIncrModel extends Model {
+        static table = "fn_incr_models";
+        static primaryKey = "id";
+        static autoGenerateId = true;
+        static randomIncrement = () => 3;
+      }
+
+      const mockIdGenerator = {
+        generateNextId: vi.fn().mockResolvedValue(4),
+      };
+
+      const dataSourceWithIdGen = createMockDataSource({
+        driver: mockDriver,
+        idGenerator: mockIdGenerator,
+      });
+
+      vi.spyOn(FnIncrModel, "getDataSource").mockReturnValue(
+        dataSourceWithIdGen,
+      );
+
+      const model = new FnIncrModel({ name: "Test" });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockIdGenerator.generateNextId).toHaveBeenCalledWith(
+        expect.objectContaining({
+          incrementIdBy: 3,
+        }),
+      );
+    });
+  });
+
+  describe("Timestamp Columns", () => {
+    it("should use custom timestamp column names", async () => {
+      // Reset driver mocks to ensure clean state
+      vi.clearAllMocks();
+
+      class CustomTimestampModel extends Model {
+        static table = "custom_ts_models";
+        static primaryKey = "id";
+        static createdAtColumn = "created_date";
+        static updatedAtColumn = "modified_date";
+      }
+
+      vi.spyOn(CustomTimestampModel, "getDataSource").mockReturnValue(
+        mockDataSource,
+      );
+
+      const model = new CustomTimestampModel({ name: "Test" });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockDriver.insert).toHaveBeenCalledWith(
+        "custom_ts_models",
+        expect.objectContaining({
+          created_date: expect.any(Date),
+          modified_date: expect.any(Date),
+        }),
+      );
+    });
+  });
+
+  describe("Backdated createdAt on insert", () => {
+    it("keeps the caller-supplied createdAt instead of overwriting it", async () => {
+      vi.clearAllMocks();
+
+      const backdated = new Date("2000-01-01T00:00:00.000Z");
+      const model = new TestModel({ name: "Imported", createdAt: backdated });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockDriver.insert).toHaveBeenCalledWith(
+        "test_models",
+        expect.objectContaining({
+          createdAt: backdated,
+        }),
+      );
+    });
+
+    it("still stamps createdAt with now when the caller did not supply one", async () => {
+      vi.clearAllMocks();
+
+      const before = Date.now();
+      const model = new TestModel({ name: "Fresh" });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      const insertedData = (mockDriver.insert as any).mock.calls[0][1];
+      expect(insertedData.createdAt).toBeInstanceOf(Date);
+      expect(insertedData.createdAt.getTime()).toBeGreaterThanOrEqual(before);
+    });
+
+    it("always stamps updatedAt with now even when createdAt is backdated", async () => {
+      vi.clearAllMocks();
+
+      const before = Date.now();
+      const backdated = new Date("2000-01-01T00:00:00.000Z");
+      const model = new TestModel({ name: "Imported", createdAt: backdated });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      const insertedData = (mockDriver.insert as any).mock.calls[0][1];
+      expect(insertedData.updatedAt).toBeInstanceOf(Date);
+      expect(insertedData.updatedAt.getTime()).toBeGreaterThanOrEqual(before);
+      // updatedAt must NOT have been pinned to the backdated createdAt value.
+      expect(insertedData.updatedAt.getTime()).toBeGreaterThan(
+        backdated.getTime(),
+      );
+    });
+
+    it("preserves a backdated createdAt through insert validation under strict 'strip' mode", async () => {
+      vi.clearAllMocks();
+
+      class StripInsertModel extends Model {
+        static table = "strip_insert_models";
+        static primaryKey = "id";
+        static schema = v.object({ name: v.string() });
+        static createdAtColumn = "createdAt";
+        static updatedAtColumn = "updatedAt";
+        static strictMode = "strip" as const;
+      }
+      vi.spyOn(StripInsertModel, "getDataSource").mockReturnValue(
+        mockDataSource,
+      );
+
+      const backdated = new Date("2001-02-03T04:05:06.000Z");
+      const model = new StripInsertModel({
+        name: "Imported",
+        createdAt: backdated,
+      });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      // createdAt is whitelisted on the insert validation path, so the backdated
+      // value survives validation and reaches the driver instead of being
+      // stripped (which would let performInsert stamp "now").
+      expect(mockDriver.insert).toHaveBeenCalledWith(
+        "strip_insert_models",
+        expect.objectContaining({
+          createdAt: backdated,
+        }),
+      );
+    });
+
+    it("does not reject an insert carrying createdAt under strict 'fail' mode", async () => {
+      vi.clearAllMocks();
+
+      class FailInsertModel extends Model {
+        static table = "fail_insert_models";
+        static primaryKey = "id";
+        static schema = v.object({ name: v.string() });
+        static createdAtColumn = "createdAt";
+        static updatedAtColumn = "updatedAt";
+        static strictMode = "fail" as const;
+      }
+      vi.spyOn(FailInsertModel, "getDataSource").mockReturnValue(mockDataSource);
+
+      const backdated = new Date("2001-02-03T04:05:06.000Z");
+      const model = new FailInsertModel({
+        name: "Imported",
+        createdAt: backdated,
+      });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+
+      await expect(writer.save()).resolves.toMatchObject({ success: true });
+      expect(mockDriver.insert).toHaveBeenCalledWith(
+        "fail_insert_models",
+        expect.objectContaining({
+          createdAt: backdated,
+        }),
+      );
+    });
+  });
+
+  describe("Soft-delete column in update validation", () => {
+    it("keeps deletedAt on update under strict 'strip' mode (not stripped)", async () => {
+      vi.clearAllMocks();
+
+      class SoftStripModel extends Model {
+        static table = "soft_strip_models";
+        static primaryKey = "id";
+        static schema = v.object({ name: v.string() });
+        static deletedAtColumn = "deletedAt";
+        static strictMode = "strip" as const;
+      }
+      vi.spyOn(SoftStripModel, "getDataSource").mockReturnValue(mockDataSource);
+
+      const model = new SoftStripModel({
+        id: 1,
+        name: "Test",
+        deletedAt: new Date(),
+      });
+      model.isNew = false;
+      model.set("name", "Updated"); // make the model dirty so the update runs
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      // deletedAt is whitelisted, so it survives validation instead of being
+      // stripped out of the model.
+      expect(model.get("deletedAt")).toBeInstanceOf(Date);
+    });
+
+    it("does not reject an update carrying deletedAt under strict 'fail' mode", async () => {
+      vi.clearAllMocks();
+
+      class SoftFailModel extends Model {
+        static table = "soft_fail_models";
+        static primaryKey = "id";
+        static schema = v.object({ name: v.string() });
+        static deletedAtColumn = "deletedAt";
+        static strictMode = "fail" as const;
+      }
+      vi.spyOn(SoftFailModel, "getDataSource").mockReturnValue(mockDataSource);
+
+      const model = new SoftFailModel({
+        id: 1,
+        name: "Test",
+        deletedAt: new Date(),
+      });
+      model.isNew = false;
+      model.set("name", "Updated");
+
+      const writer = new DatabaseWriter(model);
+
+      await expect(writer.save()).resolves.toMatchObject({ success: true });
+    });
+  });
+
+  describe("Explicit null is written as NULL (Real-Estate #18)", () => {
+    it("writes the soft-delete column as null when merge() clears it, instead of dropping the update", async () => {
+      vi.clearAllMocks();
+
+      class SoftRestoreModel extends Model {
+        static table = "soft_restore_models";
+        static primaryKey = "id";
+        static schema = v.object({ name: v.string() });
+        static deletedAtColumn = "deletedAt";
+      }
+      vi.spyOn(SoftRestoreModel, "getDataSource").mockReturnValue(mockDataSource);
+
+      const model = new SoftRestoreModel({
+        id: 1,
+        name: "Test",
+        deletedAt: new Date("2020-01-01T00:00:00.000Z"),
+      });
+      model.isNew = false;
+
+      model.merge({ deletedAt: null });
+
+      expect(model.hasChanges()).toBe(true);
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockDriver.update).toHaveBeenCalledWith(
+        "soft_restore_models",
+        { id: 1 },
+        expect.objectContaining({
+          $set: expect.objectContaining({ deletedAt: null }),
+        }),
+      );
+
+      // The column must be written as NULL via $set, never silently
+      // coerced into an $unset (that would change unset()'s own contract).
+      const [, , operations] = (mockDriver.update as any).mock.calls[0];
+      expect(operations.$unset?.deletedAt).toBeUndefined();
+    });
+
+    it("writes an ordinary schema column as null via set(), even when it is only .optional() and not .nullable()", async () => {
+      vi.clearAllMocks();
+
+      class DeletedByModel extends Model {
+        static table = "deleted_by_models";
+        static primaryKey = "id";
+        static schema = v.object({
+          name: v.string(),
+          deletedBy: v.number().optional(), // deliberately NOT .nullable()
+        });
+      }
+      vi.spyOn(DeletedByModel, "getDataSource").mockReturnValue(mockDataSource);
+
+      const model = new DeletedByModel({ id: 1, name: "Test", deletedBy: 7 });
+      model.isNew = false;
+
+      model.set("deletedBy", null);
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockDriver.update).toHaveBeenCalledWith(
+        "deleted_by_models",
+        { id: 1 },
+        expect.objectContaining({
+          $set: expect.objectContaining({ deletedBy: null }),
+        }),
+      );
+    });
+
+    it("still rejects an explicit null on a required column (no rule is loosened)", async () => {
+      vi.clearAllMocks();
+
+      class RequiredNameModel extends Model {
+        static table = "required_name_models";
+        static primaryKey = "id";
+        static schema = v.object({
+          name: v.string(),
+        });
+      }
+      vi.spyOn(RequiredNameModel, "getDataSource").mockReturnValue(mockDataSource);
+
+      const model = new RequiredNameModel({ id: 1, name: "Test" });
+      model.isNew = false;
+
+      model.set("name", null);
+
+      await expect(new DatabaseWriter(model).save()).rejects.toThrow(/Validation failed/);
+      expect(mockDriver.update).not.toHaveBeenCalled();
+    });
+
+    it("still restores via unset() ($unset) — Model.restore()'s shape is unchanged", async () => {
+      vi.clearAllMocks();
+
+      class SoftUnsetModel extends Model {
+        static table = "soft_unset_models";
+        static primaryKey = "id";
+        static schema = v.object({ name: v.string() });
+        static deletedAtColumn = "deletedAt";
+      }
+      vi.spyOn(SoftUnsetModel, "getDataSource").mockReturnValue(mockDataSource);
+
+      const model = new SoftUnsetModel({
+        id: 1,
+        name: "Test",
+        deletedAt: new Date(),
+      });
+      model.isNew = false;
+
+      model.unset("deletedAt");
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockDriver.update).toHaveBeenCalledWith(
+        "soft_unset_models",
+        { id: 1 },
+        expect.objectContaining({
+          $unset: { deletedAt: 1 },
+        }),
+      );
+    });
+
+    it("insert path is unaffected: an explicit null on a non-nullable optional field does not throw", async () => {
+      vi.clearAllMocks();
+
+      class InsertNullModel extends Model {
+        static table = "insert_null_models";
+        static primaryKey = "id";
+        static autoGenerateId = false;
+        static schema = v.object({
+          name: v.string(),
+          deletedBy: v.number().optional(),
+        });
+      }
+      vi.spyOn(InsertNullModel, "getDataSource").mockReturnValue(mockDataSource);
+
+      const model = new InsertNullModel({ name: "Test", deletedBy: null });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      const result = await writer.save();
+
+      expect(result.success).toBe(true);
+      expect(mockDriver.insert).toHaveBeenCalled();
+    });
+  });
+});

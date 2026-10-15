@@ -1,0 +1,108 @@
+// Context
+export * from "./context/database-data-source-context";
+export * from "./context/database-transaction-context";
+export { afterCommit } from "./transactions/after-commit";
+
+// Contracts
+export * from "./contracts/database-driver.contract";
+export * from "./contracts/database-id-generator.contract";
+export * from "./contracts/database-remover.contract";
+export * from "./contracts/database-restorer.contract";
+export * from "./contracts/database-writer.contract";
+export * from "./contracts/migration-driver.contract";
+export * from "./contracts/query-builder.contract";
+export * from "./contracts/sync-adapter.contract";
+
+// Data Source
+export * from "./data-source/data-source";
+export * from "./data-source/data-source-registry";
+
+// Errors
+export * from "./errors/missing-data-source.error";
+export * from "./errors/transaction-rollback.error";
+export * from "./errors/undefined-where-value.error";
+export * from "./errors/unsafe-filter.error";
+export * from "./errors/unsafe-raw-expression.error";
+export * from "./errors/unsupported-lean-operation.error";
+export * from "./errors/unsupported-lock-for-update.error";
+export * from "./errors/unsupported-query-operation.error";
+export * from "./errors/unsupported-update-operation.error";
+
+// Core Services
+export * from "./database-dirty-tracker";
+export * from "./events/model-events";
+export * from "./model/model";
+export * from "./model/register-model";
+export * from "./model/relation-decorators";
+export * from "./remover/database-remover";
+export * from "./restorer/database-restorer";
+export * from "./types";
+export * from "./validation";
+export * from "./writer/database-writer";
+
+// Relations System
+export * from "./relations";
+
+// Expressions
+export * from "./expressions";
+
+// MongoDB Driver
+export * from "./drivers/mongodb/mongodb-driver";
+export * from "./drivers/mongodb/mongodb-id-generator";
+export * from "./drivers/mongodb/mongodb-query-builder";
+export * from "./drivers/mongodb/mongodb-sync-adapter";
+export * from "./drivers/mongodb/types";
+
+// Re-export MongoDB client types for convenience
+export type { MongoClientOptions, TransactionOptions } from "mongodb";
+
+// Sync system
+export { modelSync } from "./sync/model-sync";
+export { ModelSyncOperation } from "./sync/model-sync-operation";
+export { DEFAULT_MAX_SYNC_DEPTH, SyncContextManager } from "./sync/sync-context";
+export { SyncManager } from "./sync/sync-manager";
+export type {
+  EmbedKey,
+  ModelSyncConfig,
+  ModelSyncContract,
+  ModelSyncOperationContract,
+  SyncConfig,
+  SyncContext,
+  SyncEventPayload,
+  SyncInstruction,
+  SyncInstructionOptions,
+  SyncResult,
+} from "./sync/types";
+
+// Utilities
+export * from "./utils/connect-to-database";
+export * from "./utils/escape-regex";
+export * from "./utils/sanitize-filter";
+export * from "./utils/database-writer.utils";
+export * from "./utils/define-model";
+export * from "./utils/once-connected";
+
+// Migration System
+export * from "./migration";
+
+// Operations API
+export * from "./operations";
+
+// PendingMigration is declared twice under the same name: the rich runner-internal
+// shape in ./migration/types (name, table, migration instance, filePath, Date) and
+// the lean public dry-run shape in ./operations/migrations (name, optional string
+// createdAt). Both reach this barrel through the star exports above, so the name was
+// ambiguous and a consumer silently got whichever TypeScript resolved first.
+// listPendingMigrations() returns the public one, so that is what this barrel exports.
+// The runner-internal shape stays importable from ./migration for anything that
+// genuinely needs it.
+export type { PendingMigration } from "./operations/migrations";
+
+// MongoDB Migration Driver
+export { MongoMigrationDriver } from "./drivers/mongodb/mongodb-migration-driver";
+
+// Shared SQL Infrastructure
+export * from "./drivers/sql";
+
+// PostgreSQL Driver
+export * from "./drivers/postgres";

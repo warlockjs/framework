@@ -1,0 +1,1 @@
+{"version":3,"file":"transaction-rollback.error.d.ts","sourceRoot":"","sources":["../../src/errors/transaction-rollback.error.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AACH,qBAAa,wBAAyB,SAAQ,KAAK;IACjD;;OAEG;IACH,SAAgB,MAAM,CAAC,EAAE,MAAM,CAAC;IAEhC;;;;OAIG;gBACgB,MAAM,CAAC,EAAE,MAAM;CAUnC"}

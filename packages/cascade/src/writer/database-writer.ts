@@ -1,0 +1,637 @@
+import { when } from "@mongez/reinforcements";
+import { getSealConfig, v, type ObjectValidator } from "@warlock.js/seal";
+import type {
+  DriverContract,
+  InsertResult,
+  UpdateOperations,
+  UpdateResult,
+} from "../contracts/database-driver.contract";
+import type {
+  WriterContract,
+  WriterOptions,
+  WriterResult,
+} from "../contracts/database-writer.contract";
+import { mergeDriverFields } from "../model/methods/accessor-methods";
+import { generateModelId } from "../model/generate-model-id";
+import type { ChildModel, Model } from "../model/model";
+import { enqueueSyncFanout } from "../sync/sync-fanout";
+import { triggerModelEvent } from "../sync/model-events";
+import type { StrictMode } from "../types";
+import { DatabaseWriterValidationError } from "../validation";
+import { afterCommit } from "../transactions/after-commit";
+import type { DataSource } from "./../data-source/data-source";
+
+/**
+ * Database writer service that orchestrates model persistence.
+ *
+ * Handles the complete save pipeline:
+ * 1. Check for changes (skip if no changes and not new)
+ * 2. Emit `saving` event (for data enrichment)
+ * 3. Emit `validating` event
+ * 4. Validate and cast data via @warlock.js/seal schema
+ * 5. Emit `validated` event
+ * 6. Generate ID (for new NoSQL records)
+ * 7. Emit `creating`/`updating` events
+ * 8. Execute insert or update via driver
+ * 9. Merge returned data into model
+ * 10. Reset dirty tracker and update `isNew` flag
+ * 11. Emit `saved` and `created`/`updated` events
+ *
+ * @example
+ * ```typescript
+ * const user = new User({ name: "Alice", email: "alice@example.com" });
+ * const writer = new DatabaseWriter(user);
+ * await writer.save();
+ *
+ * console.log(user.get("id")); // 1 (auto-generated)
+ * console.log(user.get("_id")); // ObjectId("...")
+ *
+ * // Update existing record
+ * user.set("name", "Alice Smith");
+ * await writer.save();
+ * // Only updates the "name" field (partial update)
+ *
+ * // Silent save (no events)
+ * await writer.save({ skipEvents: true });
+ * ```
+ */
+export class DatabaseWriter implements WriterContract {
+  /** The model instance being persisted */
+  private readonly model: Model;
+
+  /** Dirty columns an update validation dropped (strip mode); never written. */
+  private readonly unvalidatedColumns = new Set<string>();
+
+  /** Model constructor reference */
+  private readonly ctor: ChildModel<Model>;
+
+  /** Data source containing driver and ID generator */
+  private readonly dataSource: DataSource;
+
+  /** Database driver for executing queries */
+  private readonly driver: DriverContract;
+
+  /** Table/collection name */
+  private readonly table: string;
+
+  /** Primary key field name */
+  private readonly primaryKey: string;
+
+  /** Validation schema (if defined) */
+  private readonly schema?: ObjectValidator;
+
+  /** Strict mode configuration */
+  private readonly strictMode: StrictMode;
+
+  /**
+   * Create a new writer instance for a model.
+   *
+   * @param model - The model instance to persist
+   *
+   * @example
+   * ```typescript
+   * const user = new User({ name: "Alice" });
+   * const writer = new DatabaseWriter(user);
+   * await writer.save();
+   * ```
+   */
+  public constructor(model: Model) {
+    this.model = model;
+    this.ctor = model.constructor as ChildModel<Model>;
+    this.dataSource = this.ctor.getDataSource();
+    this.driver = this.dataSource.driver;
+    this.table = this.ctor.table;
+    this.primaryKey = this.ctor.primaryKey;
+    this.schema = this.ctor.schema;
+    this.strictMode = this.ctor.strictMode;
+  }
+
+  /**
+   * Save the model instance to the database.
+   *
+   * @param options - Save options
+   * @returns Result with success status, document, and metadata
+   * @throws {ValidationError} If validation fails
+   */
+  public async save(options: WriterOptions = {}): Promise<WriterResult> {
+    const isInsert = this.model.isNew;
+
+    // 1. Check if model has changes (skip if no changes and not new)
+    if (!isInsert && !this.model.hasChanges()) {
+      return {
+        success: true,
+        document: this.model.data,
+        isNew: false,
+        modifiedCount: 0,
+      };
+    }
+
+    // 2. Emit saving event (before validation for data enrichment)
+    if (!options.skipEvents) {
+      await this.model.emitEvent("saving", {
+        isInsert,
+        options,
+        mode: isInsert ? "insert" : "update",
+      });
+    }
+
+    // 3-4. Execute insert or update (validation happens inside each path)
+    let result: InsertResult | UpdateResult;
+
+    if (isInsert) {
+      result = await this.performInsert(options);
+    } else {
+      await this.validateAndCast(false, options);
+      result = await this.performUpdate(options);
+    }
+
+    // 5. Reset dirty tracker and update isNew flag
+    const changedFields = isInsert ? [] : this.model.getDirtyColumns();
+    this.model.dirtyTracker.reset();
+    this.model.isNew = false;
+
+    // 6. Emit post-save events
+    if (!options.skipEvents) {
+      await this.model.emitEvent("saved");
+      await this.model.emitEvent(isInsert ? "created" : "updated");
+    }
+
+    // 7. Trigger sync operations after COMMIT (inside a transaction they are
+    // queued, so a rolled-back write never fans out). Failures are logged.
+    if (!options.skipSync && !isInsert) {
+      afterCommit(() => this.triggerSync(changedFields));
+    }
+
+    return {
+      success: true,
+      document: this.model.data,
+      isNew: isInsert,
+      modifiedCount: isInsert
+        ? undefined
+        : (result as UpdateResult).modifiedCount,
+    };
+  }
+
+  /**
+   * Validate and cast model data using the schema.
+   *
+   * Updates the model's data in-place with validated/casted values.
+   *
+   * @param isInsert - Whether this is an insert operation
+   * @param options - Save options
+   * @throws {ValidationError} If validation fails
+   * @private
+   */
+  private async validateAndCast(
+    isInsert: boolean,
+    options: WriterOptions,
+  ): Promise<void> {
+    // Emit validating event
+    if (!options.skipEvents) {
+      await this.model.emitEvent("validating", {
+        isInsert,
+        options,
+        mode: isInsert ? "insert" : "update",
+      });
+    }
+
+    // Skip validation if requested or no schema defined
+    if (options.skipValidation || !this.schema) {
+      return;
+    }
+
+    // Whitelist the framework-managed system columns so a model carrying them
+    // (id / _id / timestamps / soft-delete deletedAt) validates cleanly instead
+    // of being stripped (strictMode "strip") or rejected (strictMode "fail").
+    // `when(...)` adds each timestamp/soft-delete column only when configured
+    // (truthy) — the lazy factory means a disabled column (`false`) never even
+    // builds a bogus schema key.
+    //
+    // The whitelist must apply to BOTH insert and update: on insert a caller may
+    // supply a backdated createdAt (e.g. data migrations / imports), and without
+    // the whitelist strictMode "strip" silently drops it before it reaches the
+    // writer, while "fail" rejects the whole insert.
+    const systemColumns = {
+      id: v.scalar().optional(),
+      _id: v.any().optional(),
+      ...when(this.ctor.createdAtColumn, () => ({
+        [this.ctor.createdAtColumn as string]: v.date().optional(),
+      })),
+      ...when(this.ctor.updatedAtColumn, () => ({
+        [this.ctor.updatedAtColumn as string]: v.date().optional(),
+      })),
+      ...when(this.ctor.deletedAtColumn, () => ({
+        [this.ctor.deletedAtColumn as string]: v.date().optional(),
+      })),
+    };
+
+    // Clone full schema for insert, partial (dirty keys only) for updates.
+    //
+    // An update validates ONLY the dirty columns and merges back only those
+    // keys: columns the schema does not list (migration-added, withCount, ...)
+    // are never touched, so they can no longer be turned into `$unset`.
+    const dataToValidate: Record<string, unknown> = isInsert
+      ? this.model.data
+      : Object.fromEntries(
+          this.model
+            .getDirtyColumns()
+            .filter(column => column in this.model.data)
+            .map(column => [column, this.model.data[column]]),
+        );
+
+    const validationSchema = isInsert
+      ? this.schema.clone().extend(systemColumns)
+      : this.schema.clone(Object.keys(dataToValidate)).extend(systemColumns);
+
+    // Apply strict mode
+    if (this.strictMode === "strip") {
+      validationSchema.stripUnknown();
+    } else if (this.strictMode === "fail") {
+      validationSchema.allowUnknown(false);
+    } else if (this.strictMode === "allow") {
+      validationSchema.allowUnknown(true);
+    }
+
+    // Run validation
+    const result = await v.validate(validationSchema, dataToValidate, {
+      context: {
+        model: this.model,
+      },
+      ...getSealConfig(),
+    });
+
+    if (!result.isValid) {
+      const error = new DatabaseWriterValidationError(
+        `[${this.model.constructor.name} Model] ${isInsert ? "Insert" : "Update"} Validation failed`,
+        result.errors,
+      );
+      if (!options.skipEvents) {
+        await this.model.emitEvent("validated", { result, error });
+      }
+      throw error;
+    }
+
+    // Update model data with validated/casted data
+    if (isInsert) {
+      this.model.replaceData(result.data);
+    } else {
+      const validated = result.data as Record<string, unknown>;
+
+      for (const column of Object.keys(dataToValidate)) {
+        if (column in validated) {
+          this.model.set(column, validated[column]);
+        } else if (dataToValidate[column] === null && column in validationSchema.schema) {
+          // An explicit null on a KNOWN column that passed validation: an
+          // optional, non-nullable leaf coalesces null to "absent" in seal, so
+          // it is missing from the result. It is a deliberate "clear this
+          // column", not an unknown one to strip (Real-Estate #18). A required
+          // column never gets here: its rule rejects the null and validation throws.
+          this.model.set(column, null);
+        } else {
+          // Dropped by strictMode "strip": never write an unvalidated column.
+          this.unvalidatedColumns.add(column);
+        }
+      }
+    }
+
+    // Emit validated event
+    if (!options.skipEvents) {
+      await this.model.emitEvent("validated", { result });
+    }
+  }
+
+  /**
+   * Validate, cast and id-generate a not-yet-persisted model for `upsert()`.
+   *
+   * Runs the insert-mode pipeline (schema, casts, strictMode, Mongo `id`) but
+   * does not write; the caller sends the resulting data through the driver.
+   */
+  public async prepareForUpsert(): Promise<void> {
+    await this.validateAndCast(true, {});
+    await this.generateNextId();
+  }
+
+  /**
+   * Perform an insert operation.
+   *
+   * @param options - Save options
+   * @returns Insert result
+   * @private
+   */
+  private async performInsert(options: WriterOptions): Promise<InsertResult> {
+    const dataToInsert = await this.prepareForInsert(options);
+
+    // INSERT: use full validated data
+    let result: InsertResult;
+
+    try {
+      result = await this.driver.insert(this.table, dataToInsert);
+    } catch (error) {
+      throw this.mapUniqueViolation(error, true);
+    }
+
+    // Merge returned data (e.g., generated _id, timestamps)
+    // Note: We use merge here because the result might not include all fields
+    // (e.g., our generated 'id' field), and we don't want to lose them
+    mergeDriverFields(this.model, result.document as Record<string, unknown>);
+
+    // Reset dirty tracker immediately after merge to prevent
+    // database-generated fields (like _id) from being marked as dirty
+    this.model.dirtyTracker.reset();
+
+    return result;
+  }
+
+  /**
+   * Run the insert pipeline (validation, casting, id generation, timestamps,
+   * `validating`/`validated`/`creating` hooks) WITHOUT writing.
+   *
+   * `save()` uses this for its insert path, so bulk inserts and single inserts
+   * cannot drift. The caller is responsible for sending the returned document
+   * to the driver.
+   *
+   * @param options - Save options (e.g. `skipEvents`, `skipValidation`)
+   * @returns The prepared document to insert
+   */
+  public async prepareForInsert(options: WriterOptions = {}): Promise<Record<string, unknown>> {
+    // Validate and cast data
+    await this.validateAndCast(true, options);
+
+    // Generate ID if needed (NoSQL only)
+    await this.generateNextId();
+
+    // Get data to insert (already validated and casted)
+    const dataToInsert = this.model.data;
+
+    // Add createdAt and updatedAt to the data (using resolved column names)
+    // The column names are already resolved through the hierarchy:
+    // Model static property > Database config > Driver defaults > undefined
+    //
+    // Only stamp createdAt when the caller did NOT supply one, so a backdated
+    // value (e.g. data migrations / imports) is honored instead of overwritten.
+    // This mirrors the upsert path's guard. updatedAt is always stamped to
+    // reflect the moment the record is persisted.
+    const createdAtColumn = this.ctor.createdAtColumn;
+
+    if (createdAtColumn && dataToInsert[createdAtColumn] == null) {
+      dataToInsert[createdAtColumn] = new Date();
+    }
+
+    const updatedAtColumn = this.ctor.updatedAtColumn;
+    if (updatedAtColumn) {
+      dataToInsert[updatedAtColumn] = new Date();
+    }
+
+    // Emit creating event
+    if (!options.skipEvents) {
+      await this.model.emitEvent("creating");
+    }
+
+    return dataToInsert;
+  }
+
+  /**
+   * Perform an update operation.
+   *
+   * @param options - Save options
+   * @returns Update result
+   * @private
+   */
+  private async performUpdate(options: WriterOptions): Promise<UpdateResult> {
+    // Emit updating event
+    if (!options.skipEvents) {
+      await this.model.emitEvent("updating");
+    }
+
+    // Update the updatedAt timestamp (using resolved column name)
+    const updatedAtColumn = this.ctor.updatedAtColumn;
+    if (updatedAtColumn) {
+      this.model.set(updatedAtColumn, new Date());
+    }
+
+    if (options.replace) {
+      const document = await this.driver.replace(
+        this.table,
+        this.buildPrimaryKeyFilter(),
+        this.model.data,
+      );
+
+      if (document) {
+        this.model.replaceData(document as Record<string, unknown>);
+      }
+
+      return { modifiedCount: document ? 1 : 0 };
+    }
+
+    // Build operations from dirty tracker
+    const operations = this.buildUpdateOperations();
+
+    // Nothing left to write once identity columns are excluded — don't hand the
+    // driver an empty update document (MongoDB rejects one).
+    if (Object.keys(operations).length === 0) {
+      return { modifiedCount: 0 };
+    }
+
+    // Execute update with operations
+    try {
+      return await this.driver.update(
+        this.table,
+        this.buildPrimaryKeyFilter(),
+        operations,
+      );
+    } catch (error) {
+      throw this.mapUniqueViolation(error, false);
+    }
+  }
+
+  /**
+   * Map a driver unique-constraint violation (Postgres 23505, MongoDB 11000)
+   * to a field validation error, so a lost `unique` race never surfaces as a
+   * 500. Any other error is returned untouched.
+   */
+  private mapUniqueViolation(error: unknown, isInsert: boolean): unknown {
+    const err = error as
+      | {
+          code?: string | number;
+          detail?: string;
+          keyPattern?: Record<string, unknown>;
+          message?: string;
+        }
+      | undefined;
+
+    if (err?.code !== "23505" && err?.code !== 11000 && err?.code !== "11000") {
+      return error;
+    }
+
+    let field: string | undefined;
+
+    if (err.keyPattern) {
+      field = Object.keys(err.keyPattern)[0];
+    } else {
+      // Postgres: "Key (email)=(x) already exists."
+      field = /Key \(([^)]+)\)=/.exec(err.detail ?? "")?.[1]?.split(",")[0]?.trim();
+    }
+
+    if (!field) {
+      // Mongo: "index: email_1 dup key"
+      field = /index: (\S+?)_-?1\b/.exec(err.message ?? "")?.[1];
+    }
+
+    return new DatabaseWriterValidationError(
+      `[${this.model.constructor.name} Model] ${isInsert ? "Insert" : "Update"} Validation failed`,
+      [
+        {
+          type: "unique",
+          error: `The ${field ?? "value"} must be unique`,
+          input: field ?? "id",
+        },
+      ],
+    );
+  }
+
+  /**
+   * Build the filter that pins a write to the row this model was loaded from.
+   *
+   * It reads `model.trustedPrimaryKey` — the value captured when the instance
+   * became persisted — NOT the current value in `model.data`. The current value
+   * is reachable by mass assignment (`model.merge(req.body)`), so deriving the
+   * filter from it let a request body redirect the UPDATE to another document.
+   *
+   * @returns Filter matching the originally loaded record
+   * @private
+   */
+  private buildPrimaryKeyFilter(): Record<string, unknown> {
+    return { [this.primaryKey]: this.model.trustedPrimaryKey };
+  }
+
+  /**
+   * Generate ID for the model if auto-generation is enabled.
+   *
+   * @private
+   */
+  public async generateNextId(): Promise<void> {
+    if (!this.ctor.autoGenerateId || this.model.get("id")) {
+      return;
+    }
+
+    const id = await generateModelId(this.ctor);
+
+    if (id === undefined) {
+      return;
+    }
+
+    this.model.set("id", id);
+  }
+
+  /**
+   * Build update operations from the model's dirty tracker.
+   *
+   * Handles both modified fields ($set) and removed fields ($unset).
+   *
+   * @returns Update operations for the driver
+   * @private
+   *
+   * @example
+   * ```typescript
+   * // Model with changes
+   * user.set("name", "Alice");
+   * user.unset("tempField");
+   *
+   * const operations = this.buildUpdateOperations();
+   * // {
+   * //   $set: { name: "Alice" },
+   * //   $unset: { tempField: 1 }
+   * // }
+   * ```
+   */
+  private buildUpdateOperations(): UpdateOperations {
+    const operations: UpdateOperations = {};
+
+    // Identity columns are never written by an update. The filter pins the row
+    // by its captured primary key, so a dirty `id`/`_id` can only come from
+    // mass assignment or an explicit set() — either way, rewriting the key of
+    // an existing row corrupts identity (and `_id` is immutable in MongoDB).
+    // Changing a primary key is a deliberate operation: use the atomic/raw APIs.
+    const identityColumns = new Set([this.primaryKey, "id", "_id"]);
+
+    // Top-level fields assigned/unset as a whole (`set("nested", obj)`,
+    // `unset("nested")`) are written as ONE value. Per-leaf operations can only
+    // report the leaves that changed or vanished, so a nested object replaced with
+    // one that has fewer keys would keep its removed keys' empty parents in the
+    // stored document. Dotted-path sets (`set("nested.a", v)`) and merges are
+    // partial by intent and keep going through the per-leaf path below.
+    const replacedColumns = this.model.dirtyTracker
+      .getReplacedColumns()
+      .filter(column => !identityColumns.has(column) && !this.unvalidatedColumns.has(column));
+
+    // A leaf under a whole-written field must not be sent too: MongoDB rejects
+    // an update touching both `nested` and `nested.a`.
+    const isUnderReplaced = (column: string): boolean =>
+      replacedColumns.some(root => column === root || column.startsWith(`${root}.`));
+
+    // Get dirty columns (modified fields)
+    const dirtyColumns = this.model
+      .getDirtyColumns()
+      .filter(
+        column =>
+          !identityColumns.has(column) &&
+          !this.unvalidatedColumns.has(column) &&
+          !isUnderReplaced(column),
+      );
+
+    if (dirtyColumns.length > 0) {
+      operations.$set = {};
+      for (const column of dirtyColumns) {
+        const value = this.model.get(column);
+        if (value === undefined) continue;
+
+        operations.$set[column] = this.model.get(column);
+      }
+    }
+
+    // Get removed columns, collapsed to the highest path that is actually gone so
+    // a parent emptied by an unset is removed too instead of left behind as `{}`.
+    const removedColumns = this.model.dirtyTracker
+      .getRemovedPaths()
+      .filter(column => !identityColumns.has(column) && !isUnderReplaced(column));
+
+    if (removedColumns.length > 0) {
+      operations.$unset = {};
+      for (const column of removedColumns) {
+        operations.$unset[column] = 1;
+      }
+    }
+
+    for (const column of replacedColumns) {
+      const value = this.model.get(column);
+
+      if (value === undefined) {
+        operations.$unset ??= {};
+        operations.$unset[column] = 1;
+        continue;
+      }
+
+      operations.$set ??= {};
+      operations.$set[column] = value;
+    }
+
+    return operations;
+  }
+
+  /**
+   * Trigger sync operations after successful save.
+   *
+   * Emits a model.updated event that ModelSyncOperation listens to.
+   * The sync is handled by registered sync operations, not directly here.
+   *
+   * @param changedFields - Fields that were changed (for filtering)
+   * @private
+   */
+  private triggerSync(changedFields: string[]): void {
+    enqueueSyncFanout({
+      sourceModel: this.ctor.name,
+      operation: "update",
+      execute: () => triggerModelEvent(this.ctor, "updated", this.model, changedFields),
+    });
+  }
+}

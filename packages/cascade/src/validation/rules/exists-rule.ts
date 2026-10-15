@@ -1,0 +1,38 @@
+import { invalidRule, VALID_RULE, type SchemaRule } from "@warlock.js/seal";
+import { requireModelClass } from "../../model/register-model";
+import type { ExistsRuleOptions } from "../types";
+
+/**
+ * Validates that a record exists in the database for the given column/value.
+ *
+ * @example
+ * v.string().exists(Organization, { column: "id" });
+ */
+export const existsRule: SchemaRule<ExistsRuleOptions> = {
+  name: "exists",
+  defaultErrorMessage: "The :input must exist",
+  async validate(value: any, context) {
+    const { Model, query, column } = this.context.options;
+
+    const ResolvedModelClass = requireModelClass(Model);
+
+    // Explicit column wins, otherwise look up by the related model's primary key
+    const lookupColumn = column ?? ResolvedModelClass.primaryKey;
+
+    const dbQuery = ResolvedModelClass.query();
+
+    dbQuery.where(lookupColumn, value);
+
+    if (query) {
+      await query({
+        query: dbQuery,
+        value,
+        allValues: context.allValues,
+      });
+    }
+
+    const document = await dbQuery.first();
+
+    return document ? VALID_RULE : invalidRule(this, context);
+  },
+};

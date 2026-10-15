@@ -1,0 +1,2212 @@
+import { colors } from "@mongez/copper";
+import type { Collection } from "mongodb";
+import type { GroupByInput, RawExpression, WhereOperator } from "../../contracts";
+import { UnsafeRawExpressionError } from "../../errors/unsafe-raw-expression.error";
+import { UnsupportedQueryOperationError } from "../../errors/unsupported-query-operation.error";
+import {
+  isAggregateExpression,
+  type AggregateExpression,
+} from "../../expressions/aggregate-expressions";
+import type { ColumnExpression } from "../../expressions/column-expressions";
+import { escapeRegex } from "../../utils/escape-regex";
+import type { MongoQueryBuilder } from "./mongodb-query-builder";
+import { isPipelineStageObject } from "./pipeline-stage-object";
+import type { Operation, PipelineStage } from "./types";
+
+const isPlainObject = (value: unknown): value is Record<string, any> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+/**
+ * AND one `key: value` condition into `target`. Operators on the same field
+ * with distinct keys are merged (`{ age: { $gt, $lt } }`); any other collision
+ * (same operator, `$expr`, `$nor`, ...) is pushed into `$and` so neither
+ * side is overwritten.
+ */
+const mergeConditionEntry = (target: Record<string, any>, key: string, value: unknown): void => {
+  if (!(key in target)) {
+    target[key] = value;
+    return;
+  }
+
+  if (key === "$and" && Array.isArray(target.$and) && Array.isArray(value)) {
+    target.$and.push(...value);
+    return;
+  }
+
+  const existing = target[key];
+
+  if (
+    !key.startsWith("$") &&
+    isPlainObject(existing) &&
+    isPlainObject(value) &&
+    !Object.keys(value).some((operator) => operator in existing)
+  ) {
+    target[key] = { ...existing, ...value };
+    return;
+  }
+
+  if (!Array.isArray(target.$and)) {
+    target.$and = [];
+  }
+
+  target.$and.push({ [key]: value });
+};
+
+/**
+ * Options for configuring the MongoDB query parser.
+ */
+export type MongoQueryParserOptions = {
+  /** The MongoDB collection being queried */
+  collection: Collection;
+  /** The ordered list of operations to parse */
+  operations: Operation[];
+  /** Factory method for creating sub-builders (used for callbacks) */
+  createSubBuilder: () => MongoQueryBuilder;
+};
+
+/**
+ * Compile a LIKE argument to regex source with the same wildcards as SQL/pg:
+ * `%` matches any run of characters and `_` exactly one. Every other regex
+ * metacharacter in a string is escaped, so `a.b*` matches literally. An explicit
+ * `RegExp` is developer-authored and used verbatim.
+ */
+export function resolveMongoLikePattern(pattern: RegExp | string): string {
+  if (pattern instanceof RegExp) return pattern.source;
+
+  return escapeRegex(pattern).replace(/%+/g, ".*").replace(/_/g, ".");
+}
+
+/**
+ * Parses query builder operations into MongoDB aggregation pipeline.
+ *
+ * This parser is responsible for converting the abstract operations collected
+ * by the query builder into a concrete MongoDB aggregation pipeline. It handles
+ * intelligent grouping of mergeable operations (like multiple where clauses)
+ * into single pipeline stages for optimal performance.
+ */
+export class MongoQueryParser {
+  /**
+   * The MongoDB collection being queried.
+   */
+  private readonly collection: Collection;
+
+  /**
+   * The ordered list of operations to parse.
+   */
+  private readonly operations: Operation[];
+
+  /**
+   * Factory for creating sub-builders (used when resolving callbacks).
+   */
+  private readonly createSubBuilder: () => MongoQueryBuilder;
+
+  /**
+   * Track group field names for automatic _id renaming.
+   * Maps pipeline index to field names.
+   */
+  private readonly groupFieldNames = new Map<number, string | string[]>();
+
+  /**
+   * Track `countDistinct` aggregate aliases per group stage. The renaming
+   * `$project` finalizes these with `{ $size: "$alias" }` over the set built
+   * by `$addToSet` in the `$group` stage.
+   * Maps pipeline index to the set of aliases needing `$size` finalization.
+   */
+  private readonly countDistinctAliases = new Map<number, Set<string>>();
+
+  /**
+   * Create a new MongoDB query parser.
+   *
+   * @param options - Configuration options for the parser
+   */
+  public constructor(options: MongoQueryParserOptions) {
+    this.collection = options.collection;
+    this.operations = options.operations;
+    this.createSubBuilder = options.createSubBuilder;
+  }
+
+  /**
+   * Parse the operations into a MongoDB aggregation pipeline.
+   *
+   * This method intelligently groups mergeable operations (e.g., multiple where
+   * clauses) into single pipeline stages while maintaining the correct execution
+   * order for non-mergeable operations.
+   *
+   * @returns The MongoDB aggregation pipeline
+   *
+   * @example
+   * ```typescript
+   * const parser = new MongoQueryParser({ collection, operations });
+   * const pipeline = parser.parse();
+   * // [
+   * //   { $match: { status: 'active', age: { $gt: 18 } } },
+   * //   { $sort: { createdAt: -1 } },
+   * //   { $limit: 10 }
+   * // ]
+   * ```
+   */
+  public parse(): any[] {
+    this.groupFieldNames.clear();
+    this.countDistinctAliases.clear();
+
+    const pipeline: any[] = [];
+    let currentStage: PipelineStage | null = null;
+    let currentBuffer: Operation[] = [];
+    // Index of the `$project` built from select operations while it is the
+    // last stage emitted, so a `$sort` that follows can be placed around it.
+    let trailingProjectIndex = -1;
+
+    const emit = (stage: PipelineStage, operations: Operation[]): void => {
+      if (stage === "$raw") {
+        for (const op of operations) {
+          this.applyRawOperation(pipeline, op);
+        }
+
+        trailingProjectIndex = -1;
+        return;
+      }
+
+      const builtStage = this.buildStage(stage, operations);
+
+      if (!builtStage) {
+        return;
+      }
+
+      if (
+        builtStage.$sort &&
+        trailingProjectIndex >= 0 &&
+        trailingProjectIndex === pipeline.length - 1
+      ) {
+        const projectStage = pipeline.pop();
+        pipeline.push(...this.placeSortAroundProjection(projectStage, builtStage));
+        trailingProjectIndex = -1;
+        return;
+      }
+
+      const stageIndex = pipeline.length;
+      pipeline.push(builtStage);
+      trailingProjectIndex = stage === "$project" ? stageIndex : -1;
+
+      // Rename `_id` back to the grouped field names right after the $group.
+      this.trackGroupFieldNames(stage, operations, stageIndex);
+      const renameStage = this.buildGroupRenameStage(builtStage, stageIndex);
+
+      if (renameStage) {
+        pipeline.push(renameStage);
+      }
+
+      // $lookup is a left join; an inner join drops the rows with no match.
+      if (stage === "$lookup" && builtStage.$lookup && operations[0]?.data?.type === "inner") {
+        pipeline.push({ $match: { [builtStage.$lookup.as]: { $ne: [] } } });
+      }
+    };
+
+    for (const op of this.orderStages(this.operations)) {
+      if (op.mergeable && op.stage === currentStage) {
+        // Same mergeable stage, add to buffer
+        currentBuffer.push(op);
+        continue;
+      }
+
+      // Different stage or non-mergeable, flush buffer
+      if (currentBuffer.length > 0) {
+        emit(currentStage!, currentBuffer);
+        currentBuffer = [];
+      }
+
+      if (op.mergeable) {
+        currentStage = op.stage;
+        currentBuffer.push(op);
+      } else {
+        emit(op.stage, [op]);
+        currentStage = null;
+      }
+    }
+
+    if (currentBuffer.length > 0) {
+      emit(currentStage!, currentBuffer);
+    }
+
+    return this.hoistVectorSearch(pipeline);
+  }
+
+  /**
+   * Atlas requires `$vectorSearch` as the first stage. Any `$match` emitted
+   * before it (where clauses, scopes) moves into its `filter` instead.
+   */
+  private hoistVectorSearch(pipeline: any[]): any[] {
+    const index = pipeline.findIndex((stage) => stage.$vectorSearch);
+
+    if (index <= 0) {
+      return pipeline;
+    }
+
+    // similarTo() already carries the limit, so a `$limit` recorded before it is redundant.
+    const before = pipeline.slice(0, index).filter((stage) => !stage.$limit);
+
+    if (!before.every((stage) => stage.$match)) {
+      throw new UnsupportedQueryOperationError(
+        "similarTo",
+        "mongodb",
+        "$vectorSearch must be the first pipeline stage; only where() filters can precede similarTo().",
+      );
+    }
+
+    const vectorStage = pipeline[index].$vectorSearch;
+    const filters = [
+      ...before.map((stage) => stage.$match),
+      ...(vectorStage.filter ? [vectorStage.filter] : []),
+    ];
+
+    return [
+      {
+        $vectorSearch: {
+          ...vectorStage,
+          ...(filters.length === 0
+            ? {}
+            : { filter: filters.length === 1 ? filters[0] : { $and: filters } }),
+        },
+      },
+      ...pipeline.slice(index + 1),
+    ];
+  }
+
+  /**
+   * Apply a raw escape-hatch operation to the pipeline built so far.
+   *
+   * - `joinRaw`: appends the caller-built stages verbatim.
+   * - `raw`: calls the callback with the pipeline array. A returned array
+   *   replaces the pipeline; `undefined` keeps the (possibly mutated) array.
+   *
+   * @throws UnsupportedQueryOperationError when a `raw()` callback leaves
+   *   something other than an array of stage objects
+   */
+  private applyRawOperation(pipeline: any[], op: Operation): void {
+    if (op.type === "joinRaw") {
+      pipeline.push(...(op.data.stages as unknown[]));
+      return;
+    }
+
+    const result: unknown = op.data.builder(pipeline);
+    const next = result === undefined ? pipeline : result;
+
+    if (!Array.isArray(next) || !next.every(isPipelineStageObject)) {
+      throw new UnsupportedQueryOperationError(
+        "raw",
+        "mongodb",
+        "The raw() callback receives the aggregation pipeline array and must return an array of stage objects, or mutate that array and return nothing.",
+      );
+    }
+
+    if (next !== pipeline) {
+      pipeline.splice(0, pipeline.length, ...next);
+    }
+  }
+
+  /**
+   * Order a `$sort` against the select `$project` it follows.
+   *
+   * A `$sort` after a `$project` cannot see fields the projection dropped, so
+   * `select(["title"]).orderBy("likes")` would not sort. The sort moves before
+   * the projection, unless it sorts by a field the projection computes
+   * (`selectRaw({ score: ... }).orderBy("score")`), which only exists after it:
+   *
+   * - no computed sort key: `$sort`, `$project`
+   * - only computed or selected sort keys: `$project`, `$sort` (unchanged)
+   * - computed AND unselected sort keys: `$addFields` (the computed keys),
+   *   `$sort`, `$project` (those keys passed through)
+   */
+  private placeSortAroundProjection(projectStage: any, sortStage: any): any[] {
+    const projection: Record<string, unknown> = projectStage.$project;
+    const sortKeys = Object.keys(sortStage.$sort);
+
+    const isInclusionFlag = (value: unknown): boolean =>
+      value === 1 || value === true || value === 0 || value === false;
+
+    const computedKeys = sortKeys.filter((key) => {
+      const value = projection[key];
+
+      return value !== undefined && !isInclusionFlag(value) && value !== `$${key}`;
+    });
+
+    if (computedKeys.length === 0) {
+      return [sortStage, projectStage];
+    }
+
+    const hasUnselectedKey = sortKeys.some((key) => {
+      const value = projection[key];
+
+      return value === undefined || value === 0 || value === false;
+    });
+
+    if (!hasUnselectedKey) {
+      return [projectStage, sortStage];
+    }
+
+    const addFields: Record<string, unknown> = {};
+    const passThrough: Record<string, unknown> = { ...projection };
+
+    for (const key of computedKeys) {
+      addFields[key] = projection[key];
+      passThrough[key] = 1;
+    }
+
+    return [{ $addFields: addFields }, sortStage, { $project: passThrough }];
+  }
+
+  /**
+   * Reorder operations so filters run before projections, mirroring SQL
+   * semantics: in `select(...).where(...)`, the WHERE always applies to the
+   * source columns regardless of call order. Without this, a `$project` that
+   * strips the filter column would run before the `$match` and silently drop
+   * every document (`select(["a"]).where("b", x)` → `[]`).
+   *
+   * Only *mergeable* operations move, and only within a segment of neighboring
+   * mergeable `$match` / `$project` / `$sort` operations. Inside a segment the
+   * order is `$match`, then `$project`, then `$sort` (each keeping call order),
+   * and {@link placeSortAroundProjection} then decides whether the sort runs
+   * before the projection. Any other operation — `$group`, `$lookup`,
+   * `$limit`, `$skip`, `$setWindowFields`, raw escapes, having-style
+   * post-group matches, `$sample` — is a barrier: nothing moves across it.
+   * So `groupBy(...).where(...)` still filters AFTER the group, and
+   * `limit(...)` / `random()` keep their call-order meaning.
+   */
+  private orderStages(operations: Operation[]): Operation[] {
+    const reordered: Operation[] = [];
+    let segment: Operation[] = [];
+
+    const flushSegment = (): void => {
+      if (segment.length === 0) {
+        return;
+      }
+
+      reordered.push(...segment.filter((op) => op.stage === "$match"));
+      reordered.push(...segment.filter((op) => op.stage === "$project"));
+      reordered.push(...segment.filter((op) => op.stage === "$sort"));
+      segment = [];
+    };
+
+    for (const op of operations) {
+      const isReorderable =
+        op.mergeable && (op.stage === "$match" || op.stage === "$project" || op.stage === "$sort");
+
+      if (isReorderable) {
+        segment.push(op);
+      } else {
+        flushSegment();
+        reordered.push(op);
+      }
+    }
+
+    flushSegment();
+    return reordered;
+  }
+
+  /**
+   * Track field names for group stages that need _id renaming.
+   */
+  private trackGroupFieldNames(
+    stage: PipelineStage,
+    operations: Operation[],
+    stageIndex: number,
+  ): void {
+    if (stage === "$group") {
+      const op = operations[0];
+
+      // A `$group` stage with no operations has nothing to track. Returning is
+      // the same outcome the `if` chain below already produces for an
+      // unrecognised type — stated explicitly so the reads that follow are not
+      // guesses about whether the array can be empty.
+      if (op === undefined) return;
+
+      if (op.type === "groupByWithAggregates" && op.data.fields) {
+        const fieldNames = this.extractGroupFieldNames(op.data.fields);
+        if (fieldNames) {
+          this.groupFieldNames.set(stageIndex, fieldNames);
+        }
+
+        this.trackCountDistinctAliases(stageIndex, op.data.aggregates);
+      } else if (op.type === "groupByDate") {
+        // The `$dateTrunc` bucket becomes `_id`; rename it back to the column.
+        this.groupFieldNames.set(stageIndex, op.data.column as string);
+        this.trackCountDistinctAliases(stageIndex, op.data.aggregates ?? {});
+      }
+    }
+  }
+
+  /**
+   * Record which aggregate aliases in a group stage are `countDistinct` so the
+   * renaming `$project` can finalize them with `{ $size: "$alias" }` over the
+   * set built by `$addToSet` (the standard distinct-count-per-group pattern).
+   */
+  private trackCountDistinctAliases(
+    stageIndex: number,
+    aggregates: Record<string, RawExpression>,
+  ): void {
+    const distinctAliases = new Set<string>();
+    for (const [alias, expression] of Object.entries(aggregates)) {
+      if (isAggregateExpression(expression) && expression.__agg === "countDistinct") {
+        distinctAliases.add(alias);
+      }
+    }
+
+    if (distinctAliases.size > 0) {
+      this.countDistinctAliases.set(stageIndex, distinctAliases);
+    }
+  }
+
+  /**
+   * Build the `$project` that renames `_id` back to the grouped field name(s)
+   * right after a `$group` stage with tracked field names, so results carry
+   * the grouping columns instead of MongoDB's `_id`.
+   *
+   * @param stage - The stage just emitted
+   * @param stageIndex - Its index in the pipeline
+   * @returns The renaming `$project` stage, or null when none is needed
+   */
+  private buildGroupRenameStage(stage: any, stageIndex: number): any {
+    if (!stage.$group || !this.groupFieldNames.has(stageIndex)) {
+      return null;
+    }
+
+    const fieldNames = this.groupFieldNames.get(stageIndex)!;
+    const projection: Record<string, unknown> = {};
+
+    if (typeof fieldNames === "string") {
+      // Single field: rename _id to field name
+      projection[fieldNames] = "$_id";
+    } else if (Array.isArray(fieldNames) && fieldNames.length > 0) {
+      // Multiple fields: _id is an object, spread it
+      for (const fieldName of fieldNames) {
+        projection[fieldName] = `$_id.${fieldName}`;
+      }
+    }
+
+    // Include all aggregate fields. countDistinct aliases are finalized
+    // with `{ $size: "$alias" }` over the set built by `$addToSet`; every
+    // other aggregate is projected through as-is.
+    const distinctAliases = this.countDistinctAliases.get(stageIndex);
+    const aggregateFields = Object.keys(stage.$group).filter((key) => key !== "_id");
+
+    for (const field of aggregateFields) {
+      projection[field] = distinctAliases?.has(field) ? { $size: `$${field}` } : 1;
+    }
+
+    if (Object.keys(projection).length === 0) {
+      return null;
+    }
+
+    // now unselect the _id field
+    projection._id = 0;
+    return { $project: projection };
+  }
+
+  /**
+   * Convert the parsed pipeline to a pretty-printed string for debugging.
+   *
+   * This method formats the MongoDB aggregation pipeline in a human-readable
+   * way, making it easier to understand and debug complex queries.
+   *
+   * @returns A formatted string representation of the pipeline
+   *
+   * @example
+   * ```typescript
+   * const parser = new MongoQueryParser({ collection, operations });
+   * console.log(parser.toPrettyString());
+   * // Output:
+   * // MongoDB Aggregation Pipeline:
+   * // ════════════════════════════
+   * // Stage 1: $match
+   * //   status: "active"
+   * //   age: { $gt: 18 }
+   * //
+   * // Stage 2: $sort
+   * //   createdAt: -1
+   * ```
+   */
+  public toPrettyString(): string {
+    const pipeline = this.parse();
+
+    if (pipeline.length === 0) {
+      return "MongoDB Aggregation Pipeline: (empty)";
+    }
+
+    let output = "MongoDB Aggregation Pipeline:\n";
+    output += "═".repeat(50) + "\n";
+
+    pipeline.forEach((stage, index) => {
+      // Debug formatting only. A stage object with no keys is malformed rather
+      // than impossible, and printing "<empty stage>" beats throwing out of a
+      // function whose entire job is to help someone read a pipeline.
+      const stageName = Object.keys(stage)[0] ?? "<empty stage>";
+      const stageData = stage[stageName];
+
+      if (index > 0) {
+        output += "\n";
+      }
+
+      output += `Stage ${index + 1}: ${colors.redBright(stageName)}\n`;
+      output += this.formatStageData(stageData, 2);
+    });
+
+    return output;
+  }
+
+  /**
+   * Format stage data with proper indentation.
+   *
+   * @param data - The stage data to format
+   * @param indent - The indentation level
+   * @returns Formatted string
+   */
+  private formatStageData(data: any, indent: number = 0): string {
+    const spaces = " ".repeat(indent);
+
+    if (typeof data !== "object" || data === null) {
+      return `${spaces}${JSON.stringify(data)}\n`;
+    }
+
+    if (Array.isArray(data)) {
+      if (data.length === 0) return `${spaces}[]`;
+
+      let result = "";
+      data.forEach((item, index) => {
+        result += `${spaces}[${colors.magenta(index)}]:\n`;
+        result += this.formatStageData(item, indent + 2);
+      });
+      return result;
+    }
+
+    let result = "";
+    Object.entries(data).forEach(([key, value]) => {
+      const isOperator = key.startsWith("$");
+      const coloredKey = isOperator ? colors.magentaBright(key) : colors.blue(key);
+
+      if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+        result += `${spaces}${coloredKey}:\n`;
+        result += this.formatStageData(value, indent + 2);
+      } else if (Array.isArray(value)) {
+        result += `${spaces}${coloredKey}:\n`;
+        result += this.formatStageData(value, indent + 2);
+      } else {
+        const formattedValue =
+          typeof value === "number"
+            ? colors.yellowBright(value)
+            : typeof value === "boolean"
+              ? colors.cyanBright(value.toString())
+              : typeof value === "string"
+                ? colors.greenBright(JSON.stringify(value))
+                : colors.greenBright(String(value));
+        result += `${spaces}${coloredKey}: ${formattedValue}\n`;
+      }
+    });
+
+    return result.endsWith("\n") ? result : `${result}\n`;
+  }
+
+  /**
+   * Build a single pipeline stage from a group of operations.
+   *
+   * @param stage - The pipeline stage type
+   * @param operations - The operations to build the stage from
+   * @returns The built pipeline stage or null if no stage should be added
+   */
+  private buildStage(stage: PipelineStage, operations: Operation[]): any {
+    switch (stage) {
+      case "$match":
+        return this.buildMatchStage(operations);
+      case "$project":
+        return this.buildProjectStage(operations);
+      case "$sort":
+        return this.buildSortStage(operations);
+      case "$group":
+        return this.buildGroupStage(operations);
+      case "$lookup":
+        return this.buildLookupStage(operations);
+      // These three read operations[0] directly. `?? null` rather than an
+      // assertion because this function is documented to return "the built
+      // pipeline stage or null if no stage should be added", and no operations
+      // IS no stage — the same answer `default` gives. Asserting instead would
+      // turn an empty group into `{ $limit: undefined }`, and a $limit stage
+      // with an undefined value is a query Mongo rejects at execution time,
+      // far from the code that built it.
+      case "$limit": {
+        const [first] = operations;
+
+        return first === undefined ? null : { $limit: first.data.value };
+      }
+      case "$skip": {
+        const [first] = operations;
+
+        return first === undefined ? null : { $skip: first.data.value };
+      }
+      case "$setWindowFields": {
+        const [first] = operations;
+
+        return first === undefined ? null : { $setWindowFields: first.data.spec };
+      }
+      // `$unwind`, `$addFields` and `$vectorSearch` used to fall through to
+      // `default` and vanish from the pipeline, so `similarTo()` ran as a plain
+      // scan and a recorded unwind was silently ignored.
+      case "$unwind": {
+        const [first] = operations;
+
+        if (first === undefined) return null;
+
+        const { path, ...options } = first.data as Record<string, unknown>;
+
+        return Object.keys(options).length === 0
+          ? { $unwind: path }
+          : { $unwind: { path, ...options } };
+      }
+      case "$addFields": {
+        const [first] = operations;
+
+        return first === undefined ? null : { $addFields: first.data };
+      }
+      case "$vectorSearch": {
+        const [first] = operations;
+
+        return first === undefined ? null : { $vectorSearch: first.data };
+      }
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Build a $match stage from where operations.
+   *
+   * Query building strategy:
+   * - Top-level where() + orWhere() = Pure OR
+   * - Use callbacks for AND + OR grouping
+   *
+   * @param operations - The where operations
+   * @returns The $match stage or null
+   */
+  private buildMatchStage(operations: Operation[]): any {
+    const andFilter: Record<string, any> = {};
+    const orClauses: any[] = [];
+    const pendingSimpleWhere: any[] = [];
+    let topLevelOrMode = false;
+
+    const pushOr = (clause: any): void => {
+      if (!clause) {
+        return;
+      }
+
+      if (this.isPureOrCondition(clause)) {
+        orClauses.push(...clause.$or);
+        return;
+      }
+
+      if (Array.isArray(clause)) {
+        orClauses.push(...clause);
+        return;
+      }
+
+      orClauses.push(clause);
+    };
+
+    const mergeAnd = (condition: any): void => {
+      if (!condition) {
+        return;
+      }
+
+      Object.entries(condition).forEach(([key, value]) => {
+        if (key === "$or") {
+          pushOr(value);
+          return;
+        }
+
+        mergeConditionEntry(andFilter, key, value);
+      });
+    };
+
+    const queueSimpleWhere = (condition: any): void => {
+      if (!condition) {
+        return;
+      }
+      if (topLevelOrMode) {
+        pushOr(condition);
+      } else {
+        pendingSimpleWhere.push(condition);
+      }
+    };
+
+    const enterTopLevelOrMode = (): void => {
+      if (topLevelOrMode) {
+        return;
+      }
+      topLevelOrMode = true;
+      // The conditions queued so far are ANDed together, then ORed with what
+      // follows: `where(a).where(b).orWhere(c)` is `(a AND b) OR c`, not `a OR b OR c`.
+      const pending = pendingSimpleWhere.splice(0).filter(Boolean);
+      if (pending.length === 1) {
+        pushOr(pending[0]);
+      } else if (pending.length > 1) {
+        pushOr({ $and: pending });
+      }
+    };
+
+    const flushPendingSimpleWhere = (): void => {
+      if (pendingSimpleWhere.length === 0) {
+        return;
+      }
+      if (topLevelOrMode) {
+        pendingSimpleWhere.forEach(pushOr);
+      } else {
+        pendingSimpleWhere.forEach(mergeAnd);
+      }
+      pendingSimpleWhere.length = 0;
+    };
+
+    for (const op of operations) {
+      if (op.type === "where:callback" || op.type === "orWhere:callback") {
+        flushPendingSimpleWhere();
+        const callbackCondition = this.buildCallbackCondition(op.data);
+        if (!callbackCondition) {
+          continue;
+        }
+
+        const treatAsOr =
+          op.type === "orWhere:callback" ||
+          (topLevelOrMode && !this.isPureOrCondition(callbackCondition)) ||
+          this.isPureOrCondition(callbackCondition);
+
+        if (treatAsOr) {
+          if (op.type === "orWhere:callback") {
+            enterTopLevelOrMode();
+          }
+          pushOr(callbackCondition);
+        } else {
+          mergeAnd(callbackCondition);
+        }
+        continue;
+      }
+
+      if (op.type === "where:object") {
+        queueSimpleWhere(op.data);
+        continue;
+      }
+
+      if (
+        op.type === "where:not" ||
+        op.type === "orWhere:not" ||
+        op.type === "where:exists" ||
+        op.type === "where:notExists"
+      ) {
+        const negated = op.type === "where:not" || op.type === "where:notExists";
+        const nested = this.buildCallbackCondition(op.data.callback);
+        if (nested) {
+          const condition = negated ? { $nor: [nested] } : nested;
+          if (op.type.startsWith("orWhere")) {
+            enterTopLevelOrMode();
+            pushOr(condition);
+          } else {
+            queueSimpleWhere(condition);
+          }
+        }
+        continue;
+      }
+
+      if (op.type === "orWhere:object") {
+        enterTopLevelOrMode();
+        pushOr(op.data);
+        continue;
+      }
+
+      const condition = this.buildWhereCondition(op);
+      if (!condition) {
+        continue;
+      }
+
+      if (op.type.startsWith("orWhere")) {
+        enterTopLevelOrMode();
+        pushOr(condition);
+      } else {
+        queueSimpleWhere(condition);
+      }
+    }
+
+    flushPendingSimpleWhere();
+
+    const hasAnd = Object.keys(andFilter).length > 0;
+    const hasOr = orClauses.length > 0;
+
+    if (!hasAnd && !hasOr) {
+      return null;
+    }
+
+    const match: any = {};
+    if (hasAnd) {
+      Object.assign(match, andFilter);
+    }
+    if (hasOr) {
+      match.$or = orClauses;
+    }
+
+    return { $match: match };
+  }
+
+  private isPureOrCondition(condition: any): condition is { $or: any[] } {
+    return (
+      condition &&
+      typeof condition === "object" &&
+      !Array.isArray(condition) &&
+      Object.keys(condition).length === 1 &&
+      Array.isArray((condition as any).$or)
+    );
+  }
+
+  /**
+   * Build a condition from a callback-based where clause.
+   * Creates a sub-builder, executes the callback, and extracts the conditions.
+   * If callback has orWhere, all conditions become OR.
+   *
+   * @param callback - The callback function
+   * @returns The built condition or null
+   */
+  private buildCallbackCondition(callback: any): any {
+    // Create a temporary sub-builder
+    const subBuilder = this.createSubBuilder();
+
+    // Execute the callback with the sub-builder
+    callback(subBuilder);
+
+    // Extract only match operations from the sub-builder
+    const matchOps = subBuilder.operations.filter((op: Operation) => op.stage === "$match");
+
+    if (matchOps.length === 0) {
+      return null;
+    }
+
+    const andFilter: Record<string, any> = {};
+    const orClauses: any[] = [];
+    const hasInternalOr = matchOps.some((op) => op.type.startsWith("orWhere"));
+
+    const pushOr = (clause: any): void => {
+      if (!clause) {
+        return;
+      }
+      if (this.isPureOrCondition(clause)) {
+        orClauses.push(...clause.$or);
+        return;
+      }
+      orClauses.push(clause);
+    };
+
+    if (hasInternalOr) {
+      for (const op of matchOps) {
+        if (op.type === "where:callback" || op.type === "orWhere:callback") {
+          const nestedCondition = this.buildCallbackCondition(op.data);
+          if (nestedCondition) {
+            pushOr(nestedCondition);
+          }
+          continue;
+        }
+
+        if (op.type === "where:object" || op.type === "orWhere:object") {
+          pushOr(op.data);
+          continue;
+        }
+
+        const condition = this.buildWhereCondition(op);
+        if (condition) {
+          pushOr(condition);
+        }
+      }
+
+      return orClauses.length > 0 ? { $or: orClauses } : null;
+    }
+
+    const mergeInto = (condition: any): void => {
+      if (!condition) {
+        return;
+      }
+
+      Object.entries(condition).forEach(([key, value]) => mergeConditionEntry(andFilter, key, value));
+    };
+
+    for (const op of matchOps) {
+      if (op.type === "where:callback") {
+        mergeInto(this.buildCallbackCondition(op.data));
+      } else if (op.type === "where:object") {
+        mergeInto(op.data);
+      } else {
+        mergeInto(this.buildWhereCondition(op));
+      }
+    }
+
+    return Object.keys(andFilter).length > 0 ? andFilter : null;
+  }
+
+  /**
+   * Build a MongoDB filter condition from a where operation.
+   *
+   * @param op - The operation to build
+   * @returns The MongoDB filter condition
+   */
+  private buildWhereCondition(op: Operation): any {
+    const { field, operator, value } = op.data;
+
+    switch (op.type) {
+      case "where":
+      case "orWhere":
+        return this.buildOperatorCondition(field, operator, value);
+
+      case "whereIn":
+      case "orWhereIn":
+        return { [field]: { $in: value || op.data.values } };
+
+      case "whereNotIn":
+      case "orWhereNotIn":
+        return { [field]: { $nin: value || op.data.values } };
+
+      case "whereNull":
+      case "orWhereNull":
+        return { [field]: null };
+
+      case "whereNotNull":
+      case "orWhereNotNull":
+        return { [field]: { $ne: null } };
+
+      case "whereBetween":
+      case "orWhereBetween":
+        return {
+          [field]: {
+            $gte: op.data.range[0],
+            $lte: op.data.range[1],
+          },
+        };
+
+      case "whereNotBetween":
+        return {
+          [field]: {
+            $not: {
+              $gte: op.data.range[0],
+              $lte: op.data.range[1],
+            },
+          },
+        };
+
+      case "whereLike":
+        return {
+          [field]: { $regex: this.buildLikeRegexSource(op.data), $options: "i" },
+        };
+
+      case "whereNotLike":
+        return {
+          [field]: {
+            $not: { $regex: this.buildLikeRegexSource(op.data), $options: "i" },
+          },
+        };
+
+      case "whereStartsWith":
+        return {
+          [field]: { $regex: `^${escapeRegex(String(op.data.value))}`, $options: "i" },
+        };
+
+      case "whereNotStartsWith":
+        return {
+          [field]: {
+            $not: { $regex: `^${escapeRegex(String(op.data.value))}`, $options: "i" },
+          },
+        };
+
+      case "whereEndsWith":
+        return {
+          [field]: { $regex: `${escapeRegex(String(op.data.value))}$`, $options: "i" },
+        };
+
+      case "whereNotEndsWith":
+        return {
+          [field]: {
+            $not: { $regex: `${escapeRegex(String(op.data.value))}$`, $options: "i" },
+          },
+        };
+
+      case "whereExists":
+        return { [field]: { $exists: true } };
+
+      case "whereNotExists":
+        return { [field]: { $exists: false } };
+
+      case "whereSize":
+        if (op.data.operator === "=") {
+          return { [field]: { $size: op.data.size } };
+        } else {
+          const mongoOp = this.getMongoOperator(op.data.operator);
+          return {
+            $expr: {
+              [mongoOp]: [{ $size: `$${field}` }, op.data.size],
+            },
+          };
+        }
+
+      case "textSearch":
+        return {
+          $text: { $search: op.data.query },
+          ...(op.data.filters || {}),
+        };
+
+      case "whereRaw":
+      case "orWhereRaw":
+        return this.resolveRawExpression(op.data.expression as RawExpression, op.data.bindings);
+
+      case "whereColumn":
+      case "orWhereColumn":
+        return this.buildColumnComparison(op.data.first, op.data.operator, op.data.second);
+
+      case "whereBetweenColumns":
+        return this.buildBetweenColumnsCondition(
+          op.data.field,
+          op.data.lowerColumn,
+          op.data.upperColumn,
+        );
+
+      case "whereDate":
+      case "whereDateEquals":
+        return this.buildDateEqualityCondition(op.data.field, op.data.value);
+
+      case "whereDateBefore":
+        return this.buildDateBeforeCondition(op.data.field, op.data.value);
+
+      case "whereDateAfter":
+        return this.buildDateAfterCondition(op.data.field, op.data.value);
+
+      case "whereTime":
+        return this.buildTimeCondition(op.data.field, op.data.value);
+
+      case "whereDay":
+        return this.buildDatePartCondition(op.data.field, "$dayOfMonth", op.data.value);
+
+      case "whereMonth":
+        return this.buildDatePartCondition(op.data.field, "$month", op.data.value);
+
+      case "whereYear":
+        return this.buildDatePartCondition(op.data.field, "$year", op.data.value);
+
+      case "whereJsonContains":
+        return this.buildJsonContainsCondition(op.data.path, op.data.value);
+
+      case "whereJsonDoesntContain":
+        return this.buildJsonDoesntContainCondition(op.data.path, op.data.value);
+
+      case "whereJsonContainsKey":
+        return this.buildJsonContainsKeyCondition(op.data.path);
+
+      case "whereJsonLength":
+        return this.buildJsonLengthCondition(op.data.path, op.data.operator, op.data.value);
+
+      case "whereJsonIsArray":
+        return this.buildJsonTypeCondition(op.data.path, "array");
+
+      case "whereJsonIsObject":
+        return this.buildJsonTypeCondition(op.data.path, "object");
+
+      case "whereArrayLength":
+        return this.buildArrayLengthCondition(op.data.field, op.data.operator, op.data.value);
+
+      case "whereFullText":
+      case "orWhereFullText":
+        return { $text: { $search: op.data.query } };
+
+      case "whereSearch":
+        return {
+          [op.data.field]: {
+            // Search text is the most user-facing input in the whole API —
+            // always a literal, never a pattern.
+            $regex: escapeRegex(String(op.data.query)),
+            $options: "i",
+          },
+        };
+
+      case "where:not":
+      case "orWhere:not": {
+        const nestedNot = this.buildCallbackCondition(op.data.callback);
+        return nestedNot ? { $nor: [nestedNot] } : null;
+      }
+
+      case "where:exists":
+        return this.buildCallbackCondition(op.data.callback);
+
+      case "where:notExists": {
+        const nestedExists = this.buildCallbackCondition(op.data.callback);
+        return nestedExists ? { $nor: [nestedExists] } : null;
+      }
+
+      case "whereArrayContains":
+        if (op.data.key) {
+          return {
+            [field]: {
+              $elemMatch: { [op.data.key]: op.data.value },
+            },
+          };
+        } else {
+          return { [field]: op.data.value };
+        }
+
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Resolve the `$regex` source for a whereLike/whereNotLike operation.
+   *
+   * A `RegExp` argument is developer-authored and used verbatim; a string is
+   * treated as a literal LIKE pattern (`%` aside) so that search input cannot
+   * inject regex operators or a catastrophically backtracking pattern. The base
+   * (driver-agnostic) query builder flattens a `RegExp` to its source string and
+   * flags it with `isRegExp`, which is honored here for the same reason.
+   *
+   * @param data - The operation data (`{ pattern, isRegExp? }`)
+   * @returns Regex source for `$regex`
+   */
+  private buildLikeRegexSource(data: any): string {
+    if (data.isRegExp === true && typeof data.pattern === "string") {
+      return data.pattern;
+    }
+
+    return resolveMongoLikePattern(data.pattern);
+  }
+
+  /**
+   * Build a condition based on the operator.
+   *
+   * @param field - The field name
+   * @param operator - The comparison operator
+   * @param value - The value to compare
+   * @returns The MongoDB filter condition
+   */
+  private buildOperatorCondition(field: string, operator: string, value: unknown): any {
+    switch (operator) {
+      case "=":
+        return { [field]: value };
+      case "!=":
+      case "<>":
+        return { [field]: { $ne: value } };
+      case "in":
+        return { [field]: { $in: this.assertArrayOperand(operator, value) } };
+      case "notIn":
+      case "not in":
+        return { [field]: { $nin: this.assertArrayOperand(operator, value) } };
+      case "between":
+      case "notBetween":
+      case "not between": {
+        const range = this.assertArrayOperand(operator, value);
+        if (range.length !== 2) {
+          throw new Error(`Operator "${operator}" requires a [min, max] pair.`);
+        }
+        const bounds = { $gte: range[0], $lte: range[1] };
+        return { [field]: operator === "between" ? bounds : { $not: bounds } };
+      }
+      case "like":
+        return { [field]: { $regex: resolveMongoLikePattern(value as string), $options: "i" } };
+      case "notLike":
+      case "not like":
+        return { [field]: { $not: { $regex: resolveMongoLikePattern(value as string), $options: "i" } } };
+      case "startsWith":
+        return { [field]: { $regex: `^${escapeRegex(String(value))}`, $options: "i" } };
+      case "notStartsWith":
+        return { [field]: { $not: { $regex: `^${escapeRegex(String(value))}`, $options: "i" } } };
+      case "endsWith":
+        return { [field]: { $regex: `${escapeRegex(String(value))}$`, $options: "i" } };
+      case "notEndsWith":
+        return { [field]: { $not: { $regex: `${escapeRegex(String(value))}$`, $options: "i" } } };
+      case "exists":
+        return { [field]: { $exists: value !== false } };
+      case ">":
+        return { [field]: { $gt: value } };
+      case ">=":
+        return { [field]: { $gte: value } };
+      case "<":
+        return { [field]: { $lt: value } };
+      case "<=":
+        return { [field]: { $lte: value } };
+      default:
+        throw new Error(`Unsupported where operator "${operator}" on the MongoDB driver.`);
+    }
+  }
+
+  private assertArrayOperand(operator: string, value: unknown): unknown[] {
+    if (!Array.isArray(value)) {
+      throw new Error(`Operator "${operator}" requires an array operand.`);
+    }
+
+    return value;
+  }
+
+  /**
+   * Get MongoDB operator from comparison operator.
+   *
+   * @param operator - The comparison operator
+   * @returns The MongoDB operator
+   */
+  private getMongoOperator(operator: string): string {
+    const map: Record<string, string> = {
+      "=": "$eq",
+      "!=": "$ne",
+      ">": "$gt",
+      ">=": "$gte",
+      "<": "$lt",
+      "<=": "$lte",
+    };
+    return map[operator] || "$eq";
+  }
+
+  private resolveRawExpression(expression: RawExpression, _bindings?: unknown[]): any {
+    if (typeof expression === "string") {
+      // String expressions used to compile to { $where: "<js>" } — a
+      // server-side JavaScript execution sink inside mongod (and an unindexed
+      // full-scan even when trusted). Refuse them outright.
+      throw new UnsafeRawExpressionError(
+        `whereRaw()/orWhereRaw() string expressions are not supported on the MongoDB driver: ` +
+          `they would compile to a {$where: "<js>"} filter, which executes JavaScript on the database server. ` +
+          `Use the object form instead, e.g. whereRaw({ $expr: { $gt: ["$stock", "$reserved"] } }).`,
+      );
+    }
+
+    if (typeof expression === "object" && expression !== null) {
+      this.assertNoJsExecutionOperators(expression);
+      return expression;
+    }
+
+    return null;
+  }
+
+  /**
+   * The object form of whereRaw() is forwarded to MongoDB verbatim, so it must
+   * not smuggle in the operators that execute JavaScript inside mongod
+   * ($where, and $function/$accumulator which can nest under $expr).
+   * Aggregation operators like $expr/$gt remain valid — that is the object
+   * form's purpose.
+   */
+  private assertNoJsExecutionOperators(value: unknown): void {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        this.assertNoJsExecutionOperators(item);
+      }
+      return;
+    }
+
+    if (typeof value !== "object" || value === null) return;
+
+    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+      if (key === "$where" || key === "$function" || key === "$accumulator") {
+        throw new UnsafeRawExpressionError(
+          `whereRaw()/orWhereRaw() expressions must not contain "${key}": ` +
+            `it executes JavaScript on the database server. ` +
+            `Express the condition with query operators instead, e.g. whereRaw({ $expr: { $gt: ["$stock", "$reserved"] } }).`,
+        );
+      }
+      this.assertNoJsExecutionOperators(nested);
+    }
+  }
+
+  private bindRawString(expression: string, bindings?: unknown[]): string {
+    if (!bindings || bindings.length === 0) {
+      return expression;
+    }
+
+    let index = 0;
+    return expression.replace(/\?/g, () => {
+      const value = bindings[index++];
+      return value === undefined ? "?" : JSON.stringify(value);
+    });
+  }
+
+  private buildColumnComparison(first: string, operator: WhereOperator, second: string): any {
+    const mongoOperator = this.getMongoOperator(operator);
+    return {
+      $expr: {
+        [mongoOperator]: [this.wrapColumn(first), this.wrapColumn(second)],
+      },
+    };
+  }
+
+  private buildBetweenColumnsCondition(field: string, lower: string, upper: string): any {
+    return {
+      $expr: {
+        $and: [
+          { $gte: [this.wrapColumn(field), this.wrapColumn(lower)] },
+          { $lte: [this.wrapColumn(field), this.wrapColumn(upper)] },
+        ],
+      },
+    };
+  }
+
+  private wrapColumn(column: string): string {
+    return column.startsWith("$") ? column : `$${column}`;
+  }
+
+  private buildDateEqualityCondition(field: string, value: Date | string): any {
+    const target = this.normalizeDateInput(value);
+    const start = this.startOfDay(target);
+    const end = this.endOfDay(target);
+    return { [field]: { $gte: start, $lte: end } };
+  }
+
+  private buildDateBeforeCondition(field: string, value: Date | string): any {
+    const target = this.startOfDay(this.normalizeDateInput(value));
+    return { [field]: { $lt: target } };
+  }
+
+  private buildDateAfterCondition(field: string, value: Date | string): any {
+    const target = this.endOfDay(this.normalizeDateInput(value));
+    return { [field]: { $gt: target } };
+  }
+
+  private buildTimeCondition(field: string, value: string): any {
+    return {
+      $expr: {
+        $eq: [
+          {
+            $dateToString: {
+              format: "%H:%M",
+              date: `$${field}`,
+            },
+          },
+          value,
+        ],
+      },
+    };
+  }
+
+  private buildDatePartCondition(
+    field: string,
+    operator: "$dayOfMonth" | "$month" | "$year",
+    value: number,
+  ): any {
+    return {
+      $expr: {
+        $eq: [
+          {
+            [operator]: `$${field}`,
+          },
+          value,
+        ],
+      },
+    };
+  }
+
+  private buildJsonContainsCondition(path: string, value: unknown): any {
+    const fieldPath = this.normalizePath(path);
+    if (Array.isArray(value)) {
+      return { [fieldPath]: { $all: value } };
+    }
+    return { [fieldPath]: value };
+  }
+
+  private buildJsonDoesntContainCondition(path: string, value: unknown): any {
+    const fieldPath = this.normalizePath(path);
+    const values = Array.isArray(value) ? value : [value];
+    return { [fieldPath]: { $nin: values } };
+  }
+
+  private buildJsonContainsKeyCondition(path: string): any {
+    return {
+      [this.normalizePath(path)]: { $exists: true },
+    };
+  }
+
+  private buildJsonLengthCondition(path: string, operator: WhereOperator, value: number): any {
+    const mongoOperator = this.getMongoOperator(operator);
+    return {
+      $expr: {
+        [mongoOperator]: [{ $size: { $ifNull: [`$${this.normalizePath(path)}`, []] } }, value],
+      },
+    };
+  }
+
+  private buildJsonTypeCondition(path: string, type: string): any {
+    return {
+      $expr: {
+        $eq: [{ $type: `$${this.normalizePath(path)}` }, type],
+      },
+    };
+  }
+
+  private buildArrayLengthCondition(field: string, operator: WhereOperator, value: number): any {
+    const mongoOperator = this.getMongoOperator(operator);
+    return {
+      $expr: {
+        [mongoOperator]: [{ $size: { $ifNull: [`$${field}`, []] } }, value],
+      },
+    };
+  }
+
+  private normalizeDateInput(value: Date | string): Date {
+    if (value instanceof Date) {
+      return value;
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error(`Invalid date value: ${value}`);
+    }
+    return parsed;
+  }
+
+  private startOfDay(date: Date): Date {
+    const copy = new Date(date);
+    copy.setUTCHours(0, 0, 0, 0);
+    return copy;
+  }
+
+  private endOfDay(date: Date): Date {
+    const copy = new Date(date);
+    copy.setUTCHours(23, 59, 59, 999);
+    return copy;
+  }
+
+  private normalizePath(path: string): string {
+    return path.replace(/->/g, ".");
+  }
+
+  private applyProjectionFields(
+    projection: Record<string, unknown>,
+    fields: string[],
+    value: 0 | 1,
+  ): void {
+    for (const field of fields) {
+      projection[field] = value;
+    }
+  }
+
+  /**
+   * Apply projection object with aliases and inclusion/exclusion.
+   * @param projection - The projection object to modify
+   * @param projectionObj - The projection specification
+   */
+  private applyProjectionObject(
+    projection: Record<string, unknown>,
+    projectionObj: Record<string, unknown>,
+  ): void {
+    for (const [field, value] of Object.entries(projectionObj)) {
+      // Handle boolean values (true = 1, false = 0)
+      if (typeof value === "boolean") {
+        projection[field] = value ? 1 : 0;
+        continue;
+      }
+
+      // Handle numeric values (0 or 1)
+      if (typeof value === "number") {
+        projection[field] = value;
+        continue;
+      }
+
+      // Handle string values (aliases)
+      if (typeof value === "string") {
+        // Alias: project the field with a new name
+        projection[value] = `$${field}`;
+        continue;
+      }
+
+      // Handle complex expressions (objects)
+      if (typeof value === "object" && value !== null) {
+        projection[field] = value;
+        continue;
+      }
+
+      // Default: include the field
+      projection[field] = 1;
+    }
+  }
+
+  private applyRawProjection(
+    projection: Record<string, unknown>,
+    expression: RawExpression,
+    bindings?: unknown[],
+  ): void {
+    const resolved = this.resolveProjectionExpression(expression, bindings);
+    if (!resolved) {
+      return;
+    }
+
+    if (typeof resolved === "object" && resolved !== null && !Array.isArray(resolved)) {
+      Object.assign(projection, resolved as Record<string, unknown>);
+    }
+  }
+
+  private resolveProjectionExpression(
+    expression: RawExpression | unknown,
+    bindings?: unknown[],
+  ): any {
+    if (typeof expression === "string") {
+      const source =
+        bindings && expression.includes("?")
+          ? this.bindRawString(expression, bindings)
+          : expression;
+      if (source.startsWith(":")) {
+        return source.slice(1);
+      }
+      return this.normalizeFieldReference(source);
+    }
+
+    if (typeof expression === "object" && expression !== null && !(expression instanceof Date)) {
+      return expression;
+    }
+
+    if (typeof expression === "number" || typeof expression === "boolean") {
+      return expression;
+    }
+
+    return expression;
+  }
+
+  private normalizeFieldReference(value: string | RawExpression): any {
+    if (typeof value === "string") {
+      if (value.startsWith(":")) {
+        return value.slice(1);
+      }
+      // If already a field reference, return as-is
+      if (value.startsWith("$")) {
+        return value;
+      }
+      // Check if it's a string literal (contains spaces or special chars)
+      // Field paths are typically: alphanumeric, underscore, dot only
+      if (!/^[a-zA-Z0-9_.]+$/.test(value)) {
+        return value; // Return as literal
+      }
+      // Otherwise, treat as field reference
+      return `$${value}`;
+    }
+    return value;
+  }
+
+  private buildAggregateProjection(field: string, aggregate: string): any {
+    if (aggregate === "count") {
+      return this.buildArraySizeExpression(field);
+    }
+
+    const map: Record<string, string> = {
+      sum: "$sum",
+      avg: "$avg",
+      min: "$min",
+      max: "$max",
+      first: "$first",
+      last: "$last",
+    };
+
+    const operator = map[aggregate];
+    if (!operator) {
+      return null;
+    }
+
+    return {
+      [operator]: this.normalizeFieldReference(field),
+    };
+  }
+
+  private buildExistsProjection(field: string): any {
+    return {
+      $ne: [{ $type: `$${field}` }, "missing"],
+    };
+  }
+
+  private buildArraySizeExpression(field: string): any {
+    return {
+      $size: { $ifNull: [`$${field}`, []] },
+    };
+  }
+
+  private buildCaseExpression(
+    cases: Array<{ when: RawExpression; then: RawExpression | unknown }>,
+    otherwise: RawExpression | unknown,
+  ): any {
+    return {
+      $switch: {
+        branches: cases.map((item) => ({
+          case: this.resolveProjectionExpression(item.when),
+          then: this.resolveLiteralOrExpression(item.then),
+        })),
+        default: this.resolveLiteralOrExpression(otherwise),
+      },
+    };
+  }
+
+  private buildCondExpression(
+    condition: RawExpression,
+    thenValue: RawExpression | unknown,
+    elseValue: RawExpression | unknown,
+  ): any {
+    return {
+      $cond: [
+        this.resolveProjectionExpression(condition),
+        this.resolveLiteralOrExpression(thenValue),
+        this.resolveLiteralOrExpression(elseValue),
+      ],
+    };
+  }
+
+  /**
+   * Resolve a value as a literal (if it's a plain string) or as an expression.
+   * Used for `then`/`default` values in CASE/WHEN expressions.
+   */
+  private resolveLiteralOrExpression(value: RawExpression | unknown): any {
+    // If it's a string that starts with $, treat as field reference
+    if (typeof value === "string" && value.startsWith("$")) {
+      return value;
+    }
+    // If it's a plain string (not starting with $), treat as literal
+    if (typeof value === "string") {
+      return value;
+    }
+    // For objects (expressions), numbers, booleans, etc., use normal resolution
+    return this.resolveProjectionExpression(value);
+  }
+
+  private inferJsonAlias(path: string): string {
+    const normalized = this.normalizePath(path);
+    const segments = normalized.split(".");
+
+    // `String.split` never returns an empty array — the empty string yields
+    // [""] — so the last element always exists. Falling back to `normalized`
+    // rather than asserting keeps the alias a real string in every case,
+    // including the one the compiler is worried about, and an alias is a NAME:
+    // `undefined` reaching here would produce a projection key of "undefined".
+    return segments[segments.length - 1] ?? normalized;
+  }
+
+  private buildConcatExpression(values: Array<string | RawExpression>): any {
+    return {
+      $concat: values.map((value) => this.normalizeFieldReference(value)),
+    };
+  }
+
+  private buildCoalesceExpression(values: Array<string | RawExpression>): any {
+    if (values.length === 0) {
+      return null;
+    }
+
+    let expression = this.normalizeFieldReference(values[values.length - 1]);
+
+    for (let index = values.length - 2; index >= 0; index--) {
+      expression = {
+        $ifNull: [this.normalizeFieldReference(values[index]), expression],
+      };
+    }
+
+    return expression;
+  }
+
+  /**
+   * Build a $project stage from select operations.
+   *
+   * @param operations - The select operations
+   * @returns The $project stage or null
+   */
+  private buildProjectStage(operations: Operation[]): any {
+    if (operations.length === 0) {
+      return null;
+    }
+
+    const projection: Record<string, unknown> = {};
+    const driverCallbacks: Array<(projection: Record<string, unknown>) => void> = [];
+
+    for (const op of operations) {
+      switch (op.type) {
+        case "select":
+          // Handle new projection format with aliases
+          if (op.data.projection) {
+            this.applyProjectionObject(projection, op.data.projection);
+          } else if (op.data.fields) {
+            this.applyProjectionFields(projection, op.data.fields, 1);
+          }
+          break;
+
+        case "deselect":
+          this.applyProjectionFields(projection, op.data.fields, 0);
+          break;
+
+        case "addSelect":
+          this.applyProjectionFields(projection, op.data.fields, 1);
+          break;
+
+        case "selectRaw":
+          this.applyRawProjection(projection, op.data.expression, op.data.bindings);
+          break;
+
+        case "selectSub":
+        case "addSelectSub": {
+          const expr = this.resolveProjectionExpression(op.data.expression, op.data.bindings);
+          if (expr !== undefined) {
+            projection[op.data.alias] = expr;
+          }
+          break;
+        }
+
+        case "selectAggregate":
+          projection[op.data.alias] = this.buildAggregateProjection(
+            op.data.field,
+            op.data.aggregate,
+          );
+          break;
+
+        case "selectExists":
+          projection[op.data.alias] = this.buildExistsProjection(op.data.field);
+          break;
+
+        case "selectCount":
+          projection[op.data.alias] = this.buildArraySizeExpression(op.data.field);
+          break;
+
+        case "selectCase":
+          projection[op.data.alias] = this.buildCaseExpression(op.data.cases, op.data.otherwise);
+          break;
+
+        case "selectWhen":
+          projection[op.data.alias] = this.buildCondExpression(
+            op.data.condition,
+            op.data.thenValue,
+            op.data.elseValue,
+          );
+          break;
+
+        case "selectDriverProjection":
+          driverCallbacks.push(op.data.callback);
+          break;
+
+        case "selectJson": {
+          const alias = op.data.alias ?? this.inferJsonAlias(op.data.path);
+          projection[alias] = this.normalizeFieldReference(`$${this.normalizePath(op.data.path)}`);
+          break;
+        }
+
+        case "selectJsonRaw": {
+          projection[op.data.alias] = this.resolveProjectionExpression(op.data.expression);
+          break;
+        }
+
+        case "deselectJson":
+          projection[this.normalizePath(op.data.path)] = 0;
+          break;
+
+        case "selectConcat":
+          projection[op.data.alias] = this.buildConcatExpression(op.data.fields);
+          break;
+
+        case "selectCoalesce":
+          projection[op.data.alias] = this.buildCoalesceExpression(op.data.fields);
+          break;
+
+        default:
+          break;
+      }
+    }
+
+    for (const callback of driverCallbacks) {
+      callback(projection);
+    }
+
+    return Object.keys(projection).length > 0 ? { $project: projection } : null;
+  }
+
+  /**
+   * Build a $sort stage from order operations.
+   *
+   * @param operations - The order operations
+   * @returns The $sort stage or null
+   */
+  private buildSortStage(operations: Operation[]): any {
+    const sort: any = {};
+
+    for (const op of operations) {
+      switch (op.type) {
+        case "orderBy":
+          sort[op.data.field] = op.data.direction === "asc" ? 1 : -1;
+          break;
+
+        case "orderByRandom":
+          return { $sample: { size: op.data.limit } };
+
+        case "orderByRaw":
+          throw new Error("orderByRaw() is not supported by the MongoDB driver; use orderBy() instead.");
+      }
+    }
+
+    return Object.keys(sort).length > 0 ? { $sort: sort } : null;
+  }
+
+  /**
+   * Build a $group stage from group operations.
+   *
+   * @param operations - The group operations
+   * @returns The $group stage or null
+   */
+  private buildGroupStage(operations: Operation[]): any {
+    const op = operations[0];
+
+    // Documented to return "the $group stage or null", and no operations means
+    // no stage. Every `case` below reads off `op`, so without this the empty
+    // array would throw a TypeError out of query construction rather than
+    // producing the null the caller already handles.
+    if (op === undefined) return null;
+
+    switch (op.type) {
+      case "groupBy": {
+        const stage = this.buildGroupByStage(op.data.fields);
+        if (stage) {
+          return stage;
+        }
+        break;
+      }
+      case "groupByWithAggregates": {
+        const stage = this.buildGroupByWithAggregatesStage(op.data.fields, op.data.aggregates);
+        if (stage) {
+          return stage;
+        }
+        break;
+      }
+      case "groupByDate": {
+        const stage = this.buildGroupByDateStage(
+          op.data.column,
+          op.data.unit,
+          op.data.aggregates ?? {},
+        );
+        if (stage) {
+          return stage;
+        }
+        break;
+      }
+      case "groupByRaw": {
+        const expression = op.data.expression;
+        if (expression && typeof expression === "object") {
+          return { $group: expression };
+        }
+        // If expression is not an object, it might be a string or other type
+        // In that case, we should still return it as a $group stage
+        if (expression) {
+          return { $group: { _id: expression } };
+        }
+        break;
+      }
+      case "distinct": {
+        const stage = this.buildGroupByStage(op.data.fields);
+        if (stage) {
+          return stage;
+        }
+        break;
+      }
+      default:
+        break;
+    }
+
+    return null;
+  }
+
+  private buildGroupByStage(fields: GroupByInput): any {
+    const groupId = this.buildGroupId(fields);
+    if (!groupId) {
+      return null;
+    }
+
+    return { $group: { _id: groupId } };
+  }
+
+  /**
+   * Build a $group stage with aggregates from group operations.
+   *
+   * @param fields - Fields to group by
+   * @param aggregates - Aggregate operations (abstract or raw)
+   * @returns The $group stage or null
+   */
+  private buildGroupByWithAggregatesStage(
+    fields: GroupByInput,
+    aggregates: Record<string, RawExpression>,
+  ): any {
+    const groupId = this.buildGroupId(fields);
+    if (!groupId) {
+      return null;
+    }
+
+    const groupStage: Record<string, unknown> = {
+      _id: groupId,
+    };
+
+    // Translate each aggregate expression
+    for (const [alias, expression] of Object.entries(aggregates)) {
+      if (isAggregateExpression(expression)) {
+        // Translate abstract expression to MongoDB format
+        groupStage[alias] = this.translateAggregateExpression(expression);
+      } else {
+        // Use raw expression as-is (already in MongoDB format)
+        groupStage[alias] = expression;
+      }
+    }
+
+    return { $group: groupStage };
+  }
+
+  /**
+   * Build a `$group` stage that buckets documents by a `$dateTrunc` of a date
+   * field, optionally running aggregates over each bucket.
+   *
+   * @param column - The date field to bucket
+   * @param unit - The bucket granularity
+   * @param aggregates - Aggregate operations (abstract or raw)
+   * @returns The `$group` stage
+   */
+  private buildGroupByDateStage(
+    column: string,
+    unit: string,
+    aggregates: Record<string, RawExpression>,
+  ): any {
+    const groupStage: Record<string, unknown> = {
+      _id: { $dateTrunc: { date: `$${column}`, unit } },
+    };
+
+    for (const [alias, expression] of Object.entries(aggregates)) {
+      if (isAggregateExpression(expression)) {
+        groupStage[alias] = this.translateAggregateExpression(expression);
+      } else {
+        groupStage[alias] = expression;
+      }
+    }
+
+    return { $group: groupStage };
+  }
+
+  /**
+   * Extract field names from GroupByInput for renaming _id.
+   *
+   * @param fields - The grouping fields
+   * @returns Field name(s) to use for renaming _id
+   */
+  private extractGroupFieldNames(fields: GroupByInput): string | string[] | null {
+    if (typeof fields === "string") {
+      return fields;
+    }
+
+    if (Array.isArray(fields)) {
+      const allStrings = fields.every((field) => typeof field === "string");
+      if (allStrings) {
+        return fields as string[];
+      }
+      // For complex arrays, return null (don't rename)
+      return null;
+    }
+
+    if (typeof fields === "object" && fields !== null) {
+      // For object syntax, use the keys as field names
+      return Object.keys(fields);
+    }
+
+    return null;
+  }
+
+  /**
+   * Translate an abstract aggregate expression to MongoDB format.
+   *
+   * @param expr - Abstract aggregate expression
+   * @returns MongoDB aggregation expression
+   */
+  private translateAggregateExpression(expr: AggregateExpression): Record<string, unknown> {
+    switch (expr.__agg) {
+      case "count":
+        return { $sum: 1 };
+
+      case "countDistinct":
+        if (!expr.__field) {
+          throw new Error("Count distinct aggregate requires a field name");
+        }
+        // Accumulate the set of distinct values in the $group stage; the
+        // renaming $project then finalizes it with `{ $size: "$alias" }`
+        // (the standard distinct-count-per-group pattern — `$size` is not a
+        // valid $group accumulator).
+        return { $addToSet: `$${expr.__field}` };
+
+      case "sum":
+        // When a composed column expression is present, sum operates on it
+        // (e.g. SUM(price * quantity) → { $sum: { $multiply: [...] } }) instead
+        // of a bare field. This is the only aggregate that accepts `__expr`.
+        if (expr.__expr) {
+          return { $sum: this.columnExpressionToMongo(expr.__expr) };
+        }
+        if (!expr.__field) {
+          throw new Error("Sum aggregate requires a field name");
+        }
+        return { $sum: `$${expr.__field}` };
+
+      case "avg":
+        if (!expr.__field) {
+          throw new Error("Average aggregate requires a field name");
+        }
+        return { $avg: `$${expr.__field}` };
+
+      case "min":
+        if (!expr.__field) {
+          throw new Error("Min aggregate requires a field name");
+        }
+        return { $min: `$${expr.__field}` };
+
+      case "max":
+        if (!expr.__field) {
+          throw new Error("Max aggregate requires a field name");
+        }
+        return { $max: `$${expr.__field}` };
+
+      case "first":
+        if (!expr.__field) {
+          throw new Error("First aggregate requires a field name");
+        }
+        return { $first: `$${expr.__field}` };
+
+      case "last":
+        if (!expr.__field) {
+          throw new Error("Last aggregate requires a field name");
+        }
+        return { $last: `$${expr.__field}` };
+
+      case "distinct":
+        if (!expr.__field) {
+          throw new Error("Distinct aggregate requires a field name");
+        }
+        return { $distinct: `$${expr.__field}` };
+
+      case "floor":
+        if (!expr.__field) {
+          throw new Error("Floor aggregate requires a field name");
+        }
+
+        return { $floor: `$${expr.__field}` };
+
+      default:
+        throw new Error(`Unknown aggregate function: ${expr.__agg}`);
+    }
+  }
+
+  /**
+   * Compile a typed {@link ColumnExpression} tree into a MongoDB aggregation
+   * expression.
+   *
+   * Column references become `$field` paths; literals are emitted verbatim;
+   * arithmetic ops map to `$add` / `$subtract` / `$multiply` / `$divide`. The
+   * `raw` node is rejected — a raw SQL fragment is not portable to a MongoDB
+   * pipeline, so callers must use the typed combinators (or `groupByRaw`) here.
+   *
+   * @param expression - The expression tree to compile
+   * @returns A MongoDB aggregation expression (e.g. `{ $multiply: ["$price", "$quantity"] }`)
+   */
+  private columnExpressionToMongo(expression: ColumnExpression): unknown {
+    switch (expression.__expr) {
+      case "column":
+        return `$${expression.column}`;
+
+      case "literal":
+        return expression.value;
+
+      case "raw":
+        throw new Error(
+          `$agg.sumRaw / $expr.raw is not portable to a MongoDB pipeline — a raw ` +
+            `SQL fragment has no MongoDB equivalent. Use the typed $expr ` +
+            `combinators ($expr.mul / $expr.add / $expr.sub / $expr.div / $expr.col / $expr.lit) or groupByRaw instead.`,
+        );
+
+      case "add":
+      case "subtract":
+      case "multiply":
+      case "divide": {
+        const operator = {
+          add: "$add",
+          subtract: "$subtract",
+          multiply: "$multiply",
+          divide: "$divide",
+        }[expression.__expr];
+
+        return {
+          [operator]: expression.operands.map((operand) => this.columnExpressionToMongo(operand)),
+        };
+      }
+
+      default:
+        throw new Error(`Unsupported column expression node: ${JSON.stringify(expression)}`);
+    }
+  }
+
+  private buildGroupId(fields: GroupByInput): any {
+    if (!fields) {
+      return null;
+    }
+
+    if (typeof fields === "string") {
+      return `$${fields}`;
+    }
+
+    if (Array.isArray(fields)) {
+      if (fields.length === 0) {
+        return null;
+      }
+
+      const allStrings = fields.every((field) => typeof field === "string");
+      if (allStrings) {
+        const result: Record<string, string> = {};
+        for (const field of fields as string[]) {
+          result[field] = `$${field}`;
+        }
+        return result;
+      }
+
+      // Array of objects - merge them to build complex _id structures
+      return (fields as Record<string, unknown>[]).reduce((acc, item) => ({ ...acc, ...item }), {});
+    }
+
+    if (typeof fields === "object") {
+      const normalized: Record<string, unknown> = {};
+      Object.entries(fields).forEach(([key, value]) => {
+        if (typeof value === "string" && !value.startsWith("$")) {
+          normalized[key] = `$${value}`;
+        } else {
+          normalized[key] = value;
+        }
+      });
+      return normalized;
+    }
+
+    return null;
+  }
+
+  /**
+   * Build a $lookup stage from join operations.
+   *
+   * @param operations - The join operations
+   * @returns The $lookup stage or null
+   */
+  private buildLookupStage(operations: Operation[]): any {
+    const op = operations[0];
+
+    // Documented "or null", and no join operations means no $lookup — the
+    // same shape as buildGroupStage above. Without this an empty group built
+    // a $lookup whose `from`, `localField` and `foreignField` were all
+    // undefined, which Mongo rejects at execution time with an error that
+    // points at the query rather than at the code that assembled it.
+    if (op === undefined) return null;
+
+    const options = op.data;
+
+    // Pipeline form: `join({ table, alias, pipeline })`. The pipeline used to
+    // be dropped, leaving a $lookup with neither a pipeline nor join fields.
+    // `localField`/`foreignField` are kept when given (MongoDB 5+ allows both).
+    if (Array.isArray(options.pipeline)) {
+      return {
+        $lookup: {
+          from: options.table,
+          ...(options.localField !== undefined ? { localField: options.localField } : {}),
+          ...(options.foreignField !== undefined ? { foreignField: options.foreignField } : {}),
+          as: options.alias || options.table,
+          pipeline: options.pipeline,
+        },
+      };
+    }
+
+    return {
+      $lookup: {
+        from: options.table,
+        localField: options.localField,
+        foreignField: options.foreignField,
+        as: options.alias || options.table,
+      },
+    };
+  }
+}

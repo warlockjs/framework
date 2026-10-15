@@ -1,0 +1,1496 @@
+/**
+ * PostgreSQL Query Parser
+ *
+ * Translates Cascade query operations into PostgreSQL SQL queries.
+ * Mirrors the MongoQueryParser pattern but generates SQL instead
+ * of MongoDB aggregation pipelines.
+ *
+ * @module cascade/drivers/postgres
+ */
+
+import type {
+  DriverQuery,
+  JoinOptions,
+  WhereOperator,
+} from "../../contracts/query-builder.contract";
+import type { SqlDialectContract } from "../sql/sql-dialect.contract";
+
+import { escapeSqlLiteral, PostgresDialect } from "./postgres-dialect";
+
+/** Allowed `::cast` type names, e.g. `int`, `numeric(10,2)`, `text[]`. */
+const SAFE_CAST_PATTERN = /^[a-z_][a-z0-9_ ]*(\(\d+(,\d+)?\))?(\[\])?$/i;
+
+/** Allowed orderBy direction, with optional NULLS placement. */
+const SAFE_DIRECTION_PATTERN = /^(asc|desc)(\s+nulls\s+(first|last))?$/i;
+
+/**
+ * Operation types supported by the query parser.
+ */
+export type PostgresOperationType =
+  // WHERE operations
+  | "where"
+  | "orWhere"
+  | "whereRaw"
+  | "orWhereRaw"
+  | "whereIn"
+  | "whereNotIn"
+  | "whereNull"
+  | "whereNotNull"
+  | "whereBetween"
+  | "whereNotBetween"
+  | "orWhereIn"
+  | "orWhereNotIn"
+  | "orWhereNull"
+  | "orWhereNotNull"
+  | "orWhereBetween"
+  | "whereLike"
+  | "whereNotLike"
+  | "whereColumn"
+  | "orWhereColumn"
+  | "whereExists"
+  | "whereNotExists"
+  | "whereNot"
+  | "orWhereNot"
+  | "whereDate"
+  | "whereDateBefore"
+  | "whereDateAfter"
+  | "whereDateBetween"
+  | "whereJsonContains"
+  | "whereJsonDoesntContain"
+  | "whereFullText"
+  // SELECT operations
+  | "select"
+  | "selectRaw"
+  | "deselect"
+  // JOIN operations
+  | "join"
+  | "leftJoin"
+  | "rightJoin"
+  | "innerJoin"
+  | "fullJoin"
+  | "crossJoin"
+  | "joinRaw"
+  // ORDER operations
+  | "orderBy"
+  | "orderByRaw"
+  // GROUP operations
+  | "groupBy"
+  | "groupByRaw"
+  | "having"
+  | "havingRaw"
+  // LIMIT operations
+  | "limit"
+  | "offset"
+  // Row locking
+  | "lock"
+  // RELATION operations
+  | "has"
+  | "whereHas"
+  | "doesntHave"
+  | "whereDoesntHave"
+  // joinWith operations
+  | "selectRelatedColumns"
+  // Builder-level metadata (consumed before parsing)
+  | "joinWith"
+  | "cursor"
+  // Other
+  | "distinct";
+
+/**
+ * Internal operation representation.
+ */
+export type PostgresParserOperation = {
+  /** Operation type */
+  readonly type: PostgresOperationType;
+  /** Operation data/parameters */
+  readonly data: Record<string, unknown>;
+};
+
+/**
+ * Parser configuration options.
+ */
+export type PostgresParserOptions = {
+  /** Target table name */
+  readonly table: string;
+  /** Table alias (optional) */
+  readonly alias?: string;
+  /** Operations to parse */
+  readonly operations: PostgresParserOperation[];
+  /** SQL dialect for syntax generation */
+  readonly dialect?: SqlDialectContract;
+  /** Factory for creating sub-parsers (for nested queries) */
+  readonly createSubParser?: (table: string) => PostgresQueryParser;
+};
+
+/**
+ * PostgreSQL Query Parser.
+ *
+ * Converts a list of query operations into a SQL query string with parameters.
+ * Handles SELECT, WHERE, JOIN, ORDER BY, GROUP BY, LIMIT/OFFSET clauses.
+ *
+ * @example
+ * ```typescript
+ * const parser = new PostgresQueryParser({
+ *   table: 'users',
+ *   operations: [
+ *     { type: 'where', data: { field: 'name', operator: '=', value: 'Alice' } },
+ *     { type: 'orderBy', data: { field: 'createdAt', direction: 'desc' } },
+ *     { type: 'limit', data: { value: 10 } }
+ *   ]
+ * });
+ *
+ * const { sql, params } = parser.parse();
+ * // sql: 'SELECT * FROM "users" WHERE "name" = $1 ORDER BY "createdAt" DESC LIMIT 10'
+ * // params: ['Alice']
+ * ```
+ */
+export class PostgresQueryParser {
+  /**
+   * Target table name.
+   */
+  private readonly table: string;
+
+  /**
+   * Table alias.
+   */
+  private readonly alias?: string;
+
+  /**
+   * Operations to process.
+   */
+  private readonly operations: PostgresParserOperation[];
+
+  /**
+   * SQL dialect for syntax.
+   */
+  private readonly dialect: SqlDialectContract;
+
+  /**
+   * Current parameter index (1-based for PostgreSQL).
+   */
+  private paramIndex = 1;
+
+  /**
+   * Collected parameters.
+   */
+  private readonly params: unknown[] = [];
+
+  /**
+   * SELECT columns.
+   */
+  public selectColumns: string[] = [];
+
+  /**
+   * Deselected (excluded) columns.
+   */
+  private deselectColumns: string[] = [];
+
+  /**
+   * Raw SELECT expressions.
+   */
+  private selectRaw: string[] = [];
+
+  /**
+   * WHERE clauses.
+   */
+  public whereClauses: string[] = [];
+
+  /**
+   * JOIN clauses.
+   */
+  private joinClauses: string[] = [];
+
+  /**
+   * ORDER BY clauses.
+   */
+  public orderClauses: string[] = [];
+
+  /**
+   * GROUP BY columns (bare identifiers — get quoted).
+   */
+  private groupColumns: string[] = [];
+
+  /**
+   * Raw GROUP BY expressions (emitted verbatim — e.g. a `date_trunc(...)`
+   * bucket). Kept separate from `groupColumns` so they bypass identifier
+   * quoting while still landing in the same `GROUP BY` clause.
+   */
+  private groupRawExpressions: string[] = [];
+
+  /**
+   * HAVING clauses.
+   */
+  private havingClauses: string[] = [];
+
+  /**
+   * LIMIT value.
+   */
+  public limitValue?: number;
+
+  /**
+   * OFFSET value.
+   */
+  public offsetValue?: number;
+
+  /**
+   * DISTINCT flag.
+   */
+  private isDistinct = false;
+
+  /**
+   * Row-locking clause (`FOR UPDATE [SKIP LOCKED | NOWAIT]`). Appended after
+   * LIMIT/OFFSET — the locking clause is last in PostgreSQL's SELECT grammar.
+   */
+  private lockClause = "";
+
+  /**
+   * Whether the query has any JOIN operations (pre-scanned before processing).
+   * Used by qualifyColumn() to decide whether to prefix columns with the main table.
+   */
+  private hasJoins = false;
+
+  /**
+   * Tracked joined tables (for table reference detection).
+   */
+  private readonly joinedTables = new Set<string>();
+
+  /**
+   * Create a new query parser.
+   *
+   * @param options - Parser configuration
+   */
+  public constructor(options: PostgresParserOptions) {
+    this.table = options.table;
+    this.alias = options.alias;
+    this.operations = options.operations;
+    this.dialect = options.dialect ?? new PostgresDialect();
+  }
+
+  /**
+   * Parse all operations and build the SQL query.
+   *
+   * @returns DriverQuery with `query` (SQL string) and `bindings` (parameter values)
+   */
+  public parse(): DriverQuery {
+    // Pre-scan for any join operations so qualifyColumn() can prefix columns
+    // correctly even when WHERE clauses appear before JOINs in the operations list.
+    const JOIN_TYPES = new Set([
+      "join",
+      "leftJoin",
+      "rightJoin",
+      "innerJoin",
+      "fullJoin",
+      "crossJoin",
+      "joinRaw",
+    ]);
+
+    this.hasJoins = false;
+
+    // First pass: locate all joins and populate joinedTables for accurate JSON path detection
+    for (const operation of this.operations) {
+      if (JOIN_TYPES.has(operation.type)) {
+        this.hasJoins = true;
+        const data = operation.data as any;
+        const joinTable = data.table as string;
+        const alias = data.alias as string;
+
+        if (joinTable) this.joinedTables.add(joinTable);
+        if (alias) this.joinedTables.add(alias);
+      }
+    }
+
+    // Process each operation
+    for (const operation of this.operations) {
+      this.processOperation(operation);
+    }
+
+    // Build the final SQL query
+    const query = this.buildSql();
+
+    return { query, bindings: this.params };
+  }
+
+  /**
+   * Get a formatted string representation of the query.
+   *
+   * @returns Formatted SQL with bindings
+   */
+  public toPrettyString(): string {
+    const { query = "", bindings } = this.parse();
+    return `${query}\n-- Bindings: ${JSON.stringify(bindings ?? [])}`;
+  }
+
+  /**
+   * Process a single operation.
+   *
+   * @param operation - The operation to process
+   */
+  private processOperation(operation: PostgresParserOperation): void {
+    const { type, data } = operation;
+
+    switch (type) {
+      // WHERE operations
+      case "where":
+        this.processWhere(data, "AND");
+        break;
+      case "orWhere":
+        this.processWhere(data, "OR");
+        break;
+      case "whereRaw":
+        this.processWhereRaw(data, "AND");
+        break;
+      case "orWhereRaw":
+        this.processWhereRaw(data, "OR");
+        break;
+      case "whereIn":
+        this.processWhereIn(data, false);
+        break;
+      case "whereNotIn":
+        this.processWhereIn(data, true);
+        break;
+      case "orWhereIn":
+        this.processWhereIn(data, false, "OR");
+        break;
+      case "orWhereNotIn":
+        this.processWhereIn(data, true, "OR");
+        break;
+      case "whereNull":
+        this.processWhereNull(data, false);
+        break;
+      case "whereNotNull":
+        this.processWhereNull(data, true);
+        break;
+      case "orWhereNull":
+        this.processWhereNull(data, false, "OR");
+        break;
+      case "orWhereNotNull":
+        this.processWhereNull(data, true, "OR");
+        break;
+      case "orWhereBetween":
+        this.processWhereBetween(data, false, "OR");
+        break;
+      case "whereBetween":
+        this.processWhereBetween(data, false);
+        break;
+      case "whereNotBetween":
+        this.processWhereBetween(data, true);
+        break;
+      case "whereLike":
+        this.processWhereLike(data, false);
+        break;
+      case "whereNotLike":
+        this.processWhereLike(data, true);
+        break;
+      case "whereColumn":
+        this.processWhereColumn(data, "AND");
+        break;
+      case "orWhereColumn":
+        this.processWhereColumn(data, "OR");
+        break;
+      case "whereJsonContains":
+        this.processWhereJsonContains(data, false);
+        break;
+      case "whereJsonDoesntContain":
+        this.processWhereJsonContains(data, true);
+        break;
+      case "whereFullText":
+        this.processWhereFullText(data);
+        break;
+      case "whereNot":
+        this.processNested(data.nested, "AND", true, type);
+        break;
+      case "orWhereNot":
+        this.processNested(data.nested, "OR", true, type);
+        break;
+      // Same semantics as the Mongo driver: the callback conditions are applied
+      // inline (exists) or negated (notExists).
+      case "whereExists":
+        this.processNested(data.subquery, "AND", false, type);
+        break;
+      case "whereNotExists":
+        this.processNested(data.subquery, "AND", true, type);
+        break;
+      case "whereDate":
+        this.processWhereDate(data, "=");
+        break;
+      case "whereDateBefore":
+        this.processWhereDate(data, "<");
+        break;
+      case "whereDateAfter":
+        this.processWhereDate(data, ">");
+        break;
+      case "whereDateBetween":
+        this.processWhereDateBetween(data);
+        break;
+
+      // SELECT operations
+      case "select":
+        this.processSelect(data);
+        break;
+      case "selectRaw":
+        this.processSelectRaw(data);
+        break;
+      case "deselect":
+        this.processDeselect(data);
+        break;
+
+      // JOIN operations
+      case "join":
+      case "innerJoin":
+        this.processJoin(data, "INNER");
+        break;
+      case "leftJoin":
+        this.processJoin(data, "LEFT");
+        break;
+      case "rightJoin":
+        this.processJoin(data, "RIGHT");
+        break;
+      case "fullJoin":
+        this.processJoin(data, "FULL OUTER");
+        break;
+      case "crossJoin":
+        this.processCrossJoin(data);
+        break;
+      case "joinRaw":
+        this.processJoinRaw(data);
+        break;
+
+      // ORDER operations
+      case "orderBy":
+        this.processOrderBy(data);
+        break;
+      case "orderByRaw":
+        this.processOrderByRaw(data);
+        break;
+
+      // GROUP operations
+      case "groupBy":
+        this.processGroupBy(data);
+        break;
+      case "groupByRaw":
+        this.processGroupByRaw(data);
+        break;
+      case "having":
+        this.processHaving(data);
+        break;
+      case "havingRaw":
+        this.processHavingRaw(data);
+        break;
+
+      // LIMIT operations
+      case "limit":
+        this.limitValue = data.value as number;
+        break;
+      case "offset":
+        this.offsetValue = data.value as number;
+        break;
+
+      // Row locking
+      case "lock": {
+        let clause = "FOR UPDATE";
+        if (data.skipLocked) {
+          clause += " SKIP LOCKED";
+        } else if (data.noWait) {
+          clause += " NOWAIT";
+        }
+        this.lockClause = clause;
+        break;
+      }
+
+      // Other
+      case "distinct":
+        this.isDistinct = true;
+        break;
+
+      // joinWith select related columns
+      case "selectRelatedColumns":
+        this.processSelectRelatedColumns(data);
+        break;
+
+      // Builder-level metadata consumed before parsing; carries no SQL of its own
+      case "cursor":
+      case "joinWith":
+        break;
+
+      default:
+        // An unknown filter must never silently disappear: write paths
+        // (delete/update) reuse this parser, so a dropped filter widens the
+        // statement to every row.
+        throw new Error(`PostgresQueryParser: unsupported operation type "${type}"`);
+    }
+  }
+
+  /**
+   * Build the final SQL query from collected clauses.
+   *
+   * @returns Complete SQL query string
+   */
+  private buildSql(): string {
+    const parts: string[] = [];
+
+    // SELECT clause
+    parts.push(this.buildSelectClause());
+
+    // FROM clause
+    const quotedTable = this.quoteTable(this.table);
+    const fromClause = this.alias
+      ? `FROM ${quotedTable} AS ${this.dialect.quoteIdentifier(this.alias)}`
+      : `FROM ${quotedTable}`;
+    parts.push(fromClause);
+
+    // JOIN clauses
+    if (this.joinClauses.length > 0) {
+      parts.push(this.joinClauses.join(" "));
+    }
+
+    // WHERE clause
+    if (this.whereClauses.length > 0) {
+      parts.push(`WHERE ${this.whereClauses.join(" ")}`);
+    }
+
+    // GROUP BY clause — bare columns are quoted; raw expressions (e.g.
+    // date_trunc buckets) are emitted verbatim. Both share one clause.
+    if (this.groupColumns.length > 0 || this.groupRawExpressions.length > 0) {
+      const quotedCols = this.groupColumns.map((c) => this.dialect.quoteIdentifier(c));
+      const allGroupTerms = [...quotedCols, ...this.groupRawExpressions];
+      parts.push(`GROUP BY ${allGroupTerms.join(", ")}`);
+    }
+
+    // HAVING clause
+    if (this.havingClauses.length > 0) {
+      parts.push(`HAVING ${this.havingClauses.join(" AND ")}`);
+    }
+
+    // ORDER BY clause
+    if (this.orderClauses.length > 0) {
+      parts.push(`ORDER BY ${this.orderClauses.join(", ")}`);
+    }
+
+    // LIMIT/OFFSET
+    const limitOffset = this.dialect.limitOffset(this.limitValue, this.offsetValue);
+    if (limitOffset) {
+      parts.push(limitOffset);
+    }
+
+    // Row-locking clause — last in PostgreSQL's SELECT grammar
+    if (this.lockClause) {
+      parts.push(this.lockClause);
+    }
+
+    return parts.join(" ");
+  }
+
+  /**
+   * Build the SELECT clause.
+   *
+   * @returns SELECT clause string
+   */
+  private buildSelectClause(): string {
+    const distinct = this.isDistinct ? "DISTINCT " : "";
+
+    // If no specific columns, select all — qualify with main table when joins present
+    if (this.selectColumns.length === 0 && this.selectRaw.length === 0) {
+      return this.hasJoins
+        ? `SELECT ${distinct}${this.quoteTable(this.table)}.*`
+        : `SELECT ${distinct}*`;
+    }
+
+    const columns: string[] = [];
+
+    // Add selected columns — prefix with main table when joins present to avoid ambiguity
+    for (const col of this.selectColumns) {
+      if (!this.deselectColumns.includes(col)) {
+        columns.push(this.parseColumnIdentifier(col, this.table, this.alias));
+      }
+    }
+
+    // Add raw expressions
+    columns.push(...this.selectRaw);
+
+    return `SELECT ${distinct}${columns.join(", ")}`;
+  }
+
+  /**
+   * Add a placeholder and parameter.
+   *
+   * @param value - Parameter value
+   * @returns Placeholder string ($1, $2, etc.)
+   */
+  private addParam(value: unknown): string {
+    this.params.push(value);
+    return this.dialect.placeholder(this.paramIndex++);
+  }
+
+  /**
+   * Absorb a sub-parser's params into this parser, returning a rewriter
+   * function that translates the sub-parser's `$N` placeholders into freshly
+   * numbered placeholders in this parser's namespace.
+   *
+   * Required whenever sub-parser SQL fragments (e.g. WHERE clauses produced
+   * for a `joinWith` constraint) are spliced into the outer query — without
+   * the rewrite the embedded `$N` references point at parameters this
+   * parser has no knowledge of, leaving them dangling in the final SQL.
+   *
+   * The sub-parser's `params[i]` corresponds to its `$(i+1)` placeholder
+   * (its `paramIndex` always starts at 1), so we map sequentially.
+   *
+   * @example
+   *   const renumber = this.absorbSubParserParams(subParser);
+   *   const fragment = renumber(subParser.whereClauses.join(" "));
+   */
+  private absorbSubParserParams(subParser: PostgresQueryParser): (sql: string) => string {
+    if (subParser.params.length === 0) {
+      return (sql) => sql;
+    }
+
+    const oldToNew = new Map<string, string>();
+
+    for (let index = 0; index < subParser.params.length; index++) {
+      const newPlaceholder = this.addParam(subParser.params[index]);
+      oldToNew.set(`$${index + 1}`, newPlaceholder);
+    }
+
+    return (sql) => sql.replace(/\$\d+/g, (match) => oldToNew.get(match) ?? match);
+  }
+
+  /**
+   * Process a basic WHERE operation.
+   *
+   * Delegates to specialised processors for operators that require more than a
+   * single placeholder (between, in, like-variants, exists, etc.).
+   */
+  private processWhere(data: Record<string, unknown>, boolean: "AND" | "OR"): void {
+    // `where(q => ...)` / `orWhere(q => ...)` record a nested group
+    if (data.nested !== undefined) {
+      return this.processNested(data.nested, boolean, false, "where");
+    }
+
+    const field = data.field as string;
+    const operator = (data.operator as WhereOperator) ?? "=";
+    const value = data.value;
+
+    // Delegate to specialised processors for operators that need it. The
+    // `boolean` connective is forwarded so `orWhere(f, "in", …)` stays an OR.
+    const range = value as [unknown, unknown];
+    const like = { field, pattern: value as string };
+
+    switch (operator) {
+      case "between":
+        return this.processWhereBetween({ field, range }, false, boolean);
+      case "notBetween":
+        return this.processWhereBetween({ field, range }, true, boolean);
+      case "in":
+        return this.processWhereIn({ field, values: value as unknown[] }, false, boolean);
+      case "notIn":
+        return this.processWhereIn({ field, values: value as unknown[] }, true, boolean);
+      case "like":
+      case "ilike":
+        return this.processWhereLike(like, false, boolean);
+      case "startsWith":
+      case "endsWith":
+        return this.processWhereLike(like, false, boolean, operator);
+      case "notLike":
+        return this.processWhereLike(like, true, boolean);
+      case "notStartsWith":
+        return this.processWhereLike(like, true, boolean, "startsWith");
+      case "notEndsWith":
+        return this.processWhereLike(like, true, boolean, "endsWith");
+      case "exists":
+        // Raw strings are never inlined into SQL (injection); a sub-query must
+        // arrive as an already-parameterised builder, not text.
+        throw new Error(
+          'PostgresQueryParser: where(field, "exists", value) does not accept a raw SQL string; use a query builder or callback',
+        );
+    }
+
+    const quotedField = this.parseColumnIdentifier(field, this.table, this.alias);
+
+    if (value === null) {
+      const nullOperator = operator === "!=" ? "IS NOT NULL" : "IS NULL";
+      return this.addWhereClause(`${quotedField} ${nullOperator}`, boolean);
+    }
+
+    // Simple single-value operator — fall through to generic path
+    const placeholder = this.addParam(value);
+    this.addWhereClause(`${quotedField} ${this.mapOperator(operator)} ${placeholder}`, boolean);
+  }
+
+  /**
+   * Process a nested group of operations as `(<group>)` / `NOT (<group>)`.
+   *
+   * The group is parsed by a sub-parser; its params are renumbered into this
+   * parser's namespace.
+   */
+  private processNested(
+    nested: unknown,
+    boolean: "AND" | "OR",
+    negate: boolean,
+    opType: string,
+  ): void {
+    const subParser = new PostgresQueryParser({
+      table: this.table,
+      alias: this.alias,
+      dialect: this.dialect,
+      operations: (nested as PostgresParserOperation[] | undefined) ?? [],
+    });
+    subParser.parse();
+
+    if (subParser.whereClauses.length === 0) {
+      throw new Error(`PostgresQueryParser: "${opType}" received an empty condition group`);
+    }
+
+    const renumber = this.absorbSubParserParams(subParser);
+    const group = `(${renumber(subParser.whereClauses.join(" "))})`;
+
+    this.addWhereClause(negate ? `NOT ${group}` : group, boolean);
+  }
+
+  /**
+   * Compare the date portion of a column (time ignored).
+   */
+  private processWhereDate(data: Record<string, unknown>, operator: string): void {
+    const quotedField = this.parseColumnIdentifier(data.field as string, this.table, this.alias);
+    const placeholder = this.addParam(data.value);
+
+    this.addWhereClause(`${quotedField}::date ${operator} ${placeholder}::date`, "AND");
+  }
+
+  /**
+   * Date portion of a column within an inclusive [from, to] range.
+   */
+  private processWhereDateBetween(data: Record<string, unknown>): void {
+    const range = data.range as [unknown, unknown];
+    const quotedField = this.parseColumnIdentifier(data.field as string, this.table, this.alias);
+    const from = this.addParam(range[0]);
+    const to = this.addParam(range[1]);
+
+    this.addWhereClause(`${quotedField}::date BETWEEN ${from}::date AND ${to}::date`, "AND");
+  }
+
+  /**
+   * Process a raw WHERE operation.
+   */
+  private processWhereRaw(data: Record<string, unknown>, boolean: "AND" | "OR"): void {
+    const expression = data.expression as string;
+    const bindings = (data.bindings as unknown[]) ?? [];
+
+    // Replace ? placeholders with $n
+    let processed = expression;
+    for (const binding of bindings) {
+      processed = processed.replace("?", this.addParam(binding));
+    }
+
+    this.addWhereClause(processed, boolean);
+  }
+
+  /**
+   * Process WHERE IN / NOT IN.
+   */
+  private processWhereIn(
+    data: Record<string, unknown>,
+    negate: boolean,
+    boolean: "AND" | "OR" = "AND",
+  ): void {
+    const field = data.field as string;
+    const values = data.values as unknown[];
+
+    const quotedField = this.parseColumnIdentifier(field, this.table, this.alias);
+    const operator = negate ? "!= ALL" : "= ANY";
+    const placeholder = this.addParam(values);
+
+    this.addWhereClause(`${quotedField} ${operator}(${placeholder})`, boolean);
+  }
+
+  /**
+   * Process WHERE NULL / NOT NULL.
+   */
+  private processWhereNull(
+    data: Record<string, unknown>,
+    negate: boolean,
+    boolean: "AND" | "OR" = "AND",
+  ): void {
+    const field = data.field as string;
+    const quotedField = this.parseColumnIdentifier(field, this.table, this.alias);
+    const clause = negate ? `${quotedField} IS NOT NULL` : `${quotedField} IS NULL`;
+    this.addWhereClause(clause, boolean);
+  }
+
+  /**
+   * Process WHERE BETWEEN / NOT BETWEEN.
+   */
+  private processWhereBetween(
+    data: Record<string, unknown>,
+    negate: boolean,
+    boolean: "AND" | "OR" = "AND",
+  ): void {
+    const field = data.field as string;
+    const range = data.range as [unknown, unknown];
+
+    const quotedField = this.parseColumnIdentifier(field, this.table, this.alias);
+    const placeholder1 = this.addParam(range[0]);
+    const placeholder2 = this.addParam(range[1]);
+    const keyword = negate ? "NOT BETWEEN" : "BETWEEN";
+
+    this.addWhereClause(`${quotedField} ${keyword} ${placeholder1} AND ${placeholder2}`, boolean);
+  }
+
+  /**
+   * Process WHERE LIKE / NOT LIKE.
+   *
+   * Cross-driver semantics (matches MongoDB): `%` is the only wildcard, `_`
+   * and backslash are literal, and a pattern with no `%` matches as a
+   * substring. `startsWith` / `endsWith` anchor the escaped text explicitly.
+   * A `RegExp` has no SQL equivalent and is rejected.
+   */
+  private processWhereLike(
+    data: Record<string, unknown>,
+    negate: boolean,
+    boolean: "AND" | "OR" = "AND",
+    modeArg?: "startsWith" | "endsWith",
+  ): void {
+    const field = data.field as string;
+    const mode = modeArg ?? (data.mode as "startsWith" | "endsWith" | undefined);
+
+    // A RegExp maps to the POSIX case-insensitive match operators
+    if (data.isRegExp === true || (data.pattern as unknown) instanceof RegExp) {
+      const source =
+        (data.pattern as unknown) instanceof RegExp
+          ? (data.pattern as unknown as RegExp).source
+          : String(data.pattern);
+      const regexField = this.parseColumnIdentifier(field, this.table, this.alias);
+      const regexPlaceholder = this.addParam(source);
+
+      return this.addWhereClause(
+        `${regexField} ${negate ? "!~*" : "~*"} ${regexPlaceholder}`,
+        boolean,
+      );
+    }
+    // Mode ops carry the raw user value; `pattern` is only the display shape
+    const pattern = String(mode && data.value !== undefined ? data.value : data.pattern);
+
+    const quotedField = this.parseColumnIdentifier(field, this.table, this.alias);
+    const { operator } = this.dialect.likePattern(pattern, true);
+    // Escape `\` and `_` (literal). `%` stays the wildcard of a plain LIKE
+    // pattern, but startsWith / endsWith values are literal text, so it is
+    // escaped there too.
+    let escaped = pattern.replace(/\\/g, "\\\\").replace(/_/g, "\\_");
+
+    if (mode) {
+      escaped = escaped.replace(/%/g, "\\%");
+    }
+
+    let finalPattern = escaped;
+
+    if (mode === "startsWith") {
+      finalPattern = `${escaped}%`;
+    } else if (mode === "endsWith") {
+      finalPattern = `%${escaped}`;
+    } else if (!escaped.includes("%")) {
+      finalPattern = `%${escaped}%`;
+    }
+
+    const placeholder = this.addParam(finalPattern);
+    const keyword = negate ? `NOT ${operator}` : operator;
+
+    // Mode variants state the escape character explicitly
+    const escapeClause = mode ? " ESCAPE '\\'" : "";
+
+    this.addWhereClause(`${quotedField} ${keyword} ${placeholder}${escapeClause}`, boolean);
+  }
+
+  /**
+   * Process WHERE column comparison.
+   */
+  private processWhereColumn(data: Record<string, unknown>, boolean: "AND" | "OR"): void {
+    const first = data.first as string;
+    const operator = this.mapOperator(((data.operator as string) ?? "=") as WhereOperator);
+    const second = data.second as string;
+
+    // Both sides may need qualification if unambiguous table is unclear
+    const quotedFirst = this.parseColumnIdentifier(first, this.table, this.alias);
+    const quotedSecond = this.parseColumnIdentifier(second, this.table, this.alias);
+
+    this.addWhereClause(`${quotedFirst} ${operator} ${quotedSecond}`, boolean);
+  }
+
+  /**
+   * Process WHERE JSON contains.
+   */
+  private processWhereJsonContains(data: Record<string, unknown>, negate: boolean): void {
+    const path = data.path as string;
+    const value = data.value;
+
+    const quotedPath = this.parseColumnIdentifier(path, this.table, this.alias);
+    const operator = negate ? "NOT @>" : "@>";
+    const placeholder = this.addParam(JSON.stringify(value));
+
+    this.addWhereClause(`${quotedPath} ${operator} ${placeholder}::jsonb`, "AND");
+  }
+
+  /** Text search config name; anything but a plain identifier falls back to english. */
+  private safeLanguage(language: unknown): string {
+    return typeof language === "string" && /^[a-z_]+$/i.test(language) ? language : "english";
+  }
+
+  /**
+   * Process full-text search WHERE.
+   */
+  private processWhereFullText(data: Record<string, unknown>): void {
+    const fields = data.fields as string[];
+    const query = data.query as string;
+    const language = this.safeLanguage(data.language);
+    const weights = (data.weights as Record<string, string> | undefined) ?? {};
+
+    // Same expression as `createFullTextIndex`, so the GIN index is used and a
+    // NULL column doesn't null the whole vector.
+    const tsVectors = fields
+      .map((f) => {
+        const weight = /^[A-D]$/.test(weights[f] ?? "") ? weights[f] : "A";
+
+        return `setweight(to_tsvector('${language}', COALESCE(${this.dialect.quoteIdentifier(f)}, '')), '${weight}')`;
+      })
+      .join(" || ");
+
+    const placeholder = this.addParam(query);
+    this.addWhereClause(`(${tsVectors}) @@ plainto_tsquery('${language}', ${placeholder})`, "AND");
+  }
+
+  /**
+   * Process SELECT operation.
+   */
+  private processSelect(data: Record<string, unknown>): void {
+    const fields = data.fields as string[] | Record<string, string>;
+
+    if (Array.isArray(fields)) {
+      this.selectColumns.push(...fields);
+    } else {
+      // Handle aliases: { field: 'alias' }
+      for (const [field, alias] of Object.entries(fields)) {
+        const quotedField = this.dialect.quoteIdentifier(field);
+        const quotedAlias = this.dialect.quoteIdentifier(alias);
+        this.selectRaw.push(`${quotedField} AS ${quotedAlias}`);
+      }
+    }
+  }
+
+  /**
+   * Process raw SELECT expression.
+   */
+  private processSelectRaw(data: Record<string, unknown>): void {
+    const expression = data.expression as string | Record<string, unknown>;
+    const bindings = (data.bindings as unknown[]) ?? [];
+
+    if (typeof expression === "string") {
+      // Replace ? placeholders with $n positional params (same as processWhereRaw)
+      let processed = expression;
+      for (const binding of bindings) {
+        processed = processed.replace("?", this.addParam(binding));
+      }
+      this.selectRaw.push(processed);
+    } else {
+      // Handle object expressions (for compatibility)
+      for (const [alias, expr] of Object.entries(expression)) {
+        this.selectRaw.push(`${expr} AS ${this.dialect.quoteIdentifier(alias)}`);
+      }
+    }
+  }
+
+  /**
+   * Process DESELECT operation.
+   */
+  private processDeselect(data: Record<string, unknown>): void {
+    const fields = data.fields as string[];
+    this.deselectColumns.push(...fields);
+  }
+
+  /**
+   * Process SELECT for related columns (joinWith).
+   *
+   * - hasOne / belongsTo  → LEFT JOIN + row_to_json  (single object)
+   * - hasMany             → correlated subquery with json_agg (array, no row explosion)
+   *
+   * @example hasMany correlated subquery:
+   *   (SELECT json_agg(row_to_json(a.*))
+   *    FROM "chat_message_actions" a
+   *    WHERE a."chat_message_id" = "chat_messages"."id") AS "actions"
+   *
+   * @example hasOne/belongsTo row_to_json:
+   *   row_to_json("organizationAiModel".*) AS "organizationAiModel"
+   */
+  private processSelectRelatedColumns(data: Record<string, unknown>): void {
+    const alias = data.alias as string;
+    const select = data.select as string[] | undefined;
+    const relationType = data.type as string | undefined;
+    const constraintOps = data.constraintOps as PostgresParserOperation[] | undefined;
+    const quotedAlias = this.dialect.quoteIdentifier(alias);
+    const quotedTable = this.quoteTable(this.table);
+
+    const hasExplicitSelect = this.selectColumns.length > 0;
+    if (!hasExplicitSelect && !this.selectRaw.includes(`${quotedTable}.*`)) {
+      this.selectRaw.unshift(`${quotedTable}.*`);
+    }
+
+    if (relationType === "hasMany") {
+      // Correlated subquery — no JOIN, no row explosion, returns a JSON array.
+      const relatedTable = data.table as string;
+      const foreignKey = data.foreignKey as string;
+      const localKey = data.localKey as string;
+      const quotedRelatedTable = this.quoteTable(relatedTable);
+      const quotedForeignKey = this.dialect.quoteIdentifier(foreignKey);
+      const quotedLocalKey = this.dialect.quoteIdentifier(localKey);
+      const quotedMainTable = this.quoteTable(this.table);
+
+      let innerSelect: string;
+      if (select && select.length > 0) {
+        // Pick specific columns: json_agg(json_build_object('id', a."id", ...))
+        const fields = select
+          .map((col) => `'${escapeSqlLiteral(col)}', a.${this.dialect.quoteIdentifier(col)}`)
+          .join(", ");
+        innerSelect = `json_agg(json_build_object(${fields}))`;
+      } else {
+        innerSelect = `json_agg(row_to_json(a.*))`;
+      }
+
+      // Build the base FK condition
+      const fkCondition = `a.${quotedForeignKey} = ${quotedMainTable}.${quotedLocalKey}`;
+
+      // Merge constraint ops (where / order / limit) from a sub-parser.
+      // The sub-parser numbers its own placeholders starting at $1; we must
+      // absorb its params into this parser and renumber the embedded SQL,
+      // otherwise $N references in the merged clauses dangle.
+      let extraWhere = "";
+      let orderBy = "";
+      let limitClause = "";
+
+      if (constraintOps && constraintOps.length > 0) {
+        const subParser = new PostgresQueryParser({
+          table: relatedTable,
+          alias: "a",
+          dialect: this.dialect,
+          operations: constraintOps,
+        });
+        subParser.parse();
+
+        const renumber = this.absorbSubParserParams(subParser);
+
+        if (subParser.whereClauses.length > 0) {
+          extraWhere = ` AND ${renumber(subParser.whereClauses.join(" "))}`;
+        }
+        if (subParser.orderClauses.length > 0) {
+          orderBy = ` ORDER BY ${renumber(subParser.orderClauses.join(", "))}`;
+        }
+        if (subParser.limitValue !== undefined) {
+          limitClause = ` ${this.dialect.limitOffset(subParser.limitValue)}`;
+        }
+      }
+
+      // Wrap with ORDER/LIMIT only when constraints are present (json_agg ignores ORDER)
+      const innerQuery =
+        orderBy || limitClause
+          ? `SELECT row_to_json(sub.*) FROM (SELECT * FROM ${quotedRelatedTable} a WHERE ${fkCondition}${extraWhere}${orderBy}${limitClause}) sub`
+          : `SELECT ${innerSelect.replace("json_agg(", "").replace(/\)$/, "")} FROM ${quotedRelatedTable} a WHERE ${fkCondition}${extraWhere}`;
+
+      const aggregated =
+        orderBy || limitClause
+          ? `(SELECT json_agg(row_to_json(sub.*)) FROM (SELECT * FROM ${quotedRelatedTable} a WHERE ${fkCondition}${extraWhere}${orderBy}${limitClause}) sub) AS ${quotedAlias}`
+          : `(SELECT ${innerSelect} FROM ${quotedRelatedTable} a WHERE ${fkCondition}${extraWhere}) AS ${quotedAlias}`;
+
+      this.selectRaw.push(aggregated);
+    } else {
+      // hasOne / belongsTo — single object via LEFT JOIN + row_to_json.
+      // If constraint provides an explicit select list, prefer it over data.select
+      let effectiveSelect = select;
+      if (constraintOps && constraintOps.length > 0) {
+        const subParser = new PostgresQueryParser({
+          table: (data.table as string) ?? alias,
+          alias,
+          dialect: this.dialect,
+          operations: constraintOps,
+        });
+        subParser.parse();
+        if (subParser.selectColumns.length > 0) {
+          effectiveSelect = subParser.selectColumns;
+        }
+      }
+
+      if (effectiveSelect && effectiveSelect.length > 0) {
+        const selectedColumns = effectiveSelect
+          .map((col) => `${quotedAlias}.${this.dialect.quoteIdentifier(col)}`)
+          .join(", ");
+        this.selectRaw.push(
+          `row_to_json((SELECT d FROM (SELECT ${selectedColumns}) d)) AS ${quotedAlias}`,
+        );
+      } else {
+        this.selectRaw.push(`row_to_json(${quotedAlias}.*) AS ${quotedAlias}`);
+      }
+    }
+  }
+
+  /**
+   * Process JOIN operation with smart field detection.
+   *
+   * Handles both regular columns and JSONB nested paths:
+   * - "id" → "table"."id" (auto-prefixed)
+   * - "users.id" → "users"."id" (explicit table)
+   * - "createdBy.id" → "table"."createdBy"->>'id' (JSONB path)
+   * - "posts.createdBy.id" → "posts"."createdBy"->>'id' (JSONB with table)
+   */
+  private processJoin(data: Record<string, unknown>, type: string): void {
+    const options = data as unknown as
+      | JoinOptions
+      | { table: string; localField: string; foreignField: string };
+
+    const joinTable = "table" in options ? options.table : "";
+    const localField = "localField" in options ? options.localField : "";
+    const foreignField = "foreignField" in options ? options.foreignField : "";
+    const alias = "alias" in options ? options.alias : undefined;
+    const constraintOps = (data.constraintOps as PostgresParserOperation[] | undefined) ?? [];
+
+    const quotedTable = this.quoteTable(joinTable);
+    const tableRef = alias
+      ? `${quotedTable} AS ${this.dialect.quoteIdentifier(alias)}`
+      : quotedTable;
+    const tableAlias = alias ?? joinTable;
+
+    // Track the joined table for reference detection
+    this.joinedTables.add(joinTable);
+    if (alias) {
+      this.joinedTables.add(alias);
+    }
+
+    // Parse local field (belongs to main table)
+    const quotedLocal = this.parseColumnIdentifier(localField!, this.table, this.alias);
+
+    // Parse foreign field (belongs to join table)
+    const quotedForeign = this.parseColumnIdentifier(foreignField!, joinTable, tableAlias);
+
+    // Build the basic ON condition. For hasOne/belongsTo joinWith with a
+    // constraint callback, append the constraint's where-clauses to the ON
+    // clause (preserves LEFT JOIN semantics — main rows stay even when no
+    // related row passes the constraint). orderBy/limit on the constraint
+    // are silently dropped — they have no meaning on a single-row LEFT JOIN.
+    let onClause = `${quotedLocal} = ${quotedForeign}`;
+
+    if (constraintOps.length > 0) {
+      const whereOps = constraintOps.filter(
+        (op) => op.type.startsWith("where") || op.type.startsWith("orWhere"),
+      );
+
+      if (whereOps.length > 0) {
+        const subParser = new PostgresQueryParser({
+          table: joinTable,
+          alias: tableAlias,
+          dialect: this.dialect,
+          operations: whereOps,
+        });
+        subParser.parse();
+
+        if (subParser.whereClauses.length > 0) {
+          const renumber = this.absorbSubParserParams(subParser);
+          onClause = `${onClause} AND ${renumber(subParser.whereClauses.join(" "))}`;
+        }
+      }
+    }
+
+    this.joinClauses.push(`${type} JOIN ${tableRef} ON ${onClause}`);
+  }
+
+  /**
+   * Parse a column identifier with smart detection for table prefixes and JSONB paths.
+   *
+   * Supports an optional explicit cast suffix using PostgreSQL's `::type` syntax,
+   * which is the only way to coerce a JSONB-extracted value (always returned as
+   * `text`) into another type. The parser does NOT infer casts from key names —
+   * coercion is always opt-in by the caller.
+   *
+   * @param field - The field string. Examples:
+   *   - "id"                       → `"table"."id"`
+   *   - "users.id"                 → `"users"."id"`
+   *   - "createdBy.id"             → `"table"."createdBy"->>'id'`
+   *   - "createdBy.id::int"        → `("table"."createdBy"->>'id')::int`
+   *   - "meta.score::numeric"      → `("table"."meta"->>'score')::numeric`
+   *   - "posts.createdBy.id::uuid" → `("posts"."createdBy"->>'id')::uuid`
+   * @param defaultTable - Default table to use if no prefix
+   * @param tableAlias - Table alias to use if provided
+   * @returns Properly quoted SQL expression
+   */
+  private parseColumnIdentifier(field: string, defaultTable: string, tableAlias?: string): string {
+    if (!field) return "";
+
+    // Extract optional explicit cast suffix: "createdBy.id::int" → path "createdBy.id", cast "int"
+    let cast: string | undefined;
+    const castIndex = field.indexOf("::");
+    if (castIndex !== -1) {
+      cast = field.slice(castIndex + 2).trim();
+      field = field.slice(0, castIndex);
+    }
+
+    const effectiveTable = tableAlias ?? defaultTable;
+    const parts = field.split(".");
+
+    let expression: string;
+
+    if (parts.length === 1) {
+      // Single part: just a column name, prefix with default table
+      expression = `${this.quoteTable(effectiveTable)}.${this.dialect.quoteIdentifier(field)}`;
+    } else if (parts.length === 2) {
+      // Two parts: could be "table.column" or "jsonbColumn.key"
+      const [first, second] = parts;
+
+      // `parts.length === 2` above guarantees both, but the compiler does not
+      // narrow a destructured element from a length check. Throwing rather
+      // than defaulting to "": every branch below feeds `quoteIdentifier` or a
+      // JSONB path, so an empty segment would emit SYNTACTICALLY VALID SQL
+      // against the wrong identifier — a query that silently returns the wrong
+      // rows is far worse than one that refuses to build.
+      if (first === undefined || second === undefined) {
+        throw new Error(`Cannot parse field path "${field}": expected two non-empty segments.`);
+      }
+
+      if (this.isTableReference(first)) {
+        // It's table.column - regular column reference
+        expression = `${this.quoteTable(first)}.${this.dialect.quoteIdentifier(second)}`;
+      } else {
+        // It's jsonbColumn.key - JSONB path
+        expression = this.buildJsonbPath(effectiveTable, first, [second]);
+      }
+    } else {
+      // Three or more parts: "table.jsonbColumn.key..." or "jsonbColumn.key1.key2..."
+      const [first, second, ...rest] = parts;
+
+      // Same reasoning as the two-part branch: this arm runs only for three or
+      // more parts, so both exist — and an empty identifier reaching the SQL
+      // is a wrong-rows bug, not a crash.
+      if (first === undefined || second === undefined) {
+        throw new Error(
+          `Cannot parse field path "${field}": expected at least three non-empty segments.`,
+        );
+      }
+
+      if (this.isTableReference(first)) {
+        // First part is table: "posts.createdBy.id" → table is "posts", JSONB is "createdBy.id"
+        expression = this.buildJsonbPath(first, second, rest);
+      } else {
+        // No table prefix: "createdBy.address.city" → use default table
+        expression = this.buildJsonbPath(effectiveTable, first, [second, ...rest]);
+      }
+    }
+
+    if (cast) {
+      if (!SAFE_CAST_PATTERN.test(cast)) {
+        throw new Error(`PostgresQueryParser: unsafe cast type "${cast}"`);
+      }
+
+      return `(${expression})::${cast}`;
+    }
+
+    return expression;
+  }
+
+  /**
+   * Check if a string is a table reference (main table or join table).
+   */
+  private isTableReference(name: string): boolean {
+    if (name === this.table || name === this.alias) {
+      return true;
+    }
+
+    if (this.joinedTables.has(name)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private quoteTable(table: string): string {
+    return this.dialect instanceof PostgresDialect
+      ? this.dialect.quoteTableIdentifier(table)
+      : this.dialect.quoteIdentifier(table);
+  }
+
+  /**
+   * Build a JSONB path expression.
+   *
+   * @param table - Table name
+   * @param column - JSONB column name
+   * @param path - Array of nested keys
+   * @returns PostgreSQL JSONB path expression
+   *
+   * Returns the raw JSONB path expression — extracted values are always `text`
+   * (`->>` returns text). Callers that need a different type must request an
+   * explicit cast via the `::type` suffix in `parseColumnIdentifier`.
+   *
+   * @example
+   * buildJsonbPath("posts", "createdBy", ["id"])
+   * // Returns: "posts"."createdBy"->>'id'
+   *
+   * buildJsonbPath("posts", "createdBy", ["address", "city"])
+   * // Returns: "posts"."createdBy"->'address'->>'city'
+   */
+  private buildJsonbPath(table: string, column: string, path: string[]): string {
+    const quotedTable = this.quoteTable(table);
+    const quotedColumn = this.dialect.quoteIdentifier(column);
+
+    if (path.length === 0) {
+      return `${quotedTable}.${quotedColumn}`;
+    }
+
+    // Build JSONB path: use -> for intermediate keys, ->> for final key (returns text)
+    let expression = `${quotedTable}.${quotedColumn}`;
+
+    for (let i = 0; i < path.length; i++) {
+      const isLast = i === path.length - 1;
+      const operator = isLast ? "->>" : "->";
+      expression += `${operator}'${escapeSqlLiteral(path[i] as string)}'`;
+    }
+
+    return expression;
+  }
+
+  /**
+   * Process CROSS JOIN operation.
+   */
+  private processCrossJoin(data: Record<string, unknown>): void {
+    const table = data.table as string;
+    const quotedTable = this.quoteTable(table);
+    this.joinClauses.push(`CROSS JOIN ${quotedTable}`);
+  }
+
+  /**
+   * Process raw JOIN expression.
+   */
+  private processJoinRaw(data: Record<string, unknown>): void {
+    const expression = data.expression as string;
+    const bindings = (data.bindings as unknown[]) ?? [];
+
+    let processed = expression;
+    for (const binding of bindings) {
+      processed = processed.replace("?", this.addParam(binding));
+    }
+
+    this.joinClauses.push(processed);
+  }
+
+  /**
+   * Process ORDER BY operation.
+   */
+  private processOrderBy(data: Record<string, unknown>): void {
+    const field = data.field as string;
+    const rawDirection = String(data.direction ?? "asc").trim();
+
+    if (!SAFE_DIRECTION_PATTERN.test(rawDirection)) {
+      throw new Error(`PostgresQueryParser: invalid orderBy direction "${rawDirection}"`);
+    }
+
+    const direction = rawDirection.replace(/\s+/g, " ").toUpperCase();
+
+    const quotedField = this.parseColumnIdentifier(field, this.table, this.alias);
+    this.orderClauses.push(`${quotedField} ${direction}`);
+  }
+
+  /**
+   * Process raw ORDER BY expression.
+   */
+  private processOrderByRaw(data: Record<string, unknown>): void {
+    const expression = data.expression as string;
+    const bindings = (data.bindings as unknown[]) ?? [];
+
+    // Replace ? placeholders with $n positional params (same as processWhereRaw)
+    let processed = expression;
+    for (const binding of bindings) {
+      processed = processed.replace("?", this.addParam(binding));
+    }
+    this.orderClauses.push(processed);
+  }
+
+  /**
+   * Process GROUP BY operation.
+   */
+  private processGroupBy(data: Record<string, unknown>): void {
+    const fields = data.fields as string | string[];
+    const columns = Array.isArray(fields) ? fields : [fields];
+    this.groupColumns.push(...columns);
+  }
+
+  /** Process a raw GROUP BY expression, binding `?` placeholders positionally. */
+  private processGroupByRaw(data: Record<string, unknown>): void {
+    let expression = data.expression as string;
+    const bindings = (data.bindings as unknown[]) ?? [];
+
+    for (const binding of bindings) {
+      expression = expression.replace("?", this.addParam(binding));
+    }
+
+    this.groupRawExpressions.push(expression);
+  }
+
+  /**
+   * Process HAVING operation.
+   */
+  private processHaving(data: Record<string, unknown>): void {
+    const field = data.field as string;
+    const operator = this.mapOperator(((data.operator as string) ?? "=") as WhereOperator);
+    const value = data.value;
+
+    const quotedField = this.dialect.quoteIdentifier(field);
+    const placeholder = this.addParam(value);
+
+    this.havingClauses.push(`${quotedField} ${operator} ${placeholder}`);
+  }
+
+  /**
+   * Process a raw HAVING expression, threading `?` placeholders into
+   * positional params the same way `processWhereRaw` / `processSelectRaw` do.
+   * Without this, bindings on a `havingRaw` op are silently dropped.
+   */
+  private processHavingRaw(data: Record<string, unknown>): void {
+    let expression = data.expression as string;
+    const bindings = (data.bindings as unknown[]) ?? [];
+
+    for (const binding of bindings) {
+      expression = expression.replace("?", this.addParam(binding));
+    }
+
+    this.havingClauses.push(expression);
+  }
+
+  /**
+   * Add a WHERE clause with boolean operator.
+   */
+  private addWhereClause(clause: string, boolean: "AND" | "OR"): void {
+    if (this.whereClauses.length === 0) {
+      this.whereClauses.push(clause);
+    } else {
+      this.whereClauses.push(`${boolean} ${clause}`);
+    }
+  }
+
+  /**
+   * Map simple Cascade operators to their SQL equivalents.
+   *
+   * Complex operators (between, in, like-variants, exists) are handled by
+   * dedicated processors and should never reach this method.
+   */
+  private mapOperator(operator: WhereOperator): string {
+    const mapping: Record<string, string> = {
+      "=": "=",
+      "!=": "!=",
+      "<>": "<>",
+      ">": ">",
+      ">=": ">=",
+      "<": "<",
+      "<=": "<=",
+      like: "LIKE",
+      notlike: "NOT LIKE",
+      ilike: "ILIKE",
+    };
+
+    const mapped = mapping[String(operator).toLowerCase()];
+
+    if (mapped === undefined) {
+      throw new Error(`PostgresQueryParser: unsupported operator "${operator}"`);
+    }
+
+    return mapped;
+  }
+}

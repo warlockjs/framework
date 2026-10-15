@@ -1,0 +1,1 @@
+{"version":3,"file":"sql-database-dirty-tracker.d.ts","sourceRoot":"","sources":["../src/sql-database-dirty-tracker.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,oBAAoB,EAAE,MAAM,0BAA0B,CAAC;AAEhE;;;;GAIG;AACH,qBAAa,uBAAwB,SAAQ,oBAAoB;IAC/D;;OAEG;cACgB,WAAW,CAAC,IAAI,EAAE,MAAM,CAAC,MAAM,EAAE,OAAO,CAAC,GAAG,MAAM,CAAC,MAAM,EAAE,OAAO,CAAC;CAIvF"}

@@ -1,0 +1,395 @@
+﻿# Changelog — @warlock.js/cascade
+
+All notable changes to `@warlock.js/cascade` are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
+
+## 5.29.0 - 2026-10-01
+
+### Changed
+
+- Lockstep release; package APIs are unchanged. Skills refer to other topics by name instead of file paths, so cross-references keep working after `agent-kit` copies them into an app.
+
+## 5.28.0 - 2026-10-01
+
+### Fixed
+
+- Replacing a nested object on MongoDB (`model.set("nested", obj).save()`) now writes the whole new object with one `$set`, instead of diffing per leaf. Removing keys no longer leaves their parents behind as empty `{}` objects in the stored document. Dotted-path sets (`set("nested.a", v)`) and `merge()` stay partial per-leaf updates, so concurrent writes to other keys still survive. SQL drivers already replace the whole JSON column and are unchanged.
+- `unset("nested.x")` now removes the parents it empties (`unset("a.b.c")` on `{ a: { b: { c: 1 } } }` stores no `a`), and the update `$unset`s that parent rather than leaving `{}`. A parent is pruned only when that unset emptied it: an object stored or set as `{}` is left alone, and arrays are never pruned. `unset("nested")` removes the whole object.
+
+## 5.27.0 - 2026-10-01
+
+### Changed
+
+- Dependency: @mongez/supportive-is 3.0 (type-predicate checkers).
+
+## 5.26.0 - 2026-09-30
+
+### Added
+
+- `whereTrusted(conditions)` on the query builder contract applies a code-authored filter without the unsafe-operator check, so MongoDB operators such as `$in` and `$lt` pass through. Never pass request input to it. The PostgreSQL builder throws `UnsupportedQueryOperationError` for operator objects, because its `where()` parser would otherwise bind them as plain values. Custom query builders must implement the new method.
+- Migrations can be registered with an origin (`"package"` or `"app"`). Package migrations run before every app migration while preserving the existing `order`, `createdAt`, and name sort within each partition. Direct `register()` calls default to `"app"`.
+
+### Fixed
+
+- Migrations now reject colliding unnamed index definitions before sending DDL to MongoDB or PostgreSQL, with guidance to provide an explicit index name. Declarative alter migrations with a custom `up()` but no `down()` now emit one rollback warning.
+- `trustedFilter: true` now works on `atomic()`, `findOneAndUpdate()` and `findAndUpdate()` with an operator filter such as `{ id: { $in: ids } }`. The scoped-write lookup re-ran the filter through `where()`, which rejected the operator, so these calls threw `UnsafeFilterError` even when the filter was trusted. Global scopes (tenant, soft delete) still apply to the write. `findAndUpdate()` now accepts `trustedFilter`.
+
+## 5.25.0 - 2026-09-28
+
+### Added
+
+- Drivers emit public `query` events for settled PostgreSQL SQL and MongoDB commands; `dataSourceRegistry` forwards them with the registered connection name for centralized inspection.
+
+### Fixed
+
+- PostgreSQL `groupByRaw()` now emits and parses its raw GROUP BY operation correctly, including bound parameters.
+- MongoDB `lockForUpdate()` now throws the public `UnsupportedLockForUpdateError` with guidance to use a conditional atomic update instead of a nonexistent row lock.
+- MongoDB atomic upserts now assign the model's auto-increment `id` on insert without changing an existing document's id.
+
+## 5.24.0 - 2026-09-27
+
+### Added
+
+- PostgreSQL transactions accept transaction-local `settings`, applied safely with parameterized `set_config` calls after `BEGIN`; use them for RLS context, `statement_timeout`, or `search_path` without leaking values to the pool.
+
+### Fixed
+
+- An explicit `null` given to `merge()`/`set()` is now written as NULL on save. Before, an optional, non-nullable column cleared to `null` (for example, restoring a soft-deleted row with `merge({ deletedAt: null })`) was dropped from the update, and the row kept its old value. A required column set to `null` still fails validation.
+
+## 5.23.2 - 2026-09-26
+
+### Changed
+
+- Lockstep patch release; package APIs are unchanged.
+
+## 5.23.1 - 2026-09-26
+
+### Changed
+
+- Lockstep patch release; package APIs are unchanged.
+
+## 5.23.0 - 2026-09-25
+
+### Added
+
+- Postgres `naming: "snake_case"` (opt-in, default `"preserve"`): camelCase model keys map to snake_case columns in inserts, updates, `where`, `orderBy`, `select`, `groupBy` and joins, and rows come back camelCase. Table names and raw SQL are left as written.
+- Static `Model.whereRaw(expression, bindings?)`, matching the other static query entry points (`Model.query().whereRaw(...)` still works).
+
+### Fixed
+
+- Postgres `bigint`/`int8` columns (and int8 arrays) come back as numbers when they fit in a safe integer, so a bigint id passes `v.number()`; larger values stay strings. The parser is installed on Cascade's own pool, not on the global `pg.types`.
+- `unique()` / `exists()` on `StringValidator` and `NumberValidator` now return `this`, so `Infer<>` keeps the concrete output type (was `unknown`).
+
+## 5.22.1 - 2026-09-25
+
+### Changed
+
+- Lockstep patch release; package APIs are unchanged.
+
+## 5.22.0 - 2026-09-25
+
+### Added
+
+- PostgreSQL TTL indexes register purge jobs and persist retention rules in index comments so jobs restore after reconnect.
+
+### Fixed
+
+- Post-commit sync fan-out retries transient failures without failing committed writes.
+
+## 5.21.0 - 2026-09-25
+
+### Added
+
+- Migration locks: a migration run takes a lock for its whole duration (Postgres advisory lock `warlock:migrations`; MongoDB lock document with a 10-minute TTL). A held lock is waited on for up to 60s, then the run throws naming the holder.
+
+### Changed
+
+- **BREAKING:** `Model.delete()` with no filter throws instead of deleting everything. Pass a filter.
+- **BREAKING:** migrations run in authored order; `order` is the primary sort key, so a migration with a non-zero `order` changes run/rollback order. Multi-batch rollback sorts batch DESC, then `createdAt` DESC, and `export .down.sql` orders newest-first. `transactional: false` and `dataSource` are now honoured.
+- **BREAKING:** dry runs (`--sql`, `export-sql`, `runAll({ dryRun })`) write nothing — no `up()`/`down()` side effects and no recording.
+- **BREAKING:** `isDefault` applies only to the first data source.
+- **BREAKING:** model events are emitted under both the class name and the table name (`model.<table>.updated`, or `model.<dataSource>:<table>.updated`). Listeners on either name work.
+- **BREAKING:** a unique-constraint violation on insert/update (pg `23505`, mongo `11000`) throws `DatabaseWriterValidationError` (a field error) instead of a raw driver error. The `unique` rule excludes the model's own row on update.
+- **BREAKING:** `unique`/`exists`/`databaseModels`/embed rules with an unregistered string model name throw a descriptive error ("did you forget `@RegisterModel()`?"). `exists()` defaults to the primary key, and `uuid` always returns a string.
+- **BREAKING:** sync runs after commit and logs failures as `sync.failed`; multi-level sync (`.maxDepth()`) is removed.
+- Mongo: `orderByRaw()`/`cursor()` throw instead of being ignored, `raw()` throws a "SQL only" error, `whereDate`/`whereBefore`/`whereAfter` use UTC day boundaries, and transaction callbacks may run more than once (retried on transient errors).
+- `defineModel` no longer overrides base-class `strictMode`/`autoGenerateId` unless supplied. Validation no longer calls `console.trace`.
+
+### Fixed
+
+- Postgres driver: `whereLike` with a RegExp (`~*`/`!~*`), `count()`/`exists()` honour `has`/`whereHas`, joins and `groupBy`/`distinct`, and `whereJsonContains` binds a parameter.
+- Migrations: `.index()`/`.unique()`/`.vectorIndex()` inside `Migration.alter` `modify` now create the index, and `randomIncrement` takes effect.
+- Mongo: replica-set detection runs `hello` once per driver.
+
+### Changed
+
+- Lockstep release maintenance and dependency refresh.
+
+## 5.20.0 - 2026-09-24
+
+### Added
+
+- `afterCommit(fn)` — run a side effect only once the transaction has committed. Inside a transaction, `fn` is queued and runs after the outermost COMMIT (in order, awaited one by one); it is discarded on rollback or a failed COMMIT. Outside a transaction, it runs on the next microtask. Errors are logged and never change the transaction result. Use it in model event listeners (`saved`, `created`, ...) for cache clears, sitemap regeneration and emails.
+
+## 5.19.0 - 2026-09-23
+
+### Changed
+
+- Refined package skill-discovery descriptions and regenerated the llms projections.
+
+## 5.17.0 - 2026-09-21
+
+### Fixed
+
+- `where(field, undefined)` / `where(field, operator, undefined)` / `where({ field: undefined })` (and the `orWhere` equivalents, on both the Postgres and MongoDB query builders) now throw `UndefinedWhereValueError` instead of silently reaching the driver. A bound `undefined` used to bind as `= NULL` (SQL) / "field missing" (MongoDB) — a comparison that never matches but never fails either, hiding call sites that forgot to guard a value that turned out to be missing (card 62e0e781: a blog author lookup ran `User.find(post.authorId)` with an undefined id under load). Pass `null` to match NULL explicitly; guard the call site to skip the query when there's no value.
+- Postgres pool leaks (card ba1193b4): `beginTransaction()` now releases its client on every path, including when `BEGIN`, `COMMIT` or `ROLLBACK` throws. A failed `COMMIT`/`ROLLBACK` discards the client (`release(error)`) instead of recycling one left in an unknown transaction state, and `transaction()` no longer issues `ROLLBACK` after a failed `COMMIT`. The pool also gets an `error` listener (an idle client dropped by the server no longer crashes the process), `keepAlive`, and a 10s connect timeout.
+
+## 5.13.0 - 2026-09-17
+
+### Upgrading
+
+- On Postgres, `$push` / `$pull` / `$addToSet`, pipeline updates, `arrayFilters` and unknown update operators now throw `UnsupportedUpdateOperationError` instead of being silently ignored. If any code path relied on such an operator being a no-op on Postgres, update it to an operation Postgres supports (or branch by driver) before upgrading.
+
+### Added
+
+- `Model.atomic`, `Model.findOneAndUpdate` and `Model.findAndUpdate` take options: `upsert`, `arrayFilters` (MongoDB), and on `findOneAndUpdate` `returnDocument: "before" | "after"` (default stays `"after"`). A counter or quota can now be filter + `$inc`/`$setOnInsert` + upsert, returning the new document, in one call.
+- Update operators `$setOnInsert` and `$addToSet`, and pipeline (array-form) updates such as `[{ $set: { score: { $add: ["$likes", "$shares"] } } }]` (MongoDB).
+- `trustedFilter: true` lets a code-authored conditional filter (`{ used: { $lt: 10 } }`) through the operator-injection check on these statics. Filters are still checked by default.
+- Postgres upsert runs as `INSERT … ON CONFLICT … DO UPDATE … RETURNING *`. The conflict target is the primary key or a unique index whose columns are all equality keys of the filter.
+- `UnsupportedUpdateOperationError` (`operation`, `driver`): what a driver throws when it cannot run part of an update.
+- `.lean()` on the query builder: `get` / `first` / `paginate` / `chunk` return plain objects typed as the model schema (`LeanDocument<T>`), with no Model hydration, no driver casting and no `fetched` event. `static hidden` fields are still removed. With `with()` / `joinWith()` it throws `UnsupportedLeanOperationError`. About 1.9x faster than a hydrated read for 10k MongoDB documents.
+- `.unwind(field, { preserveNullAndEmptyArrays?, includeArrayIndex? })` and `.addFields(fields)` on the query builder (MongoDB). Both run in call order, so a `where()` after `unwind()` filters the elements. `join({ table, alias, pipeline })` now sends a pipeline `$lookup`.
+- `UnsupportedQueryOperationError` (`operation`, `driver`): the Postgres builder throws it for `unwind()` and `addFields()`, so these stages are never dropped without an error.
+
+### Changed
+
+- **BREAKING:** The Postgres driver now throws `UnsupportedUpdateOperationError` for `$push` / `$pull` / `$addToSet`, pipeline updates, `arrayFilters` and unknown operators. It used to ignore `$push` / `$pull` without saying so.
+- `Model.atomic` returns modified + upserted count.
+- Postgres `findOneAndUpdate` picks its row with `SELECT … LIMIT 1 FOR UPDATE`, matches it by primary key and checks the filter again, so concurrent callers never go past a conditional filter.
+
+### Fixed
+
+- `$dec` on the MongoDB driver was sent to the server as-is and rejected ("Unknown modifier"). It is now converted to a negative `$inc`.
+- The MongoDB pipeline parser dropped `$vectorSearch` and `$addFields` stages, so `similarTo()` ran with no vector search and no `score`. It now emits both.
+- On MongoDB, a `join()` with a `pipeline` sent a `$lookup` with no pipeline and no join fields.
+- On MongoDB, `joinRaw()` and `raw()` were silently dropped from the pipeline. `joinRaw(stage | stages)` now emits the stages verbatim in call order; `raw(pipeline => …)` receives the pipeline built so far and may return a replacement. A SQL string, a non-stage object or a non-array callback result throws `UnsupportedQueryOperationError`.
+- On MongoDB, `select([...]).orderBy(field)` did not sort when `field` was not selected, because `$project` ran before `$sort` (hydrated, lean, `first()` and `paginate()` reads). The sort now runs before the projection; sorting by a computed `selectRaw` alias still works, also mixed with unselected fields.
+
+## 5.11.0 - 2026-09-14
+
+### Fixed
+
+- A project that uses no database — or only one of PostgreSQL / MongoDB — no longer fails `npm ls` with missing `pg` / `mongodb` peers; both drivers are now optional peers, and you install the one you use.
+
+## 5.10.0 - 2026-09-14
+
+_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.10.0._
+
+## 5.9.0 - 2026-09-13
+
+_Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.9.0._
+
+## 5.8.0 - 2026-09-13
+
+### Added
+
+- `Migration.foreignId(name)` derives a foreign-key column's type from `migrationDefaults.primaryKey`, so FK columns match the app's chosen primary-key type (integer / bigInteger / uuid).
+
+### Fixed
+
+- Numeric-looking Postgres connection config (e.g. a numeric `DB_NAME`) is coerced to a string via `buildPostgresPoolConfig`, instead of crashing the driver with an inscrutable buffer error.
+
+## 5.7.0 - 2026-09-11
+
+### Fixed
+
+- The Postgres query builder could quote a malformed or empty field path straight into generated SQL, producing a syntactically valid query against the wrong identifier; it now throws naming the offending field path instead.
+- The MongoDB pipeline builder could build `$group`, `$lookup`, `$limit`/`$skip`/`$setWindowFields` stages from an empty operation group, producing malformed stages (e.g. `{ $limit: undefined }`, a `$lookup` with no `from`/`localField`/`foreignField`) that MongoDB rejected only at query execution. These now resolve to the documented safe defaults (`null`/skip) instead.
+- The dirty-change tracker and the MongoDB migration driver could write or delete the literal key `"undefined"` on a document when a dirty-path segment was missing, instead of leaving the real field untouched.
+- The query builder's count and JSON-projection handling could dereference an absent regex capture and throw, instead of falling back to the same empty result its other branches already return.
+
+### Changed
+
+- Internal type-safety hardening elsewhere; no other behaviour change.
+
+## 5.5.0 - 2026-09-07
+
+### Fixed
+
+- Documentation shipped in this package's `skills/` told users to run `pnpm`-specific commands. `pnpm <binary>` has no npm equivalent, so those instructions failed outright for anyone not using pnpm. Commands are now package-manager neutral.
+
+## 5.2.3 - 2026-09-02
+
+### Fixed
+
+- Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3.
+
+## 5.2.2
+
+- `package.json` now declares `"warlock": { "environment": "server" }` — build-boundary metadata `@warlock.js/web` uses to refuse value-imports of this package from app client code (type-only imports are still allowed; server loaders/controllers/modules are unaffected).
+
+## 5.1.0
+
+No changes to `@warlock.js/cascade`. Released in lockstep with the `@warlock.js/web`
+React-execution fix and the `@warlock.js/core` CLI additions — see those packages'
+changelogs.
+
+## 5.0.2 - 2026-08-25
+
+No changes to `@warlock.js/cascade`. Released in lockstep with the `@warlock.js/web` SSR
+fix (`ssr.noExternal`) — see that package's changelog.
+
+## 5.0.1 - 2026-08-25
+
+No changes to `@warlock.js/cascade`. Released in lockstep with the `create-warlock` vite
+resolution pin and the `@warlock.js/web` peer narrowing — see those packages'
+changelogs.
+
+## 5.0.0 - 2026-08-25
+
+### Changed
+
+- This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep.
+
+## 4.16.0 - 2026-08-18
+
+### Security
+
+- **NoSQL operator injection via equality filters is now rejected.** `where({ field: value })`, `where(field, value)` and the filter-accepting model statics (`first`, `findFirst`, `findAll`, `count`, `paginate`, `deleteMany`, `deleteOne`, …) treated the value verbatim, so a request-controlled payload such as `{ password: { $ne: null } }` compiled into a MongoDB _operator_ query instead of an equality match — the textbook auth-bypass primitive (`User.first({ email, password })` matched any user). Equality-position values (and top-level object-form keys) containing `$`-prefixed keys now throw `UnsafeFilterError`. Explicit operator APIs are unaffected: `where(field, operator, value)`, `whereIn`/`whereNull`/`whereBetween`/…, and the object form of `whereRaw`. Dotted paths (`"profile.name"`) and plain sub-document equality values remain valid. A `sanitizeFilter` / `sanitizeFilterValue` helper pair is exported for callers who forward request objects to other driver-level APIs
+- **String-mode `whereRaw()` / `orWhereRaw()` no longer compiles to `$where` on the MongoDB driver.** Any string expression was wrapped as `{ $where: "<js>" }` — JavaScript executed _inside_ `mongod` for every scanned document (an injection sink whenever any part of the string was request-influenced, and an unindexed full-scan DoS even when trusted), with `?`-bindings substituted by string concatenation rather than real parameterization. The MongoDB parser now throws `UnsafeRawExpressionError` for string expressions and directs callers to the object form (`whereRaw({ $expr: … })`), which keeps working. SQL drivers keep string mode with real bindings
+- **`static hidden` — fields `toJSON()` can never emit.** With no `resource`/`toJsonColumns` configured (the quick-start model shape), `toJSON()` — invoked implicitly by `JSON.stringify(model)` / `res.json(model)` — returned the entire raw document, password hashes and tokens included. Models can now declare `static hidden = ["password", …]`; those top-level fields are ALWAYS stripped from `toJSON()` output — with the raw-document default, with `toJsonColumns` (hidden wins), and from the data handed to a `resource` class. Defaults to `[]`, so nothing changes until a model declares hidden fields — but because that default still fails open, cascade now logs a one-time `console.warn` per model whose schema declares a credential-shaped field (`password`/`passwordHash`/`secret`/`token`/`apiKey`/`api_key`, case-insensitive) that no `hidden`/`resource`/`toJsonColumns` covers
+- **Atomic/find-and-modify statics now sanitize their filter.** `atomic()`, `findAndUpdate()`, `findOneAndUpdate()`, `findAndReplace()` and `findOneAndDelete()` forwarded their `filter` object straight to the driver — bypassing `where()` and therefore the operator-injection check above, so `{ role: { $ne: "admin" } }` from a request body was still a live operator query on these paths. The filter argument now runs through `sanitizeFilter` and throws `UnsafeFilterError` on `$`-prefixed keys. Update-operator semantics (`$set`/`$inc`/`$unset`/…) are untouched — only the FILTER is checked. Callers who legitimately need operator conditions must express them through the query API (`Model.query().where(…)`) instead of the raw filter argument
+- **Residual injection paths closed.** The three-argument equality form `where(field, "=", value)` now sanitizes its value like the two-argument form (other operators are unaffected), and the object form of `whereRaw()`/`orWhereRaw()` rejects the server-side JavaScript operators `$where`, `$function` and `$accumulator` anywhere in the expression (throws `UnsafeRawExpressionError`); `$expr` and the other aggregation operators keep working
+- **A `merge()`d primary key can no longer retarget a write at another document.** `performUpdate()` built its filter from `model.get(primaryKey)` _after_ `merge()` had run, so the canonical update-my-profile shape — `model.merge(req.body); await model.save()` — let a body carrying `{ id: "<victim-id>", role: "admin" }` redirect the UPDATE (and the mass-assigned fields with it) onto somebody else's row. Two independent controls now stand between a payload and the write target: (1) an instance captures its primary key at the moment it becomes persisted (`isNew` flipping to `false` — hydration, or the writer after an insert), and `update`/`replace`/`destroy` build their filter from that captured value, exposed as `model.trustedPrimaryKey`; (2) `merge()` on an already-persisted model drops the identity columns (`id`, `_id`, and the configured primary key) instead of applying them — which also covers `save({ merge })`. Identity columns are additionally excluded from the update's `$set`/`$unset`, so an explicit `set("id", …)` on a loaded record no longer rewrites the key of the row it is pinned to (`_id` was never writable in MongoDB anyway); changing a primary key is now a deliberate operation through the atomic/raw APIs. **Creating** a record with an explicit id is unchanged — a new model accepts identity columns — and the writer still merges driver-returned values (generated `_id`, `RETURNING *`) back onto the instance through a framework-internal path that request data never reaches
+- **`whereLike` / `whereSearch` string arguments are matched literally instead of compiled as regexes.** `whereLike`, `whereNotLike`, `whereStartsWith`/`whereEndsWith` (and their `Not` variants) and the `$regex` form of `whereSearch` interpolated their argument straight into a MongoDB `$regex`. Wired to a search box — `User.query().whereSearch("name", req.query.q)`, the intended use — that handed the caller the regex engine running inside `mongod`: metacharacters rewrote the match semantics (`^.*$` matches everything, `^a`/`^b` probes read a value back character by character), and a nested-quantifier pattern such as `(a+)+$` backtracked catastrophically against every scanned document. String arguments are now escaped and treated as literals; the SQL `LIKE` wildcard `%` still expands (to `.*`, with runs of `%` collapsed) and matching stays unanchored/substring as this driver documents. An explicit `RegExp` argument — which cannot arrive as JSON — is still used as a pattern, so raw regex remains available to developer-authored queries; never build that `RegExp` from user input. `escapeRegex` / `likePatternToRegexSource` are exported for callers compiling their own patterns. The Postgres path was already parameterized (`ILIKE $1`) and is unchanged
+- **`@mongez/*` dependencies bumped to the 2026-08-17 security release**: `@mongez/reinforcements` `^3.3.0` → `^4.0.1`, `@mongez/dotenv` `^1.3.1` → `^1.3.2`, `@mongez/events` `^2.2.6` → `^2.2.7`, `@mongez/supportive-is` `^2.1.3` → `^2.1.4`. Reinforcements 4 adds a prototype-pollution guard to `set`/`merge`/`pick`/`defaults` — the utilities behind `model.set()` / `model.merge()`, i.e. exactly where request-shaped data enters a model — and a ReDoS fix in `repeatsOf`. Its breaking change (`Random` is CSPRNG-backed and no longer honors `Random.seed()`) does not affect cascade: the package imports no `Random` API and seeds nothing. Requires Node 20+, which cascade already targets
+
+## 4.12.0
+
+### Added
+
+- **`listPendingMigrations()`** — the registered migrations that have not executed, **in the order they will execute**, mirroring `listExecutedMigrations()`. The set was already computed inside the runner on every migrate run; `getPendingMigrations()` was `private` and had no read-only exit, so nothing outside could ask "what will run next?" without running it
+
+  Returns `PendingMigration { name, createdAt? }` rather than the migration classes: `MigrationClass` is module-local, so a public API returning it would hand consumers a type they cannot name. It deliberately omits `table`, which `status()` obtains by constructing each migration — instantiating user classes to decorate a listing lets a constructor throw inside the very call meant to report on a broken tree
+
+  `getPendingMigrations()` is now public alongside it. **Both document the trap in their own JSDoc:** only _registered_ migrations can be pending, so a caller that has not registered anything receives `[]` — indistinguishable from a database with nothing pending, and the reason `@warlock.js/core`'s CLI loads before it reports
+
+### Changed
+
+- Declares its own test runner and pins it to an exact version (`vitest@4.1.10`). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to
+
+## 4.9.2
+
+### Fixed
+
+- `migrate:rollback` and `migrate:rollback --all` ran `down()` migrations in **apply order** instead of reverse. `getMigrationsToRollback` reversed the executed list and then re-sorted it ascending, which put it straight back into forward order and made the reverse dead code — so a rollback would drop a table before dropping the column added to it, failing with `relation "…" does not exist`. Any batch containing more than one migration was affected; single-migration batches hid it because one item has no order to get wrong
+- migration ordering now lives in `migration-order.ts` with an explicit `sortMigrationsForRollback`. The descending sort is required, not cosmetic: the executed list is read back ordered by `batch, name`, so it is alphabetical rather than chronological and simply _not_ re-sorting after the reverse would have produced reverse-alphabetical order — a different wrong answer
+
+## 4.9.1
+
+### Fixed
+
+- `save({ merge })` silently dropped a `Date` written over a column that already held a `Date` — the dirty tracker's merge treated anything `typeof "object"` as mergeable and recursed into the `Date`, which has no own enumerable properties, so nothing was copied and the old value survived. The column never went dirty and `save()` returned `{ success: true, modifiedCount: 0 }` without issuing an `UPDATE`. Only plain objects deep-merge now; `Date`, `Map`, `Set`, `RegExp` and every other class instance replace, matching what `model.data` already did. Writing into an empty column always worked, so only overwrites were affected
+
+## 4.9.0 - 2026-08-06
+
+### Fixed
+
+- migrations ran in **filename order instead of chronological order** on any fresh database. `SQLGrammar.sort` — the comparator that decides execution order across every pending migration — parsed `createdAt` with `new Date()`, which cannot read the `MM-DD-YYYY_HH-MM-SS` stamp the framework's own generator produces; every timestamp became `NaN`, was floored to `0`, and the alphabetical tiebreaker silently decided the whole ordering. A January 2026 migration would run before a December 2025 one
+- `parseCreatedAt` now lives in its own module and backs both migration comparators through a shared `compareCreatedAt`, so the two can no longer drift apart — one of them being wrong was the symptom, two comparators sorting the same data by different rules was the defect
+
+## 4.7.0
+
+### Added
+
+- `lockForUpdate({ skipLocked?, noWait? })` — row locking on SELECT (`FOR UPDATE [SKIP LOCKED | NOWAIT]`), the concurrent job-queue claim shape; Postgres-only, the MongoDB driver throws
+- `DatabaseDriverContract.supportsSqlSerialization` — capability flag (default `true`); `false` routes the MigrationRunner through direct migration-driver execution
+
+### Fixed
+
+- Postgres model-level `sum`/`avg`/`min`/`max`/`distinct`/`countDistinct`/`pluck`/`value` no longer return `0`/`undefined` — the hydration callback is reset before reading, matching MongoDB
+- Postgres `Model.findAndUpdate` / `Model.atomic` now update every matching row instead of one arbitrary row (a hidden `LIMIT 1`; MongoDB was already multi-row)
+- Postgres query-builder `update()` / `unset()` now honor the chained `where` filter — previously they updated the whole table
+- Postgres query-builder `deleteOne()` deletes exactly one row — the internal `limit(1)` was silently ignored, deleting every matching row
+- Postgres pivot `detach(ids)` (and `sync` / `toggle`) works — the driver translates Mongo-style filter operators (`$in`, `$nin`, `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`) instead of binding the operator object literally
+- CHECK constraints are no longer silently dropped on the MigrationRunner SQL path — the Postgres serializer emits `ADD CONSTRAINT ... CHECK` for `this.check(...)` and column `.check(...)`
+- MongoDB `with()` eager loading is no longer a silent no-op — `get()` runs the relation loader, same wiring as Postgres
+- MongoDB pipelines order `$match` before `$project` (SQL semantics), so `select()` before `where()` no longer strips the filter column and returns `[]` — fixes pivot `attach` de-duplication and `sync` / `toggle` deltas
+- The MigrationRunner works on MongoDB — migrations execute directly through the migration driver; `exportSQL` stays SQL-only with a clear unsupported error
+- MongoDB `dropIndex(table, name)` honors the literal index name — the string form is no longer rewritten to `<name>_1` (the columns-array form keeps the convention name)
+- `addGlobalScope` / `addLocalScope` register per-subclass — a scope added on one model (e.g. a soft-delete `notDeleted`) no longer leaks onto every other model
+
+## 4.6.1
+
+### Fixed
+
+- Native Postgres array columns (`TEXT[]` / `JSONB[]`, from `arrayText()` / `arrayJson()`) are now auto-detected by introspecting the schema on connect and bound as raw arrays — no more "malformed array literal" on insert and no need to hand-list `nativeArrayColumns` (which stays as an optional per-connection override, now consulted per-table)
+- `transaction()` now flat-nests: a nested `transaction()` joins the active one (same session, sees its uncommitted writes) instead of opening a second, independent transaction — fixes phantom foreign-key violations when a service that opens its own transaction is called inside an outer one (e.g. a seeder creating a row, then a service inserting a child that references it). MongoDB joins too, replacing its "nested not supported" throw
+
+## 4.6.0
+
+### Added
+
+- Fast bulk `Model.createMany(data, options?: { batchSize?; bulk? })` — both paths chunk by `batchSize` (default 500); `bulk: true` routes each chunk to the driver's native multi-row `insertMany` for 10–100× throughput (skips per-row hooks/events; default path preserves them)
+- `IdGeneratorContract.generateNextIds({ table, count })` — reserve a contiguous block of auto-increment ids in a SINGLE atomic op (MongoDB). `Model.createMany` (default + bulk) now reserves one id block per chunk instead of one counter round-trip per row; engages only for fixed-increment, auto-generated, id-less rows (random-increment or caller-supplied-id rows fall back to per-row generation)
+- `QueryBuilder.groupByDate(column, unit, aggregates?)` — portable date-bucketed `GROUP BY` (`day`/`week`/`month`/`year`) across Postgres `date_trunc` and MongoDB `$dateTrunc`
+- `$agg.sum(expr)` now also accepts a typed column expression (`$expr.mul`/`$expr.add`/`$expr.sub`/`$expr.div`/`$expr.col`/`$expr.lit`) so you can sum `price * quantity`; bare-string payload is unchanged. Added `$agg.sumRaw(expression)` raw escape hatch (Postgres `SUM(<raw>)`; throws on MongoDB)
+- Column-expression DSL grouped under a single `$expr` object (mirroring `$agg`) — `$expr.col` / `$expr.lit` / `$expr.mul` / `$expr.add` / `$expr.sub` / `$expr.div` / `$expr.raw` — plus `isColumnExpression` / `toColumnExpression` and the `ColumnExpression` / `ColumnExpressionInput` types
+- MongoDB id counter (`MasterMind`) now has a lazily-ensured unique index on `{ collection: 1 }` plus a bounded retry on duplicate-key (E11000), closing the cold-start race where two concurrent first inserts into a new collection could reserve overlapping ids/blocks
+- `$agg.countDistinct(field)` — a cross-driver grouped distinct-count aggregate (Postgres `COUNT(DISTINCT col)`; MongoDB `$addToSet` in `$group` finalized with `$size` in the renaming `$project`)
+- `Model.raw<T>(sql, params)` — typed, transaction-aware raw query that auto-joins the active `transaction()` scope and returns `RawQueryResult<T>`
+- `DataSource.raw<T>(sql, params)` — thin transaction-aware passthrough to `driver.query`
+- Postgres connection option `nativeArrayColumns` — opt out listed columns (`JSONB[]`/`TEXT[]`/…) from JSON-text encoding so genuine native-array columns keep their `{...}` literal form
+
+### Changed
+
+- `DriverContract.query<T>()` is now typed `Promise<RawQueryResult<T>>` (new `rows` + `rowCount` result type) instead of `Promise<any>`
+
+### Fixed
+
+- Postgres `json`/`jsonb` columns no longer corrupt: object-arrays, string-arrays, mixed arrays, empty `[]` (previously stored as `{}`), and plain objects are now JSON-encoded before binding instead of falling through to a Postgres array literal; the same encoding is applied on the UPDATE `$set` path. The pgvector all-number array form is preserved.
+- Insert no longer overwrites a caller-supplied `createdAt` — a backdated value (imports/migrations) is now honored, mirroring the upsert guard, while `updatedAt` is always stamped at persist time
+- Insert validation now whitelists the system columns (`id`/`_id`/timestamps/`deletedAt`) like the update path, so a backdated `createdAt` survives strict `strip`/`fail` mode instead of being dropped before reaching the writer
+- Corrected the MongoDB id-generator docs that falsely claimed the counter write "participates in active transactions" — it is a standalone, immediately-durable write (no transaction session is attached), so a rolled-back insert leaves the consumed id as a gap, exactly like SQL `SERIAL`
+
+## 4.4.0 - 2026-06-21
+
+### Changed
+
+- **Documented `model.uuid`** — the accessor returns the model's primary id as `string` (where `model.id` is `string | number`); the name is historical and performs no UUID validation.
+
+## 4.2.11
+
+### Added
+
+- `Migration.create` auto-wires the `deletedAt` column when the model's delete strategy is `"soft"` (opt out with `{ softDeletes: false }`)
+
+### Changed
+
+- Require `@mongez/reinforcements` ≥ 3.3.0 — the update validator now uses its new `when` helper for conditional schema fields
+
+### Fixed
+
+- Soft `destroy()` now sets `deletedAt` on the in-memory model — the instance was left stale before
+- Update validation no longer strips or rejects the `deletedAt` column under strict mode (now whitelisted like the timestamps)
+
+## 4.2.1
+
+### Fixed
+
+- Ship the `bin` folder so the `cascade` CLI works from the published package — it was omitted from the 4.2.0 build.
+
+## 4.2.0
+
+### Changed
+
+- MongoDB and PostgreSQL drivers now log a failed initial `connect()` at `log.fatal` (was `log.error`) — a boot-time database connection failure is unrecoverable, so `fatal` keeps "page on fatal only" alerting clean. Per-query and disconnect failures stay at `error`.
+
+### Fixed
+
+- PostgreSQL `increment` / `decrement` (and the `*Many` variants) bound the amount as `$1`, colliding with the first filter placeholder (`SET n = n + $1 WHERE id = $1`) so every filtered counter update wrote the wrong number; the amount now binds after the filter params.
+
+## 4.1.15
+
+- Baseline — per-package changelog tracking starts at this version.
