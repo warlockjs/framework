@@ -70,7 +70,7 @@ async function gracefulShutdown() {
 process.once("SIGTERM", gracefulShutdown);
 ```
 
-`log.flush()` fans out to every channel that implements `flush()` and awaits them together (`Promise.allSettled`). Each channel is isolated — one channel's flush rejecting neither aborts the others nor escapes as an unhandled rejection. Channels without `flush()` are skipped.
+`log.flush()` first waits for every async channel delivery still in flight (level methods are fire-and-forget and never return a promise), then fans out to every channel that implements `flush()` and awaits them together (`Promise.allSettled`). Each channel is isolated — one channel's flush rejecting neither aborts the others nor escapes as an unhandled rejection. Channels without `flush()` are skipped.
 
 | | `flushSync()` | `flush()` |
 |---|---|---|

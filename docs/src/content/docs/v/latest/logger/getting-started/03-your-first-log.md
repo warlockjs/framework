@@ -13,7 +13,7 @@ Once a channel is attached, you log through the `log` singleton. Every entry fol
 Every log call takes three positional arguments — **module**, **action**, **message** — plus an optional fourth **context** object for structured data.
 
 ```ts
-await log.info("users", "register", "New user created", { userId: 42 });
+log.info("users", "register", "New user created", { userId: 42 });
 //            ^^^^^^^ ^^^^^^^^^^ ^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
 //            module   action      message               context (optional)
 ```
@@ -22,20 +22,20 @@ The first three let you filter and search logs by feature area instead of wading
 
 ```ts
 // Auth
-await log.info("auth", "login", "User signed in");
-await log.warn("auth", "tokenExpired", "JWT expired for session");
+log.info("auth", "login", "User signed in");
+log.warn("auth", "tokenExpired", "JWT expired for session");
 
 // Payments — message in the 3rd arg, structured data in the 4th (context)
-await log.info("payments", "chargeInitiated", "Charge initiated", { amount: 4999, currency: "USD" });
-await log.error("payments", "chargeFailed", new Error("Stripe declined card"));
+log.info("payments", "chargeInitiated", "Charge initiated", { amount: 4999, currency: "USD" });
+log.error("payments", "chargeFailed", new Error("Stripe declined card"));
 
 // Email
-await log.success("email", "welcomeSent", "Welcome email delivered");
-await log.warn("email", "bounced", "Delivery failed — invalid address");
+log.success("email", "welcomeSent", "Welcome email delivered");
+log.warn("email", "bounced", "Delivery failed — invalid address");
 
 // Orders
-await log.debug("orders", "priceCalculation", "Calculated cart total", { subtotal: 120, discount: 10 });
-await log.success("orders", "fulfillment", "Order shipped via FedEx");
+log.debug("orders", "priceCalculation", "Calculated cart total", { subtotal: 120, discount: 10 });
+log.success("orders", "fulfillment", "Order shipped via FedEx");
 ```
 
 :::tip[Naming style]
@@ -54,12 +54,12 @@ Pick one style and stay consistent — `module` and `action` become searchable k
 | `fatal` | `log.fatal()` | Unrecoverable failures; the app is going down (boot fail, `uncaughtException`) | bright red on red background |
 
 ```ts
-await log.debug("cache", "miss", "Key not found, fetching from DB");
-await log.info("jobs", "queued", "SendInvoice job added to queue");
-await log.warn("api", "rateLimitApproaching", "80% of quota used");
-await log.error("db", "connectionFailed", new Error("ECONNREFUSED 5432"));
-await log.success("payments", "captured", "Payment of $49.99 captured");
-await log.fatal("config", "missingSecret", new Error("STRIPE_KEY is required to boot"));
+log.debug("cache", "miss", "Key not found, fetching from DB");
+log.info("jobs", "queued", "SendInvoice job added to queue");
+log.warn("api", "rateLimitApproaching", "80% of quota used");
+log.error("db", "connectionFailed", new Error("ECONNREFUSED 5432"));
+log.success("payments", "captured", "Payment of $49.99 captured");
+log.fatal("config", "missingSecret", new Error("STRIPE_KEY is required to boot"));
 ```
 
 :::note[`fatal` is a level, not an action]
@@ -72,7 +72,7 @@ To attach arbitrary metadata, pass a fourth `context` argument, or pass a full `
 
 ```ts
 // Fourth argument — context
-await log.info("orders", "checkout", "Order placed", {
+log.info("orders", "checkout", "Order placed", {
   orderId: "ord_9f2a",
   userId: 101,
   amount: 4999,
@@ -107,7 +107,7 @@ Pass an `Error` instance directly as the `message` argument. File and JSON chann
 try {
   await processPayment(orderId);
 } catch (err) {
-  await log.error("payments", "processPayment", err);
+  log.error("payments", "processPayment", err);
 }
 ```
 

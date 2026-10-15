@@ -13,7 +13,7 @@ When a request fans out across services and helpers, you want every line it prod
 Every level method takes structured context as its fourth argument. File and JSON channels persist it alongside the entry:
 
 ```ts
-await log.info("orders", "checkout", "Order placed", {
+log.info("orders", "checkout", "Order placed", {
   requestId: "req_9f2a",
   userId: 101,
   amount: 4999,

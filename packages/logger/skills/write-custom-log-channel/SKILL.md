@@ -185,6 +185,6 @@ Prefer extending `LogChannel` unless you have a concrete reason not to — the l
 ## Don't do
 
 - Don't mutate `data` inside `log()`. Later channels see the mutation if the logger passes the same reference.
-- Don't throw synchronously from `log()`. The logger fires it without awaiting; an unhandled rejection takes down the process (unless `captureAnyUnhandledRejection` is wired up — and then it's embarrassing to be the cause).
+- Don't rely on throwing from `log()` to surface a failure. The logger isolates each channel: a sync throw or a rejected promise from `log()` goes to the logger's `onChannelError` handler (default: one stderr line), never to the caller, the other channels or `unhandledRejection`. Return the promise from an async `log()` so `await log.flush()` can wait for the delivery.
 - Don't block the event loop. `log()` may be sync or async; if your work takes >100ms, make it async and return the promise.
 - Don't forget `shouldBeLogged(data)` at the top of `log()` — or your channel silently ignores `levels` / `filter` config.

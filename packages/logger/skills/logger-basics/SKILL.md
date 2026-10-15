@@ -44,8 +44,8 @@ log.configure({
   autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],
 });
 
-await log.info("users", "register", "New user created");
-await log.error("payments", "charge", new Error("Card declined"));
+log.info("users", "register", "New user created");
+log.error("payments", "charge", new Error("Card declined"));
 ```
 
 ## The six levels
@@ -83,6 +83,6 @@ Every call signature is the same — `module`, `action`, `message`, optional `co
 - Don't set `extension` on `JSONFileLog` — it's hardcoded to `"json"` and your value is silently ignored.
 - Don't register multiple `FileLog` instances with the same `name` in the same `storagePath` — the lookup via `log.channel("file")` returns only one, and they'll fight over the same file.
 - Don't mix `autoFlushOn: ["SIGINT"]` with your own `process.on("SIGINT", ...)` handler — both fire, and ours re-raises mid-way through your async work.
-- Don't `await log.info(...)` expecting the write to be on disk — `FileLog` buffers. Call `log.flushSync()` (or rely on `autoFlushOn`) before the process exits.
+- Don't `await log.info(...)` — level methods return the logger synchronously (fire-and-forget, since 5.30.0), so there is nothing to wait for. The write is not on disk yet either: `FileLog` buffers. Call `await log.flush()` / `log.flushSync()` (or rely on `autoFlushOn`) before the process exits.
 - Don't call `captureAnyUnhandledRejection()` more than once — it re-registers listeners every call and your rejections get logged N times.
 - Don't shadow the import in local code: `for (const log of logEntries) { ... }` will hide the singleton inside that block. Rename loop variables (`entry`, `record`) when working with logger imports.

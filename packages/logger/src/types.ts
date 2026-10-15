@@ -189,6 +189,17 @@ export interface LogContract {
   flushSync?(): void;
 }
 
+/**
+ * Receives a channel's delivery failure: a synchronous throw from its `log()`
+ * or a rejection of the promise it returned. Set with
+ * `Logger.onChannelError()` or `configure({ onChannelError })`.
+ */
+export type ChannelErrorHandler = (
+  error: unknown,
+  channel: LogContract,
+  entry: LoggingData,
+) => void;
+
 export type LoggingData = {
   type: LogLevel;
   module: string;

@@ -3,6 +3,8 @@ import type { LogChannel } from "./log-channel";
 import { applyRedact, mergeRedact } from "./redact";
 import type {
   AutoFlushEvent,
+  ChannelErrorHandler,
+  LogContract,
   LoggingData,
   LogLevel,
   OmittedLoggingData,
@@ -66,6 +68,18 @@ export class Logger {
   private redactConfig?: RedactConfig;
 
   /**
+   * Deliveries still in flight on async channels. `log()` never awaits them;
+   * `flush()` does, so a graceful shutdown still waits for every entry.
+   */
+  private pendingDeliveries = new Set<Promise<void>>();
+
+  /**
+   * Receives a channel's delivery failure (a sync throw or a rejected async
+   * `log()`). Defaults to a single stderr line, never back through the logger.
+   */
+  private channelErrorHandler: ChannelErrorHandler = reportChannelError;
+
+  /**
    * Add a new channel
    */
   public addChannel(channel: LogChannel) {
@@ -82,6 +96,7 @@ export class Logger {
     autoFlushOn?: AutoFlushEvent[];
     minLevel?: LogLevel;
     redact?: RedactConfig;
+    onChannelError?: ChannelErrorHandler;
   }) {
     if (config.channels) {
       this.channels = config.channels;
@@ -99,6 +114,25 @@ export class Logger {
       this.setRedact(config.redact);
     }
 
+    if (config.onChannelError) {
+      this.onChannelError(config.onChannelError);
+    }
+
+    return this;
+  }
+
+  /**
+   * Handle a channel's delivery failure. Logging is fire-and-forget, so a
+   * channel that throws or rejects never reaches the call site and never
+   * becomes an unhandled rejection; it goes to this handler instead. The
+   * default writes one line to stderr. The handler must not log through this
+   * logger (a failing channel would loop).
+   *
+   * @example
+   * log.onChannelError((error, channel) => metrics.increment(`log.${channel.name}.failed`));
+   */
+  public onChannelError(handler: ChannelErrorHandler): this {
+    this.channelErrorHandler = handler;
     return this;
   }
 
@@ -193,8 +227,13 @@ export class Logger {
    * — each channel sees its own shallow clone so one channel cannot observe
    * another's mutations (e.g. a later terminal channel still sees the original
    * colored message).
+   *
+   * Synchronous and fire-and-forget: it returns the logger, not a promise.
+   * Async channel deliveries are tracked and awaited by {@link flush}; a
+   * channel that throws or rejects is isolated from the others and reported
+   * to {@link onChannelError}.
    */
-  public async log(data: LoggingData) {
+  public log(data: LoggingData): this {
     if (this.minLevel && LEVEL_RANK[data.type] < LEVEL_RANK[this.minLevel]) {
       return this;
     }
@@ -220,10 +259,45 @@ export class Logger {
         payload = { ...payload, message: clearMessage(payload.message) };
       }
 
-      channel.log(payload);
+      this.deliver(channel, payload);
     }
 
     return this;
+  }
+
+  /**
+   * Hand one entry to one channel, isolating its failure and tracking an
+   * async delivery until it settles.
+   */
+  private deliver(channel: LogChannel, payload: LoggingData) {
+    let result: void | Promise<void>;
+
+    try {
+      result = channel.log(payload);
+    } catch (error) {
+      this.reportChannelError(error, channel, payload);
+      return;
+    }
+
+    if (!result || typeof (result as Promise<void>).then !== "function") {
+      return;
+    }
+
+    const delivery: Promise<void> = Promise.resolve(result)
+      .catch((error) => this.reportChannelError(error, channel, payload))
+      .finally(() => {
+        this.pendingDeliveries.delete(delivery);
+      });
+
+    this.pendingDeliveries.add(delivery);
+  }
+
+  private reportChannelError(error: unknown, channel: LogChannel, entry: LoggingData) {
+    try {
+      this.channelErrorHandler(error, channel, entry);
+    } catch {
+      // An error handler that throws must not turn logging into a crash.
+    }
   }
 
   /**
@@ -327,7 +401,7 @@ export class Logger {
     action: string,
     message: any,
     context?: Record<string, any>,
-  ): Promise<Logger> | Logger {
+  ): this {
     if (condition) return this;
     return this.error(module, action, message, context);
   }
@@ -345,7 +419,7 @@ export class Logger {
   public timer(
     module: string,
     action: string,
-  ): (extra?: Record<string, any>) => Promise<Logger> {
+  ): (extra?: Record<string, any>) => this {
     const startedAt = Date.now();
     return (extra?: Record<string, any>) => {
       const durationMs = Date.now() - startedAt;
@@ -375,7 +449,8 @@ export class Logger {
   }
 
   /**
-   * Asynchronously drain every channel that implements `flush()`.
+   * Wait for every in-flight async delivery, then drain every channel that
+   * implements `flush()`.
    *
    * Unlike {@link flushSync}, this awaits each channel's async I/O — the
    * correct call for a graceful shutdown that can afford to wait
@@ -395,6 +470,10 @@ export class Logger {
    * }
    */
   public async flush(): Promise<void> {
+    // Deliveries never reject (failures go to the channel error handler);
+    // allSettled is belt and braces.
+    await Promise.allSettled([...this.pendingDeliveries]);
+
     await Promise.allSettled(
       this.channels.map(async (channel) => {
         if (!channel.flush) {
@@ -462,6 +541,21 @@ export class Logger {
     this.autoFlushHandlers.clear();
 
     return this;
+  }
+}
+
+/**
+ * Default {@link ChannelErrorHandler}: one stderr line per failure. Written
+ * directly to the stream, never through a logger, so a broken channel cannot
+ * recurse.
+ */
+function reportChannelError(error: unknown, channel: LogContract) {
+  const reason = error instanceof Error ? error.message : String(error);
+
+  try {
+    process.stderr.write(`[@warlock.js/logger] channel "${channel.name}" failed to log: ${reason}\n`);
+  } catch {
+    // stderr itself is gone; nothing left to report to.
   }
 }
 

@@ -32,9 +32,26 @@ Anything in the buffer when the process terminates without a synchronous flush:
 | Uncaught exception without a handler | **Yes** |
 | `SIGINT` / `SIGTERM` without a handler | **Yes** |
 | OS-level kill (`kill -9`, OOM) | **Yes** — unavoidable |
-| `await log.info(...)` then `process.exit()` | **Yes** — `log.info` resolves once the entry is buffered, not written |
+| `log.info(...)` then `process.exit()` | **Yes** — `log.info` returns as soon as the entry is handed to each channel; it never waits for the write |
 
 The asynchronous 5-second flush provides *eventual* durability while the process is alive. It does not help at shutdown.
+
+## Logging is fire-and-forget
+
+`log.info(...)` and every other level method return the logger synchronously (since 5.30.0), never a promise, so there is nothing to `await` and `no-floating-promises` stays quiet. Async channel deliveries (a `Sentry` send, a custom network channel) are tracked by the logger; `await log.flush()` waits for every one still in flight, then drains each channel's own `flush()`.
+
+A channel that throws or rejects cannot break the caller or the other channels, and never becomes an unhandled rejection. The failure goes to the channel error handler, which writes one line to stderr by default:
+
+```ts
+log.configure({
+  channels: [new ConsoleLog(), new SentryLog({ client })],
+  onChannelError: (error, channel, entry) => {
+    metrics.increment(`log.${channel.name}.failed`);
+  },
+});
+```
+
+The handler must not log through the same logger: a failing channel would loop.
 
 ## Graceful shutdown — the easy way
 

@@ -426,7 +426,7 @@ async function gracefulShutdown() {
 process.once("SIGTERM", gracefulShutdown);
 ```
 
-`log.flush()` fans out to every channel that implements `flush()` and awaits them together (`Promise.allSettled`). Each channel is isolated — one channel's flush rejecting neither aborts the others nor escapes as an unhandled rejection. Channels without `flush()` are skipped.
+`log.flush()` first waits for every async channel delivery still in flight (level methods are fire-and-forget and never return a promise), then fans out to every channel that implements `flush()` and awaits them together (`Promise.allSettled`). Each channel is isolated — one channel's flush rejecting neither aborts the others nor escapes as an unhandled rejection. Channels without `flush()` are skipped.
 
 | | `flushSync()` | `flush()` |
 |---|---|---|
@@ -521,8 +521,8 @@ log.configure({
   autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],
 });
 
-await log.info("users", "register", "New user created");
-await log.error("payments", "charge", new Error("Card declined"));
+log.info("users", "register", "New user created");
+log.error("payments", "charge", new Error("Card declined"));
 ```
 
 ## The six levels
@@ -560,7 +560,7 @@ Every call signature is the same — `module`, `action`, `message`, optional `co
 - Don't set `extension` on `JSONFileLog` — it's hardcoded to `"json"` and your value is silently ignored.
 - Don't register multiple `FileLog` instances with the same `name` in the same `storagePath` — the lookup via `log.channel("file")` returns only one, and they'll fight over the same file.
 - Don't mix `autoFlushOn: ["SIGINT"]` with your own `process.on("SIGINT", ...)` handler — both fire, and ours re-raises mid-way through your async work.
-- Don't `await log.info(...)` expecting the write to be on disk — `FileLog` buffers. Call `log.flushSync()` (or rely on `autoFlushOn`) before the process exits.
+- Don't `await log.info(...)` — level methods return the logger synchronously (fire-and-forget, since 5.30.0), so there is nothing to wait for. The write is not on disk yet either: `FileLog` buffers. Call `await log.flush()` / `log.flushSync()` (or rely on `autoFlushOn`) before the process exits.
 - Don't call `captureAnyUnhandledRejection()` more than once — it re-registers listeners every call and your rejections get logged N times.
 - Don't shadow the import in local code: `for (const log of logEntries) { ... }` will hide the singleton inside that block. Rename loop variables (`entry`, `record`) when working with logger imports.
 
@@ -1544,7 +1544,7 @@ Prefer extending `LogChannel` unless you have a concrete reason not to — the l
 ## Don't do
 
 - Don't mutate `data` inside `log()`. Later channels see the mutation if the logger passes the same reference.
-- Don't throw synchronously from `log()`. The logger fires it without awaiting; an unhandled rejection takes down the process (unless `captureAnyUnhandledRejection` is wired up — and then it's embarrassing to be the cause).
+- Don't rely on throwing from `log()` to surface a failure. The logger isolates each channel: a sync throw or a rejected promise from `log()` goes to the logger's `onChannelError` handler (default: one stderr line), never to the caller, the other channels or `unhandledRejection`. Return the promise from an async `log()` so `await log.flush()` can wait for the delivery.
 - Don't block the event loop. `log()` may be sync or async; if your work takes >100ms, make it async and return the promise.
 - Don't forget `shouldBeLogged(data)` at the top of `log()` — or your channel silently ignores `levels` / `filter` config.
 

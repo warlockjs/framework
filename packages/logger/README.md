@@ -28,8 +28,8 @@ log.setChannels([
   new FileLog({ chunk: "daily" }),
 ]);
 
-await log.info("users", "register", "New user created");
-await log.error("payments", "charge", new Error("Card declined"));
+log.info("users", "register", "New user created");
+log.error("payments", "charge", new Error("Card declined"));
 ```
 
 The logger starts with no channels — nothing is printed or written until you register at least one.
@@ -39,15 +39,15 @@ The logger starts with no channels — nothing is printed or written until you r
 Every call carries three pieces of context. Modules and actions become searchable keys in file and JSON channels:
 
 ```ts
-await log.info("auth", "login", "User signed in");
-await log.warn("api", "rateLimitApproaching", "80% of quota used");
-await log.success("payments", "captured", "Payment of $49.99 captured");
+log.info("auth", "login", "User signed in");
+log.warn("api", "rateLimitApproaching", "80% of quota used");
+log.success("payments", "captured", "Payment of $49.99 captured");
 ```
 
 Pass an object instead of positional args when you need `context` metadata:
 
 ```ts
-await log.error({
+log.error({
   module: "orders",
   action: "checkout",
   message: "Card declined",

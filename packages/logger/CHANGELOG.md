@@ -4,6 +4,25 @@ All notable changes to `@warlock.js/logger` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.30.0
+
+### Upgrading
+
+- **BREAKING (types):** `log.info/warn/error/debug/success/fatal/log/assert` and the function `timer()` returns now return the logger synchronously instead of `Promise<this>`. Remove `await` before log calls (it is harmless but pointless) and any `.then()` chained on one; code that needs the write to finish calls `await log.flush()`.
+
+### Changed
+
+- Logging is fire-and-forget: level methods no longer return a promise, so `@typescript-eslint/no-floating-promises` no longer flags every call site (WR-019).
+- `log.flush()` first waits for every async channel delivery still in flight, then drains each channel's `flush()`.
+
+### Added
+
+- `log.onChannelError(handler)` / `configure({ onChannelError })` and the `ChannelErrorHandler` type: receives a channel's sync throw or async rejection from `log()`. Default: one stderr line.
+
+### Fixed
+
+- A channel whose `log()` rejected became an unhandled rejection (looping through `captureAnyUnhandledRejection`), and one that threw synchronously stopped delivery to the channels after it; both are now isolated and reported to the channel error handler.
+
 ## 5.29.0 - 2026-10-01
 
 ### Changed

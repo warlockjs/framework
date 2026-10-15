@@ -30,19 +30,20 @@ sidebar:
 | --- | --- | --- |
 | `addChannel` | `(channel: LogChannel): this` | Register a new channel. Chainable. |
 | `setChannels` | `(channels: LogChannel[]): this` | Replace the full channel list. |
-| `configure` | `(config: { channels?: LogChannel[]; autoFlushOn?: AutoFlushEvent[]; minLevel?: LogLevel; redact?: RedactConfig }): this` | One-shot setup: channel list, auto-flush handlers, severity floor, redaction floor. Every field optional. |
-| `log` | `(data: LoggingData): Promise<this>` | Pass a fully formed `LoggingData` object through all channels. |
-| `debug` | `(dataOrModule: OmittedLoggingData \| string, action?: string, message?: any, context?: Record<string, any>): Promise<this>` | Log at `debug`. |
-| `info` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at `info`. |
-| `warn` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at `warn`. |
-| `error` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at `error`. |
-| `success` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at `success`. |
-| `fatal` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at `fatal` — unrecoverable failures, app is going down. Does NOT auto-flush or exit. |
-| `assert` | `(condition: unknown, module: string, action: string, message: any, context?: Record<string, any>): Promise<this> \| this` | Log an `error` entry when `condition` is falsy; genuinely free no-op when truthy. |
-| `timer` | `(module: string, action: string): (extra?: Record<string, any>) => Promise<this>` | Start a duration timer. The returned function emits an `info` entry with `completed in <ms>ms` and a `durationMs` field in `context`. |
+| `configure` | `(config: { channels?: LogChannel[]; autoFlushOn?: AutoFlushEvent[]; minLevel?: LogLevel; redact?: RedactConfig; onChannelError?: ChannelErrorHandler }): this` | One-shot setup: channel list, auto-flush handlers, severity floor, redaction floor, channel error handler. Every field optional. |
+| `onChannelError` | `(handler: (error: unknown, channel: LogContract, entry: LoggingData) => void): this` | Receive a channel's sync throw or async rejection. Default: one stderr line. Never log through the same logger from it. |
+| `log` | `(data: LoggingData): this` | Pass a fully formed `LoggingData` object through all channels. Synchronous and fire-and-forget (since 5.30.0): async deliveries are tracked for `flush()`, channel failures go to `onChannelError`. |
+| `debug` | `(dataOrModule: OmittedLoggingData \| string, action?: string, message?: any, context?: Record<string, any>): this` | Log at `debug`. |
+| `info` | `(dataOrModule, action?, message?, context?): this` | Log at `info`. |
+| `warn` | `(dataOrModule, action?, message?, context?): this` | Log at `warn`. |
+| `error` | `(dataOrModule, action?, message?, context?): this` | Log at `error`. |
+| `success` | `(dataOrModule, action?, message?, context?): this` | Log at `success`. |
+| `fatal` | `(dataOrModule, action?, message?, context?): this` | Log at `fatal` — unrecoverable failures, app is going down. Does NOT auto-flush or exit. |
+| `assert` | `(condition: unknown, module: string, action: string, message: any, context?: Record<string, any>): this` | Log an `error` entry when `condition` is falsy; genuinely free no-op when truthy. |
+| `timer` | `(module: string, action: string): (extra?: Record<string, any>) => this` | Start a duration timer. The returned function emits an `info` entry with `completed in <ms>ms` and a `durationMs` field in `context`. |
 | `channel` | `(name: string): LogChannel \| undefined` | Find a registered channel by its `name` property. |
 | `flushSync` | `(): void` | Synchronously invoke `flushSync()` on every channel that implements it. |
-| `flush` | `(): Promise<void>` | Asynchronously `await` `flush()` on every channel that implements it (`Promise.allSettled`, per-channel isolation). The async path for graceful shutdown of network/async channels. |
+| `flush` | `(): Promise<void>` | Wait for every in-flight async delivery, then `await` `flush()` on every channel that implements it (`Promise.allSettled`, per-channel isolation). The async path for graceful shutdown of network/async channels. |
 | `enableAutoFlush` | `(events: AutoFlushEvent[]): this` | Register one process handler per event that flushes before exit. Signals are flushed + re-raised; `beforeExit` is flushed in place. Idempotent — replaces previous handlers. |
 | `disableAutoFlush` | `(): this` | Remove every handler installed by `enableAutoFlush`. Safe with none registered. |
 | `setMinLevel` | `(level: LogLevel \| undefined): this` | Drop entries below `level` before fan-out. `undefined` clears. |
@@ -68,7 +69,7 @@ log
   .addChannel(new FileLog({ storagePath: "./logs", name: "app" }));
 
 // Positional shorthand — (module, action, message, context?)
-await log.info("UserService", "login", "User authenticated");
+log.info("UserService", "login", "User authenticated");
 
 // Full data object — level implied by log.log
 await log.log({

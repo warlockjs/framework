@@ -1065,3 +1065,140 @@ describe("log singleton", () => {
     log.channels = [];
   });
 });
+
+describe("Logger — fire-and-forget delivery", () => {
+  class AsyncChannel extends LogChannel {
+    public name = "async";
+    public terminal = false;
+    public delivered: LoggingData[] = [];
+    public release!: () => void;
+    private gate = new Promise<void>((resolve) => {
+      this.release = resolve;
+    });
+
+    public async log(data: LoggingData) {
+      await this.gate;
+      this.delivered.push(data);
+    }
+  }
+
+  class ThrowingChannel extends LogChannel {
+    public name = "throwing";
+    public terminal = false;
+
+    public log(_data: LoggingData) {
+      throw new Error("sync boom");
+    }
+  }
+
+  class RejectingChannel extends LogChannel {
+    public name = "rejecting";
+    public terminal = false;
+
+    public async log(_data: LoggingData) {
+      throw new Error("async boom");
+    }
+  }
+
+  it("returns the logger synchronously, not a promise", () => {
+    const instance = new Logger().addChannel(new CapturingChannel());
+
+    const results = [
+      instance.debug("m", "a", "x"),
+      instance.info("m", "a", "x"),
+      instance.warn("m", "a", "x"),
+      instance.error("m", "a", "x"),
+      instance.success("m", "a", "x"),
+      instance.fatal("m", "a", "x"),
+      instance.assert(false, "m", "a", "x"),
+      instance.timer("m", "a")(),
+    ];
+
+    for (const result of results) {
+      expect(result).toBe(instance);
+      expect(typeof (result as any).then).toBe("undefined");
+    }
+  });
+
+  it("flush() waits for in-flight async channel deliveries", async () => {
+    const channel = new AsyncChannel();
+    const instance = new Logger().addChannel(channel);
+
+    instance.info("m", "a", "pending");
+    expect(channel.delivered).toHaveLength(0);
+
+    let flushed = false;
+    const flushing = instance.flush().then(() => {
+      flushed = true;
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(flushed).toBe(false);
+
+    channel.release();
+    await flushing;
+
+    expect(flushed).toBe(true);
+    expect(channel.delivered).toHaveLength(1);
+  });
+
+  it("isolates a synchronously throwing channel from the others and the caller", () => {
+    const after = new CapturingChannel();
+    const onChannelError = vi.fn();
+    const instance = new Logger()
+      .configure({ onChannelError })
+      .addChannel(new ThrowingChannel())
+      .addChannel(after);
+
+    expect(() => instance.error("m", "a", "x")).not.toThrow();
+    expect(after.received).toHaveLength(1);
+    expect(onChannelError).toHaveBeenCalledTimes(1);
+    expect(onChannelError.mock.calls[0]![0]).toBeInstanceOf(Error);
+    expect(onChannelError.mock.calls[0]![1].name).toBe("throwing");
+    expect(onChannelError.mock.calls[0]![2].message).toBe("x");
+  });
+
+  it("routes an async rejection to the handler instead of an unhandled rejection", async () => {
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+
+    try {
+      const onChannelError = vi.fn();
+      const instance = new Logger()
+        .onChannelError(onChannelError)
+        .addChannel(new RejectingChannel());
+
+      instance.info("m", "a", "x");
+      await instance.flush();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+
+      expect(onChannelError).toHaveBeenCalledTimes(1);
+      expect((onChannelError.mock.calls[0]![0] as Error).message).toBe("async boom");
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off("unhandledRejection", unhandled);
+    }
+  });
+
+  it("reports to stderr by default and survives a throwing handler", async () => {
+    const write = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    try {
+      const instance = new Logger().addChannel(new RejectingChannel());
+      instance.info("m", "a", "x");
+      await instance.flush();
+
+      expect(write).toHaveBeenCalledWith(
+        expect.stringContaining('channel "rejecting" failed to log: async boom'),
+      );
+
+      instance.onChannelError(() => {
+        throw new Error("handler boom");
+      });
+      instance.info("m", "a", "x");
+      await expect(instance.flush()).resolves.toBeUndefined();
+    } finally {
+      write.mockRestore();
+    }
+  });
+});

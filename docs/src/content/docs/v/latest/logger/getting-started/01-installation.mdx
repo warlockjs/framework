@@ -19,15 +19,15 @@ import { log, ConsoleLog } from "@warlock.js/logger";
 log.addChannel(new ConsoleLog());
 
 // 2. Log with a module, an action, a message, and optional structured context.
-await log.info("users", "register", "New account created", { userId: 42 });
-await log.warn("auth", "login", "Password attempt failed", { attempts: 3 });
-await log.success("billing", "charge", "Payment captured", { amount: 4999 });
+log.info("users", "register", "New account created", { userId: 42 });
+log.warn("auth", "login", "Password attempt failed", { attempts: 3 });
+log.success("billing", "charge", "Payment captured", { amount: 4999 });
 
 // 3. Pass an Error straight through — file channels keep the full stack.
 try {
   throw new Error("Stripe declined the card");
 } catch (error) {
-  await log.error("billing", "charge", error);
+  log.error("billing", "charge", error);
 }
 ```
 
@@ -73,7 +73,7 @@ import { log, ConsoleLog } from "@warlock.js/logger";
 
 log.addChannel(new ConsoleLog());
 
-await log.info("users", "register", "New user created successfully");
+log.info("users", "register", "New user created successfully");
 ```
 
 Three lines of setup, then you're logging. Adding channels is covered in full on the [Configuration](./02-configuration/) page.

@@ -85,7 +85,7 @@ It inherits every `FileLog` option and supports the same chunking, rotation, and
 The channel does **not** tag class instances with their class name. If you need a specific shape, pre-shape the value before passing it to `context`:
 
 ```ts
-await log.error("orders", "checkout", "Card declined", {
+log.error("orders", "checkout", "Card declined", {
   order: { id: order.id, status: order.status }, // not the full Order instance
   declineReason,
 });
