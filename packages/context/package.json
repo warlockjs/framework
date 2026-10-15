@@ -1,0 +1,41 @@
+{
+  "name": "@warlock.js/context",
+  "version": "5.29.0",
+  "type": "module",
+  "description": "A simple and unified way to share context using AsyncLocalStorage for the Warlock.js framework",
+  "keywords": [
+    "warlock",
+    "warlockjs",
+    "context",
+    "async-local-storage",
+    "asynclocalstorage",
+    "async-context",
+    "request-context",
+    "nodejs"
+  ],
+  "author": "hassanzohdy",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/warlockjs/context.git"
+  },
+  "bugs": {
+    "url": "https://github.com/warlockjs/context/issues"
+  },
+  "homepage": "https://github.com/warlockjs/context#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "4.1.10",
+    "typescript": "^5.9.3"
+  },
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "typings": "./src/index.ts",
+  "packageManager": "pnpm@11.24.0"
+}
