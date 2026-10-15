@@ -8,7 +8,7 @@
 
 ---
 name: setup-anthropic
-description: 'Wire @warlock.js/ai-anthropic — new AnthropicSDK({apiKey, baseURL?, provider?}) for Claude, .model({name, vision?, structuredOutput?, reasoning?, thinkingMode?, promptCaching?, maxTokens?}). System-prompt hoisting, max_tokens required (default 4096), extended thinking via options.reasoning → adaptive thinking + output_config.effort (current/unknown models) or budget_tokens (Haiku 4.5, 4.6 and older; override with thinkingMode), prompt caching via promptCaching + options.cacheControl, cost-truth usage (cachedTokens/cacheWriteTokens), no first-party embeddings. Triggers: `AnthropicSDK`, `anthropic.model`, `anthropic.count`, `maxTokens`, `reasoning`, `thinking`, `budget_tokens`, `thinkingMode`, `adaptive`, `cacheControl`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-7`; "wire claude into warlock agent", "configure anthropic provider", "use claude sonnet", "anthropic gateway baseURL", "claude extended thinking", "anthropic prompt caching cost"; typical import `import { AnthropicSDK } from "@warlock.js/ai-anthropic"`. Skip: embeddings — the `setup-openai` topic of the `warlock-js-ai-openai` skill; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `@anthropic-ai/sdk`; Vercel `@ai-sdk/anthropic`.'
+description: 'Wire @warlock.js/ai-anthropic — new AnthropicSDK({apiKey, baseURL?, provider?}) for Claude, .model({name, vision?, structuredOutput?, reasoning?, thinkingMode?, promptCaching?, maxTokens?}). System-prompt hoisting, max_tokens required (default 4096), extended thinking via options.reasoning → adaptive thinking + output_config.effort (current/unknown models) or budget_tokens (Haiku 4.5, 4.6 and older; override with thinkingMode), prompt caching via promptCaching + options.cacheControl (per-call ttl), provider blocks (thinking/compaction) replayed verbatim via ModelResponse.blocks / Message.blocks, providerOptions.anthropic (betas, body fields such as context_management / fallbacks, thinkingDisplay), model.countTokens(), distinct finish reasons (pause_turn, refusal, context_exceeded), cost-truth usage (cachedTokens/cacheWriteTokens), no first-party embeddings. Triggers: `AnthropicSDK`, `anthropic.model`, `anthropic.count`, `maxTokens`, `reasoning`, `thinking`, `budget_tokens`, `thinkingMode`, `adaptive`, `cacheControl`, `providerOptions`, `blocks`, `countTokens`, `pause_turn`, `refusal`, `context_management`, `compaction`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-7`; "wire claude into warlock agent", "configure anthropic provider", "use claude sonnet", "anthropic gateway baseURL", "claude extended thinking", "anthropic prompt caching cost"; typical import `import { AnthropicSDK } from "@warlock.js/ai-anthropic"`. Skip: embeddings — the `setup-openai` topic of the `warlock-js-ai-openai` skill; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `@anthropic-ai/sdk`; Vercel `@ai-sdk/anthropic`.'
 ---
 
 # `@warlock.js/ai-anthropic`
@@ -101,7 +101,7 @@ Anthropic has no `"system"` role inside `messages`. The adapter hoists every neu
 
 - Outgoing: vendor-neutral tools → Anthropic `tools` with `input_schema` (non-object schemas degrade to a parameterless object so registration never fails).
 - Assistant tool calls in history → `assistant` message with an optional leading `text` block + one `tool_use` block per call.
-- Tool results (`role: "tool"`) → a `user` turn carrying a single `tool_result` block keyed by `tool_use_id`.
+- Tool results (`role: "tool"`) → `tool_result` blocks keyed by `tool_use_id`. Consecutive tool messages (the results of one parallel tool-use turn) are grouped into **one** `user` turn, as Anthropic expects.
 - Response `tool_use` blocks → neutral `toolCalls`; `stop_reason: "tool_use"` → `finishReason: "tool_calls"`.
 
 ## Structured output
@@ -121,7 +121,7 @@ Adaptive models reject `budget_tokens` with a 400, so the shape matters.
 
 - **Adaptive:** `reasoning.effort` (`"low" | "medium" | "high"`) → `output_config.effort` of the same name. With only `reasoning.maxTokens` set, effort is `"medium"`; `maxTokens` then only sizes the reserved `max_tokens` room, it is not sent as a budget.
 - **Budget:** `reasoning.maxTokens` → `budget_tokens` verbatim; `reasoning.effort` → a tiered budget (`1024` / `4096` / `12000`) when no `maxTokens` is given. Any resolved budget is floored at Anthropic's `1024` minimum.
-- `reasoning` with neither `effort` nor `maxTokens`, or `effort: "none"`, emits nothing.
+- `reasoning` with neither `effort` nor `maxTokens`, or `effort: "none"`, emits nothing — except `effort: "none"` on Claude Sonnet 5.5, which sends `thinking: { type: "between_tools" }` (see below).
 
 ### `thinkingMode` override
 
@@ -152,7 +152,57 @@ await model.complete(messages, { reasoning: { maxTokens: 8000 } });
 // adaptive model: effort "medium"; budget model: budget_tokens 8000
 ```
 
-When a thinking-enabled response also makes tool calls, its signed `thinking` and `redacted_thinking` blocks are retained in each call's `providerMetadata.anthropic.thinkingBlocks`. The adapter replays those opaque blocks automatically on the next assistant turn, preserving Anthropic's required signatures; application code should leave that metadata intact when persisting message history.
+**Claude 5 family (Opus 5.5, Sonnet 5.5, Fable 5 / 5.1):** thinking is always on. These models reject `thinking: { type: "disabled" }` and `budget_tokens` with a 400, so the adapter never sends either: they are adaptive and `reasoning.maxTokens` only sizes `max_tokens`. `effort: "none"` is mapped per model:
+
+| Model | `effort: "none"` sends | Result |
+| --- | --- | --- |
+| Sonnet 5.5 | `thinking: { type: "between_tools" }`, alone (no `output_config.effort`, no `display`) | Thinking off. `between_tools` takes no other field and needs effort `high` or below; the model default, `high`, applies. |
+| Opus 5.5, Fable 5 / 5.1 | no `thinking` field | No thinking-off form exists, so the model still thinks at its default effort (Opus 5.5: `medium`). Pass `effort: "low"` to think less. |
+
+`thinkingDisplay` is applied only to adaptive thinking, never beside `between_tools`.
+
+`thinking.display` is set with `providerOptions.anthropic.thinkingDisplay` (`"summarized"` for readable summaries; the 5-family default is `"omitted"`, empty thinking text). It is applied whenever the adapter sends `thinking` to an adaptive model, so pair it with a `reasoning` option.
+
+When a thinking-enabled response also makes tool calls, its signed `thinking` and `redacted_thinking` blocks are retained in each call's `providerMetadata.anthropic.thinkingBlocks` and replayed on the next assistant turn. The full turn is also returned as `ModelResponse.blocks` — see [Provider blocks](#provider-blocks-thinking-compaction-server-tools).
+
+## Provider blocks (thinking, compaction, server tools)
+
+When a response contains a block the neutral `content` / `toolCalls` cannot carry (thinking, redacted thinking, `compaction`, server-tool use/results, cited text), the adapter returns the whole ordered turn as `ModelResponse.blocks` (and on the streaming `done` chunk): `{ provider: "anthropic", type, data }` per block. Plain text / tool-use turns have no `blocks`.
+
+The agent copies them onto the assistant `Message.blocks` (tool-call trips, `pause_turn` trips, repair turns), onto `LLMTrip.blocks`, and the final trip's onto `AgentResult.blocks`. On the next request the adapter replays an assistant message **verbatim** from its `blocks` — required for preserved thinking and server-side compaction. It falls back to rebuilding from `content` + `toolCalls` when the blocks come from another provider or their `tool_use` ids no longer match `toolCalls`.
+
+```ts
+const result = await agent.execute(input);
+
+// Keep your own transcript? Store the blocks with the reply.
+history.push({ role: "assistant", content: result.text ?? "", blocks: result.blocks });
+```
+
+## Provider options (`providerOptions.anthropic`)
+
+Anthropic-only request options, per call or in the agent's `modelOptions`. Other adapters ignore the key. Type: `AnthropicCallOptions`.
+
+| Field             | Effect                                                                                                                                       |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `betas`           | Beta flags. When non-empty the request goes through `client.beta.messages` (needed for beta body fields and beta blocks such as `compaction`). |
+| `body`            | Extra body fields merged **last** (caller wins): `context_management`, `fallbacks`, `inference_geo`, `tool_choice`, … Not validated.          |
+| `thinkingDisplay` | `thinking.display` on adaptive models: `"summarized"`, `"omitted"`, `"updates"` (the last needs its beta).                                     |
+
+```ts
+const agent = ai.agent({
+  model: anthropic.model({ name: "claude-opus-5-5" }),
+  modelOptions: {
+    providerOptions: {
+      anthropic: {
+        betas: ["compact-2026-01-12"],
+        body: { context_management: { edits: [{ type: "compact_20260112" }] } },
+      },
+    },
+  },
+});
+```
+
+Cache TTL per call: `options.cacheControl.ttl` (`"5m"` | `"1h"`) overrides the model's `promptCacheTtl` for that call.
 
 ## Prompt caching (`cache_control`)
 
@@ -190,11 +240,14 @@ await agent.execute("…", { cacheControl: { breakpoints: 1 } }); // cache the s
 
 - `content_block_delta` text → `{ type: "delta", content }`
 - `tool_use` blocks accumulate `input_json_delta` fragments and emit one consolidated `{ type: "tool-call", ... }` at `content_block_stop` (no partial-arg `{}` artifact — input is parsed once, whole)
-- terminal `{ type: "done", finishReason, usage }` — `usage.input` from `message_start`, `usage.output` from `message_delta`, `total` computed; `cachedTokens` / `cacheWriteTokens` from `message_start` then the cumulative `message_delta` counts (see [Tokens & usage accounting](#tokens--usage-accounting))
+- every content block is also assembled by index (text, thinking + signature, server-tool input, beta `compaction_delta`) and returned as `done.blocks` when the turn has a non-neutral block
+- terminal `{ type: "done", finishReason, usage, blocks? }` — `usage.input` from `message_start`, `usage.output` from `message_delta`, `total` computed; `cachedTokens` / `cacheWriteTokens` from `message_start` then the cumulative `message_delta` counts (see [Tokens & usage accounting](#tokens--usage-accounting))
 
 ## Finish-reason mapping
 
-`end_turn` / `stop_sequence` → `stop` · `max_tokens` → `length` · `tool_use` → `tool_calls` · `refusal` / `pause_turn` / unknown / null → `error`.
+`end_turn` / `stop_sequence` / beta `compaction` → `stop` · `max_tokens` → `length` · `model_context_window_exceeded` → `context_exceeded` · `pause_turn` → `pause_turn` · `refusal` → `refusal` · `tool_use` → `tool_calls` · unknown / null → `error`.
+
+The agent resumes `pause_turn` automatically (it replays the paused turn and calls again, within `maxTrips`). `refusal` and `context_exceeded` end the run like `stop`; check `report.trips.at(-1).finishReason` to fall back to another model or compact the history.
 
 ## Errors
 
@@ -211,7 +264,12 @@ Raw SDK errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy. 
 
 ```ts
 await anthropic.count("some text"); // approximate heuristic, offline
+
+const model = anthropic.model({ name: "claude-opus-5-5" }); // an AnthropicModel
+await model.countTokens(messages, { tools }); // exact, via messages.countTokens (network)
 ```
+
+`countTokens` sends the same system prompt, tools, thinking and `providerOptions.anthropic.betas` a real call would, keeping only the fields the endpoint accepts.
 
 ## No embeddings
 

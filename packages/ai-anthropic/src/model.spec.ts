@@ -493,7 +493,7 @@ describe("AnthropicModel.complete()", () => {
     expect(result.finishReason).toBe("length");
   });
 
-  it("maps model_context_window_exceeded stop_reason to the 'length' finish reason", async () => {
+  it("maps model_context_window_exceeded stop_reason to the 'context_exceeded' finish reason", async () => {
     const { client } = makeFakeClient({
       message: message({ stop_reason: "model_context_window_exceeded" }),
     });
@@ -501,7 +501,7 @@ describe("AnthropicModel.complete()", () => {
 
     const result = await model.complete([{ role: "user", content: "hi" }]);
 
-    expect(result.finishReason).toBe("length");
+    expect(result.finishReason).toBe("context_exceeded");
   });
 
   it("maps an unknown/null stop_reason to the 'error' finish reason", async () => {

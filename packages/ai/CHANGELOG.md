@@ -4,6 +4,26 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.30.0
+
+### Upgrading
+
+- **The tool calls of one trip now run concurrently.** Results still reach the model in request order. Tools that share mutable state can keep the old behaviour with `ai.agent({ toolDispatch: "sequential" })` (or per call).
+- `FinishReason` gained `context_exceeded`, `pause_turn` and `refusal`. Code that switches exhaustively over it needs the new cases; adapters now report these instead of `length` / `error`.
+
+### Added
+
+- **Provider content blocks**: `ProviderContentBlock` (`{ provider, type, data }`) on `ModelResponse.blocks`, the streaming `done` chunk, `Message.blocks`, `CapturedMessage.blocks`, `LLMTrip.blocks` and `AgentResult.blocks`. The agent copies a response's blocks onto the assistant turn so the adapter can replay it verbatim (thinking, compaction) (WR-022).
+- `FinishReason` values `context_exceeded`, `pause_turn` and `refusal`. The agent resumes a `pause_turn` by replaying the paused turn, within `maxTrips` (WR-023).
+- `toolDispatch: "concurrent" | "sequential"` on `AgentConfig` and `AgentExecuteOptions` (`ToolDispatchMode`), concurrent by default (WR-024).
+- `ModelCallOptions.providerOptions` (adapter-only options keyed by wire format) and `cacheControl.ttl` (`"5m" | "1h"`) (WR-025).
+- `MockModelResponse.blocks` for scripting provider blocks in tests.
+
+### Fixed
+
+- The semantic cache no longer stores a paused (`pause_turn`) turn as a final answer.
+- VCR request hashes include `providerOptions`, so two calls that differ only in provider options (betas, `context_management`, …) no longer replay the same recording. It joins the hash only when a provider entry is set, so existing cassettes recorded without it still match. `cacheControl` (breakpoints, `ttl`) stays out of the hash: it changes billing, not output (WR-025).
+
 ## 5.29.0 - 2026-10-01
 
 ### Changed

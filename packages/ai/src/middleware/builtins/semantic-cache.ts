@@ -371,8 +371,9 @@ export function semanticCache(options: SemanticCacheOptions): AgentMiddleware {
         // (the one that actually finishes with `stop`) can read it
         // and write the final response under the *original* trip-0
         // prompt key. Deleting here would orphan the pending and the
-        // post-tool answer would never make it into the store.
-        if (response.finishReason === "tool_calls") {
+        // post-tool answer would never make it into the store. A paused
+        // turn (`pause_turn`) is mid-turn the same way: the agent resumes it.
+        if (response.finishReason === "tool_calls" || response.finishReason === "pause_turn") {
           return;
         }
 

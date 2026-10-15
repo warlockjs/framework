@@ -1,4 +1,5 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
+import type { ToolDispatchMode } from "../contracts/agent/agent-options.type";
 import type { AgentSnapshot } from "../contracts/agent/agent-snapshot.type";
 import type { AttachmentPolicy } from "../contracts/attachment-policy.type";
 import type { CompleteEvent } from "../contracts/events/complete-event.type";
@@ -208,6 +209,13 @@ export type AgentConfig<TOutput = unknown> = {
    * tier.
    */
   streamingToolGuard?: StreamingToolGuardConfig;
+  /**
+   * How the tool calls of one trip are dispatched: `"concurrent"`
+   * (default — all calls of the trip run at once) or `"sequential"`
+   * (each awaited before the next). Results reach the model in request
+   * order either way. Per-call `AgentExecuteOptions.toolDispatch` wins.
+   */
+  toolDispatch?: ToolDispatchMode;
   /**
    * Per-trip usage callback. Fires once after every LLM round-trip
    * (initial trip, continuation trips after tool results, repair

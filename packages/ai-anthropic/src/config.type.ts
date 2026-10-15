@@ -92,7 +92,8 @@ export type AnthropicModelConfig = ModelConfig & {
    * Lifetime for prompt-cache entries emitted by `promptCaching` and
    * explicit `cacheControl.breakpoints`. Omit for Anthropic's default
    * five-minute TTL; use `"1h"` only when its higher write cost is worth
-   * retaining a stable prefix for longer.
+   * retaining a stable prefix for longer. A per-call
+   * `ModelCallOptions.cacheControl.ttl` overrides it for that call.
    */
   promptCacheTtl?: "5m" | "1h";
   /**
@@ -123,4 +124,66 @@ export type AnthropicModelConfig = ModelConfig & {
    * anthropic.model({ name: "my-gateway/haiku", thinkingMode: "budget" });
    */
   thinkingMode?: AnthropicThinkingMode;
+};
+
+/**
+ * Anthropic-only request options, passed per call (or through the agent's
+ * `modelOptions`) as `providerOptions.anthropic`. Other adapters ignore
+ * this key, so the same options object is safe in a cross-provider
+ * fallback chain.
+ *
+ * @example
+ * // Server-side compaction (beta) on a long-running agent.
+ * const agent = ai.agent({
+ *   model: anthropic.model({ name: "claude-opus-5-5" }),
+ *   modelOptions: {
+ *     providerOptions: {
+ *       anthropic: {
+ *         betas: ["compact-2026-01-12"],
+ *         body: { context_management: { edits: [{ type: "compact_20260112" }] } },
+ *       },
+ *     },
+ *   },
+ * });
+ *
+ * @example
+ * // Readable thinking summaries plus the refusal fallback.
+ * await model.complete(messages, {
+ *   reasoning: { effort: "high" },
+ *   providerOptions: {
+ *     anthropic: {
+ *       thinkingDisplay: "summarized",
+ *       betas: ["server-side-fallback-2026-07-01"],
+ *       body: { fallbacks: "default" },
+ *     },
+ *   },
+ * });
+ */
+export type AnthropicCallOptions = {
+  /**
+   * Beta flags (`anthropic-beta` header values). When non-empty the
+   * request goes through the SDK's `client.beta.messages` endpoint, which
+   * accepts the beta-only body fields (`context_management`, `fallbacks`,
+   * `speed`, …) and returns beta-only blocks such as `compaction`.
+   */
+  betas?: string[];
+  /**
+   * Extra Messages API body fields, merged last over the adapter-built
+   * body — e.g. `context_management`, `fallbacks`, `inference_geo`,
+   * `tool_choice`, `metadata`. Sent as-is: the adapter does not validate
+   * them, so a field the endpoint or model rejects surfaces as the
+   * provider's 400.
+   */
+  body?: Record<string, unknown>;
+  /**
+   * `thinking.display` for adaptive-thinking models: `"summarized"`
+   * returns readable thinking summaries, `"omitted"` (the API default on
+   * Claude 5-family models) returns empty thinking text, `"updates"`
+   * returns between-tool progress notes (needs the
+   * `thinking-display-updates-2026-08-18` beta). Applied whenever the
+   * adapter sends `thinking` to an adaptive-mode model — i.e. alongside a
+   * `reasoning` option (on Claude 5-family models, `reasoning: { effort }`
+   * is enough). Ignored on budget-mode models.
+   */
+  thinkingDisplay?: "summarized" | "omitted" | "updates";
 };

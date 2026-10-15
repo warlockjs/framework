@@ -2,6 +2,7 @@ import type { FinishReason } from "../contracts/finish-reason.type";
 import type { ImageModelPricing } from "../contracts/image-model.contract";
 import type { ModelToolCallRequest } from "../contracts/model-tool-call-request.type";
 import type { ModelCapabilities } from "../contracts/model.contract";
+import type { ProviderContentBlock } from "../contracts/provider-content-block.type";
 import type { ModelPricing } from "../contracts/result/model-pricing.type";
 import type { SpeechModelPricing } from "../contracts/speech-model.contract";
 import type { TranscriptionModelPricing } from "../contracts/transcription-model.contract";
@@ -45,6 +46,8 @@ export type MockModelResponse = {
   finishReason?: FinishReason;
   usage?: MockUsage;
   toolCalls?: ModelToolCallRequest[];
+  /** Raw provider blocks to return as `ModelResponse.blocks` (and on the stream's `done` chunk). */
+  blocks?: ProviderContentBlock[];
   /**
    * Exact chunk boundaries `stream()` should emit for `content`.
    * Omitted = the mock splits `content` on whitespace. Use this when a

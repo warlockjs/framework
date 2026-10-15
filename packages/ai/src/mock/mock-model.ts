@@ -110,6 +110,7 @@ export class MockModel implements ModelContract {
           : {}),
       },
       toolCalls: mock.toolCalls,
+      ...(mock.blocks ? { blocks: mock.blocks } : {}),
     };
   }
 
@@ -182,6 +183,7 @@ export class MockModel implements ModelContract {
       type: "done",
       finishReason: response.finishReason,
       usage: response.usage,
+      ...(response.blocks ? { blocks: response.blocks } : {}),
     };
   }
 

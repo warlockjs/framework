@@ -73,10 +73,12 @@ export type VcrOptions = {
   mode?: VcrMode;
   /**
    * Fields of `ModelCallOptions` to include in the request hash. Default
-   * `["temperature","maxTokens","responseSchema","tools","reasoning"]`.
-   * `signal` and unknown provider keys are always excluded so an
-   * otherwise-identical logical call still matches. `tools` are hashed by
-   * name + description + input-schema shape, not object identity.
+   * `["temperature","maxTokens","responseSchema","tools","reasoning","providerOptions"]`.
+   * `providerOptions` joins the hash only when a provider entry is set, so
+   * recordings made without it keep their hashes. `signal`, `cacheControl`
+   * and unknown top-level keys are excluded so an otherwise-identical
+   * logical call still matches. `tools` are hashed by name + description +
+   * input-schema shape, not object identity.
    */
   hashOptions?: string[];
   /**

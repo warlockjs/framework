@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { acceptsTemperature, inferThinkingMode } from "./thinking-mode";
+import { acceptsBetweenTools, acceptsTemperature, inferThinkingMode } from "./thinking-mode";
 
 describe("inferThinkingMode", () => {
   it("returns 'adaptive' for the models that reject budget_tokens", () => {
@@ -70,5 +70,36 @@ describe("acceptsTemperature", () => {
   it("is true only for budget-mode models", () => {
     expect(acceptsTemperature("budget")).toBe(true);
     expect(acceptsTemperature("adaptive")).toBe(false);
+  });
+});
+
+describe("acceptsBetweenTools", () => {
+  it("is true for Claude Sonnet 5.5 ids, dated, tagged or platform-prefixed", () => {
+    for (const name of [
+      "claude-sonnet-5-5",
+      "Claude-Sonnet-5-5",
+      "claude-sonnet-5-5-20260901",
+      "claude-sonnet-5-5-latest",
+      "claude-sonnet-5-5@20260901",
+      "anthropic.claude-sonnet-5-5",
+    ]) {
+      expect(acceptsBetweenTools(name), name).toBe(true);
+    }
+  });
+
+  it("is false for every model without a documented between_tools form", () => {
+    for (const name of [
+      "claude-opus-5-5",
+      "claude-fable-5-1",
+      "claude-fable-5",
+      "claude-opus-5",
+      "claude-sonnet-5",
+      "claude-sonnet-5-6",
+      "claude-haiku-5-5",
+      "claude-haiku-4-5",
+      "claude-some-future-model",
+    ]) {
+      expect(acceptsBetweenTools(name), name).toBe(false);
+    }
   });
 });

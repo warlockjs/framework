@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { ModelContract, ModelPricing, SDKAdapterContract } from "@warlock.js/ai";
+import type { ModelPricing, SDKAdapterContract } from "@warlock.js/ai";
 import { approximateTokenCount } from "@warlock.js/ai";
 import type { AnthropicModelConfig, AnthropicSDKConfig } from "./config.type";
 import { AnthropicModel } from "./model";
@@ -67,7 +67,7 @@ export class AnthropicSDK implements SDKAdapterContract {
    * SDK-level registry entry keyed by `config.name`; otherwise
    * `undefined` (no cost computed).
    */
-  public model(config: AnthropicModelConfig): ModelContract {
+  public model(config: AnthropicModelConfig): AnthropicModel {
     const resolvedPricing = config.pricing ?? this.pricing?.[config.name];
     const resolvedConfig: AnthropicModelConfig =
       resolvedPricing === config.pricing ? config : { ...config, pricing: resolvedPricing };
@@ -79,9 +79,9 @@ export class AnthropicSDK implements SDKAdapterContract {
    * Rough token-count estimate for a given text. Uses the
    * character-heuristic (`approximateTokenCount`) from the core package
    * — good enough for budgeting and quota guards, not for billing.
-   * Anthropic does expose a `messages.countTokens` endpoint, but that
-   * is a network round-trip; `count()` is intentionally offline and
-   * synchronous-cost. The optional model id is reserved for future
+   * For an exact count use `AnthropicModel.countTokens()`, which calls
+   * Anthropic's `messages.countTokens` endpoint (a network round-trip);
+   * `count()` is intentionally offline and synchronous-cost. The optional model id is reserved for future
    * per-model tokenizer dispatch; currently ignored.
    */
   public async count(text: string, _model?: string): Promise<number> {

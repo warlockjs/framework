@@ -13,10 +13,21 @@ import {
 } from "@warlock.js/ai";
 import { log, type Logger } from "@warlock.js/logger";
 import type Anthropic from "@anthropic-ai/sdk";
-import type { AnthropicModelConfig } from "./config.type";
+import type { AnthropicCallOptions, AnthropicModelConfig } from "./config.type";
 import { inferVisionCapability } from "./known-vision-models";
-import { acceptsTemperature, inferThinkingMode, type AnthropicThinkingMode } from "./thinking-mode";
-import { mapStopReason, toAnthropicMessages, toAnthropicTools, wrapAnthropicError } from "./utils";
+import {
+  acceptsBetweenTools,
+  acceptsTemperature,
+  inferThinkingMode,
+  type AnthropicThinkingMode,
+} from "./thinking-mode";
+import {
+  mapStopReason,
+  toAnthropicMessages,
+  toAnthropicTools,
+  toProviderBlocks,
+  wrapAnthropicError,
+} from "./utils";
 
 const LOG_MODULE = "ai.anthropic";
 
@@ -91,6 +102,22 @@ const EFFORT_TO_OUTPUT_EFFORT: Record<
 };
 
 type AnthropicThinkingBlock = Anthropic.ThinkingBlock | Anthropic.RedactedThinkingBlock;
+
+/**
+ * The SDK's `messages.create` (or `beta.messages.create`) seen through a
+ * loose signature: provider-option body fields and beta flags are merged
+ * in untyped, and the response is narrowed by the caller.
+ */
+type LooseCreate = (
+  body: Record<string, unknown>,
+  options?: { signal?: AbortSignal },
+) => Promise<unknown>;
+
+/** Content-block types whose input arrives as `input_json_delta` while streaming. */
+const STREAMED_INPUT_BLOCK_TYPES = new Set(["tool_use", "server_tool_use", "mcp_tool_use"]);
+
+/** One content block being assembled from stream events. */
+type StreamedBlock = { block: Record<string, unknown>; json?: string };
 
 /**
  * Resolved thinking settings for one request.
@@ -209,10 +236,11 @@ export class AnthropicModel implements ModelContract {
     let response: Anthropic.Message;
 
     try {
-      response = await this.client.messages.create(
-        { ...this.buildParams(messages, options), stream: false },
-        options?.signal ? { signal: options.signal } : undefined,
-      );
+      response = (await this.send(
+        { ...this.buildBody(messages, options), stream: false },
+        options,
+        "create",
+      )) as Anthropic.Message;
     } catch (thrown) {
       throw this.logAndWrap(thrown);
     }
@@ -220,6 +248,7 @@ export class AnthropicModel implements ModelContract {
     const finishReason = mapStopReason(response.stop_reason);
     const usage = this.extractUsage(response.usage);
     const toolCalls = this.extractToolCalls(response.content);
+    const blocks = toProviderBlocks(response.content);
 
     this.logger.debug(LOG_MODULE, "response", "call to messages.create succeeded", {
       finishReason,
@@ -231,7 +260,40 @@ export class AnthropicModel implements ModelContract {
       finishReason,
       usage,
       toolCalls,
+      ...(blocks ? { blocks } : {}),
     };
+  }
+
+  /**
+   * Count the input tokens a request would use, through Anthropic's
+   * `messages.countTokens` endpoint (a network call; no tokens are
+   * generated or billed as output). Takes the same messages and options
+   * as `complete()` — system prompt, tools, thinking and
+   * `providerOptions.anthropic.betas` are counted exactly as they would be
+   * sent. For an offline estimate use `AnthropicSDK.count()`.
+   *
+   * @example
+   * const tokens = await model.countTokens(messages, { tools });
+   */
+  public async countTokens(messages: Message[], options?: ModelCallOptions): Promise<number> {
+    const body = this.buildBody(messages, options);
+    const countBody: Record<string, unknown> = {};
+
+    for (const key of COUNT_TOKENS_FIELDS) {
+      if (body[key] !== undefined) {
+        countBody[key] = body[key];
+      }
+    }
+
+    try {
+      const result = (await this.send(countBody, options, "countTokens")) as {
+        input_tokens: number;
+      };
+
+      return result.input_tokens;
+    } catch (thrown) {
+      throw this.logAndWrap(thrown);
+    }
   }
 
   /**
@@ -252,13 +314,14 @@ export class AnthropicModel implements ModelContract {
       toolCount: options?.tools?.length ?? 0,
     });
 
-    let stream: Awaited<ReturnType<Anthropic["messages"]["create"]>>;
+    let stream: AsyncIterable<Anthropic.RawMessageStreamEvent>;
 
     try {
-      stream = await this.client.messages.create(
-        { ...this.buildParams(messages, options), stream: true },
-        options?.signal ? { signal: options.signal } : undefined,
-      );
+      stream = (await this.send(
+        { ...this.buildBody(messages, options), stream: true },
+        options,
+        "create",
+      )) as AsyncIterable<Anthropic.RawMessageStreamEvent>;
     } catch (thrown) {
       throw this.logAndWrap(thrown);
     }
@@ -267,9 +330,14 @@ export class AnthropicModel implements ModelContract {
     const usage: Usage = { input: 0, output: 0, total: 0 };
     const toolBlocks = new Map<number, { id: string; name: string; json: string }>();
     const thinkingBlocks = new Map<number, AnthropicThinkingBlock>();
+    // Every content block of the turn, by index, so the full ordered turn
+    // can be returned as `blocks` (thinking, compaction, server tools…).
+    const streamedBlocks = new Map<number, StreamedBlock>();
 
     try {
-      for await (const event of stream as AsyncIterable<Anthropic.RawMessageStreamEvent>) {
+      for await (const event of stream) {
+        this.trackStreamedBlock(streamedBlocks, event);
+
         if (event.type === "message_start") {
           usage.input = event.message.usage.input_tokens ?? 0;
 
@@ -389,13 +457,131 @@ export class AnthropicModel implements ModelContract {
     usage.total = usage.input + usage.output;
 
     const finishReason = mapStopReason(rawStopReason);
+    const blocks = toProviderBlocks(this.finishStreamedBlocks(streamedBlocks));
 
     this.logger.debug(LOG_MODULE, "response", "Streaming call to messages.create succeeded", {
       finishReason,
       usage,
     });
 
-    yield { type: "done", finishReason, usage };
+    yield { type: "done", finishReason, usage, ...(blocks ? { blocks } : {}) };
+  }
+
+  /**
+   * Fold one stream event into the per-index block accumulator. Unknown
+   * block and delta types (beta `compaction`, future additions) are kept
+   * as their start payload plus whatever their delta carries, so they
+   * round-trip without the adapter knowing their shape.
+   */
+  private trackStreamedBlock(
+    blocks: Map<number, StreamedBlock>,
+    event: Anthropic.RawMessageStreamEvent,
+  ): void {
+    if (event.type === "content_block_start") {
+      const block = { ...(event.content_block as unknown as Record<string, unknown>) };
+
+      blocks.set(event.index, {
+        block,
+        ...(STREAMED_INPUT_BLOCK_TYPES.has(String(block.type)) ? { json: "" } : {}),
+      });
+
+      return;
+    }
+
+    if (event.type !== "content_block_delta") {
+      return;
+    }
+
+    const entry = blocks.get(event.index);
+
+    if (!entry) {
+      return;
+    }
+
+    const delta = event.delta as unknown as Record<string, unknown> & { type: string };
+    const block = entry.block;
+
+    if (delta.type === "text_delta") {
+      block.text = String(block.text ?? "") + String(delta.text ?? "");
+    } else if (delta.type === "thinking_delta") {
+      block.thinking = String(block.thinking ?? "") + String(delta.thinking ?? "");
+    } else if (delta.type === "signature_delta") {
+      block.signature = String(block.signature ?? "") + String(delta.signature ?? "");
+    } else if (delta.type === "input_json_delta") {
+      entry.json = (entry.json ?? "") + String(delta.partial_json ?? "");
+    } else if (delta.type === "citations_delta") {
+      block.citations = [
+        ...(Array.isArray(block.citations) ? block.citations : []),
+        delta.citation,
+      ];
+    } else {
+      // e.g. beta `compaction_delta` — carries the block's final fields.
+      for (const [key, value] of Object.entries(delta)) {
+        if (key !== "type") {
+          block[key] = value;
+        }
+      }
+    }
+  }
+
+  /** Close the accumulated stream blocks into an ordered content array. */
+  private finishStreamedBlocks(blocks: Map<number, StreamedBlock>): Array<{ type: string }> {
+    return Array.from(blocks.entries())
+      .sort(([left], [right]) => left - right)
+      .map(([, { block, json }]) => {
+        if (json !== undefined) {
+          block.input = safeJsonParse<Record<string, unknown>>(json, {});
+        }
+
+        return block as { type: string };
+      });
+  }
+
+  /**
+   * Send a request through the SDK. With `providerOptions.anthropic.betas`
+   * the call goes to `client.beta.messages` (which takes the `betas` list
+   * and the beta-only body fields); otherwise to `client.messages`. The
+   * cancellation signal rides in the request options, as before.
+   */
+  private send(
+    body: Record<string, unknown>,
+    options: ModelCallOptions | undefined,
+    method: "create" | "countTokens",
+  ): Promise<unknown> {
+    const betas = resolveAnthropicOptions(options).betas;
+    const requestOptions = options?.signal ? { signal: options.signal } : undefined;
+    const api = betas && betas.length > 0 ? this.client.beta.messages : this.client.messages;
+    const call = api[method] as unknown as LooseCreate;
+
+    return call.call(api, betas && betas.length > 0 ? { ...body, betas } : body, requestOptions);
+  }
+
+  /**
+   * The full request body: the adapter-built params, then
+   * `thinking.display` when thinking is sent on an adaptive model, then
+   * `providerOptions.anthropic.body` merged last (caller fields win).
+   */
+  private buildBody(
+    messages: Message[],
+    options: ModelCallOptions | undefined,
+  ): Record<string, unknown> {
+    const anthropic = resolveAnthropicOptions(options);
+    const body: Record<string, unknown> = { ...this.buildParams(messages, options) };
+
+    // `display` belongs to adaptive thinking only; `between_tools` takes
+    // no other field and 400s with one.
+    if (
+      anthropic.thinkingDisplay &&
+      this.thinkingMode === "adaptive" &&
+      (body.thinking as { type?: string } | undefined)?.type === "adaptive"
+    ) {
+      body.thinking = {
+        ...(body.thinking as Record<string, unknown>),
+        display: anthropic.thinkingDisplay,
+      };
+    }
+
+    return { ...body, ...anthropic.body };
   }
 
   /**
@@ -451,7 +637,7 @@ export class AnthropicModel implements ModelContract {
       ...this.buildAutomaticCacheControl(options?.cacheControl),
       ...this.buildSystem(system, options?.cacheControl),
       ...(sendTemperature ? { temperature } : {}),
-      ...this.buildTools(options?.tools),
+      ...this.buildTools(options?.tools, options?.cacheControl),
       ...this.buildOutputConfig(options?.responseSchema, thinking.effort),
       ...(thinking.thinking ? { thinking: thinking.thinking } : {}),
     };
@@ -481,7 +667,9 @@ export class AnthropicModel implements ModelContract {
 
     if (this.capabilities.promptCaching && breakpoints > 0) {
       return {
-        system: [{ type: "text", text: system, cache_control: this.cacheControl() }],
+        system: [
+          { type: "text", text: system, cache_control: this.cacheControl(cacheControl?.ttl) },
+        ],
       };
     }
 
@@ -499,15 +687,21 @@ export class AnthropicModel implements ModelContract {
     const breakpoints = cacheControl?.breakpoints ?? 0;
 
     return this.config.promptCaching && breakpoints <= 0
-      ? { cache_control: this.cacheControl() }
+      ? { cache_control: this.cacheControl(cacheControl?.ttl) }
       : {};
   }
 
-  /** Build a typed cache-control marker, omitting TTL for Anthropic's 5-minute default. */
-  private cacheControl(): Anthropic.CacheControlEphemeral {
+  /**
+   * Build a typed cache-control marker. The per-call
+   * `cacheControl.ttl` wins over the model's `promptCacheTtl`; with
+   * neither, TTL is omitted for Anthropic's 5-minute default.
+   */
+  private cacheControl(callTtl?: "5m" | "1h"): Anthropic.CacheControlEphemeral {
+    const ttl = callTtl ?? this.config.promptCacheTtl;
+
     return {
       type: "ephemeral",
-      ...(this.config.promptCacheTtl ? { ttl: this.config.promptCacheTtl } : {}),
+      ...(ttl ? { ttl } : {}),
     };
   }
 
@@ -530,20 +724,30 @@ export class AnthropicModel implements ModelContract {
    *   budget. `budget_tokens` must be ≥ 1024 (`ThinkingConfigEnabled`,
    *   `messages.d.ts:1084`), so the budget is floored at that minimum.
    *
-   * The neutral `effort: "none"` ("run without reasoning") maps to no
-   * `thinking` field at all in both modes.
+   * The neutral `effort: "none"` ("run without reasoning") is mapped per
+   * model:
+   * - Claude Sonnet 5.5 (`acceptsBetweenTools`): `thinking: { type:
+   *   "between_tools" }`, its only thinking-off form. It is sent alone —
+   *   no `output_config.effort` (the model default, `high`, is within the
+   *   `high`-or-below range it requires) and no `display`, both of which
+   *   the API rejects alongside it.
+   * - Opus 5.5 and Fable 5/5.1: no `thinking` field. These models have no
+   *   thinking-off form (`disabled` and `budget_tokens` are a 400 at every
+   *   effort), so thinking still runs at the model's default effort. Pass
+   *   `effort: "low"` to spend less.
+   * - Every other model: no `thinking` field, as before.
    */
   private buildThinking(reasoning: ModelCallOptions["reasoning"]): ThinkingRequest {
     if (!this.capabilities.reasoning || !reasoning) {
       return {};
     }
 
-    // `effort: "none"` is an explicit "run without reasoning". Anthropic
-    // has no reasoning-off effort knob — extended thinking is opt-in — so
-    // we simply omit the `thinking` block. (This also short-circuits the
+    // `effort: "none"` is an explicit "run without reasoning". Sonnet 5.5
+    // turns thinking off only through `between_tools`; elsewhere we omit
+    // the `thinking` block. (This also short-circuits the
     // `EFFORT_THINKING_BUDGET["none"]` → `undefined` → `NaN` budget path.)
     if (reasoning.effort === "none") {
-      return {};
+      return acceptsBetweenTools(this.name) ? { thinking: { type: "between_tools" } } : {};
     }
 
     if (reasoning.maxTokens === undefined && reasoning.effort === undefined) {
@@ -583,7 +787,10 @@ export class AnthropicModel implements ModelContract {
    * breakpoint there would pay the ~1.25x write surcharge every turn
    * with no reads.
    */
-  private buildTools(tools: ModelCallOptions["tools"]): { tools?: Anthropic.Tool[] } {
+  private buildTools(
+    tools: ModelCallOptions["tools"],
+    cacheControl: ModelCallOptions["cacheControl"],
+  ): { tools?: Anthropic.Tool[] } {
     const mapped = toAnthropicTools(tools);
 
     if (!mapped) {
@@ -595,7 +802,7 @@ export class AnthropicModel implements ModelContract {
       const lastTool = mapped[last];
 
       if (lastTool) {
-        mapped[last] = { ...lastTool, cache_control: this.cacheControl() };
+        mapped[last] = { ...lastTool, cache_control: this.cacheControl(cacheControl?.ttl) };
       }
     }
 
@@ -757,4 +964,25 @@ export class AnthropicModel implements ModelContract {
 
     return wrapped;
   }
+}
+
+/** Body fields `messages.countTokens` accepts, copied from the full request body. */
+const COUNT_TOKENS_FIELDS = [
+  "model",
+  "messages",
+  "system",
+  "tools",
+  "tool_choice",
+  "thinking",
+  "output_config",
+  "cache_control",
+  "context_management",
+  "mcp_servers",
+] as const;
+
+/** Read `providerOptions.anthropic`, tolerating its absence or a wrong shape. */
+function resolveAnthropicOptions(options: ModelCallOptions | undefined): AnthropicCallOptions {
+  const raw = options?.providerOptions?.anthropic;
+
+  return typeof raw === "object" && raw !== null ? (raw as AnthropicCallOptions) : {};
 }

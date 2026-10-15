@@ -1,5 +1,6 @@
 import type { AIError } from "../../errors/ai-error";
 import type { FinishReason } from "../finish-reason.type";
+import type { ProviderContentBlock } from "../provider-content-block.type";
 import type { ToolCall } from "./tool-call.type";
 import type { Usage } from "./usage.type";
 
@@ -37,6 +38,12 @@ export type LLMTrip = {
   usage: Usage;
   /** Tool calls made during this trip, if any */
   toolCalls?: ToolCall[];
+  /**
+   * The provider's raw content blocks for this trip's response (thinking,
+   * compaction, …), when the adapter returned them. Persist the final
+   * trip's blocks with your transcript to replay the turn verbatim.
+   */
+  blocks?: ProviderContentBlock[];
   /** Typed AI error that occurred during this trip, if any */
   error?: AIError;
 };

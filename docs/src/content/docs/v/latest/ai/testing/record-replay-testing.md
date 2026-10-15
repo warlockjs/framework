@@ -49,7 +49,7 @@ const model = ai.vcr(liveModel, { path: "./cassettes/support.json", mode });
 
 ## How matching works
 
-On each call VCR computes a stable hash over `{ messages, picked options }` and looks for a matching entry. The hashed option fields default to `["temperature", "maxTokens", "responseSchema", "tools", "reasoning"]` — override with `hashOptions`. `signal` and unknown provider keys are **always excluded**, so an otherwise-identical logical call still matches across runs. `tools` are hashed by name + description + input-schema shape, not object identity, so re-constructing the same tool doesn't bust the cassette.
+On each call VCR computes a stable hash over `{ messages, picked options }` and looks for a matching entry. The hashed option fields default to `["temperature", "maxTokens", "responseSchema", "tools", "reasoning", "providerOptions"]` — override with `hashOptions`. `providerOptions` joins the hash only when a provider entry is set, so cassettes recorded without it still match; two calls that differ only in provider options (betas, `context_management`, …) get different entries. `signal`, `cacheControl` (breakpoints and `ttl` change billing, not output) and unknown top-level keys are **always excluded**, so an otherwise-identical logical call still matches across runs. `tools` are hashed by name + description + input-schema shape, not object identity, so re-constructing the same tool doesn't bust the cassette.
 
 ```ts
 ai.vcr(model, {

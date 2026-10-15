@@ -110,7 +110,9 @@ Note the subtlety: **omitting** `effort` is *not* the same as `"none"`. With the
 
 The trade-off is you lose reasoning. For tool-heavy agent work (function calls plus solid replies, not deep analysis) that's usually the right call — it's the difference between empty replies and working ones. When you need reasoning **and** tools together, use OpenAI's Responses API (planned in `@warlock.js/ai-openai`).
 
-The budget-based adapters honor the same intent natively: Anthropic and Bedrock emit no `thinking` block, Gemini sends `thinkingBudget: 0`, and Ollama sends `think: false`. So `effort: "none"` means "no reasoning" consistently across every provider.
+The budget-based adapters honor the same intent natively: Anthropic and Bedrock emit no `thinking` block, Gemini sends `thinkingBudget: 0`, and Ollama sends `think: false`. So `effort: "none"` means "no reasoning" on every provider that can turn it off.
+
+Some Claude models can't. Claude Sonnet 5.5 turns thinking off only through `thinking: { type: "between_tools" }`, which the Anthropic adapter sends for `effort: "none"`. Claude Opus 5.5 and Fable 5 / 5.1 have no thinking-off form at all: the adapter leaves `thinking` out and they still think at their default effort, so use `effort: "low"` there to spend the least.
 
 ## When the model isn't reasoning-capable
 

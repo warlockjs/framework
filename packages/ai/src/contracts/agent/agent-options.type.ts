@@ -137,6 +137,11 @@ export type AgentExecuteOptions<TOutput = unknown> = {
    */
   streamingToolGuard?: StreamingToolGuardConfig;
   /**
+   * Per-call override for how the tool calls of one trip are dispatched.
+   * Wins over `AgentConfig.toolDispatch`. See {@link ToolDispatchMode}.
+   */
+  toolDispatch?: ToolDispatchMode;
+  /**
    * Opaque caller-supplied identifier that groups multiple `execute()`
    * calls into one conceptual user session / request. Mirrored onto
    * every report node this run produces (and every nested executable
@@ -164,3 +169,16 @@ export type AgentResumeOptions<TOutput = unknown> = AgentExecuteOptions<TOutput>
   /** Bypass the drift check and resume against the changed definition. */
   force?: boolean;
 };
+
+/**
+ * How the agent runs the tool calls a model requests in one trip.
+ *
+ * - `"concurrent"` (default) — every call of the trip starts at once and
+ *   the trip continues when all have settled.
+ * - `"sequential"` — each call is awaited before the next starts; use it
+ *   for tools that share mutable state or must observe each other's
+ *   side effects.
+ *
+ * Results always reach the model in the order the calls were requested.
+ */
+export type ToolDispatchMode = "concurrent" | "sequential";

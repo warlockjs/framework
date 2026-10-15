@@ -148,6 +148,63 @@ const model = anthropic.model({
 On the [Bedrock adapter](/v/latest/ai/providers/bedrock/), `promptCaching` is a *capability override* rather than an opt-in — auto-inferred `true` for Claude 3.5+/3.7/4 and Nova, mapping per-call `cacheControl` breakpoints to Converse `cachePoint` blocks. Set `promptCaching: false` to force it off.
 :::
 
+Per call, `cacheControl: { ttl: "1h" }` overrides the model's `promptCacheTtl` for the entries that call writes.
+
+## Thinking on Claude 5 models
+
+Claude Opus 5.5, Sonnet 5.5 and Fable 5 / 5.1 always think. They reject `thinking: { type: "disabled" }` and `budget_tokens` with a 400, so the adapter never sends either to them: a `reasoning` option becomes `thinking: { type: "adaptive" }` plus `output_config.effort`. `effort: "none"` depends on the model:
+
+- **Sonnet 5.5** turns thinking off with `thinking: { type: "between_tools" }`, so the adapter sends exactly that, with no `output_config.effort` and no `display` (the API rejects either beside it; the model default effort, `high`, is within the range it allows).
+- **Opus 5.5 and Fable 5 / 5.1** have no thinking-off form. The adapter leaves `thinking` out and the model still thinks at its default effort, so pass `effort: "low"` to spend less.
+
+Thinking text is empty by default on these models. Ask for readable summaries with `thinkingDisplay`:
+
+```ts
+await agent.execute("Plan the migration.", {
+  reasoning: { effort: "high" },
+  providerOptions: { anthropic: { thinkingDisplay: "summarized" } },
+});
+```
+
+## Provider blocks and compaction
+
+Thinking, redacted-thinking, compaction and server-tool blocks have no place in the neutral `content` string, and several features only work when the assistant turn goes back exactly as Claude sent it. When a response has such a block, the adapter returns the whole ordered turn as `blocks`. The agent stores it on the assistant message and the adapter replays it verbatim on the next call. The final trip's blocks are on `result.blocks`; keep them if you persist your own transcript:
+
+```ts
+const result = await agent.execute(question);
+
+history.push({ role: "assistant", content: result.text ?? "", blocks: result.blocks });
+```
+
+Beta features go through `providerOptions.anthropic`: `betas` routes the call to the beta endpoint, and `body` adds request fields as-is, after the adapter's own. Server-side compaction:
+
+```ts
+const agent = ai.agent({
+  model: anthropic.model({ name: "claude-opus-5-5" }),
+  modelOptions: {
+    providerOptions: {
+      anthropic: {
+        betas: ["compact-2026-01-12"],
+        body: { context_management: { edits: [{ type: "compact_20260112" }] } },
+      },
+    },
+  },
+});
+```
+
+The same `body` carries `fallbacks`, `inference_geo` or any other field the Messages API accepts. Other adapters ignore the `anthropic` key, so the options are safe in a fallback chain.
+
+## Finish reasons
+
+| Claude `stop_reason` | `finishReason` |
+| --- | --- |
+| `end_turn`, `stop_sequence` | `stop` |
+| `tool_use` | `tool_calls` |
+| `max_tokens` | `length` |
+| `model_context_window_exceeded` | `context_exceeded` |
+| `pause_turn` | `pause_turn` (the agent resumes it automatically) |
+| `refusal` | `refusal` |
+
 ## Vision
 
 Pass image parts on a user message — the agent resolves attachments
@@ -192,7 +249,10 @@ const anthropic = new AnthropicSDK({
 
 Need an offline token estimate before a call? `anthropic.count(text)`
 returns a fast character-heuristic approximation — good for budgeting
-and quota guards, not for billing.
+and quota guards, not for billing. For an exact count, call
+`model.countTokens(messages, options)`: it asks Anthropic's
+`messages.countTokens` endpoint, with the same system prompt, tools and
+thinking settings the real call would send.
 
 For the agent/workflow surface these models plug into, see
 [`@warlock.js/ai`](/v/latest/ai/). For provider-specific notes and the

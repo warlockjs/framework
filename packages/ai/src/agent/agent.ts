@@ -18,11 +18,13 @@ import type {
   MiddlewareTripContext,
   ModelResponse,
   ModelToolCallRequest,
+  ProviderContentBlock,
   StreamContract,
   StreamEventBody,
   StreamingToolGuardConfig,
   ToolCall,
   ToolContext,
+  ToolDispatchMode,
   ToolEventMeta,
   Usage,
   UsageEvent,
@@ -67,6 +69,12 @@ import { computeAgentSignature } from "./signature";
 import { deleteAgentSnapshot, loadAgentSnapshotForResume, persistAgentSnapshot } from "./snapshot";
 
 const LOG_MODULE = "ai.agent";
+
+/** One settled tool dispatch: its record plus the tool-result message for the next trip. */
+type DispatchedToolCall = {
+  record: ToolCall;
+  message: Message;
+};
 
 /**
  * Internal post-normalization view of an `AgentConfig`. The public
@@ -885,7 +893,12 @@ class Execution<TOutput> {
         return;
       }
 
-      const tripInput = tripIndex === 0 ? this.input : "[tool results]";
+      const tripInput =
+        tripIndex === 0
+          ? this.input
+          : this.trips[tripIndex - 1]?.finishReason === "pause_turn"
+            ? "[continue]"
+            : "[tool results]";
       const outcome = await this.runTrip(tripIndex, tripInput);
 
       if (outcome === "error" || outcome === "stop") {
@@ -895,7 +908,7 @@ class Execution<TOutput> {
 
     const lastTrip = this.trips[this.trips.length - 1];
 
-    if (lastTrip?.finishReason === "tool_calls") {
+    if (lastTrip?.finishReason === "tool_calls" || lastTrip?.finishReason === "pause_turn") {
       this.error = new AgentMaxTripsError("Max trips exceeded", {
         maxTrips: this.maxTrips,
       });
@@ -976,6 +989,11 @@ class Execution<TOutput> {
       response.toolCalls !== undefined &&
       response.toolCalls.length > 0;
 
+    // A paused turn (Anthropic `pause_turn`, long-running server tools)
+    // resumes by sending the assistant turn back unchanged — so it is
+    // replayed into the history and the loop continues, within maxTrips.
+    const isPausedTrip = response.finishReason === "pause_turn";
+
     const tripToolCalls: ToolCall[] = [];
 
     if (isToolCallTrip) {
@@ -983,13 +1001,16 @@ class Execution<TOutput> {
         role: "assistant",
         content: response.content,
         toolCalls: response.toolCalls,
+        ...(response.blocks ? { blocks: response.blocks } : {}),
       });
 
-      for (const toolCallRequest of response.toolCalls!) {
-        const record = await this.dispatchToolCall(toolCallRequest, tripIndex);
-
-        tripToolCalls.push(record);
-      }
+      tripToolCalls.push(...(await this.dispatchToolCalls(response.toolCalls!, tripIndex)));
+    } else if (isPausedTrip) {
+      this.messages.push({
+        role: "assistant",
+        content: response.content,
+        ...(response.blocks ? { blocks: response.blocks } : {}),
+      });
     }
 
     const trip: LLMTrip = {
@@ -1002,6 +1023,7 @@ class Execution<TOutput> {
       duration: performance.now() - tripStart,
       usage: response.usage,
       toolCalls: tripToolCalls.length > 0 ? tripToolCalls : undefined,
+      ...(response.blocks ? { blocks: response.blocks } : {}),
     };
 
     this.trips.push(trip);
@@ -1016,6 +1038,10 @@ class Execution<TOutput> {
     // run, it only loses resume-ability from here. No-op when `durable`
     // is absent.
     await this.checkpoint("running");
+
+    if (isPausedTrip) {
+      return "continue";
+    }
 
     if (!isToolCallTrip) {
       return "stop";
@@ -1086,6 +1112,7 @@ class Execution<TOutput> {
     let content = "";
     let finishReason: FinishReason = "stop";
     let usage: Usage = { input: 0, output: 0, total: 0 };
+    let blocks: ProviderContentBlock[] | undefined;
     const toolCalls: ModelToolCallRequest[] = [];
     const recoveredCalls: ModelToolCallRequest[] = [];
 
@@ -1140,6 +1167,7 @@ class Execution<TOutput> {
 
       finishReason = chunk.finishReason;
       usage = chunk.usage;
+      blocks = chunk.blocks;
     }
 
     if (guard) {
@@ -1170,6 +1198,9 @@ class Execution<TOutput> {
       finishReason: resolvedFinishReason,
       usage,
       toolCalls: mergedToolCalls.length > 0 ? mergedToolCalls : undefined,
+      // Recovered (guard-synthesized) calls have no provider block, so a
+      // verbatim replay would drop them — keep blocks only when none were added.
+      ...(blocks && dedupedRecovered.length === 0 ? { blocks } : {}),
     };
   }
 
@@ -1192,17 +1223,62 @@ class Execution<TOutput> {
   }
 
   /**
+   * Dispatch every tool call one trip requested. By default the calls run
+   * concurrently (`toolDispatch: "concurrent"`) — a model that emits
+   * several `tool_use` blocks in one turn expects them executed in
+   * parallel. `toolDispatch: "sequential"` awaits each call before the
+   * next, for tools that share mutable state. Either way the tool-result
+   * messages and `ToolCall` records are appended in the order the model
+   * requested them, so adapters can group all results of the turn into a
+   * single provider message.
+   */
+  private async dispatchToolCalls(
+    requests: ModelToolCallRequest[],
+    tripIndex: number,
+  ): Promise<ToolCall[]> {
+    const dispatched: DispatchedToolCall[] = [];
+
+    if (this.resolveToolDispatch() === "sequential") {
+      for (const request of requests) {
+        dispatched.push(await this.dispatchToolCall(request, tripIndex));
+      }
+    } else {
+      dispatched.push(
+        ...(await Promise.all(
+          requests.map((request) => this.dispatchToolCall(request, tripIndex)),
+        )),
+      );
+    }
+
+    for (const { record, message } of dispatched) {
+      this.toolCalls.push(record);
+      this.messages.push(message);
+    }
+
+    return dispatched.map(({ record }) => record);
+  }
+
+  /**
+   * Resolve the tool-dispatch strategy: per-call option, then agent
+   * config, then `"concurrent"`.
+   */
+  private resolveToolDispatch(): ToolDispatchMode {
+    return this.options?.toolDispatch ?? this.config.toolDispatch ?? "concurrent";
+  }
+
+  /**
    * Dispatch a single tool call requested by the model. Looks up the tool
-   * by name, invokes it via the safe `ToolContract.invoke` entry, pushes a
-   * matching tool-result message into `this.messages` so the next trip can
-   * see it, and emits the right lifecycle event (`tool-called` on success,
+   * by name, invokes it via the safe `ToolContract.invoke` entry, and
+   * emits the right lifecycle event (`tool-called` on success,
    * `tool-calling-failed` when the tool is unregistered or invoke returned
-   * an error). Never throws — always returns a `ToolCall` record.
+   * an error). Returns the `ToolCall` record together with the matching
+   * tool-result message; `dispatchToolCalls` appends both in request
+   * order. Never throws.
    */
   private async dispatchToolCall(
     toolCallRequest: ModelToolCallRequest,
     tripIndex: number,
-  ): Promise<ToolCall> {
+  ): Promise<DispatchedToolCall> {
     const registeredTool = this.effectiveTools.find((tool) => tool.name === toolCallRequest.name);
 
     if (!registeredTool) {
@@ -1229,13 +1305,11 @@ class Execution<TOutput> {
         ...(toolCallRequest.recoveredFrom ? { recoveredFrom: toolCallRequest.recoveredFrom } : {}),
       };
 
-      this.toolCalls.push(record);
-
-      this.messages.push({
+      const message: Message = {
         role: "tool",
         toolCallId: toolCallRequest.id,
         content: JSON.stringify({ error: error.message }),
-      });
+      };
 
       // Stub meta — there's no real tool to describe. Carries the
       // requested name for log correlation and an explanatory
@@ -1250,7 +1324,7 @@ class Execution<TOutput> {
         tripIndex,
       });
 
-      return record;
+      return { record, message };
     }
 
     // Build the lightweight event meta once. Resolves `action` to a
@@ -1363,8 +1437,6 @@ class Execution<TOutput> {
       ...(toolCallRequest.recoveredFrom ? { recoveredFrom: toolCallRequest.recoveredFrom } : {}),
     };
 
-    this.toolCalls.push(record);
-
     // Roll child usage into the agent's accumulator. Leaf tools
     // contribute zero; `asTool`-wrapped composites contribute the
     // full cost of the inner agent/workflow/supervisor run.
@@ -1372,13 +1444,13 @@ class Execution<TOutput> {
     // or reasoning tokens carries those counts into the parent total too.
     mergeUsage(this.usage, invokeResult.usage);
 
-    this.messages.push({
+    const message: Message = {
       role: "tool",
       toolCallId: toolCallRequest.id,
       content: invokeResult.error
         ? JSON.stringify({ error: invokeResult.error.message })
         : JSON.stringify(invokeResult.data ?? null),
-    });
+    };
 
     if (invokeResult.error) {
       this.emit("agent.tool.failed", {
@@ -1391,7 +1463,7 @@ class Execution<TOutput> {
       this.emit("agent.tool.called", { ...record, tool: toolMeta });
     }
 
-    return record;
+    return { record, message };
   }
 
   /**
@@ -1509,7 +1581,11 @@ class Execution<TOutput> {
       this.error = undefined;
       this.data = undefined;
 
-      this.messages.push({ role: "assistant", content: badResponse });
+      this.messages.push({
+        role: "assistant",
+        content: badResponse,
+        ...(lastTrip?.blocks ? { blocks: lastTrip.blocks } : {}),
+      });
 
       this.messages.push({
         role: "user",
@@ -1616,6 +1692,7 @@ class Execution<TOutput> {
       type: "agent",
       data: this.data,
       text: finalTrip?.output,
+      ...(finalTrip?.blocks ? { blocks: finalTrip.blocks } : {}),
       report,
       usage: this.usage,
       error: this.error,
@@ -1721,6 +1798,10 @@ class Execution<TOutput> {
 
       if (message.toolCallId !== undefined) {
         captured.toolCallId = message.toolCallId;
+      }
+
+      if (message.blocks !== undefined) {
+        captured.blocks = message.blocks;
       }
 
       return captured;

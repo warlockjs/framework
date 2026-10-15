@@ -1,6 +1,7 @@
 import type { Message } from "./conversation-message.type";
 import type { FinishReason } from "./finish-reason.type";
 import type { ModelToolCallRequest } from "./model-tool-call-request.type";
+import type { ProviderContentBlock } from "./provider-content-block.type";
 import type { ModelPricing } from "./result/model-pricing.type";
 import type { Usage } from "./result/usage.type";
 import type { ToolConfig } from "./tool.contract";
@@ -83,7 +84,28 @@ export type ModelCallOptions = {
    */
   cacheControl?: {
     breakpoints?: number;
+    /**
+     * Lifetime of the cache entries this call writes. Adapters with a
+     * configurable TTL (Anthropic: `"5m"` default, `"1h"`) forward it;
+     * others ignore it. Overrides any adapter-level TTL for this call.
+     */
+    ttl?: "5m" | "1h";
   };
+  /**
+   * Provider-specific request options, keyed by the adapter's wire format
+   * (`anthropic`, `openai`, …). Each adapter reads only its own key and
+   * ignores the rest, so one `modelOptions` object can serve a fallback
+   * chain across providers. See the adapter's own docs for the accepted
+   * shape (e.g. `@warlock.js/ai-anthropic`'s `AnthropicCallOptions`).
+   *
+   * @example
+   * await model.complete(messages, {
+   *   providerOptions: {
+   *     anthropic: { betas: ["compact-2026-01-12"], body: { context_management: { edits: [{ type: "compact_20260112" }] } } },
+   *   },
+   * });
+   */
+  providerOptions?: Record<string, Record<string, unknown> | undefined>;
   /** Additional provider-specific options */
   [key: string]: unknown;
 };
@@ -183,6 +205,14 @@ export type ModelResponse = {
   usage: Usage;
   /** Tool calls requested by the model, present when finishReason is "tool_calls" */
   toolCalls?: ModelToolCallRequest[];
+  /**
+   * The provider's raw content blocks for this turn, in order — set by
+   * adapters that have blocks the neutral fields cannot carry (Anthropic
+   * thinking / redacted thinking / compaction). The agent copies them onto
+   * the assistant `Message.blocks` so the next call replays the turn
+   * verbatim. See {@link ProviderContentBlock}.
+   */
+  blocks?: ProviderContentBlock[];
 };
 
 /**
@@ -209,7 +239,13 @@ export type ModelStreamChunk =
        */
       providerMetadata?: Record<string, unknown>;
     }
-  | { type: "done"; finishReason: FinishReason; usage: Usage };
+  | {
+      type: "done";
+      finishReason: FinishReason;
+      usage: Usage;
+      /** The turn's raw provider blocks — see `ModelResponse.blocks`. */
+      blocks?: ProviderContentBlock[];
+    };
 
 /**
  * Contract every SDK model instance must implement.

@@ -3,27 +3,34 @@ import type { FinishReason } from "@warlock.js/ai";
 const stopReasonMap: Record<string, FinishReason> = {
   end_turn: "stop",
   stop_sequence: "stop",
+  // Beta compaction (`compact-2026-09-04`): the turn ends with a signed
+  // `compaction` block and nothing is sampled after it. A clean stop —
+  // the block itself is on `ModelResponse.blocks`.
+  compaction: "stop",
   max_tokens: "length",
-  model_context_window_exceeded: "length",
+  model_context_window_exceeded: "context_exceeded",
+  pause_turn: "pause_turn",
+  refusal: "refusal",
   tool_use: "tool_calls",
 };
 
 /**
  * Map Anthropic's `stop_reason` to the normalized `FinishReason` union.
  *
- * `end_turn` / `stop_sequence` are both natural stops. `max_tokens` and
- * `model_context_window_exceeded` map to `length`. `tool_use` maps to
- * `tool_calls`. Everything else —
- * `refusal` (policy intervention), `pause_turn` (incomplete
- * long-running turn), `null`, or any value a future API version adds —
- * falls through to `"error"` so the agent treats the trip as a
- * non-clean terminal rather than silently accepting a partial result.
+ * `end_turn` / `stop_sequence` (and beta `compaction`) are natural stops,
+ * `max_tokens` maps to `length`, `tool_use` to `tool_calls`.
+ * `model_context_window_exceeded`, `pause_turn` and `refusal` keep their
+ * own reasons (`context_exceeded`, `pause_turn`, `refusal`) because each
+ * needs a different reaction: compact the history, send the turn back to
+ * resume, or fall back to another model. `null` and any value a future
+ * API version adds fall through to `"error"`.
  *
  * @example
- * mapStopReason("end_turn");  // "stop"
- * mapStopReason("tool_use");  // "tool_calls"
- * mapStopReason("refusal");   // "error"
- * mapStopReason(null);        // "error"
+ * mapStopReason("end_turn");   // "stop"
+ * mapStopReason("tool_use");   // "tool_calls"
+ * mapStopReason("refusal");    // "refusal"
+ * mapStopReason("pause_turn"); // "pause_turn"
+ * mapStopReason(null);         // "error"
  */
 export function mapStopReason(raw: string | null | undefined): FinishReason {
   return stopReasonMap[raw ?? ""] ?? "error";

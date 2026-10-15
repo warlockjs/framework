@@ -105,6 +105,7 @@ type AgentResult<T> = {
   type: "agent";
   data?: T;             // typed structured output when `output` schema was supplied
   text?: string;        // raw final LLM text
+  blocks?: ProviderContentBlock[]; // the final trip's raw provider blocks (thinking, compaction…)
   report: AgentReport;
   usage: Usage;         // aggregated tokens + per-channel cost breakdown
   error?: AIError;
@@ -167,6 +168,18 @@ await myAgent.execute(input, {
 ```
 
 `reasoning.effort` maps to the provider-native control (OpenAI `reasoning_effort`); `reasoning.maxTokens` caps the thinking budget. `cacheControl.breakpoints` translates into provider prompt-cache breakpoints. The resulting reasoning / cache token counts flow back through `usage`.
+
+Options that only one provider understands go under `providerOptions`, keyed by the adapter (`anthropic`, …). Each adapter reads its own key and ignores the rest, so the same `modelOptions` work in a fallback chain. See the [Anthropic provider page](/v/latest/ai/providers/anthropic/) for what it accepts.
+
+### Finish reasons and provider blocks
+
+Each trip records why the model stopped: `stop`, `tool_calls`, `length`, `context_exceeded` (the history filled the context window; compact or trim it), `pause_turn`, `refusal` or `error`. The agent resumes a `pause_turn` by itself, within `maxTrips`. `refusal` and `context_exceeded` end the run; read `report.trips.at(-1)?.finishReason` to decide whether to retry on another model.
+
+Some providers return content the neutral `text` cannot carry, such as Anthropic thinking and compaction blocks. The adapter puts the whole turn on `blocks`, and the agent replays it verbatim inside the run. If you keep your own transcript between runs, store `result.blocks` on the assistant message:
+
+```ts
+history.push({ role: "assistant", content: result.text ?? "", blocks: result.blocks });
+```
 
 ## Structured output
 

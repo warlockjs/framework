@@ -68,6 +68,10 @@ The agent calls `input["~standard"].validate(rawArgs)` before invoking `execute`
 
 Whatever your `execute` resolves with is `JSON.stringify`'d and sent back as the next trip's `tool` message. Strings pass through unchanged. Throw (or return a rejected promise) to signal failure — the agent records the error on `ToolCall.error` and tells the model.
 
+## Parallel calls — tools run concurrently
+
+When the model requests several tools in one turn, the agent runs them **concurrently** (default `toolDispatch: "concurrent"`) and continues once all settled; results reach the model in request order. A tool that shares mutable state with another (or must see its side effects) needs `ai.agent({ toolDispatch: "sequential" })` or per-call `execute(input, { toolDispatch: "sequential" })`. `ctx.signal` carries the run's cancellation into each call.
+
 ## `mode` — feedback vs silent
 
 Default `"feedback"`.

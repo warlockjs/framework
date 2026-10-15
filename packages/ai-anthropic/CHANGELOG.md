@@ -4,6 +4,29 @@ All notable changes to `@warlock.js/ai-anthropic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.30.0
+
+### Upgrading
+
+- `model_context_window_exceeded` now maps to `finishReason: "context_exceeded"` (was `length`), `pause_turn` to `pause_turn` and `refusal` to `refusal` (both were `error`).
+
+### Added
+
+- Responses with thinking, redacted-thinking, compaction, server-tool or cited-text blocks return the whole ordered turn as `ModelResponse.blocks` (and on the streaming `done` chunk); an assistant message carrying Anthropic `blocks` is replayed verbatim (WR-022).
+- `providerOptions.anthropic` (`AnthropicCallOptions`): `betas` routes the call through `client.beta.messages`, `body` merges extra request fields last (`context_management`, `fallbacks`, `inference_geo`, …), `thinkingDisplay` sets `thinking.display` (WR-025).
+- `AnthropicModel.countTokens(messages, options?)` counts input tokens through `messages.countTokens`; `AnthropicModel` is exported and `AnthropicSDK.model()` returns it (WR-025).
+- Per-call `cacheControl.ttl` overrides the model's `promptCacheTtl`.
+
+### Changed
+
+- Consecutive tool results are sent as one `user` message with several `tool_result` blocks, as Anthropic expects for parallel tool use (WR-024).
+- Claude 5-family thinking rules: Opus 5.5, Sonnet 5.5 and Fable 5 / 5.1 never receive `budget_tokens` or `disabled` (WR-026).
+- `effort: "none"` on Claude Sonnet 5.5 sends `thinking: { type: "between_tools" }` (its only thinking-off form, sent alone with no `output_config.effort` or `display`); it used to omit `thinking`, so the model still thought at its default effort. Opus 5.5 and Fable 5 / 5.1 have no thinking-off form and keep omitting `thinking` (WR-026).
+
+### Fixed
+
+- `providerOptions.anthropic.thinkingDisplay` is applied only to adaptive thinking, so it is never sent beside `between_tools` (a 400).
+
 ## 5.29.0 - 2026-10-01
 
 ### Changed

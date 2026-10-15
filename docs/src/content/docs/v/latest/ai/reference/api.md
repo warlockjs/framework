@@ -70,18 +70,20 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | Export | What it is |
 | --- | --- |
 | `AgentContract<T>` | The shape returned by `ai.agent`. Has `.execute()`, `.stream()`, `.resume()`, `.on()`, `.off()`, `.name`, `.isAnonymous`, `.description`. |
-| `AgentConfig` | Config object accepted by `ai.agent`. Includes `captureMessages?` — opt-in full-history capture onto `AgentReport.messages` (off by default; large + sensitive) — and `durable?` (below). |
+| `AgentConfig` | Config object accepted by `ai.agent`. Includes `captureMessages?` — opt-in full-history capture onto `AgentReport.messages` (off by default; large + sensitive) — `toolDispatch?` (`"concurrent"` default, or `"sequential"`; see `ToolDispatchMode`) and `durable?` (below). |
 | `agent.resume(runId, opts?)` | Durable mid-run crash-resume. Re-hydrates completed trips + tool calls + usage from the snapshot and continues from the next trip — never re-issuing a completed trip's model call. Throws `AgentDriftError` on a structural mismatch unless `{ force: true }`. |
 | `AgentConfig.durable` | `{ store?: SnapshotStore<AgentSnapshot>; deleteOnComplete? }` — opt-in checkpointing after every settled trip. `store` falls back to `ai.config({ defaultSnapshotStore })`; when neither is set, writes skip and `resume()` throws. |
 | `AgentSnapshot` / `AgentSnapshotStatus` / `AgentResumeOptions<T>` | The persisted agent state, its status, and `resume()` options (`{ force?, ... }`). |
 | `AgentExecuteOptions` | Per-call options for `execute` / `stream`. |
-| `AgentResult<T>` | Result envelope — `{ type, data?, text?, report, usage, error? }`. |
+| `AgentResult<T>` | Result envelope — `{ type, data?, text?, blocks?, report, usage, error? }`. `blocks` are the final trip's raw provider blocks (see `ProviderContentBlock`). |
+| `ToolDispatchMode` | `"concurrent" \| "sequential"` — how the tool calls of one trip run. Concurrent (default) starts them all at once; results reach the model in request order either way. Set on `AgentConfig.toolDispatch` or per call on `AgentExecuteOptions.toolDispatch`. |
 | `AgentReport` | Trace tree — `BaseReport` plus `model`, `trips`, `systemPrompt?` (the resolved `role: "system"` message), and `messages?` (the full `CapturedMessage[]`, present only when `captureMessages` is on). Tool dispatches live under `children` filtered by `type === "tool"`. |
-| `CapturedMessage` | One normalized conversation turn — `{ role, content, toolCalls?, toolCallId? }`. Populates `AgentReport.messages` when `captureMessages` is enabled. |
+| `CapturedMessage` | One normalized conversation turn — `{ role, content, toolCalls?, toolCallId?, blocks? }`. Populates `AgentReport.messages` when `captureMessages` is enabled. |
 | `AgentEventHandlers` | Typed event handler map for `on` (factory / per-call). |
 | `AgentEventMap` | Map of event name → payload, keyed by `agent.*` event. |
 | `StreamingToolGuardConfig` | Config for `streamingToolGuard`. |
-| `Message` | History message — `{ role, content, ... }`. |
+| `Message` | History message — `{ role, content, toolCalls?, toolCallId?, blocks?, ... }`. An assistant message's `blocks` are replayed verbatim by the adapter whose format they belong to. |
+| `ProviderContentBlock` | `{ provider, type, data }` — one raw provider content block (Anthropic thinking, redacted thinking, compaction, server tools…), kept on `ModelResponse.blocks`, `Message.blocks`, `LLMTrip.blocks` and `AgentResult.blocks` so the turn can be replayed exactly. |
 | `Attachment` | Image attachment — string or tagged object. |
 
 ## Workflows
@@ -351,9 +353,9 @@ The output/input-modality track — image, speech, and transcription verbs that 
 | `SDKAdapterContract` | Interface every provider adapter implements — `model()`, `embedder?()`. |
 | `ModelContract` | Returned by `sdk.model({...})`. Owns `complete`, `stream`, `capabilities`, `pricing`. |
 | `ModelCapabilities` | `{ structuredOutput?, vision?, reasoning?, promptCaching?, audio?, ... }` — feature flags the agent reads before forwarding options. |
-| `ModelCallOptions` | Per-call options forwarded to the model — `temperature`, `maxTokens`, plus `reasoning?: { effort?, maxTokens? }` and `cacheControl?: { breakpoints? }`. |
+| `ModelCallOptions` | Per-call options forwarded to the model — `temperature`, `maxTokens`, plus `reasoning?: { effort?, maxTokens? }`, `cacheControl?: { breakpoints?, ttl? }` and `providerOptions?: { [format]: {...} }` (each adapter reads only its own key, e.g. `anthropic`). |
 | `ReasoningEffort` | `"low" | "medium" | "high" | "none"`. `"none"` runs the model without reasoning (OpenAI emits `reasoning_effort: "none"` — the mode that lets gpt-5 / o-series accept function tools). |
-| `ModelResponse` | Shape returned by `model.complete`. |
+| `ModelResponse` | Shape returned by `model.complete` — `{ content, finishReason, usage, toolCalls?, blocks? }`. |
 | `ModelPricing` | `{ input, output, cachedInput?, cachedOutput?, reasoning? }` — USD per 1M tokens, per channel. |
 | `Usage` | `{ input, output, total, cachedTokens?, cacheWriteTokens?, reasoningTokens?, cost? }`. |
 | `CostBreakdown` | `{ input, output, cachedInput?, cachedOutput? }` — USD. |
@@ -521,7 +523,7 @@ A shared trust-boundary foundation used by every server-side outbound request (a
 | --- | --- |
 | `BaseReport` | Common report shape — `runId`, `rootRunId`, `parentRunId?`, `reportSchemaVersion`, `version?`, `sessionId?`. |
 | `LLMTrip` | One round-trip — `{ index, finishReason, usage, startedAt, endedAt, duration, ... }`. |
-| `FinishReason` | `"stop" | "tool_calls" | "length" | "content_filter" | "error"`. |
+| `FinishReason` | `"stop" \| "tool_calls" \| "length" \| "context_exceeded" \| "pause_turn" \| "refusal" \| "error"`. The agent resumes `pause_turn` automatically; `refusal` and `context_exceeded` end the run. |
 
 ## Mocks & test doubles
 

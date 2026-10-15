@@ -1,4 +1,5 @@
 import type { ModelToolCallRequest } from "../model-tool-call-request.type";
+import type { ProviderContentBlock } from "../provider-content-block.type";
 import type { BaseReport, ReportStatus } from "./base-report.type";
 import type { LLMTrip } from "./llm-trip.type";
 
@@ -22,6 +23,8 @@ export type CapturedMessage = {
   toolCalls?: ModelToolCallRequest[];
   /** Provider tool-call id this turn answers — present only on tool-result turns. */
   toolCallId?: string;
+  /** Raw provider blocks of an assistant turn — present only when the adapter returned them. */
+  blocks?: ProviderContentBlock[];
 };
 
 /**

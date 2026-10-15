@@ -136,3 +136,32 @@ export function inferThinkingMode(modelName: string): AnthropicThinkingMode {
 export function acceptsTemperature(mode: AnthropicThinkingMode): boolean {
   return mode === "budget";
 }
+
+/**
+ * Model release roots that accept `thinking: { type: "between_tools" }`,
+ * the only way to turn thinking off on them. Source: claude-api ref,
+ * "Thinking & Effort" per-model table (cached 2026-10-06): Claude Sonnet
+ * 5.5 returns a 400 on `{ type: "disabled" }` and takes `between_tools`
+ * instead (no other field alongside it, effort `high` or below). No other
+ * current model is documented to accept it. Opus 5.5 and Fable 5/5.1 have
+ * no thinking-off form at all: `disabled` and `budget_tokens` are a 400 at
+ * every effort, so the lowest they go is `effort: "low"`.
+ */
+const BETWEEN_TOOLS_RELEASE_ROOTS = ["claude-sonnet-5-5"];
+
+/**
+ * Whether `effort: "none"` can turn thinking off on this model with
+ * `thinking: { type: "between_tools" }`. Matches the release id with or
+ * without a platform prefix (`anthropic.claude-sonnet-5-5` on Bedrock)
+ * and with dated or tagged suffixes, but not a later minor release.
+ *
+ * @example
+ * acceptsBetweenTools("claude-sonnet-5-5"); // → true
+ * acceptsBetweenTools("claude-opus-5-5");   // → false
+ */
+export function acceptsBetweenTools(modelName: string): boolean {
+  const normalized = modelName.toLowerCase();
+  const id = normalized.slice(normalized.lastIndexOf(".") + 1);
+
+  return BETWEEN_TOOLS_RELEASE_ROOTS.some((root) => matchesReleaseRoot(id, root));
+}

@@ -1,5 +1,6 @@
 import type { ContentPart, Message, ModelToolCallRequest } from "@warlock.js/ai";
 import type Anthropic from "@anthropic-ai/sdk";
+import { fromProviderBlocks } from "./provider-blocks";
 
 /**
  * Result of splitting a vendor-neutral `Message[]` for the Anthropic
@@ -26,15 +27,24 @@ type AnthropicImageMediaType = (typeof ANTHROPIC_IMAGE_MEDIA_TYPES)[number];
  *    separated) and returned separately as the top-level `system`
  *    parameter.
  * 2. **Tool results are `user` turns.** A neutral `tool` message becomes
- *    a `user` message whose content is a single `tool_result` block
- *    keyed by `tool_use_id`.
+ *    a `tool_result` block keyed by `tool_use_id`. Consecutive tool
+ *    messages (the results of one parallel tool-use turn) are grouped
+ *    into a single `user` message, as Anthropic expects — splitting them
+ *    across messages teaches the model to stop calling tools in parallel.
  * 3. **Tool calls are `tool_use` content blocks.** An assistant message
  *    carrying `toolCalls` becomes an `assistant` message whose content
  *    is an optional leading `text` block followed by one `tool_use`
  *    block per call.
  *
- * Consecutive same-role turns are left as-is — the Messages API merges
- * them server-side.
+ * An assistant message that carries Anthropic `blocks` (thinking,
+ * redacted thinking, compaction, server-tool blocks — see
+ * `ProviderContentBlock`) is replayed verbatim from those blocks, which
+ * keeps signed thinking and compaction state valid. Blocks from another
+ * provider, or blocks whose `tool_use` ids no longer match `toolCalls`,
+ * are ignored and the turn is rebuilt from `content` + `toolCalls`.
+ *
+ * Other consecutive same-role turns are left as-is — the Messages API
+ * merges them server-side.
  *
  * @example
  * const { system, messages } = toAnthropicMessages([
@@ -56,18 +66,30 @@ export function toAnthropicMessages(messages: Message[]): AnthropicMessages {
     }
 
     if (message.role === "tool") {
-      mapped.push({
-        role: "user",
-        content: [
-          {
-            type: "tool_result",
-            tool_use_id: message.toolCallId ?? "",
-            content: stringifyContent(message.content),
-          },
-        ],
-      });
+      const toolResult: Anthropic.ToolResultBlockParam = {
+        type: "tool_result",
+        tool_use_id: message.toolCallId ?? "",
+        content: stringifyContent(message.content),
+      };
+      const previous = mapped[mapped.length - 1];
+
+      if (previous && previous.role === "user" && isToolResultTurn(previous)) {
+        previous.content.push(toolResult);
+      } else {
+        mapped.push({ role: "user", content: [toolResult] });
+      }
 
       continue;
+    }
+
+    if (message.role === "assistant") {
+      const replayed = fromProviderBlocks(message.blocks, message.toolCalls);
+
+      if (replayed) {
+        mapped.push({ role: "assistant", content: replayed });
+
+        continue;
+      }
     }
 
     if (message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0) {
@@ -150,6 +172,21 @@ function toAnthropicThinkingBlock(block: unknown): Anthropic.ContentBlockParam[]
   }
 
   return [];
+}
+
+/**
+ * A `user` turn this function built from tool results — its content is a
+ * non-empty array made only of `tool_result` blocks. Later tool results
+ * of the same tool-use turn are appended to it.
+ */
+function isToolResultTurn(
+  message: Anthropic.MessageParam,
+): message is Anthropic.MessageParam & { content: Anthropic.ContentBlockParam[] } {
+  return (
+    Array.isArray(message.content) &&
+    message.content.length > 0 &&
+    message.content.every((block) => block.type === "tool_result")
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

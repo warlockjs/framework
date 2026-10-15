@@ -1,3 +1,4 @@
 export { AnthropicSDK } from "./sdk";
-export type { AnthropicSDKConfig, AnthropicModelConfig } from "./config.type";
+export { AnthropicModel } from "./model";
+export type { AnthropicCallOptions, AnthropicSDKConfig, AnthropicModelConfig } from "./config.type";
 export type { AnthropicThinkingMode } from "./thinking-mode";

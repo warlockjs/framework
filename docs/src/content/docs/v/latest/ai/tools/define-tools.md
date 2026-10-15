@@ -76,6 +76,19 @@ execute: async ({ query }) => {
 }
 ```
 
+## Parallel tool calls
+
+When the model asks for several tools in one turn, the agent runs them **concurrently** and waits for all of them before the next trip. The results reach the model in the order it requested them, whichever finishes first.
+
+Tools that share mutable state, or must see each other's side effects, can run one after another instead:
+
+```ts
+const agent = ai.agent({ model, tools: [reserveSeat, chargeCard], toolDispatch: "sequential" });
+
+// or for a single run
+await agent.execute(input, { toolDispatch: "sequential" });
+```
+
 ## `mode: "feedback"` vs `mode: "silent"`
 
 Default is `"feedback"`.

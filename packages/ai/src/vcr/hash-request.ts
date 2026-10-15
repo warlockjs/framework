@@ -5,8 +5,15 @@ import type { ToolConfig } from "../contracts/tool.contract";
 /**
  * Default `ModelCallOptions` fields folded into the request hash. These are
  * the inputs that materially change the model's output; everything else
- * (notably `signal` and unknown provider keys) is excluded so an otherwise
- * identical logical call still matches its recording.
+ * (notably `signal`, `cacheControl` and unknown top-level keys) is excluded
+ * so an otherwise identical logical call still matches its recording.
+ *
+ * `providerOptions` is hashed because its body fields and beta flags
+ * (`context_management`, `fallbacks`, …) change what the model returns. It
+ * only joins the hash when it carries at least one provider's options, so a
+ * recording made without it keeps its hash. `cacheControl` (breakpoints and
+ * `ttl`) only changes billing and cache placement, never the output, and
+ * stays out.
  */
 export const DEFAULT_HASH_OPTIONS: readonly string[] = [
   "temperature",
@@ -14,6 +21,7 @@ export const DEFAULT_HASH_OPTIONS: readonly string[] = [
   "responseSchema",
   "tools",
   "reasoning",
+  "providerOptions",
 ];
 
 /**
@@ -60,6 +68,27 @@ function schemaShape(value: unknown, depth = 0): unknown {
 }
 
 /**
+ * The providers in `providerOptions` that carry options, or `undefined`
+ * when none do. `{}` and `{ anthropic: undefined }` hash like an absent
+ * `providerOptions`, so they replay recordings made without one.
+ */
+function pickProviderOptions(value: unknown): Record<string, unknown> | undefined {
+  if (value === null || typeof value !== "object") {
+    return undefined;
+  }
+
+  const providers: Record<string, unknown> = {};
+
+  for (const [provider, options] of Object.entries(value as Record<string, unknown>)) {
+    if (options !== undefined) {
+      providers[provider] = options;
+    }
+  }
+
+  return Object.keys(providers).length > 0 ? providers : undefined;
+}
+
+/**
  * Pick the hashable subset of `options`, normalizing `tools` into their
  * name+description+schema-shape fingerprint. `signal` and any field not in
  * `hashOptions` are dropped.
@@ -83,6 +112,16 @@ function pickOptions(
 
     if (key === "tools" && Array.isArray(value)) {
       picked[key] = (value as ToolConfig<unknown, unknown>[]).map(fingerprintTool);
+      continue;
+    }
+
+    if (key === "providerOptions") {
+      const providers = pickProviderOptions(value);
+
+      if (providers) {
+        picked[key] = providers;
+      }
+
       continue;
     }
 
@@ -146,7 +185,8 @@ function hashString(input: string): string {
  * The hash covers the full `messages` array plus the picked, normalized
  * `options` subset (see {@link DEFAULT_HASH_OPTIONS}). Inputs are
  * canonicalized (recursive key sort) before serialization so property order
- * never affects the result. `signal` and unknown provider keys are excluded.
+ * never affects the result. `signal`, `cacheControl` and unknown top-level
+ * keys are excluded.
  *
  * @example
  * const a = hashRequest(messages, { temperature: 0.2 });

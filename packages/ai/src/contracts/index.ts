@@ -3,6 +3,7 @@ export * from "./embedder.contract";
 export * from "./end.type";
 export * from "./executable.contract";
 export * from "./finish-reason.type";
+export * from "./provider-content-block.type";
 export * from "./image-model.contract";
 export * from "./memory";
 export * from "./middleware";

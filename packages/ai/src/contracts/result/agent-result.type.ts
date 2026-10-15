@@ -1,3 +1,4 @@
+import type { ProviderContentBlock } from "../provider-content-block.type";
 import type { BaseResult } from "./base-result.type";
 import type { AgentReport } from "./execution-report.type";
 
@@ -30,6 +31,12 @@ export type AgentResult<TOutput = unknown> = BaseResult & {
   data?: TOutput;
   /** Raw text from the final LLM trip. */
   text?: string;
+  /**
+   * The final trip's raw provider blocks (thinking, compaction, …), when
+   * the adapter returned them. Store them on the assistant `Message.blocks`
+   * of your own transcript so the next run replays the turn verbatim.
+   */
+  blocks?: ProviderContentBlock[];
   /** Trips, tool calls, status, and timing for this execution. */
   report: AgentReport;
 };

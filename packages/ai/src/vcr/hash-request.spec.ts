@@ -93,4 +93,73 @@ describe("hashRequest", () => {
       hashRequest(messages, { maxTokens: 500 }, ["temperature"]),
     );
   });
+
+  describe("providerOptions and cacheControl (WR-025)", () => {
+    const LEGACY_HASH_OPTIONS = [
+      "temperature",
+      "maxTokens",
+      "responseSchema",
+      "tools",
+      "reasoning",
+    ];
+    const compaction = {
+      anthropic: {
+        betas: ["compact-2026-01-12"],
+        body: { context_management: { edits: [{ type: "compact_20260112" }] } },
+      },
+    };
+
+    it("hashes providerOptions, so calls differing only there no longer share a recording", () => {
+      expect(DEFAULT_HASH_OPTIONS).toContain("providerOptions");
+      expect(hashRequest(messages, { temperature: 0.2, providerOptions: compaction })).not.toBe(
+        hashRequest(messages, { temperature: 0.2 }),
+      );
+      expect(
+        hashRequest(messages, {
+          providerOptions: { anthropic: { betas: ["compact-2026-01-12"] } },
+        }),
+      ).not.toBe(
+        hashRequest(messages, { providerOptions: { anthropic: { betas: ["other-beta"] } } }),
+      );
+    });
+
+    it("keeps the pre-5.30 hash when providerOptions is absent, empty or all-undefined", () => {
+      const legacy = hashRequest(
+        messages,
+        { temperature: 0.2, reasoning: { effort: "low" } },
+        LEGACY_HASH_OPTIONS,
+      );
+
+      for (const providerOptions of [undefined, {}, { anthropic: undefined }]) {
+        expect(
+          hashRequest(messages, {
+            temperature: 0.2,
+            reasoning: { effort: "low" },
+            providerOptions,
+          }),
+        ).toBe(legacy);
+      }
+    });
+
+    it("is insensitive to provider and body key order", () => {
+      expect(
+        hashRequest(messages, {
+          providerOptions: { openai: { a: 1 }, anthropic: { body: { x: 1, y: 2 }, betas: ["b"] } },
+        }),
+      ).toBe(
+        hashRequest(messages, {
+          providerOptions: { anthropic: { betas: ["b"], body: { y: 2, x: 1 } }, openai: { a: 1 } },
+        }),
+      );
+    });
+
+    it("leaves cacheControl, including ttl, out of the hash", () => {
+      const base = hashRequest(messages, { temperature: 0.2 });
+
+      expect(hashRequest(messages, { temperature: 0.2, cacheControl: { ttl: "1h" } })).toBe(base);
+      expect(
+        hashRequest(messages, { temperature: 0.2, cacheControl: { breakpoints: 2, ttl: "5m" } }),
+      ).toBe(base);
+    });
+  });
 });

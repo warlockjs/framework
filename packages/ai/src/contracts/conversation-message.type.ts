@@ -1,5 +1,6 @@
 import type { ContentPart } from "./content-part.type";
 import type { ModelToolCallRequest } from "./model-tool-call-request.type";
+import type { ProviderContentBlock } from "./provider-content-block.type";
 
 /**
  * A single message in a conversation history.
@@ -45,6 +46,14 @@ export type Message<User = Record<string, unknown>> = {
   toolCallId?: string;
   /** Tool calls requested by the assistant — present when role is "assistant" and the LLM triggered tools */
   toolCalls?: ModelToolCallRequest[];
+  /**
+   * The assistant turn's raw provider blocks (thinking, redacted thinking,
+   * compaction, text, tool use), in the order the provider returned them.
+   * An adapter whose format matches `block.provider` replays them verbatim
+   * instead of rebuilding the turn from `content` + `toolCalls`; other
+   * adapters ignore them. Keep it when you persist a transcript.
+   */
+  blocks?: ProviderContentBlock[];
   /** When this message was created */
   timestamp?: Date;
   /** Arbitrary metadata for application-level use */

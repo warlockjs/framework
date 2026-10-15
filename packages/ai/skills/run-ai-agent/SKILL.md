@@ -1,6 +1,6 @@
 ---
 name: run-ai-agent
-description: 'Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, agent.eval scoring, the judge-safe preset for resilient LLM-as-judge / verdict classifiers (ai.agent.judge / judge: true — lenient JSON parse + repair + never-throw, for Nova-class models), and auto-adapting raw executables in tools:[]. Triggers: `ai.agent`, `ai.agent.judge`, `agent.execute`, `agent.stream`, `agent.eval`, `AgentResult`, `AgentReport`, `AgentToolEntry`, `JudgeConfig`, `JudgeAgentConfig`, `judge`, `repairAttempts`, `streamingToolGuard`, `attachments`, `repair`, `maxTrips`, `sessionId`, `spawnSubAgent`, `SpawnSubAgentSpec`; ''run an agent'', ''stream an agent response'', ''structured output schema'', ''pass image to agent'', ''evaluate an agent'', ''LLM-as-judge that survives malformed JSON'', ''grade with a Nova model without crashing'', ''put a supervisor in tools'', ''cancel an agent run'', ''spawn a one-shot sub-agent with a per-task budget''; typical import `import { ai } from "@warlock.js/ai"`. Skip: tool definition — the `define-ai-tool` topic; workflows — the `run-ai-workflow` topic; eval matchers / batch / fallback detail — the `ai-dx-helpers` topic; competing libs `langchain`, `ai` (Vercel), raw `openai`.'
+description: 'Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, agent.eval scoring, the judge-safe preset for resilient LLM-as-judge / verdict classifiers (ai.agent.judge / judge: true — lenient JSON parse + repair + never-throw, for Nova-class models), and auto-adapting raw executables in tools:[]. Triggers: `ai.agent`, `ai.agent.judge`, `agent.execute`, `agent.stream`, `agent.eval`, `AgentResult`, `AgentReport`, `AgentToolEntry`, `JudgeConfig`, `JudgeAgentConfig`, `judge`, `repairAttempts`, `streamingToolGuard`, `attachments`, `repair`, `maxTrips`, `sessionId`, `spawnSubAgent`, `SpawnSubAgentSpec`, `toolDispatch`, `finishReason`, `pause_turn`, `refusal`, `context_exceeded`, `blocks`, `ProviderContentBlock`, `providerOptions`; ''run an agent'', ''stream an agent response'', ''structured output schema'', ''pass image to agent'', ''evaluate an agent'', ''LLM-as-judge that survives malformed JSON'', ''grade with a Nova model without crashing'', ''put a supervisor in tools'', ''cancel an agent run'', ''spawn a one-shot sub-agent with a per-task budget''; typical import `import { ai } from "@warlock.js/ai"`. Skip: tool definition — the `define-ai-tool` topic; workflows — the `run-ai-workflow` topic; eval matchers / batch / fallback detail — the `ai-dx-helpers` topic; competing libs `langchain`, `ai` (Vercel), raw `openai`.'
 ---
 
 # `ai.agent()` — single-turn primitive
@@ -26,12 +26,17 @@ ai.agent({
   output?: StandardSchemaV1<T>,                // default structured-output schema
   middleware?: AgentMiddleware[],
   streamingToolGuard?: StreamingToolGuardConfig, // opt-in tool-call recovery from text leaks
+  toolDispatch?: "concurrent" | "sequential",  // default "concurrent" — one trip's tool calls run at once
   on?: AgentEventHandlers,
   version?: string,                            // mirrored onto reports for trip archives
 });
 ```
 
 The factory returns an `AgentContract<TOutput>`. Every execution spawns a fresh internal `Execution` — the factory holds no per-call state.
+
+**Parallel tool calls.** When the model requests several tools in one turn they run concurrently (`toolDispatch: "concurrent"`, the default); tool-result messages and `ToolCall` records still follow the request order. Use `toolDispatch: "sequential"` (factory or per-call `execute(input, { toolDispatch })`) for tools that share mutable state.
+
+**Provider options.** `modelOptions.providerOptions.<format>` carries adapter-only options (e.g. `anthropic: { betas, body, thinkingDisplay }`); each adapter reads only its key. `modelOptions.cacheControl.ttl` (`"5m" | "1h"`) sets the cache lifetime per call.
 
 ## Anonymous agents
 
@@ -133,6 +138,7 @@ type AgentResult<T> = {
   type: "agent";
   data?: T; // structured output when `output` schema was supplied
   text?: string; // raw final LLM text
+  blocks?: ProviderContentBlock[]; // final trip's raw provider blocks (thinking, compaction…)
   report: AgentReport; // trips, toolCalls, status, timing
   usage: Usage; // aggregated token usage + cost breakdown
   error?: AIError;
@@ -158,6 +164,10 @@ Tool calls are NOT a separate `report.toolCalls` field — every tool dispatch i
 const toolCalls = report.children.filter((c) => c.type === "tool");
 const nestedAgents = report.children.filter((c) => c.type === "agent");
 ```
+
+**Finish reasons.** `LLMTrip.finishReason` is `stop | tool_calls | length | context_exceeded | pause_turn | refusal | error`. The agent resumes `pause_turn` itself (replays the paused turn, calls again, counts against `maxTrips`); `refusal` and `context_exceeded` end the run without an `error` — check `report.trips.at(-1)?.finishReason` to fall back to another model or compact the history.
+
+**Provider blocks.** Adapters return blocks the neutral `text` can't carry (Anthropic thinking / redacted thinking / compaction / server tools) as `ModelResponse.blocks`; the agent keeps them on the assistant `Message.blocks`, `LLMTrip.blocks` and `result.blocks`, and the adapter replays them verbatim. Persisting your own transcript? Store `{ role: "assistant", content: text, blocks }`.
 
 Canonical destructuring:
 
