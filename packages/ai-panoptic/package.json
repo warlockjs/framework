@@ -1,0 +1,64 @@
+{
+  "name": "@warlock.js/ai-panoptic",
+  "version": "5.29.0",
+  "type": "module",
+  "description": "Observability collector + exporters for @warlock.js/ai",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "typings": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "llms": "node scripts/generate-llms.mjs"
+  },
+  "keywords": [
+    "warlock",
+    "ai",
+    "observability",
+    "tracing",
+    "opentelemetry",
+    "langfuse"
+  ],
+  "author": "Hasan Zohdy",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warlockjs/ai-panoptic"
+  },
+  "devDependencies": {
+    "@warlock.js/ai": "workspace:^",
+    "@warlock.js/cache": "workspace:^",
+    "@warlock.js/logger": "workspace:^",
+    "typescript": "^5.0.0",
+    "vitest": "4.1.10"
+  },
+  "peerDependencies": {
+    "@opentelemetry/api": "*",
+    "@opentelemetry/sdk-trace-base": "*",
+    "@warlock.js/ai": "*",
+    "@warlock.js/cache": "*",
+    "@warlock.js/logger": "*",
+    "langfuse": "*"
+  },
+  "peerDependenciesMeta": {
+    "@opentelemetry/api": {
+      "optional": true
+    },
+    "@opentelemetry/sdk-trace-base": {
+      "optional": true
+    },
+    "@warlock.js/cache": {
+      "optional": true
+    },
+    "langfuse": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "langfuse": "^3.38.20"
+  },
+  "packageManager": "pnpm@11.24.0"
+}
