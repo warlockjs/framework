@@ -542,6 +542,12 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
 
   /**
    * Define custom rule
+   *
+   * `value` is deliberately untyped: custom rules run in the rule pipeline,
+   * before a container validates its children (an object's fields are not yet
+   * validated or defaulted) and, unless `firstErrorOnly` is set, even after the
+   * type rule has failed. Typing it as the schema output would promise a shape
+   * the callback does not always receive.
    */
   public refine(
     callback: (
@@ -676,7 +682,19 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
       return { isValid: true, errors: [], data: null };
     }
 
-    const valueForRules = (isBlank ? undefined : data) ?? this.getDefaultValue();
+    const input = isBlank ? undefined : data;
+    const valueForRules = input ?? this.getDefaultValue();
+    // A parent object pre-fills an absent key with this field's default and
+    // flags it; consume the flag so nested item contexts don't inherit it.
+    const parentFilledDefault = context?.valueIsDefault === true;
+
+    if (parentFilledDefault) context.valueIsDefault = false;
+
+    // The author's own default is a value, even an empty one: `.default("")`
+    // must not fail the required check it exists to satisfy.
+    const usedDefault =
+      (input == null && valueForRules !== undefined) ||
+      (parentFilledDefault && input !== undefined);
     // Optional fields with no resolved value are absent, not values to
     // transform. Skipping here protects every mutator while still allowing
     // defaults and present values through the normal mutation pipeline.
@@ -704,7 +722,8 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
 
     // Prepend the required-condition rule if set, so it always runs first.
     // requiredRule has requiresValue = false so it runs even on empty values.
-    const rulesToRun = this.requiredRule ? [this.requiredRule, ...this.rules] : this.rules;
+    const rulesToRun =
+      this.requiredRule && !usedDefault ? [this.requiredRule, ...this.rules] : this.rules;
 
     for (const rule of rulesToRun) {
       if ((rule.requiresValue ?? true) && skipEmptyRules) continue;

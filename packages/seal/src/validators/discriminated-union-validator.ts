@@ -1,13 +1,22 @@
 import { isPlainObject } from "@mongez/supportive-is";
 import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 import { applyNullable, wrapNullableStrict } from "../standard-schema/json-schema";
-import type { SchemaContext, ValidationResult } from "../types";
+import type { Schema, SchemaContext, ValidationResult } from "../types";
+import type { InferInputObjectShape, InferOutputObjectShape } from "../types/inference-types";
 import { BaseValidator } from "./base-validator";
 import { LiteralValidator } from "./literal-validator";
 import { ObjectValidator } from "./object-validator";
 
 /** A literal value a discriminator field can hold (the key type of the branch map). */
 type DiscriminatorValue = string | number | boolean;
+
+/** The union of every branch's input shape (distributes over the branches). */
+type BranchInput<B> =
+  B extends ObjectValidator<infer S extends Schema> ? InferInputObjectShape<S> : never;
+
+/** The union of every branch's output shape (distributes over the branches). */
+type BranchOutput<B> =
+  B extends ObjectValidator<infer S extends Schema> ? InferOutputObjectShape<S> : never;
 
 /** Whether a value read from the payload can be a discriminator key. */
 function isDiscriminatorValue(value: unknown): value is DiscriminatorValue {
@@ -48,7 +57,7 @@ function isDiscriminatorValue(value: unknown): value is DiscriminatorValue {
 export class DiscriminatedUnionValidator<
   K extends string = string,
   Branches extends ReadonlyArray<ObjectValidator<any>> = ReadonlyArray<ObjectValidator<any>>,
-> extends BaseValidator {
+> extends BaseValidator<BranchInput<Branches[number]>, BranchOutput<Branches[number]>> {
   /** Map from discriminator literal value → matching branch validator. */
   private branches: Map<DiscriminatorValue, ObjectValidator<any>>;
 
@@ -107,6 +116,18 @@ export class DiscriminatedUnionValidator<
   public override async validate(data: any, context: SchemaContext): Promise<ValidationResult> {
     if (data === null && this.isNullable) {
       return { isValid: true, errors: [], data: null };
+    }
+
+    if (data === undefined) {
+      const fallback = this.getDefaultValue();
+
+      // Absent with no default: required/optional is the base pipeline's
+      // question (required error, or a valid absent field under `.optional()`).
+      if (fallback === undefined) {
+        return super.validate(undefined, context);
+      }
+
+      data = fallback;
     }
 
     if (!isPlainObject(data)) {

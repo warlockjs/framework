@@ -38,16 +38,20 @@ Source: `@warlock.js/seal/src/factory/validators.ts`.
 ```ts
 validate<T extends BaseValidator>(
   schema: T,
-  data: any,
+  data: unknown,
   options?: ValidateOptions,
-): Promise<ValidationResult>;
+): Promise<TypedValidationResult<ValidatedOutput<T>>>;
+
+type TypedValidationResult<TData> =
+  | { isValid: true; data: TData; errors: ValidationResult["errors"] }
+  | { isValid: false; data: undefined; errors: ValidationResult["errors"] };
 ```
 
-Runs the schema against `data` and returns `{ isValid, data, errors }`. Never throws on bad input.
+Runs the schema against `data` and returns `{ isValid, data, errors }`. Never throws on bad input. On success `data` is `Infer.Output<T>`; on failure it is `undefined`. A schema typed as bare `BaseValidator`/`ObjectValidator` keeps `data: any`.
 
 ```ts
 const result = await validate(userSchema, request.body);
-if (result.isValid) handle(result.data);
+if (result.isValid) handle(result.data); // Infer.Output<typeof userSchema>
 ```
 
 Source: `@warlock.js/seal/src/factory/validate.ts`.

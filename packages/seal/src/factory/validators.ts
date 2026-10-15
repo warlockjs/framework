@@ -2,7 +2,7 @@ import type { SealConfig } from "../config";
 import { object } from "../object";
 import { string } from "../string";
 import type { StandardSchemaV1 } from "../standard-schema/types";
-import type { Schema, SchemaContext, ValidationResult } from "../types";
+import type { Schema, SchemaContext, TypedValidationResult, ValidatedOutput } from "../types";
 import type { Infer } from "../types/inference-types";
 import { AnyValidator } from "../validators/any-validator";
 import { ArrayValidator } from "../validators/array-validator";
@@ -184,7 +184,7 @@ export const v: ValidatorV = {
       K,
       Branches
     > &
-      StandardSchemaV1<Infer<Branches[number]>>,
+      StandardSchemaV1<Infer.Input<Branches[number]>, Infer.Output<Branches[number]>>,
 
   /** Create a computed field validator - derives value from other validated fields */
   computed: <TResult = any>(
@@ -273,7 +273,8 @@ export interface ValidatorV {
   discriminatedUnion: <K extends string, Branches extends ReadonlyArray<ObjectValidator<any>>>(
     discriminator: K,
     validators: Branches,
-  ) => DiscriminatedUnionValidator<K, Branches> & StandardSchemaV1<Infer<Branches[number]>>;
+  ) => DiscriminatedUnionValidator<K, Branches> &
+    StandardSchemaV1<Infer.Input<Branches[number]>, Infer.Output<Branches[number]>>;
   computed: <TResult = any>(
     callback: (data: any, context: SchemaContext) => TResult | Promise<TResult>,
     resultValidator?: BaseValidator,
@@ -284,7 +285,7 @@ export interface ValidatorV {
   ) => ManagedValidator<TResult> & StandardSchemaV1<TResult>;
   validate: <T extends BaseValidator>(
     schema: T,
-    data: any,
+    data: unknown,
     options?: ValidateOptions,
-  ) => Promise<ValidationResult>;
+  ) => Promise<TypedValidationResult<ValidatedOutput<T>>>;
 }

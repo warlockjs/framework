@@ -1,4 +1,5 @@
 import { literalRule } from "../rules/common/literal";
+import { presentRule } from "../rules/core/required";
 import { applyNullable } from "../standard-schema/json-schema";
 import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 import { BaseValidator } from "./base-validator";
@@ -24,20 +25,24 @@ export class LiteralValidator<
 
   public constructor(values: T, errorMessage?: string) {
     super();
-    this.blankIsMissing = true;
     this.values = values;
     this.addMutableRule(literalRule, errorMessage, { values });
 
-    // `""` is a value, not an absence. Every validator is required by default,
-    // and `required` rejects anything `isEmptyValue` calls empty — including the
-    // empty string — so `v.literal("")` could never pass. When the author has
-    // explicitly listed an empty value as acceptable, swap `required` for
-    // `present`: the key must still exist, but judging the value is the literal
-    // set's job, and it is already the stricter statement of intent.
-    //
-    // Dropping the rule entirely instead would make a missing key valid, which
-    // is the opposite mistake — `alt=""` and no `alt` at all are different
-    // things to a screen reader, and to anything else reading the schema.
+    // A blank form value counts as missing for literal/enum sets (5.25), so an
+    // unselected `<select>` reads as absent. That cannot apply when the author
+    // listed a blank string as an accepted value: there `""` is a value, not an
+    // absence, and `alt=""` and no `alt` at all mean different things.
+    const acceptsBlank = values.some((value) => typeof value === "string" && value.trim() === "");
+
+    this.blankIsMissing = !acceptsBlank;
+
+    // Every validator is required by default, and `required` rejects anything
+    // `isEmptyValue` calls empty, including `""`. When the set accepts a blank
+    // value, swap `required` for `present`: the key must still exist, and
+    // judging the value is the literal rule's job.
+    if (acceptsBlank) {
+      this.requiredRule = this.createRule(presentRule);
+    }
   }
 
   /**

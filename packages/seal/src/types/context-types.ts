@@ -42,6 +42,12 @@ export type SchemaContext = {
   /** Translation function for error messages */
   translateRule: (ruleTranslation: RuleTranslation) => string;
   translateAttribute: (attributeTranslation: AttributeTranslation) => string;
+  /**
+   * Set by a parent `ObjectValidator` when the key was absent and `value` is
+   * this field's own `.default()`. The receiving validator reads it once and
+   * clears it, so it never leaks into an array/tuple/record's item contexts.
+   */
+  valueIsDefault?: boolean;
   /** Validation configurations */
   configurations?: {
     firstErrorOnly?: boolean;

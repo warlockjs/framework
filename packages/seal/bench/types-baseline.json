@@ -1,0 +1,13 @@
+{
+  "typescript": "5.9.3",
+  "node": "v22.13.0",
+  "entities": 16,
+  "services": 8,
+  "files": 465,
+  "types": 679364,
+  "instantiations": 1765565,
+  "memoryKB": 1702170,
+  "checkTimeSeconds": 12.22,
+  "totalTimeSeconds": 12.88,
+  "errors": 0
+}

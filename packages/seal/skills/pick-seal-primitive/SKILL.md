@@ -81,6 +81,10 @@ That distinction matters wherever "empty" and "absent" mean different things —
 Before 4.9.2 `v.literal("")` always failed with *"is required"*, and `.optional()` looked like a workaround while actually disabling the literal check — accepting `""`, `null`, and a missing key alike. `v.literal(0)` and `v.literal(false)` were never affected.
 :::
 
+:::note[Fixed again in 5.30]
+5.25 made a blank form value count as missing for literal and enum sets, so an unselected `<select>` reads as absent. That rule also caught `v.literal("")` from 5.25 to 5.29: the required literal rejected `""` and `.optional()` dropped it from the data. Since 5.30 a literal set that lists a blank string keeps `""` as a value (required, `.present()`, `.optional()` and `.nullable()` all return it); a set without one still reads a blank value as missing.
+:::
+
 `v.instanceof(Ctor)` for File/Buffer/Uint8Array/custom classes. Returns `{}` from `toJsonSchema()` (not representable). For OpenAPI `File`, attach `{ type: "string", format: "binary" }` manually after generation.
 
 ## `v.any` — escape hatch

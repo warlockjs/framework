@@ -421,8 +421,8 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
     );
 
     const validationPromises = userInputEntries.map(async ([key, validator], index) => {
-      const value =
-        mutatedData?.[key] !== undefined ? mutatedData[key] : validator.getDefaultValue();
+      const isPresent = mutatedData?.[key] !== undefined;
+      const value = isPresent ? mutatedData[key] : validator.getDefaultValue();
 
       const childContext: SchemaContext = {
         ...context,
@@ -430,6 +430,7 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
         value,
         key,
         path: setKeyPath(context.path, key),
+        valueIsDefault: !isPresent && value !== undefined,
       };
 
       const childResult = await validator.validate(value, childContext);

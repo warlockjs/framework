@@ -1,16 +1,19 @@
 import { getSealConfig } from "../config";
-import type { SchemaContext, ValidationResult } from "../types";
+import type { SchemaContext, TypedValidationResult, ValidatedOutput } from "../types";
 import type { BaseValidator } from "../validators";
 import type { ValidateOptions } from "./validators";
 
 /**
- * Validate data against a schema
+ * Validate data against a schema.
+ *
+ * The result narrows on `isValid`: on success `data` is the schema's
+ * `Infer.Output`, on failure it is `undefined`.
  */
 export const validate = async <T extends BaseValidator>(
   schema: T,
-  data: any, // Temporarily use any - will fix type inference
+  data: unknown,
   { context: extendedContext, ...configurations }: ValidateOptions = getSealConfig() || {},
-): Promise<ValidationResult> => {
+): Promise<TypedValidationResult<ValidatedOutput<T>>> => {
   const context: SchemaContext = {
     allValues: data,
     parent: null,
@@ -40,8 +43,8 @@ export const validate = async <T extends BaseValidator>(
   // shipped every field the schema existed to exclude. A guard that returns the
   // unsafe value on failure reads as safe and isn't.
   if (!result.isValid) {
-    return { ...result, data: undefined };
+    return { isValid: false, errors: result.errors, data: undefined };
   }
 
-  return result;
+  return { isValid: true, errors: result.errors, data: result.data };
 };

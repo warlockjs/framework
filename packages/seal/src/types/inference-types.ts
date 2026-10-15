@@ -108,11 +108,16 @@ export type IsOutputOptionalKey<V> = V extends { isOptional: true }
  * (it'll be filled, defaulted, or rescued).
  */
 export type IsInputOptionalKey<V> = V extends
-  | { isOptional: true }
-  | { hasDefault: true }
-  | { hasCatch: true }
+  { isOptional: true } | { hasDefault: true } | { hasCatch: true }
   ? true
   : false;
+
+/**
+ * Merge the optional-key and required-key halves of an object shape into one
+ * object type, so `Infer<>` reads (and compares) as a single literal instead
+ * of an intersection of two mapped types.
+ */
+type Flatten<T> = { [K in keyof T]: T[K] } & {};
 
 /**
  * Apply `| null` widening when the validator type carries `{ isNullable: true }`.
@@ -131,11 +136,13 @@ type WithNullable<V, T> = V extends { isNullable: true } ? T | null : T;
  * walker on the parent class's type parameter creates a recursive class-base
  * reference when combined with brand-checks.
  */
-export type InferOutputObjectShape<S extends Schema> = {
-  [K in keyof S as IsOutputOptionalKey<S[K]> extends true ? K : never]?: Infer.Output<S[K]>;
-} & {
-  [K in keyof S as IsOutputOptionalKey<S[K]> extends true ? never : K]: Infer.Output<S[K]>;
-};
+export type InferOutputObjectShape<S extends Schema> = Flatten<
+  {
+    [K in keyof S as IsOutputOptionalKey<S[K]> extends true ? K : never]?: Infer.Output<S[K]>;
+  } & {
+    [K in keyof S as IsOutputOptionalKey<S[K]> extends true ? never : K]: Infer.Output<S[K]>;
+  }
+>;
 
 /**
  * Compute the inferred *input* object shape for a Schema. Mirror of
@@ -143,11 +150,13 @@ export type InferOutputObjectShape<S extends Schema> = {
  * `.default()` or `.catch()` (or `.optional()`) are all marked optional in
  * the input shape.
  */
-export type InferInputObjectShape<S extends Schema> = {
-  [K in keyof S as IsInputOptionalKey<S[K]> extends true ? K : never]?: Infer.Input<S[K]>;
-} & {
-  [K in keyof S as IsInputOptionalKey<S[K]> extends true ? never : K]: Infer.Input<S[K]>;
-};
+export type InferInputObjectShape<S extends Schema> = Flatten<
+  {
+    [K in keyof S as IsInputOptionalKey<S[K]> extends true ? K : never]?: Infer.Input<S[K]>;
+  } & {
+    [K in keyof S as IsInputOptionalKey<S[K]> extends true ? never : K]: Infer.Input<S[K]>;
+  }
+>;
 
 /**
  * Bare `Infer<T>` defaults to `Infer.Input<T>`. Use `Infer.Output<T>` when
@@ -275,3 +284,21 @@ export type InferObjectShape<S extends Schema> = InferOutputObjectShape<S>;
  * @deprecated Use `IsOutputOptionalKey<V>` instead. Kept for back-compat.
  */
 export type IsOptionalKey<V> = IsOutputOptionalKey<V>;
+
+/**
+ * The `data` type `validate(schema, input)` returns on success.
+ *
+ * It is `Infer.Output<T>`, except where the schema's type does not describe
+ * its output: a bare `BaseValidator`, an `ObjectValidator` over the wide
+ * `Schema`, or anything whose output is `unknown`. Those stay `any`, as they
+ * were before `validate()` was typed, so untyped call sites keep compiling.
+ */
+export type ValidatedOutput<T> = [Infer.Output<T>] extends [infer O]
+  ? unknown extends O
+    ? any
+    : O extends object
+      ? string extends keyof O
+        ? any
+        : O
+      : O
+  : never;

@@ -69,7 +69,7 @@ The 12 things that are true in every seal use:
 2. **Every factory return is a `StandardSchemaV1<Infer.Output<T>>`.** Pass seal schemas straight into `StandardSchemaV1<T>`-typed slots — no casts.
 3. **Two inference helpers — `Infer.Input<T>` and `Infer.Output<T>`.** Bare `Infer<T>` is an alias for `Infer.Input<T>` (the dominant usage: HTTP bodies, DTOs, form payloads). Use `Infer.Output<T>` for validated state (Cascade `Model<>` params, post-`validate()` data). See [the rules below](#inferinput-vs-inferoutput).
 4. **Fields are required by default.** Mark optional explicitly: `.optional()`. Skip `.required()` — canonical seal style omits the redundant call; inferred types already show what's required.
-5. **`validate(schema, data)` never throws.** Returns `Promise<ValidationResult>` with `{ isValid, data, errors }` — the validated value is `result.data`. See the `handle-seal-errors` topic.
+5. **`validate(schema, data)` never throws.** Returns `{ isValid, data, errors }`, narrowed on `isValid`: on success `data` is `Infer.Output<typeof schema>`, on failure it is `undefined` (a bare `BaseValidator`/`ObjectValidator` annotation keeps `data: any`). See the `handle-seal-errors` topic.
 6. **Validators are immutable by default.** Every chain method (`.min(3)`, `.email()`, `.optional()`, …) returns a clone. Toggle with the `.mutable` getter.
 7. **Two pipelines: mutators (pre-validation), transformers (post-validation).** Order: `default → mutators → required check → required-condition rule → other rules → transformers → data`. `.catch(fallback)` rescues any failure on leaf validators.
 8. **Cross-field rules need a `v.object` parent.** Standalone scalar validators have no siblings to resolve against.

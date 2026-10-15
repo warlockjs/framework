@@ -1,0 +1,21 @@
+{
+  // Typecheck-only configuration. `tsconfig.json` keeps `rootDir: src` for the
+  // build, which rejects every file under `tests/`, so the `expectTypeOf`
+  // assertions in `tests/unit/types/` were never enforced (vitest's plain
+  // runner treats them as no-ops). Including that folder here makes
+  // `pnpm typecheck` fail when an inferred type drifts.
+  //
+  // Only the type-test folder is included: the full runtime suite builds
+  // hundreds of ad-hoc schemas and exhausts the default compiler heap (see
+  // `scripts/bench-types.mjs` for the compile-cost benchmark).
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false
+  },
+  "include": ["src/**/*", "tests/unit/types/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -4,6 +4,31 @@ All notable changes to `@warlock.js/seal` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.30.0
+
+### Upgrading
+
+- **BREAKING (types only):** `validate()` now returns a result narrowed on `isValid`. On success `data` is `Infer.Output<typeof schema>`, on failure it is `undefined`. Code that read `result.data` without checking `isValid`, or assigned it to an unrelated type, may need a check or a cast. A schema typed as bare `BaseValidator`/`ObjectValidator` keeps `data: any`.
+
+### Added
+
+- `TypedValidationResult<T>` and `ValidatedOutput<T>` types.
+- `pnpm bench:types` measures inference compile cost on a generated composed-schema project (16 entities, 8 services) and fails when instantiations or types grow more than 5% over `bench/types-baseline.json` (WR-001).
+
+### Changed
+
+- `validate()` takes `data: unknown` instead of `any`.
+- `Infer.Input`/`Infer.Output` of an object is one flat object type instead of an intersection of its optional and required halves; the shape is unchanged and compile cost moves by 0.1%.
+- `pnpm typecheck` now also checks the `expectTypeOf` assertions in `tests/unit/types/` (`tsconfig.typecheck.json`); they were never enforced before.
+- `.refine()` callbacks stay `value: any` on purpose: custom rules run before an object or array validates its children, so the value is not the schema output (WR-020).
+
+### Fixed
+
+- `v.literal("")` accepts a present `""` again (regressed in 5.25): required and `.present()` keep it, `.optional()` and `.nullable()` no longer drop it. A literal set without a blank value still reads `""` as missing (WR-008).
+- A field with an empty default (`v.string().max(n).default("")`) no longer fails "is required" when the input omits it (WR-008).
+- `v.discriminatedUnion(...).optional()` accepts an absent or `undefined` field; `null` is still rejected unless `.nullable()`. A required union now reports a missing field with the `required` error, and `.default(...)` is validated through its branch (WR-007).
+- `schema["~standard"].validate(...)` on a discriminated union resolves to the branch output union instead of `unknown` (WR-020).
+
 ## 5.29.0 - 2026-10-01
 
 ### Changed

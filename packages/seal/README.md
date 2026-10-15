@@ -192,6 +192,8 @@ v.string().refine(async value => {
 });
 ```
 
+The callback's `value` is typed `any` on purpose: custom rules run before an object or array validates its children, so the value is the (mutated) input, not the schema output. Check the shape you rely on.
+
 ### ✅ Mutators & Transformers
 
 Normalize input and format output:

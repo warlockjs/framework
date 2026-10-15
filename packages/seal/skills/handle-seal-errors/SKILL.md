@@ -5,14 +5,12 @@ description: 'Read `ValidationResult` — `isValid`, `errors[]`, `data`. Branch 
 
 # `ValidationResult` — reading errors
 
-`validate(schema, data)` never throws. It returns a `ValidationResult`:
+`validate(schema, data)` never throws. It returns a result narrowed on `isValid`:
 
 ```ts
-type ValidationResult = {
-  isValid: boolean;
-  data: any;             // shape after mutators + transformers (the validated value)
-  errors: ValidationError[];
-};
+type TypedValidationResult<TData> =
+  | { isValid: true; data: TData; errors: ValidationError[] }   // TData = Infer.Output<typeof schema>
+  | { isValid: false; data: undefined; errors: ValidationError[] };
 
 type ValidationError = {
   type: string;          // rule type that failed — "required", "email", "min", "string", ...

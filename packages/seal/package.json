@@ -30,7 +30,8 @@
     "dayjs": "^1.11.9"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.typecheck.json",
+    "bench:types": "node scripts/bench-types.mjs --check",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
