@@ -1,8 +1,8 @@
 import type { CookieSerializeOptions } from "@fastify/cookie";
 import type { FastifyCorsOptions } from "@fastify/cors";
-import type { FastifyHttpOptions, FastifyHttp2Options, FastifyHttp2SecureOptions } from "fastify";
+import type { FastifyHttpOptions } from "fastify";
 import type { Server as NodeHttpServer } from "node:http";
-import type { Http2Server, Http2SecureServer } from "node:http2";
+import type { SecureServerOptions as Http2SecureOptions } from "node:http2";
 import type React from "react";
 import type { Middleware } from "../router";
 import type { HttpRateLimitConfig } from "./build-rate-limit-options";
@@ -196,7 +196,12 @@ export interface PartialMiddleware {
  * `gracefulShutdown.forceCloseConnections`) have their own `http.*` keys;
  * setting them here as well overrides those keys.
  */
-export type HttpServerOptions = FastifyHttpOptions<NodeHttpServer> | FastifyHttp2Options<Http2Server> | FastifyHttp2SecureOptions<Http2SecureServer>;
+export type HttpServerOptions = Omit<FastifyHttpOptions<NodeHttpServer>, "http2"> & {
+  /** Enable HTTP/2 while retaining the framework's HTTP-compatible reply API. */
+  http2?: boolean;
+  https?: Http2SecureOptions;
+  http2SessionTimeout?: number;
+};
 
 /**
  * Http Configurations list

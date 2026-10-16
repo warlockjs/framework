@@ -194,7 +194,7 @@ it("starts and drains the framework HTTP/2 server with default options and an id
   const app = startHttpServer({ http2: true });
   const started = gate();
   const release = gate();
-  app.get("/slow", async (_request, reply) => {
+  app.get("/slow", async (_request: unknown, reply: FastifyReply) => {
     started.release();
     await release.promise;
     return reply.send("complete");
