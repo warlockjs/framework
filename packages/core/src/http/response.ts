@@ -119,6 +119,15 @@ function secureCookieDefaults(): CookieSerializeOptions {
   };
 }
 
+/**
+ * Make a value safe for a single-line SSE field (`event:`, `id:`): line breaks
+ * would end the field and inject the rest as new fields or events, and the
+ * spec makes a client ignore an `id` containing NUL. All three are removed.
+ */
+export function toSingleLineSseField(value: unknown): string {
+  return String(value).replace(/[\r\n\0]/g, "");
+}
+
 export class Response {
   /**
    * Current route
@@ -678,7 +687,7 @@ export class Response {
     this.setContentType(contentType);
     this.header("Transfer-Encoding", "chunked");
     this.header("Cache-Control", "no-cache");
-    this.header("Connection", "keep-alive");
+    this.keepLongLivedConnectionAlive();
     this.header("X-Content-Type-Options", "nosniff");
 
     // Trigger sending events
@@ -910,7 +919,7 @@ export class Response {
     // Set SSE-specific headers
     this.setContentType("text/event-stream");
     this.header("Cache-Control", "no-cache, no-store, must-revalidate");
-    this.header("Connection", "keep-alive");
+    this.keepLongLivedConnectionAlive();
     this.header("X-Accel-Buffering", "no"); // Disable nginx buffering
 
     // Trigger sending events
@@ -939,9 +948,16 @@ export class Response {
     raw.writeHead(this.statusCode, this.getHeaders() as any);
 
     const writeMessage = (event: string, data: any, id?: string): void => {
+      // `event` and `id` are single-line SSE fields: a CR or LF in a
+      // caller-supplied value would end the field early and let the rest of
+      // the value inject fields or whole events. `data` is JSON, which
+      // escapes line breaks itself.
+      const safeEvent = toSingleLineSseField(event);
+      const safeId = id === undefined ? undefined : toSingleLineSseField(id);
+
       let message = "";
-      if (id) message += `id: ${id}\n`;
-      message += `event: ${event}\n`;
+      if (safeId) message += `id: ${safeId}\n`;
+      message += `event: ${safeEvent}\n`;
       message += `data: ${JSON.stringify(data)}\n\n`;
 
       retained.push({ event, data, id });
@@ -994,7 +1010,11 @@ export class Response {
         // Silent no-op after disconnect
         if (transport.closed) return controller;
 
-        raw.write(`: ${text}\n\n`);
+        // One `:` line per line of text, so a line break in `text` cannot
+        // start a real field.
+        const lines = String(text).split(/\r\n|\r|\n/);
+
+        raw.write(`${lines.map((line) => `: ${line}`).join("\n")}\n\n`);
 
         return controller;
       },
@@ -1104,6 +1124,21 @@ export class Response {
    */
   public getResponseTime() {
     return this.baseResponse.elapsedTime;
+  }
+
+  /**
+   * Ask a long-lived response (`sse()`, `stream()`) to keep its connection
+   * open, unless a graceful shutdown already marked it `Connection: close`
+   * (see `beginHttpDrain`). The reply's own headers win over the raw ones at
+   * `writeHead`, so setting keep-alive unconditionally would undo the drain
+   * and hold the server's `close()` until the shutdown budget runs out.
+   */
+  protected keepLongLivedConnectionAlive() {
+    const current = this.baseResponse.raw.getHeader("connection");
+
+    if (typeof current === "string" && current.toLowerCase() === "close") return;
+
+    this.header("Connection", "keep-alive");
   }
 
   /**

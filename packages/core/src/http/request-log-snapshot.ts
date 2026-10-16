@@ -106,7 +106,7 @@ export function redactUrlCredentials(url: string, extraParams: readonly string[]
 
   const hashStart = url.indexOf("#", queryStart);
   const queryEnd = hashStart === -1 ? url.length : hashStart;
-  const extra = new Set(extraParams.map(normalizeRedactKey));
+  const isCredential = credentialParamMatcher(extraParams);
 
   const query = url
     .slice(queryStart + 1, queryEnd)
@@ -123,12 +123,7 @@ export function redactUrlCredentials(url: string, extraParams: readonly string[]
         // A malformed escape is logged under its raw name.
       }
 
-      const key = normalizeRedactKey(name);
-
-      if (
-        separator !== -1 &&
-        (DEFAULT_REDACT_KEY_SET.has(key) || URL_CREDENTIAL_PARAM_SET.has(key) || extra.has(key))
-      ) {
+      if (separator !== -1 && isCredential(name)) {
         return `${rawName}=${REDACTED}`;
       }
 
@@ -139,6 +134,63 @@ export function redactUrlCredentials(url: string, extraParams: readonly string[]
   // A fragment never reaches the server, but a URL handed in by app code may
   // carry one; it is dropped rather than risk logging a token in it.
   return `${url.slice(0, queryStart)}?${query}`;
+}
+
+/**
+ * A predicate telling whether a query parameter name carries a credential:
+ * its normalized name is in the logger's default secret-key denylist, in
+ * {@link URL_CREDENTIAL_PARAMS}, or in `extraParams`.
+ */
+function credentialParamMatcher(extraParams: readonly string[]): (name: string) => boolean {
+  const extra = new Set(extraParams.map(normalizeRedactKey));
+
+  return (name) => {
+    const key = normalizeRedactKey(name);
+
+    return DEFAULT_REDACT_KEY_SET.has(key) || URL_CREDENTIAL_PARAM_SET.has(key) || extra.has(key);
+  };
+}
+
+/**
+ * Mask the values of credential-bearing parameters in a parsed query object,
+ * with the same names {@link redactUrlCredentials} masks in the URL. Nested
+ * objects and arrays (`a[b]=…` parsing) are walked; the input is not mutated.
+ *
+ * @example
+ * redactQueryCredentials({ code: "abc", page: "2" }) // { code: "[REDACTED]", page: "2" }
+ */
+export function redactQueryCredentials(
+  query: Record<string, unknown>,
+  extraParams: readonly string[] = [],
+): Record<string, unknown> {
+  return redactQueryObject(query, credentialParamMatcher(extraParams));
+}
+
+function redactQueryObject(
+  query: Record<string, unknown>,
+  isCredential: (name: string) => boolean,
+): Record<string, unknown> {
+  const output: Record<string, unknown> = {};
+
+  for (const [name, value] of Object.entries(query)) {
+    output[name] = isCredential(name) ? REDACTED : redactQueryValue(value, isCredential);
+  }
+
+  return output;
+}
+
+function redactQueryValue(value: unknown, isCredential: (name: string) => boolean): unknown {
+  if (Array.isArray(value)) return value.map((item) => redactQueryValue(item, isCredential));
+
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    Object.getPrototypeOf(value) === Object.prototype
+  ) {
+    return redactQueryObject(value as Record<string, unknown>, isCredential);
+  }
+
+  return value;
 }
 
 /**
@@ -176,6 +228,7 @@ export type RequestLogSource = {
  * Build the {@link RequestLogSnapshot} for a request, applying the route's
  * logging policy BEFORE anything reaches a log entry: an omitted body or
  * query is never copied, so no sink, channel or redaction setting can expose it.
+ * Credential-bearing query parameters are masked in both `url` and `query`.
  *
  * Uploaded files are summarised (`{ file, mimeType }`) rather than walked.
  */
@@ -195,7 +248,7 @@ export function buildRequestLogSnapshot(source: RequestLogSource): RequestLogSna
   if (source.userAgent) snapshot.userAgent = source.userAgent;
 
   if (options.query && source.query && Object.keys(source.query).length > 0) {
-    snapshot.query = { ...source.query };
+    snapshot.query = redactQueryCredentials(source.query, options.redactQueryParams);
   }
 
   if (options.body && source.body && Object.keys(source.body).length > 0) {

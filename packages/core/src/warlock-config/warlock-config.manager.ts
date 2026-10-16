@@ -1,11 +1,19 @@
 import { fileExistsAsync } from "@warlock.js/fs";
 import { get } from "@mongez/reinforcements";
+import { getTsconfig } from "get-tsconfig";
 import { unlink, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { pathToFileURL } from "url";
 import { rootPath } from "../utils";
 import { bundleWarlockConfig } from "./bundle-config";
 import { type WarlockConfig } from "./types";
 import { getDeprecatedConfigWarnings } from "./warn-deprecated-config";
+
+/**
+ * `Error` with the ES2022 `cause` option, typed for packages still compiled
+ * against an older lib (see `application.ts`).
+ */
+const ErrorWithCause = Error as new (message: string, options: { cause: unknown }) => Error;
 
 /**
  * True when `error` is Node's "this runtime can't import a `.ts` file" error.
@@ -23,19 +31,72 @@ export function isUnknownTsExtensionError(error: unknown): boolean {
 }
 
 /**
- * True when `error` is Node failing to RESOLVE an import of the config graph:
- * an extensionless relative import (`./src/connectors/local`), a directory
- * import, or a tsconfig `paths` alias (`app/connectors`) — all of which only a
- * TypeScript toolchain resolves. Native type stripping (Node ≥ 22.18) loads
- * `warlock.config.ts` itself, then fails here.
+ * True when `error` is Node failing to RESOLVE an import of the config's OWN
+ * graph: an extensionless relative import (`./src/connectors/local`), a
+ * directory import, or a tsconfig `paths` alias (`app/connectors`) — all of
+ * which only a TypeScript toolchain resolves. Native type stripping
+ * (Node ≥ 22.18) loads `warlock.config.ts` itself, then fails here.
  *
- * Resolution fails while linking, before any module of the graph has run, so
- * falling back to the bundled loader never executes the config twice.
+ * A package that is genuinely not installed is NOT a fallback case: the error
+ * names a bare specifier that matches no `paths` pattern, and it is rethrown
+ * as is. Neither is a missing module imported from inside `node_modules`.
+ *
+ * `pathAliases` are the tsconfig `paths` patterns (`app/*`). When the message
+ * cannot be parsed the error is treated as a graph error, as before.
  */
-export function isUnresolvedConfigImportError(error: unknown): boolean {
+export function isUnresolvedConfigImportError(
+  error: unknown,
+  pathAliases: readonly string[] = [],
+): boolean {
   const code = (error as { code?: string })?.code;
 
-  return code === "ERR_MODULE_NOT_FOUND" || code === "ERR_UNSUPPORTED_DIR_IMPORT";
+  if (code === "ERR_UNSUPPORTED_DIR_IMPORT") return true;
+  if (code !== "ERR_MODULE_NOT_FOUND") return false;
+
+  const message = String((error as Error)?.message ?? "");
+  const match = /Cannot find (module|package) '([^']+)' imported from (.+)$/m.exec(message);
+
+  if (!match) return true;
+
+  const [, kind, specifier = "", importer = ""] = match;
+
+  if (/[\\/]node_modules[\\/]/.test(importer)) return false;
+
+  // An unresolved relative or absolute path: an extensionless TS import.
+  if (kind === "module") return true;
+
+  // A bare name: only a tsconfig alias is the config graph's own code.
+  return pathAliases.some((pattern) => aliasCovers(pattern, specifier));
+}
+
+/**
+ * True when `error` is native type stripping refusing TypeScript it cannot
+ * strip (an `enum`, a `namespace`, a parameter property) or a `.ts` file under
+ * `node_modules`. Both are raised while loading, before the graph runs.
+ */
+export function isUnsupportedTypeStrippingError(error: unknown): boolean {
+  const code = (error as { code?: string })?.code;
+
+  return (
+    code === "ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX" ||
+    code === "ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING"
+  );
+}
+
+/**
+ * True when a tsconfig `paths` pattern can produce `packageName` as the first
+ * segment(s) of a specifier: `app/*` covers `app`, `@shared/*` covers
+ * `@shared`, a catch-all `*` covers anything.
+ */
+function aliasCovers(pattern: string, packageName: string): boolean {
+  const star = pattern.indexOf("*");
+  const prefix = star === -1 ? pattern : pattern.slice(0, star);
+
+  if (prefix === "") return true;
+
+  return (
+    prefix === packageName || prefix.startsWith(`${packageName}/`) || packageName.startsWith(prefix)
+  );
 }
 
 /**
@@ -112,16 +173,25 @@ export class WarlockConfigManager {
       // `dev` registers a TS loader hook, and Node ≥ 22.18 / 23.6 strips types
       // natively — in both cases the direct import above works for a
       // self-contained config. But `build` / `start` register no hook, so on an
-      // older Node the import throws ERR_UNKNOWN_FILE_EXTENSION, and native
+      // older Node the import throws ERR_UNKNOWN_FILE_EXTENSION; native
       // stripping cannot resolve extensionless or tsconfig-aliased local
-      // imports. Bundle the config's local graph with esbuild ourselves so
-      // config loading is Node-version-independent rather than relying on an
-      // experimental runtime feature.
-      if (isUnknownTsExtensionError(error) || isUnresolvedConfigImportError(error)) {
+      // imports, nor strip an `enum` or a parameter property. Bundle the
+      // config's local graph with esbuild ourselves so config loading is
+      // Node-version-independent.
+      //
+      // These errors are raised while resolving and loading the STATIC graph,
+      // before any of it runs. An unresolved import reached later — a dynamic
+      // `import()` while the config runs — is indistinguishable by code, so the
+      // fallback is limited to the config's own relative and aliased imports.
+      if (
+        isUnknownTsExtensionError(error) ||
+        isUnsupportedTypeStrippingError(error) ||
+        isUnresolvedConfigImportError(error, configPathAliases(configPath))
+      ) {
         return await this.loadViaEsbuild(configPath);
       }
 
-      throw new Error(`Failed to load warlock.config.ts: ${error}`);
+      throw new ErrorWithCause(`Failed to load warlock.config.ts: ${error}`, { cause: error });
     }
   }
 
@@ -151,6 +221,8 @@ export class WarlockConfigManager {
     try {
       const configModule = await import(pathToFileURL(compiledPath).href);
       return configModule.default;
+    } catch (error) {
+      throw nameOriginalConfig(error, compiledPath, configPath);
     } finally {
       await unlink(compiledPath).catch(() => {});
     }
@@ -224,6 +296,42 @@ export class WarlockConfigManager {
     this.loading = undefined;
     await this.load();
   }
+}
+
+/**
+ * The tsconfig `paths` patterns of the project holding `configPath`.
+ */
+function configPathAliases(configPath: string): string[] {
+  try {
+    return Object.keys(getTsconfig(path.dirname(configPath))?.config.compilerOptions?.paths ?? {});
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * A loader error raised by the bundled config names the temporary `.mjs`
+ * module. Rewrite it to name `warlock.config.ts`, keeping the original as the
+ * cause. An error thrown by the user's own config is returned unchanged.
+ */
+function nameOriginalConfig(error: unknown, compiledPath: string, configPath: string): unknown {
+  const code = (error as { code?: string })?.code;
+
+  if (typeof code !== "string" || !code.startsWith("ERR_")) return error;
+
+  const message = String((error as Error).message ?? error)
+    .split(pathToFileURL(compiledPath).href)
+    .join(pathToFileURL(configPath).href)
+    .split(compiledPath)
+    .join(configPath);
+
+  const wrapped = new ErrorWithCause(`Failed to load warlock.config.ts: ${message}`, {
+    cause: error,
+  });
+
+  (wrapped as Error & { code?: string }).code = code;
+
+  return wrapped;
 }
 
 /**

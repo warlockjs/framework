@@ -1,4 +1,5 @@
 import type { ServerResponse } from "node:http";
+import { log } from "@warlock.js/logger";
 
 /**
  * Shared transport bookkeeping for the long-lived responses
@@ -45,8 +46,15 @@ export function createStreamTransport(
     options.onClientDisconnected?.();
     disconnectController.abort(new DOMException(options.disconnectMessage, "AbortError"));
 
+    // Each handler is isolated: this runs inside the socket's `close`
+    // listener, so a throwing handler would otherwise become an uncaught
+    // exception (taking the process down) and skip the handlers after it.
     for (const handler of disconnectHandlers) {
-      handler();
+      try {
+        handler();
+      } catch (error) {
+        log.error("http", "stream", error as Error, { source: "onDisconnect handler" });
+      }
     }
   });
 

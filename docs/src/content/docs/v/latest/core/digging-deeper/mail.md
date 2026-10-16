@@ -658,6 +658,7 @@ When `config` is `undefined` the call uses the global default. When it's set, it
 - **`secure: true` requires port 465.** For port 587 use `secure: false` and `tls: true` (STARTTLS). Mismatching these is the most common config bug.
 - **Per-mail handlers don't replace global handlers — both fire.** If you're counting sends, count once or use a single source of truth.
 - **`assertMailSent(predicate)` throws when no mail matches.** That's by design — it's an assertion. Catch the thrown error in your test runner; don't silently swallow it.
+- **Logs mask recipients.** Mail log lines show `m***@example.com`, never the full address (also in development and test mode, and inside a logged provider error). The `MailResult` and a thrown `MailError` still carry the real addresses.
 - **`.send()` returns `success: false` on cancellation.** `beforeSending` returning `false` is not an error — `result.success` is just `false` and `result.response` says why.
 
 ## See also

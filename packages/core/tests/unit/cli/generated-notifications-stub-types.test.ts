@@ -2,20 +2,29 @@ import path from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-import { notificationControllersStub } from "../../../src/generations/stubs";
+import {
+  listNotificationsControllerStub,
+  listNotificationsSchemaStub,
+  markAllNotificationsReadControllerStub,
+  markNotificationReadControllerStub,
+  markNotificationReadServiceStub,
+  notificationResourceStub,
+  notificationsRequestTypeStub,
+  unreadNotificationsCountControllerStub,
+} from "../../../src/generations/stubs";
 
 /**
- * `warlock add notifications` scaffolds
- * `src/app/notifications/controllers/notifications.controller.ts` from
- * `notificationControllersStub` (`src/generations/stubs.ts`). The release
- * gate's own acceptance run — scaffold a fresh app, `warlock add
- * notifications`, `tsc --noEmit` — found the generated file does NOT
- * compile when the raw `request.locals.user` value (untyped from core's own
- * perspective — see the 5.12.0 CHANGELOG: `RequestUser` moved out of core to
- * `@warlock.js/auth`) is forwarded straight into `inApp` instead of narrowed
- * to an id first. `notificationControllersStub`'s own `recipientId()` helper
- * exists to do that narrowing; this test pins that skipping it is a compile
- * error, not merely a style choice.
+ * `warlock add notifications` scaffolds `src/app/notifications` from the
+ * notification stubs in `src/generations/stubs.ts`. The release gate's own
+ * acceptance run — scaffold a fresh app, `warlock add notifications`,
+ * `tsc --noEmit` — once found a generated controller that did NOT compile:
+ * `request.locals.user` is untyped from core's own perspective (see the
+ * 5.12.0 CHANGELOG: `RequestUser` moved out of core to `@warlock.js/auth`).
+ * Since 5.30.0 (FW-09) the controllers are typed with the module's own
+ * `NotificationsRequestHandler`, whose request guarantees `locals.user.id`.
+ * This test compiles the generated request type, schema, resource, service
+ * and the four controllers together, and pins that a plain `RequestHandler`
+ * reading `locals.user.id` is a compile error, not merely a style choice.
  *
  * `stub-handler-signature.test.ts` (this same directory's sibling under
  * `tests/unit/generations/`) documents an EARLIER attempt at exactly this
@@ -43,22 +52,36 @@ import { notificationControllersStub } from "../../../src/generations/stubs";
 const CORE_DIR = path.resolve(__dirname, "../../..").split(path.sep).join("/");
 const TSCONFIG_TYPECHECK_PATH = path.join(CORE_DIR, "tsconfig.typecheck.json");
 
-/** Virtual (never written to disk) file holding the CURRENT generated stub. */
-const FIXED_STUB_FILE = `${CORE_DIR}/__generated-notifications-stub-types-test__/fixed.ts`;
+/** Virtual (never written to disk) copy of the generated module, laid out as `warlock add` writes it. */
+const MODULE_DIR = `${CORE_DIR}/__generated-notifications-stub-types-test__/notifications`;
+
+const GENERATED_FILES: Record<string, string> = {
+  [`${MODULE_DIR}/types/notifications-request.type.ts`]: notificationsRequestTypeStub,
+  [`${MODULE_DIR}/schema/list-notifications.schema.ts`]: listNotificationsSchemaStub,
+  [`${MODULE_DIR}/resources/notification.resource.ts`]: notificationResourceStub,
+  [`${MODULE_DIR}/services/mark-notification-read.service.ts`]: markNotificationReadServiceStub,
+  [`${MODULE_DIR}/controllers/list-notifications.controller.ts`]: listNotificationsControllerStub,
+  [`${MODULE_DIR}/controllers/unread-notifications-count.controller.ts`]:
+    unreadNotificationsCountControllerStub,
+  [`${MODULE_DIR}/controllers/mark-notification-read.controller.ts`]:
+    markNotificationReadControllerStub,
+  [`${MODULE_DIR}/controllers/mark-all-notifications-read.controller.ts`]:
+    markAllNotificationsReadControllerStub,
+};
 
 /**
- * Virtual file holding the broken shape: `request.locals.user` forwarded
- * directly to `inApp`, skipping the stub's own `recipientId()` narrowing.
+ * Virtual file holding the broken shape: a plain `RequestHandler` reading
+ * `request.locals.user.id`, without the module's guarded request type.
  */
-const BROKEN_STUB_FILE = `${CORE_DIR}/__generated-notifications-stub-types-test__/broken.ts`;
+const BROKEN_STUB_FILE = `${MODULE_DIR}/controllers/broken.controller.ts`;
 
 const BROKEN_SNIPPET = `import { type RequestHandler } from "@warlock.js/core";
 import { inApp } from "@warlock.js/notifications";
 
-export const listNotificationsController: RequestHandler = async ({ request, response }) => {
-  const { data, pagination } = await inApp.list(request.locals.user, request.all());
+export const unreadNotificationsCountController: RequestHandler = async ({ request, response }) => {
+  const count = await inApp.countUnread(request.locals.user.id);
 
-  return response.success({ notifications: data, pagination });
+  return response.success({ count });
 };
 `;
 
@@ -90,6 +113,20 @@ function compileVirtualFiles(files: Record<string, string>): Record<string, stri
 
   const originalFileExists = host.fileExists.bind(host);
   host.fileExists = (fileName) => virtualPaths.has(fileName) || originalFileExists(fileName);
+
+  // Relative imports between the virtual files only resolve when their
+  // directories are reported as existing; none of them exist on disk.
+  const virtualDirectories = new Set(
+    [...virtualPaths].flatMap((file) => {
+      const parts = file.split("/");
+
+      return parts.slice(1, -1).map((_, index) => parts.slice(0, index + 2).join("/"));
+    }),
+  );
+  const originalDirectoryExists = host.directoryExists?.bind(host);
+  host.directoryExists = (directory) =>
+    virtualDirectories.has(directory.replace(/\/$/, "")) ||
+    (originalDirectoryExists ? originalDirectoryExists(directory) : true);
 
   const originalReadFile = host.readFile.bind(host);
   host.readFile = (fileName) =>
@@ -126,26 +163,24 @@ function compileVirtualFiles(files: Record<string, string>): Record<string, stri
   return byFile;
 }
 
-describe("notificationControllersStub type-checks against the real @warlock.js/core + @warlock.js/notifications declarations", () => {
+describe("the generated notifications module type-checks against the real @warlock.js/core + @warlock.js/notifications declarations", () => {
   it(
-    "compiles clean, and RED-CONTROL fails the un-narrowed request.locals.user shape",
+    "compiles clean, and RED-CONTROL fails a plain RequestHandler reading locals.user.id",
     () => {
       const results = compileVirtualFiles({
-        [FIXED_STUB_FILE]: notificationControllersStub,
+        ...GENERATED_FILES,
         [BROKEN_STUB_FILE]: BROKEN_SNIPPET,
       });
 
-      // The generated controller stub, as it actually ships, has zero
-      // compile errors against the real declarations.
-      expect(results[FIXED_STUB_FILE]).toEqual([]);
+      // Every generated file, as it actually ships, has zero compile errors
+      // against the real declarations.
+      for (const file of Object.keys(GENERATED_FILES)) {
+        expect({ file, errors: results[file] }).toEqual({ file, errors: [] });
+      }
 
-      // RED CONTROL: forwarding `request.locals.user` straight into `inApp`
-      // (skipping the stub's own `recipientId()` narrowing) fails, with the
-      // compiler's OWN message.
-      expect(results[BROKEN_STUB_FILE]).toHaveLength(1);
-      expect(results[BROKEN_STUB_FILE][0]).toContain(
-        "is not assignable to parameter of type 'Notifiable | Id'",
-      );
+      // RED CONTROL: without the guarded request type, `locals.user` is not
+      // known to carry an id, so the compiler refuses the read.
+      expect(results[BROKEN_STUB_FILE]?.length).toBeGreaterThan(0);
     },
     // Building the ~3000-file @warlock.js/* transitive graph from source is
     // genuinely slow (see the file-level doc comment) — this is the one

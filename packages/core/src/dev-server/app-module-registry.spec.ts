@@ -1,8 +1,10 @@
 import { pathToFileURL } from "node:url";
+import type { MessagePort } from "node:worker_threads";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { container } from "../container";
 import { DevelopmentAppModuleRegistry, getDevelopmentAppModuleRegistry } from "./app-module-registry";
 import { FilesOrchestrator } from "./files-orchestrator";
+import { trackLoaderPortAcks } from "./loader/loader-port-acks";
 
 afterEach(() => {
   container.delete("development.appModules");
@@ -54,9 +56,20 @@ describe("FilesOrchestrator app-module publication", () => {
   it("publishes a bumped file only after the hook thread acknowledged the flush", async () => {
     const orchestrator = new FilesOrchestrator();
     const messages: Array<{ type: string; absolutePath?: string }> = [];
-    (orchestrator as unknown as { loaderPort: unknown }).loaderPort = {
+    let deliver: ((message: { type: string }) => void) | undefined;
+    // A synchronous stand-in for the loader port, so each assertion sees
+    // exactly what was posted at that point.
+    const port = {
       postMessage: (message: { type: string; absolutePath?: string }) => messages.push(message),
+      on: (_event: string, listener: (message: { type: string }) => void) => {
+        deliver = listener;
+      },
+      ref: () => undefined,
+      unref: () => undefined,
     };
+    const internals = orchestrator as unknown as { loaderPort: unknown; loaderAcks: unknown };
+    internals.loaderPort = port;
+    internals.loaderAcks = trackLoaderPortAcks(port as unknown as MessagePort);
     const published = vi.fn();
     getDevelopmentAppModuleRegistry().subscribe(published);
     const file = process.platform === "win32" ? "C:\\App\\src\\app\\a.ts" : "/App/src/app/a.ts";
@@ -77,7 +90,7 @@ describe("FilesOrchestrator app-module publication", () => {
     expect(published).not.toHaveBeenCalled();
 
     // The hook thread's `sync-ack`.
-    (orchestrator as unknown as { pendingFlushes: Array<() => void> }).pendingFlushes.shift()?.();
+    deliver?.({ type: "sync-ack" });
     await flush;
 
     expect(flushed).toBe(true);

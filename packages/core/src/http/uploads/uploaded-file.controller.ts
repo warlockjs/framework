@@ -2,28 +2,24 @@ import { log } from "@warlock.js/logger";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { RequestHandler } from "../../router";
-import { storage } from "../../storage";
+import type { StorageDriverName } from "../../storage/types";
 import { HttpError } from "../errors";
 import type { Response } from "../response";
-import { uploadsConfig } from "../uploads-config";
 import {
   detectImageFormat,
   IMAGE_SIGNATURE_BYTES,
   isVariantSourceFormat,
 } from "./detect-image-format";
-import { generateImageVariant } from "./generate-image-variant";
+import { isMissingFileError, variantCacheDirectoryFor } from "./image-variant-cache";
 import type { VariantOutputFormat } from "./image-variant-types";
-import { loadVariantSource } from "./load-variant-source";
+import { localDiskRoot } from "./local-disk-root";
 import { matchesIfNoneMatch } from "./matches-if-none-match";
 import { parseUploadedFileQuery } from "./parse-uploaded-file-query";
 import { readFileHead } from "./read-file-head";
-import { resolveImageVariantsConfig } from "./resolve-image-variants-config";
+import { resolveImageVariant } from "./resolve-image-variant";
 import { resolveInlineImageContentType } from "./resolve-inline-image-content-type";
 import { resolveOriginalContentType } from "./resolve-original-content-type";
-import { resolveUploadPath, type ResolvedUploadPath } from "./resolve-upload-path";
-import { resolveVariantCandidate } from "./resolve-variant-candidate";
-import { variantCacheKey, variantCachePath } from "./variant-cache-key";
-import { variantGenerations } from "./variant-generations";
+import { resolveUploadPath } from "./resolve-upload-path";
 
 /**
  * One year, in seconds: originals and derivatives are both long-lived
@@ -37,27 +33,17 @@ const CONTENT_TYPES: Record<VariantOutputFormat, string> = {
   avif: "image/avif",
 };
 
-async function exists(target: string): Promise<boolean> {
-  try {
-    await fs.access(target);
-
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function notFound(response: Response) {
   return response.notFound({ error: "File Not Found" });
 }
 
 async function sendVariant(
   response: Response,
-  target: string,
+  body: Buffer,
   hash: string,
   format: VariantOutputFormat,
 ) {
-  return response.sendBuffer(await fs.readFile(target), {
+  return response.sendBuffer(body, {
     contentType: CONTENT_TYPES[format],
     cacheTime: ONE_YEAR,
     immutable: true,
@@ -103,10 +89,24 @@ async function sendOriginalInline(response: Response, absolutePath: string, cont
 }
 
 /**
+ * Options for {@link createUploadedFileController}
+ */
+export type UploadedFileControllerOptions = {
+  /**
+   * Local disk to serve from; the default disk when omitted. A private disk
+   * should be served from a route that checks access first.
+   */
+  disk?: StorageDriverName;
+};
+
+/**
  * Serves local uploads, and bounded on-demand variants of the images among them.
  *
  * ```ts
  * router.get("/uploads/*", uploadedFileController);
+ * router.get("/invoices/*", createUploadedFileController({ disk: "private" }), {
+ *   middleware: [authMiddleware()],
+ * });
  * ```
  *
  * - `GET /uploads/<path>` sends the original file with a one-year cache.
@@ -114,144 +114,122 @@ async function sendOriginalInline(response: Response, absolutePath: string, cont
  *   rendered from a variant named in `uploads.images.variants`. No other query
  *   key is accepted, so a client can never ask for an arbitrary size.
  *
- * The path must stay inside the storage root (after symlinks are resolved) and
+ * The path must stay inside the disk root (after symlinks are resolved) and
  * outside the variant cache; anything else is a 404, the same answer a missing
- * file gets. Derivatives are cached on disk under a sha256 of the source path,
- * size, mtime, variant and format, written atomically, generated once per key
- * even under concurrent requests, and sent with an immutable cache and an ETag.
+ * file gets. Derivatives are cached on disk under a directory per source
+ * (see `resolveImageVariant`), written atomically, generated once per key even
+ * under concurrent requests, and sent with an immutable cache and an ETag.
  */
-export const uploadedFileController: RequestHandler = async ({ request, response }) => {
-  const storageRoot = storage.root();
+export function createUploadedFileController(
+  options: UploadedFileControllerOptions = {},
+): RequestHandler {
+  return async ({ request, response }) => {
+    const diskRoot = localDiskRoot(options.disk);
 
-  if (!storageRoot || storageRoot === ".") {
-    log.error(
-      "uploads",
-      "serve",
-      "uploadedFileController needs a local storage driver with a root.",
-    );
+    if (!diskRoot) {
+      log.error(
+        "uploads",
+        "serve",
+        options.disk === undefined
+          ? "uploadedFileController needs a local storage driver with a root."
+          : `uploadedFileController needs a local disk; "${options.disk}" is not one.`,
+      );
 
-    return notFound(response);
-  }
-
-  const query = parseUploadedFileQuery(request.url);
-
-  if (query.type === "invalid") {
-    return response.badRequest({ error: query.reason });
-  }
-
-  // Every uploads response — originals and variants — tells the browser not
-  // to guess a content type from the bytes, so a mislabeled body can never be
-  // sniffed into something executable.
-  response.header("X-Content-Type-Options", "nosniff");
-
-  if (query.type === "original") {
-    const images = uploadsConfig("images");
-    const cacheDirectory = images?.cacheDirectory ? [images.cacheDirectory] : [];
-    const source = await resolveUploadPath(request.params["*"], storageRoot, [
-      storage.root(".cache/image-variants"),
-      ...cacheDirectory,
-    ]);
-
-    if (!source) return notFound(response);
-
-    // Inline is decided by SNIFFED bytes, never by extension: an svg (or any
-    // other non-raster file) named `.png` must still download, not render.
-    const head = await readFileHead(source.absolutePath, IMAGE_SIGNATURE_BYTES);
-    const sniffedFormat = detectImageFormat(head);
-
-    if (!isVariantSourceFormat(sniffedFormat)) {
-      return sendOriginalAsAttachment(response, source.absolutePath);
+      return notFound(response);
     }
 
-    // Inline is only safe when the extension-derived type agrees with the
-    // sniffed bytes too — otherwise `sendFile` would advertise the
-    // extension's type (e.g. text/html for JPEG bytes named `.html`).
-    const inlineContentType = resolveInlineImageContentType(source.absolutePath, sniffedFormat);
+    const query = parseUploadedFileQuery(request.url);
 
-    if (!inlineContentType) {
-      return sendOriginalAsAttachment(response, source.absolutePath);
+    if (query.type === "invalid") {
+      return response.badRequest({ error: query.reason });
     }
 
-    return sendOriginalInline(response, source.absolutePath, inlineContentType);
-  }
+    // Every uploads response — originals and variants — tells the browser not
+    // to guess a content type from the bytes, so a mislabeled body can never be
+    // sniffed into something executable.
+    response.header("X-Content-Type-Options", "nosniff");
 
-  const images = resolveImageVariantsConfig(uploadsConfig("images"), storageRoot);
+    if (query.type === "original") {
+      const source = await resolveUploadPath(request.params["*"], diskRoot, [
+        path.join(diskRoot, ".cache", "image-variants"),
+        variantCacheDirectoryFor(diskRoot),
+      ]);
 
-  if (!images) {
-    return response.badRequest({ error: "Image variants are not configured." });
-  }
+      if (!source) return notFound(response);
 
-  if (!Object.prototype.hasOwnProperty.call(images.variants, query.variant)) {
-    return response.badRequest({ error: `Unknown variant "${query.variant}".` });
-  }
+      // Inline is decided by SNIFFED bytes, never by extension: an svg (or any
+      // other non-raster file) named `.png` must still download, not render.
+      const head = await readFileHead(source.absolutePath, IMAGE_SIGNATURE_BYTES);
+      const sniffedFormat = detectImageFormat(head);
 
-  const requestedFormat = query.format as VariantOutputFormat | undefined;
+      if (!isVariantSourceFormat(sniffedFormat)) {
+        return sendOriginalAsAttachment(response, source.absolutePath);
+      }
 
-  if (requestedFormat !== undefined && !images.formats.includes(requestedFormat as never)) {
-    return response.badRequest({ error: `Format "${query.format}" is not allowed.` });
-  }
+      // Inline is only safe when the extension-derived type agrees with the
+      // sniffed bytes too — otherwise `sendFile` would advertise the
+      // extension's type (e.g. text/html for JPEG bytes named `.html`).
+      const inlineContentType = resolveInlineImageContentType(source.absolutePath, sniffedFormat);
 
-  const variant = images.variants[query.variant];
-  if (variant === undefined) {
-    return response.badRequest({ error: `Unknown variant "${query.variant}".` });
-  }
+      if (!inlineContentType) {
+        return sendOriginalAsAttachment(response, source.absolutePath);
+      }
 
-  let source: ResolvedUploadPath | undefined;
+      return sendOriginalInline(response, source.absolutePath, inlineContentType);
+    }
 
-  try {
-    const candidate = await resolveVariantCandidate(request.params["*"], storageRoot, images);
+    try {
+      const variantInput = {
+        path: request.params["*"] as string,
+        variant: query.variant,
+        ...(query.format !== undefined ? { format: query.format as VariantOutputFormat } : {}),
+        ...(options.disk !== undefined ? { disk: options.disk } : {}),
+      };
+      let variant = await resolveImageVariant(variantInput);
 
-    if (!candidate) return notFound(response);
+      if (!variant) return notFound(response);
 
-    const resolvedSource = candidate.source;
-
-    source = resolvedSource;
-
-    const { stats, sourceFormat } = candidate;
-    const format: VariantOutputFormat = requestedFormat ?? sourceFormat;
-    const hash = variantCacheKey({
-      relativePath: resolvedSource.relativePath,
-      sourceSize: stats.size,
-      sourceMtimeMs: stats.mtimeMs,
-      variant,
-      format,
-    });
-    const target = variantCachePath(images.cacheDirectory, hash, format);
-
-    if (await exists(target)) {
-      if (matchesIfNoneMatch(request.header("if-none-match"), `"${hash}"`)) {
+      if (matchesIfNoneMatch(request.header("if-none-match"), `"${variant.hash}"`)) {
         return response.baseResponse.status(304).send();
       }
 
-      return sendVariant(response, target, hash, format);
+      let body: Buffer;
+
+      try {
+        body = await fs.readFile(variant.absolutePath);
+      } catch (readError) {
+        if (!isMissingFileError(readError)) throw readError;
+
+        // Pruned between the existence check and the read: the source was
+        // rewritten in place and a request for the new version cleared the
+        // old generation. Resolve (and render) once more.
+        variant = await resolveImageVariant(variantInput);
+
+        if (!variant) return notFound(response);
+
+        body = await fs.readFile(variant.absolutePath);
+      }
+
+      return sendVariant(response, body, variant.hash, variant.format);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        return response.send({ error: error.message }, error.status);
+      }
+
+      log.error(
+        "uploads",
+        "variant",
+        `Could not generate variant "${query.variant}" of ${String(request.params["*"])}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+
+      return response.serverError({ error: "Could not generate the image variant." });
     }
+  };
+}
 
-    await variantGenerations.run(hash, async () => {
-      if (await exists(target)) return;
-
-      const image = await loadVariantSource(resolvedSource.absolutePath, {
-        maxSourceBytes: images.maxSourceBytes,
-        maxSourcePixels: images.maxSourcePixels,
-        expectedFormat: sourceFormat,
-      });
-
-      await generateImageVariant({ image, variant, format, targetPath: target });
-    });
-
-    return sendVariant(response, target, hash, format);
-  } catch (error) {
-    if (error instanceof HttpError) {
-      return response.send({ error: error.message }, error.status);
-    }
-
-    log.error(
-      "uploads",
-      "variant",
-      `Could not generate variant "${query.variant}" of ${source?.relativePath ?? request.params["*"]}: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    );
-
-    return response.serverError({ error: "Could not generate the image variant." });
-  }
-};
+/**
+ * Serves the default disk's uploads; see {@link createUploadedFileController}
+ */
+export const uploadedFileController: RequestHandler = createUploadedFileController();

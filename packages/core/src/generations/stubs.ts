@@ -372,7 +372,7 @@ export default heraldConfigurations;
 `;
 
 export const notificationsConfigStub = `import { type NotificationConfig, inApp, mailChannel } from "@warlock.js/notifications";
-import { Notification } from "app/notifications/notification.model";
+import { Notification } from "app/notifications/models/notification/notification.model";
 
 /**
  * Notifications configuration. Auto-loaded from src/config on boot — the
@@ -407,9 +407,11 @@ const config: NotificationConfig = {
 export default config;
 `;
 
+/** `src/app/notifications/models/notification/notification.model.ts`. */
 export const notificationModelStub = `import { RegisterModel } from "@warlock.js/cascade";
 import { DatabaseNotification, type NotificationColumnMap } from "@warlock.js/notifications";
 import { v } from "@warlock.js/seal";
+import { NotificationResource } from "../../resources/notification.resource";
 
 /**
  * Validation schema for the notifications table — mirrors the migration
@@ -417,9 +419,13 @@ import { v } from "@warlock.js/seal";
  * nullable columns use .nullish() (may be absent or null), and payload is
  * free-form JSON. Keep this in sync with the migration + columnMap when you
  * add or rename columns.
+ *
+ * user_id accepts a string or an integer so it matches whichever id type your
+ * users use (and the idType you pass to notificationColumns in the migration).
+ * Narrow it to that one type.
  */
 const notificationSchema = v.object({
-  user_id: v.string(),
+  user_id: v.union([v.string(), v.int()]),
   type: v.string(),
   title: v.string(),
   body: v.string().nullish(),
@@ -441,16 +447,21 @@ export class Notification extends DatabaseNotification {
   public static table = "notifications";
   public static schema = notificationSchema;
 
+  /** Every response that returns a notification is shaped by this resource. */
+  public static resource = NotificationResource;
+
   /**
    * Maps the in-app store's roles to your columns. This default is
    * single-tenant + read_at-only. Add tenant: "organization_id" for
    * multi-tenant; use isRead: "is_read" (instead of, or alongside, readAt) to
-   * track a boolean read flag. The migration + accessors all follow this map.
+   * track a boolean read flag. The migration, the accessors and the resource
+   * all follow this map.
    */
   public static columnMap: NotificationColumnMap = { readAt: "read_at" };
 }
 `;
 
+/** The notifications migration, under `models/notification/migrations/`. */
 export const notificationMigrationStub = `import { Migration } from "@warlock.js/cascade";
 import { notificationColumns } from "@warlock.js/notifications";
 import { Notification } from "../notification.model";
@@ -460,142 +471,242 @@ import { Notification } from "../notification.model";
  *
  * Columns come from notificationColumns(Notification) — the recipient / tenant
  * / read-state names follow the model's columnMap; type / title / body /
- * payload / idempotency_key are fixed. Spread it to add your own columns
- * (remember to mirror them in the model schema):
+ * payload / idempotency_key are fixed. The recipient column is a UUID unless
+ * you pass { idType: "integer" } (or "bigint" / "string") to match your users.
+ * Spread it to add your own columns (and mirror them in the model schema):
  *
  *   import { uuid } from "@warlock.js/cascade";
  *
  *   export default Migration.create(Notification, {
- *     ...notificationColumns(Notification),
+ *     ...notificationColumns(Notification, { idType: "integer" }),
  *     // category_id: uuid().index().nullable(),
  *   });
  */
 export default Migration.create(Notification, notificationColumns(Notification));
 `;
 
-export const notificationControllersStub = `import { type RequestHandler } from "@warlock.js/core";
-import { inApp, type Id } from "@warlock.js/notifications";
+/** `src/app/notifications/resources/notification.resource.ts` — the output shape. */
+export const notificationResourceStub = `import { defineResource } from "@warlock.js/core";
 
 /**
- * The authenticated user's notification HTTP surface — thin wrappers over the
- * recipient-scoped \`inApp\` facade (a foreign id can never touch another user's
- * rows). Notifications are produced by domain events, never over HTTP, so there
- * is no create. Trim or split these as your app grows.
+ * What every notification endpoint returns, whatever columns the model holds.
+ * readAt reads the default read_at column; change it if you change the model's
+ * columnMap.
  */
+export const NotificationResource = defineResource({
+  schema: {
+    // Passed through as stored: a UUID string or an integer, per the migration.
+    id: (id: string | number) => id,
+    type: "string",
+    title: "string",
+    body: "string?",
+    payload: "object?",
+    readAt: ["read_at", "date?"],
+    createdAt: "date?",
+  },
+});
+`;
+
+/** `src/app/notifications/schema/list-notifications.schema.ts` — the validated list query. */
+export const listNotificationsSchemaStub = `import { type Infer, v } from "@warlock.js/seal";
 
 /**
- * Read \`id\` off \`request.locals.user\` without assuming this app's
- * \`RequestUser\` augmentation declares it — \`RequestUser\` (declared by
- * \`@warlock.js/auth\`) is empty by default, so a narrow runtime read survives
- * any augmentation shape instead of assuming \`.id\` exists at the type level.
- * \`inApp\` only ever needs the id (it reduces a \`Notifiable\` to one via
- * \`recipient.id\` internally), so reading it here — rather than forwarding
- * \`request.locals.user\` itself — also skips a needless \`Notifiable\` cast.
+ * Query for GET /notifications. Only these keys reach the store (others, such
+ * as a cache-busting \`_\`, are dropped rather than rejected), and limit is
+ * capped so one request cannot read every row. Query values arrive as strings,
+ * so the numbers and the flag are coerced.
  */
-function recipientId(user: unknown): Id {
-  if (user && typeof user === "object" && "id" in user) {
-    const id = (user as { id?: unknown }).id;
+export const listNotificationsSchema = v.object({
+  page: v.int().coerce().min(1).optional(),
+  limit: v.int().coerce().min(1).max(50).optional(),
+  type: v.string().optional(),
+  unread: v.boolean().coerce().optional(),
+}).stripUnknown();
 
-    if (typeof id === "string" || typeof id === "number") return id;
+export type ListNotificationsSchema = Infer<typeof listNotificationsSchema>;
+`;
+
+/** `src/app/notifications/types/notifications-request.type.ts` — the guarded request. */
+export const notificationsRequestTypeStub = `import type { Request, RequestHandler, RequestLocals } from "@warlock.js/core";
+import type { Id } from "@warlock.js/notifications";
+
+/**
+ * A request that passed authMiddleware, so locals.user is always set. Only the
+ * user's id is declared because that is all the inApp store needs. If your
+ * app has its own guarded request type, use it instead.
+ */
+export type NotificationsRequest<Payload = unknown> = Request<Payload> & {
+  locals: RequestLocals & { user: { id: Id } };
+};
+
+export type NotificationsRequestHandler<Payload = unknown> = RequestHandler<
+  NotificationsRequest<Payload>
+>;
+`;
+
+/** `src/app/notifications/services/mark-notification-read.service.ts`. */
+export const markNotificationReadServiceStub = `import { ResourceNotFoundError, t } from "@warlock.js/core";
+import { type Id, inApp } from "@warlock.js/notifications";
+
+/**
+ * Mark one of the user's notifications read and return it. inApp is scoped to
+ * the recipient, so another user's id changes nothing and answers 404 here.
+ */
+export async function markNotificationReadService(userId: Id, notificationId: Id) {
+  await inApp.markAsRead(userId, notificationId);
+
+  const notification = await inApp.find(userId, notificationId);
+
+  if (!notification) {
+    throw new ResourceNotFoundError(t("notifications.notFound"));
   }
 
-  throw new Error("Authenticated request is missing a usable user id");
+  return notification;
 }
+`;
 
-/** GET /notifications — list, most recent first (page / limit / type / unread via query). */
-export const listNotificationsController: RequestHandler = async ({ request, response }) => {
-  const { data, pagination } = await inApp.list(recipientId(request.locals.user), request.all());
+/** `src/app/notifications/controllers/list-notifications.controller.ts`. */
+export const listNotificationsControllerStub = `import { inApp } from "@warlock.js/notifications";
+import {
+  type ListNotificationsSchema,
+  listNotificationsSchema,
+} from "../schema/list-notifications.schema";
+import type { NotificationsRequestHandler } from "../types/notifications-request.type";
+
+/** GET /notifications — the user's notifications, most recent first. */
+export const listNotificationsController: NotificationsRequestHandler<
+  ListNotificationsSchema
+> = async ({ request, response }) => {
+  const { data, pagination } = await inApp.list(request.locals.user.id, request.validated());
 
   return response.success({ notifications: data, pagination });
 };
 
 listNotificationsController.description = "List notifications";
 
+listNotificationsController.validation = {
+  schema: listNotificationsSchema,
+  validating: ["query"],
+};
+`;
+
+/** `src/app/notifications/controllers/unread-notifications-count.controller.ts`. */
+export const unreadNotificationsCountControllerStub = `import { inApp } from "@warlock.js/notifications";
+import type { NotificationsRequestHandler } from "../types/notifications-request.type";
+
 /** GET /notifications/unread-count — drives the bell badge. */
-export const unreadNotificationsCountController: RequestHandler = async ({
+export const unreadNotificationsCountController: NotificationsRequestHandler = async ({
   request,
   response,
 }) => {
-  const count = await inApp.countUnread(recipientId(request.locals.user));
+  const count = await inApp.countUnread(request.locals.user.id);
 
   return response.success({ count });
 };
 
 unreadNotificationsCountController.description = "Unread notifications count";
+`;
 
-/** PATCH /notifications/:id/read — mark one read, return the updated row. */
-export const markNotificationReadController: RequestHandler = async ({ request, response }) => {
-  const id = request.input("id");
-  const userId = recipientId(request.locals.user);
+/** `src/app/notifications/controllers/mark-notification-read.controller.ts`. */
+export const markNotificationReadControllerStub = `import { markNotificationReadService } from "../services/mark-notification-read.service";
+import type { NotificationsRequestHandler } from "../types/notifications-request.type";
 
-  await inApp.markAsRead(userId, id);
-  const notification = await inApp.find(userId, id);
+/** PATCH /notifications/:id/read — mark one read and return it. */
+export const markNotificationReadController: NotificationsRequestHandler = async ({
+  request,
+  response,
+}) => {
+  // Route params are strings. A numeric id is an integer id (the default
+  // MongoDB stack); anything else, such as a UUID, stays a string.
+  const rawId = request.string("id");
+  const id = /^\\d+$/.test(rawId) ? Number(rawId) : rawId;
+
+  const notification = await markNotificationReadService(request.locals.user.id, id);
 
   return response.success({ notification });
 };
 
 markNotificationReadController.description = "Mark notification read";
+`;
+
+/** `src/app/notifications/controllers/mark-all-notifications-read.controller.ts`. */
+export const markAllNotificationsReadControllerStub = `import { inApp } from "@warlock.js/notifications";
+import type { NotificationsRequestHandler } from "../types/notifications-request.type";
 
 /** PATCH /notifications/read-all — mark every unread one read. */
-export const markAllNotificationsReadController: RequestHandler = async ({
+export const markAllNotificationsReadController: NotificationsRequestHandler = async ({
   request,
   response,
 }) => {
-  const count = await inApp.markAsRead(recipientId(request.locals.user));
+  const count = await inApp.markAsRead(request.locals.user.id);
 
   return response.success({ count });
 };
 
 markAllNotificationsReadController.description = "Mark all notifications read";
-
-/** DELETE /notifications — dismiss all for the user. */
-export const clearNotificationsController: RequestHandler = async ({ request, response }) => {
-  await inApp.dismiss(recipientId(request.locals.user));
-
-  return response.noContent();
-};
-
-clearNotificationsController.description = "Clear notifications";
-
-/** DELETE /notifications/:id — dismiss one. */
-export const deleteNotificationController: RequestHandler = async ({ request, response }) => {
-  await inApp.dismiss(recipientId(request.locals.user), request.input("id"));
-
-  return response.noContent();
-};
-
-deleteNotificationController.description = "Delete notification";
 `;
 
+/** `src/app/notifications/routes.ts` — the four read endpoints behind `authMiddleware`. */
 export const notificationRoutesStub = `import { authMiddleware } from "@warlock.js/auth";
 import { router } from "@warlock.js/core";
-import {
-  clearNotificationsController,
-  deleteNotificationController,
-  listNotificationsController,
-  markAllNotificationsReadController,
-  markNotificationReadController,
-  unreadNotificationsCountController,
-} from "./controllers/notifications.controller";
+import { listNotificationsController } from "./controllers/list-notifications.controller";
+import { markAllNotificationsReadController } from "./controllers/mark-all-notifications-read.controller";
+import { markNotificationReadController } from "./controllers/mark-notification-read.controller";
+import { unreadNotificationsCountController } from "./controllers/unread-notifications-count.controller";
 
 /**
- * Notification routes — the authenticated user's read + dismiss surface.
+ * The signed-in user's own notifications.
  *
- * Notifications are produced by domain events (never created over HTTP), so
- * there is no POST. Every route is gated by \`authMiddleware\` and recipient-
- * scoped by \`inApp\` (a foreign id touches zero rows). Delete any endpoint you
- * don't need; if your app reads notifications over sockets/GraphQL instead,
- * delete this file + the controllers entirely.
+ * Notifications come from domain events, so there is no create. Dismissing is
+ * left out on purpose; add it when the product needs it (inApp.dismiss).
+ *
+ * authMiddleware([]) admits any signed-in user. To limit who may read
+ * notifications, add a permission gate to the group:
+ *
+ *   import { gate } from "@warlock.js/access";
+ *
+ *   router.group({ middleware: [authMiddleware([]), gate("notifications.read")] }, ...);
  */
-router.group({ prefix: "/notifications", middleware: [authMiddleware([])] }, () => {
-  router.get("/", listNotificationsController);
-  router.get("/unread-count", unreadNotificationsCountController);
-  router.patch("/read-all", markAllNotificationsReadController);
-  router.patch("/:id/read", markNotificationReadController);
-  router.delete("/", clearNotificationsController);
-  router.delete("/:id", deleteNotificationController);
+router.group({ middleware: [authMiddleware([])] }, () => {
+  const notifications = router.route("/notifications");
+
+  notifications.list(listNotificationsController);
+  notifications.nest("/unread-count").get(unreadNotificationsCountController);
+  notifications.nest("/read-all").patch(markAllNotificationsReadController);
+  notifications.nest("/:id/read").patch(markNotificationReadController);
 });
 `;
+
+/** `src/app/notifications/utils/locales.json` — the module's translations. */
+export const notificationLocalesStub = `{
+  "notFound": { "en": "Notification not found" }
+}
+`;
+
+/**
+ * A controller spec for the notifications module, written only when the app
+ * has the test feature. It checks the one thing true in every app — the route
+ * refuses a request with no signed-in user — and leaves the signed-in cases to
+ * the app, which owns its login helper.
+ */
+export function notificationControllerSpecStub(method: "GET" | "PATCH", path: string): string {
+  const helper = method === "GET" ? "testGet" : "testPatch";
+
+  return `import { ${helper} } from "@warlock.js/core/tests";
+import { describe, expect, it } from "vitest";
+
+describe("${method} ${path}", () => {
+  it("answers 401 without a signed-in user", async () => {
+    const response = await ${helper}("${path}");
+
+    expect(response.status).toBe(401);
+  });
+
+  // Add the signed-in cases with your app's login helper, including that
+  // another user's notifications are never returned or changed.
+});
+`;
+}
 
 /**
  * `src/web/root.tsx` — the application root for the SSR page layer.
@@ -618,6 +729,11 @@ export default function App({ children }: AppProps) {
   return (
     <html lang="en">
       <head>
+        {/*
+          <Head /> also renders the viewport tag (width=device-width,
+          initial-scale=1). Change it with \`metadata.viewport\`,
+          or set it to false to leave it out; do not add a second one here.
+        */}
         {/*
           Placement only. The framework injects the page's \`metadata\`, the
           stylesheet and preload tags for this route, and the canonical links

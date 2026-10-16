@@ -6,4 +6,11 @@ describe("warlock add web root.tsx stub", () => {
     expect(webRootStub).toContain('<div id="vessel">{children}</div>');
     expect(webRootStub).not.toContain('id="root"');
   });
+
+  it("leaves the viewport tag to <Head /> instead of hand-writing a second one (FW-03)", () => {
+    const code = webRootStub.replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+
+    expect(code).toContain("<Head />");
+    expect(code).not.toMatch(/<meta\s+name="viewport"/);
+  });
 });

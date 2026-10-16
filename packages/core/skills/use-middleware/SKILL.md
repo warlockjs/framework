@@ -39,7 +39,7 @@ Each is documented inline (JSDoc + `@example`) — read the file under `@warlock
 - **Rate limit** caps **requests per time window** — 5 logins/minute per IP. Use for abuse prevention, cost-control on cheap-but-spammable endpoints.
 - **Concurrency limit** caps **in-flight requests at any instant** — 3 simultaneous report generations. Use for expensive endpoints where parallel calls would overload the worker (CPU-bound, large memory, slow third-party).
 
-Both counters are **process-local**. With N replicas the effective cap is N × value. For globally-shared rate limits, configure `@fastify/rate-limit` with a Redis store via `http.rateLimit` instead.
+Both counters are **process-local** by default. With N replicas the effective cap is N × value. `rateLimit` can count in `@warlock.js/cache` instead: `store: "cache"` on the limiter, or `http.rateLimit.store: "cache"` for every limiter (give conditionally created limiters a `name`). It needs a counting driver (`redis`, `pg`, or memory for one process): `null` and `file` are refused, and a cache outage fails open with the error logged at most once a minute. The concurrency cap has no shared mode.
 
 ```ts
 import { middleware } from "@warlock.js/core";
@@ -80,7 +80,7 @@ Server errors (5xx) are not cached — clients can retry past a 5xx. 4xx respons
 
 ## Rate limit across servers
 
-`http.rateLimit` passes `@fastify/rate-limit` options through — set `redis` for a store shared by all servers; `enabled: false` turns the global limiter off. The per-route `middleware.rateLimit()` counters stay in-process.
+Set `http.rateLimit.store: "cache"` to count in the configured `@warlock.js/cache` driver, shared by every server on a Redis or Postgres cache; the per-route `middleware.rateLimit()` follows it. `http.rateLimit` also passes `@fastify/rate-limit` options through (its own `redis` option needs an ioredis client, not the cache's node-redis one); `enabled: false` turns the global limiter off.
 
 ## `maxBodySize` vs the global `http.bodyLimit`
 

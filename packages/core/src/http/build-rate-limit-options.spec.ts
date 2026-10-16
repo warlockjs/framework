@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildRateLimitOptions } from "./build-rate-limit-options";
+import { CacheRateLimitStore } from "./rate-limit-cache-store";
 
 describe("buildRateLimitOptions", () => {
   it("applies defaults", () => {
@@ -45,5 +46,27 @@ describe("buildRateLimitOptions", () => {
     const options = buildRateLimitOptions({ max: 1, bogus: true, ban: 3 } as any);
 
     expect(options).toEqual({ max: 1, timeWindow: 60000 });
+  });
+
+  it("fails open by default with the cache store, unless skipOnError is set", () => {
+    expect(buildRateLimitOptions({ store: "cache" })?.skipOnError).toBe(true);
+    expect(buildRateLimitOptions({ store: "cache", skipOnError: false })?.skipOnError).toBe(false);
+    expect(buildRateLimitOptions({})?.skipOnError).toBeUndefined();
+  });
+
+  it('selects the cache-backed store for store: "cache" (FW-14)', () => {
+    expect(buildRateLimitOptions({ store: "cache" })?.store).toBe(CacheRateLimitStore);
+  });
+
+  it('passes a custom store class through and adds none for "memory"', () => {
+    class CustomStore {
+      public incr() {}
+      public child() {
+        return this;
+      }
+    }
+
+    expect(buildRateLimitOptions({ store: CustomStore as never })?.store).toBe(CustomStore);
+    expect(buildRateLimitOptions({ store: "memory" })).toEqual({ max: 60, timeWindow: 60000 });
   });
 });

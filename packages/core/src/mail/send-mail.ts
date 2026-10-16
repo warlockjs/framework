@@ -1,4 +1,4 @@
-import { log } from "@warlock.js/logger";
+import { log, maskEmail, maskEmailsInText } from "@warlock.js/logger";
 import { readFile } from "node:fs/promises";
 import type { Options as NodemailerOptions } from "nodemailer/lib/mailer";
 import { isDevelopmentMode, isTestMode, resolveMailConfig } from "./config";
@@ -323,7 +323,11 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
 
   // Test mode - capture without sending
   if (isTestMode()) {
-    log.info(`mail.${driver}`, "test", `[TEST MODE] Captured mail to: ${normalized.to.join(", ")}`);
+    log.info(
+      `mail.${driver}`,
+      "test",
+      `[TEST MODE] Captured mail to: ${normalized.to.map(maskEmail).join(", ")}`,
+    );
 
     const result: MailResult = {
       success: true,
@@ -354,7 +358,11 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
 
   // Development mode - log without sending
   if (isDevelopmentMode()) {
-    log.info(`mail.${driver}`, "dev", `[DEV MODE] Would send mail to: ${normalized.to.join(", ")}`);
+    log.info(
+      `mail.${driver}`,
+      "dev",
+      `[DEV MODE] Would send mail to: ${normalized.to.map(maskEmail).join(", ")}`,
+    );
     log.info(`mail.${driver}`, "dev", `Subject: ${normalized.subject}`);
 
     if (normalized.html) {
@@ -393,7 +401,14 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
     const mailer = await getMailer(config);
     const nodemailerOptions = await buildNodemailerOptions(normalized);
 
-    log.info(`mail.${driver}`, "send", `Sending mail to: ${normalized.to.join(", ")}`);
+    // Recipients are personal data: log them masked (`m***@example.com`),
+    // never in full — the address sits inside the message, where key-based
+    // redaction cannot reach it.
+    log.info(
+      `mail.${driver}`,
+      "send",
+      `Sending mail to ${normalized.to.length} recipient(s): ${normalized.to.map(maskEmail).join(", ")}`,
+    );
 
     const output = await mailer.sendMail(nodemailerOptions);
 
@@ -417,7 +432,11 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
     };
 
     if (rejected.length > 0) {
-      log.warn(`mail.${driver}`, "partial", `Mail partially rejected: ${rejected.join(", ")}`);
+      log.warn(
+        `mail.${driver}`,
+        "partial",
+        `Mail partially rejected: ${(rejected as unknown[]).map((address) => maskEmail(String(address))).join(", ")}`,
+      );
     }
 
     log.success(`mail.${driver}`, "sent", `Mail sent successfully (ID: ${result.messageId})`);
@@ -438,7 +457,7 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
       error instanceof Error ? error : undefined,
     );
 
-    log.error(`mail.${driver}`, "error", mailError.message);
+    log.error(`mail.${driver}`, "error", maskEmailsInText(mailError.message));
 
     await runMailEvent(options.onError, options, mailError);
     await triggerEvents(mailId, "error", options, mailError);

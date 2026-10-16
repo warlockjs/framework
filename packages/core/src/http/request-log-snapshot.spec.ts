@@ -1,7 +1,11 @@
 import config from "@mongez/config";
 import type { MultipartFile } from "@fastify/multipart";
 import { afterEach, describe, expect, it } from "vitest";
-import { buildRequestLogSnapshot, redactUrlCredentials } from "./request-log-snapshot";
+import {
+  buildRequestLogSnapshot,
+  redactQueryCredentials,
+  redactUrlCredentials,
+} from "./request-log-snapshot";
 import { UploadedFile } from "./uploaded-file";
 
 afterEach(() => {
@@ -43,6 +47,32 @@ describe("redactUrlCredentials", () => {
   });
 });
 
+describe("redactQueryCredentials", () => {
+  it("masks credential keys at any depth and leaves the input untouched", () => {
+    const query = {
+      Code: "c",
+      page: "2",
+      filter: { api_key: "k", name: "n" },
+      list: [{ sig: "s" }, "plain"],
+    };
+
+    expect(redactQueryCredentials(query)).toEqual({
+      Code: "[REDACTED]",
+      page: "2",
+      filter: { api_key: "[REDACTED]", name: "n" },
+      list: [{ sig: "[REDACTED]" }, "plain"],
+    });
+    expect(query.Code).toBe("c");
+  });
+
+  it("masks app-configured names", () => {
+    expect(redactQueryCredentials({ workspace_key: "w", b: "1" }, ["workspaceKey"])).toEqual({
+      workspace_key: "[REDACTED]",
+      b: "1",
+    });
+  });
+});
+
 describe("buildRequestLogSnapshot", () => {
   const source = {
     id: "req-1",
@@ -68,9 +98,26 @@ describe("buildRequestLogSnapshot", () => {
       name: "accounts.store",
       ip: "127.0.0.1",
       userAgent: "vitest",
-      query: { secret: "url-sentinel", tab: "keys" },
+      query: { secret: "[REDACTED]", tab: "keys" },
       body: { providerId: "body-sentinel", nested: { deep: "nested-sentinel" } },
     });
+  });
+
+  it("masks credential parameters in the parsed query, not only in the URL", () => {
+    const snapshot = buildRequestLogSnapshot({
+      id: "req-2",
+      method: "GET",
+      url: "/oauth/callback?code=AUTHCODE&state=xyz",
+      query: { code: "AUTHCODE", state: "xyz", "X-Amz-Signature": "sig-sentinel" },
+    });
+
+    expect(snapshot.url).toBe("/oauth/callback?code=[REDACTED]&state=xyz");
+    expect(snapshot.query).toEqual({
+      code: "[REDACTED]",
+      state: "xyz",
+      "X-Amz-Signature": "[REDACTED]",
+    });
+    expect(JSON.stringify(snapshot)).not.toMatch(/AUTHCODE|sig-sentinel/);
   });
 
   it("omits body and query, including the URL's query string, per route", () => {
@@ -99,7 +146,10 @@ describe("buildRequestLogSnapshot", () => {
   it("masks the configured extra query parameters", () => {
     config.set("http.logging", { redactQueryParams: ["tab"] });
 
-    expect(buildRequestLogSnapshot(source).url).toBe("/accounts?secret=[REDACTED]&tab=[REDACTED]");
+    const snapshot = buildRequestLogSnapshot(source);
+
+    expect(snapshot.url).toBe("/accounts?secret=[REDACTED]&tab=[REDACTED]");
+    expect(snapshot.query).toEqual({ secret: "[REDACTED]", tab: "[REDACTED]" });
   });
 
   it("summarises uploaded files instead of walking them", () => {

@@ -1,3 +1,4 @@
+import type { TsconfigRaw } from "esbuild";
 import { getTsconfig } from "get-tsconfig";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -10,10 +11,10 @@ import { pathToFileURL } from "node:url";
 const LOCAL_SOURCE_FILTER = /\.(?:[cm]?[jt]sx?)$/;
 
 /**
- * `import.meta.url`, `import.meta.dirname` and `import.meta.filename` in an
- * inlined local module.
+ * Marks the nested `build.resolve()` the alias check makes, so the plugin's
+ * own resolver does not intercept it again.
  */
-const IMPORT_META_PATTERN = /\bimport\.meta\.(url|dirname|filename)\b/g;
+const ALIAS_PROBE = Symbol("warlock-config-alias-probe");
 
 /**
  * Bundle `warlock.config.ts` and its LOCAL import graph into one ESM module.
@@ -29,8 +30,14 @@ const IMPORT_META_PATTERN = /\bimport\.meta\.(url|dirname|filename)\b/g;
  *   an import, so the config shares the application's module instances:
  *   `BaseConnector`, the container and every registry keep one identity.
  * - `import.meta.url` / `dirname` / `filename` in each inlined module are
- *   rewritten to that module's ORIGINAL location, so assets resolved relative
- *   to a connector's own folder keep working after inlining.
+ *   replaced with that module's ORIGINAL location, so assets resolved relative
+ *   to a connector's own folder keep working after inlining. Only real
+ *   `import.meta` expressions are replaced: text in strings and comments is
+ *   left alone. `import.meta.resolve()` is not rewritten; resolve from
+ *   `import.meta.url` instead (`new URL("./asset", import.meta.url)`).
+ * - A specifier that matches a tsconfig `paths` pattern is inlined only when it
+ *   resolves to a file outside `node_modules`; a catch-all pattern such as
+ *   `"*": ["./types/*"]` never pulls a package in.
  *
  * Returns the bundled source. The caller writes it beside the config (so the
  * external imports resolve from the project's `node_modules`) and imports it.
@@ -58,28 +65,63 @@ export async function bundleWarlockConfig(configPath: string): Promise<string> {
         setup(pluginBuild) {
           // Keep packages external, but let tsconfig `paths` aliases through to
           // esbuild's resolver: `app/connectors/local` is local code, not a package.
-          pluginBuild.onResolve({ filter: /^[^./]/ }, (args) => {
+          pluginBuild.onResolve({ filter: /^[^./]/ }, async (args) => {
             if (args.kind === "entry-point" || path.isAbsolute(args.path)) return undefined;
 
-            if (isPathAlias(args.path)) return undefined;
+            if (args.pluginData?.[ALIAS_PROBE]) return undefined;
 
-            return { path: args.path, external: true };
+            if (!isPathAlias(args.path)) return { path: args.path, external: true };
+
+            // A `paths` pattern can match package names too (a catch-all `"*"`
+            // does). Resolve it the way TypeScript would and inline it only
+            // when it lands on the project's own source.
+            const resolved = await pluginBuild.resolve(args.path, {
+              kind: args.kind,
+              resolveDir: args.resolveDir,
+              importer: args.importer,
+              pluginData: { [ALIAS_PROBE]: true },
+            });
+
+            if (resolved.errors.length > 0 || resolved.external || isInNodeModules(resolved.path)) {
+              return { path: args.path, external: true };
+            }
+
+            return { path: resolved.path };
           });
 
           pluginBuild.onLoad({ filter: LOCAL_SOURCE_FILTER }, async (args) => {
-            if (args.path.includes(`${path.sep}node_modules${path.sep}`)) return undefined;
+            if (isInNodeModules(args.path)) return undefined;
 
             const source = await readFile(args.path, "utf8");
-            const fileUrl = pathToFileURL(args.path).href;
+            const loader = loaderFor(args.path);
 
-            const contents = source.replace(IMPORT_META_PATTERN, (_match, property: string) => {
-              if (property === "url") return JSON.stringify(fileUrl);
-              if (property === "dirname") return JSON.stringify(path.dirname(args.path));
+            if (!source.includes("import.meta")) {
+              return { contents: source, loader, resolveDir: path.dirname(args.path) };
+            }
 
-              return JSON.stringify(args.path);
+            // `define` replaces only real `import.meta.*` expressions; text in
+            // strings, templates and comments is untouched. JSX is preserved so
+            // the bundle compiles it with the project's own JSX settings.
+            const { transform } = await import("esbuild");
+            const transformed = await transform(source, {
+              loader,
+              jsx: "preserve",
+              sourcefile: args.path,
+              tsconfigRaw: {
+                compilerOptions: tsconfig?.config.compilerOptions as TsconfigRaw["compilerOptions"],
+              },
+              define: {
+                "import.meta.url": JSON.stringify(pathToFileURL(args.path).href),
+                "import.meta.dirname": JSON.stringify(path.dirname(args.path)),
+                "import.meta.filename": JSON.stringify(args.path),
+              },
             });
 
-            return { contents, loader: loaderFor(args.path), resolveDir: path.dirname(args.path) };
+            return {
+              contents: transformed.code,
+              loader: loader === "tsx" || loader === "jsx" ? "jsx" : "js",
+              resolveDir: path.dirname(args.path),
+            };
           });
         },
       },
@@ -121,6 +163,14 @@ function createPathAliasMatcher(paths: Record<string, string[]> | undefined) {
         specifier.endsWith(suffix)
       );
     });
+}
+
+/**
+ * True when `filePath` lies inside a `node_modules` folder: a package, never
+ * inlined into the config bundle.
+ */
+function isInNodeModules(filePath: string): boolean {
+  return path.normalize(filePath).split(path.sep).includes("node_modules");
 }
 
 /**

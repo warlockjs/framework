@@ -27,7 +27,6 @@ import type {
   PutFromUrlOptions,
   PutOptions,
   R2StorageDriverOptions,
-  ScopedStorageContract,
   StorageCopyEventPayload,
   StorageDriverConfig,
   StorageDriverContract,
@@ -243,7 +242,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * console.log(localFile.url);
    * ```
    */
-  public use(name: StorageDriverName): ScopedStorageContract {
+  public use(name: StorageDriverName): ScopedStorage {
     return new ScopedStorage(this.getDriver(name));
   }
 

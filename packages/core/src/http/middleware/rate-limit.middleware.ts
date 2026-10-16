@@ -1,6 +1,8 @@
 import { normalizeIP } from "@fastify/rate-limit";
+import config from "@mongez/config";
 import type { Middleware } from "../../router";
 import { HttpErrorCodes } from "../error-codes";
+import { incrementSharedRateLimit, logSharedRateLimitError } from "../rate-limit-cache-store";
 import type { Request } from "../request";
 import { t } from "./inject-request-context";
 
@@ -39,6 +41,18 @@ export type RateLimitOptions = {
    * request, e.g. to translate it into the visitor's locale.
    */
   errorMessage?: string | ((request: Request) => string);
+  /**
+   * Where this limiter counts: `"memory"` (this process) or `"cache"`
+   * (`@warlock.js/cache`, shared by every process using the same driver).
+   * Defaults to `http.rateLimit.store` when that is `"cache"`, else `"memory"`.
+   */
+  store?: "memory" | "cache";
+  /**
+   * Stable name for this limiter's shared counters. Without it, limiters are
+   * told apart by the order they were created, which matches across processes
+   * running the same code; set a name when limiters are created conditionally.
+   */
+  name?: string;
 };
 
 type Bucket = {
@@ -72,16 +86,25 @@ function pruneExpired(now: number) {
   }
 }
 
+function resolveStore(options: RateLimitOptions): "memory" | "cache" {
+  if (options.store) return options.store;
+
+  return config.get("http.rateLimit.store") === "cache" ? "cache" : "memory";
+}
+
 /**
  * Per-route / per-group rate limit. Layers on top of `@fastify/rate-limit`'s
  * global cap (configured via `http.rateLimit`) — both run, and either can
  * 429. Use this for endpoints that need a tighter cap than the global default:
  * login, OTP request, password reset, expensive search, AI completions.
  *
- * The counter of THIS middleware always lives in-process. With `N` replicas
- * its effective cap is `N × max`. The global limit can be shared across
- * replicas by setting `http.rateLimit.redis` (an ioredis instance); that
- * does not affect this per-route middleware.
+ * The counter lives in-process by default, so with `N` replicas the
+ * effective cap is `N × max`. Set `store: "cache"` (or `http.rateLimit.store:
+ * "cache"`, which this follows) to count in `@warlock.js/cache` instead, so
+ * every process sharing the cache driver counts together. A cache outage
+ * fails open: the request is let through and the error is logged (at most
+ * once a minute). The `null` and `file` cache drivers are refused the same
+ * way: they cannot count, so the limiter lets requests through and logs why.
  *
  * Sets `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` on
  * every response; adds `Retry-After` (seconds) on a 429.
@@ -95,7 +118,7 @@ function pruneExpired(now: number) {
 export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
   const limiterId = nextLimiterId++;
 
-  return ({ request, response }) => {
+  return async ({ request, response }) => {
     const now = Date.now();
 
     if (now - lastPruneAt > 60_000) {
@@ -111,7 +134,7 @@ export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
       if (id !== undefined && id !== null && id !== "") {
         userKey = `user:${String(id)}`;
       } else if (options.guests === "skip") {
-        return;
+        return undefined;
       }
     }
 
@@ -120,14 +143,35 @@ export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
     const groupKey = options.keyGenerator?.(request) || userKey || ipKey;
     const cacheKey = `${limiterId}:${request.route.path}:${groupKey}`;
 
-    let bucket = buckets.get(cacheKey);
+    let bucket: Bucket | undefined;
 
-    if (!bucket || bucket.resetAt <= now) {
-      bucket = { count: 0, resetAt: now + options.duration };
-      buckets.set(cacheKey, bucket);
+    if (resolveStore(options) === "cache") {
+      try {
+        const shared = await incrementSharedRateLimit(
+          `route.${options.name ?? limiterId}.${request.route.path}`,
+          groupKey,
+          options.duration,
+          now,
+        );
+
+        bucket = { count: shared.current, resetAt: shared.resetAt };
+      } catch (error) {
+        // Fail open, and report the outage at most once a minute rather
+        // than once per request.
+        logSharedRateLimitError(error);
+
+        return undefined;
+      }
+    } else {
+      bucket = buckets.get(cacheKey);
+
+      if (!bucket || bucket.resetAt <= now) {
+        bucket = { count: 0, resetAt: now + options.duration };
+        buckets.set(cacheKey, bucket);
+      }
+
+      bucket.count++;
     }
-
-    bucket.count++;
 
     const remaining = Math.max(0, options.max - bucket.count);
     const retryAfter = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
@@ -147,5 +191,7 @@ export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
         errorCode: HttpErrorCodes.RateLimitExceeded,
       });
     }
+
+    return undefined;
   };
 }

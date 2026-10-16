@@ -1,3 +1,4 @@
+import type { ScopedStorage } from "./scoped-storage";
 import type { Readable } from "stream";
 import type { UploadedFile } from "../http";
 import type { StorageFile } from "./storage-file";
@@ -1163,7 +1164,7 @@ export interface StorageManagerContract extends ScopedStorageContract {
    * @param name - Driver name as configured
    * @returns ScopedStorage instance for the driver
    */
-  use(name: StorageDriverName): ScopedStorageContract;
+  use(name: StorageDriverName): ScopedStorage;
 
   /**
    * Get a raw driver instance

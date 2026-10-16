@@ -15,6 +15,11 @@ export type ResolvedUploadPath = {
    * Path of the file relative to the real storage root, `/`-separated
    */
   relativePath: string;
+
+  /**
+   * Real (symlink-free) absolute path of the storage root
+   */
+  root: string;
 };
 
 async function realpathOrSelf(target: string): Promise<string> {
@@ -88,5 +93,6 @@ export async function resolveUploadPath(
   return {
     absolutePath: realPath,
     relativePath: path.relative(realRoot, realPath).split(path.sep).join("/"),
+    root: realRoot,
   };
 }

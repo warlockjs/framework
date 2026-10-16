@@ -273,12 +273,12 @@ Core logs each request's lifecycle (`Starting Request` / `Completed Request`, mi
   name: "accounts.store",
   ip: "203.0.113.7",
   userAgent: "…",
-  query: { secret: "[REDACTED]", tab: "keys" }, // key redaction still applies
+  query: { secret: "[REDACTED]", tab: "keys" }, // same names masked as in `url`
   body: { … },                                   // as received, before validation
 }
 ```
 
-Query values whose names are in the logger's secret-key denylist (`secret`, `token`, `apiKey`, …) or are typical URL credentials (`signature`, `sig`, `code`, `X-Amz-Signature`, `X-Amz-Credential`, `X-Amz-Security-Token`, `X-Goog-Signature`, `X-Goog-Credential`) are masked in `url`. Add your own with `http.logging.redactQueryParams`.
+Query values whose names are in the logger's secret-key denylist (`secret`, `token`, `apiKey`, …) or are typical URL credentials (`signature`, `sig`, `code`, `X-Amz-Signature`, `X-Amz-Credential`, `X-Amz-Security-Token`, `X-Goog-Signature`, `X-Goog-Credential`) are masked in both `url` and the parsed `query` (nested query objects included), so `GET /oauth/callback?code=…` never logs the authorization code. Add your own names with `http.logging.redactQueryParams`; they apply to both too.
 
 The body is logged **as received**, so fields a schema or middleware later rejects are part of it, and an unknown field such as `providerId` is not on any key denylist. On routes that accept secrets or arbitrary user text, leave the body (and query) out entirely:
 

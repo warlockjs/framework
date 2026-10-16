@@ -97,7 +97,7 @@ const httpConfigurations: HttpConfigurations = {
 
 `forceCloseConnections`: `"idle"` (default) closes idle keep-alive connections and lets active requests finish; `true` force-closes everything immediately; `false` waits for every connection.
 
-Under `"idle"`, a request that is still running when shutdown begins answers with `Connection: close`, and its keep-alive connection is closed as soon as the response finishes, so a browser's kept-alive connection does not hold the drain open until the timeout. Responses that had already sent their headers (streams, SSE) are closed when they end. Active responses are never cut short.
+Under `"idle"`, a request that is still running when shutdown begins answers with `Connection: close`, and its keep-alive connection is closed as soon as the response finishes, so a browser's kept-alive connection does not hold the drain open until the timeout. Responses that had already sent their headers (streams, SSE) are closed when they end; a stream or SSE response that starts after shutdown began also answers with `Connection: close`. Active responses are never cut short.
 
 :::tip
 For an even smoother handoff, give the load balancer time to _observe_ the `503` before the server closes — add an `Application.onShutdown(...)` hook with a short delay matched to your LB's health-check interval.

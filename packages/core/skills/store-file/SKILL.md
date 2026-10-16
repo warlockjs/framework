@@ -179,7 +179,11 @@ console.log(r2File.url);
 console.log(localFile.url);
 ```
 
-`storage.use(name)` returns a `ScopedStorage` with the same surface as `storage`. To change the default permanently, call `storage.setDefault(name)` — but you almost always want per-call scoping for clarity.
+`storage.use(name)` returns a `ScopedStorage` with the same surface as `storage`, directory operations included (`storage.use("private").deleteDirectory(dir)` type-checks; no cast). To change the default permanently, call `storage.setDefault(name)` — but you almost always want per-call scoping for clarity.
+
+## Cached image variants follow their source
+
+On a local disk, `delete`, `deleteMany`, `move` and `deleteDirectory` (for every file under it) also remove the file's cached image derivatives (the `?variant=` renders of `uploadedFileController`). For a file removed some other way, call `purgeImageVariants(path, { disk? })`; with no path it clears the disk's whole derivative cache. Serve another local disk's files and variants with `createUploadedFileController({ disk: "private" })`, or call `resolveImageVariant({ disk, path, variant, format? })` from your own authenticated route. A configured `uploads.images.cacheDirectory` is shared by every disk: never put it inside `public/` (Warlock warns once if you do).
 
 ## `StorageFile` — the OOP handle
 

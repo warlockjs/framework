@@ -202,9 +202,9 @@ export class ConnectorsManager {
       clearTimeout(timer);
     }
 
-    // `Logger.log()` hands each entry to `channel.log()` without awaiting it, so
-    // awaiting the calls above is not enough on its own — a buffered or async
-    // channel (file, Sentry) still loses the entry when the process exits.
+    // Log calls return before an async channel (file, Sentry) has written the
+    // entry, so a channel would lose it when the process exits; `flush()` waits
+    // for those deliveries.
     await log.flush();
   }
 
@@ -216,14 +216,15 @@ export class ConnectorsManager {
       await connector.shutdown();
     } catch (error) {
       try {
-        // Awaited deliberately: the caller (`shutdownOnProcessKill`) calls
-        // `process.exit(0)` as soon as this resolves, so an un-awaited log is
-        // a log that never happens.
+        // Synchronous: the entry is handed to every channel before this
+        // returns. `shutdown()` then flushes async channels before resolving,
+        // because the caller (`shutdownOnProcessKill`) calls `process.exit(0)`
+        // as soon as it does.
         log.error("connectors", "shutdown", error as Error, { connector: connector.name });
       } catch {
         // Reporting a failure must never become a worse failure than the one
-        // being reported: a channel that throws synchronously rejects this call
-        // INSIDE the catch, which would abort the remaining teardown. Swallowed
+        // being reported: anything thrown here (a redact rule, say) would
+        // otherwise abort the remaining teardown. Swallowed
         // rather than re-reported: the only channel we could report it through
         // is the one that just threw.
       }

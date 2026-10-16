@@ -12,28 +12,37 @@ By default Warlock keeps state in the process: memory cache, local disk, in-proc
 | --- | --- | --- | --- |
 | Cache, repository cache, locks | Memory driver | `redis` or `pg` cache driver — see [Cache](./cache.md) | `cache.silenceSingleServerWarning` |
 | Files | Local disk | S3 or R2 — see [Storage](./storage.md) and [Upload to S3](../recipes/upload-to-s3.md) | `storage.silenceSingleServerWarning` |
-| Global rate limit | In-process | `http.rateLimit.redis` | n/a |
+| Rate limits (global and `middleware.rateLimit`) | In-process | `http.rateLimit.store: "cache"` over a shared cache driver | n/a |
 | Sockets | In-process rooms | `socket.adapter` + sticky sessions | `socket.silenceSingleServerWarning` |
 | Scheduled jobs | Runs on every server | `onOneServer` — see [Overlap prevention](../../scheduler/guides/overlap-prevention/) | n/a |
 | Idempotency keys | Cache-backed | Shared cache (above) | n/a |
 
 ## Rate limiting
 
-`http.rateLimit` passes [`@fastify/rate-limit`](https://github.com/fastify/fastify-rate-limit) options through:
+Counts live in the process by default, so with `N` servers every client gets `N × max`. Set `store: "cache"` to count in `@warlock.js/cache` instead: every server using the same shared cache driver (`redis`, `pg`) counts together, and the per-route `middleware.rateLimit()` follows the same setting.
 
 ```ts
-import Redis from "ioredis";
-
 export default {
   rateLimit: {
     max: 100,
     duration: 60_000,
-    redis: new Redis(process.env.REDIS_URL),
+    store: "cache",
   },
 };
 ```
 
-`enabled: false` turns the global limiter off. The per-route `middleware.rateLimit()` stays in-process, so its counters are per server.
+Shared windows are fixed and aligned to the clock (a 60-second window resets on the minute). Each route with its own `rateLimit` counts separately. A per-route limiter can choose for itself with `middleware.rateLimit({ ..., store: "cache" | "memory" })`; give it a `name` when limiters are created conditionally, so every server keys it the same way.
+
+When the cache is down, both limiters fail open: the request goes through, and the error is logged at most once a minute. For the global limiter that means `skipOnError` defaults to `true` with this store; set `skipOnError: false` to reject requests instead (they get a 500 while the cache is down).
+
+Two cache drivers are refused for `store: "cache"`, with `UnsupportedRateLimitDriverError` (requests then pass, and the refusal is logged the same way):
+
+- `null` stores nothing, so the limit would never trip.
+- `file` never removes expired windows, so every past window would stay on disk, and its increment is only serialized within one process, so workers sharing the directory would lose counts.
+
+Use `redis` (any version from 6) or `pg` across servers, or a memory driver for a single process.
+
+`http.rateLimit` also passes [`@fastify/rate-limit`](https://github.com/fastify/fastify-rate-limit) options through. Its own `redis` option still works but needs an **ioredis** client; the `redis` driver of `@warlock.js/cache` uses node-redis, so share that connection through `store: "cache"`. A `@fastify/rate-limit` store class can be passed as `store` too. `enabled: false` turns the global limiter off.
 
 ## Sockets
 

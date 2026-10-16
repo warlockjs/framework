@@ -5,6 +5,11 @@ import { HttpError } from "../errors";
 import { uploadsConfig } from "../uploads-config";
 import type { ImageVariantOutputFormat } from "../uploads-types";
 import { generateImageVariant } from "./generate-image-variant";
+import {
+  pruneStaleVariantGenerationsIfCurrent,
+  retryOnVanishedDirectory,
+  warnIfVariantCacheIsPublic,
+} from "./image-variant-cache";
 import { ImageVariantsConfigError } from "./image-variants-config-error";
 import type {
   GeneratedImageDescriptor,
@@ -14,7 +19,13 @@ import type {
 import { loadVariantSource } from "./load-variant-source";
 import { resolveImageVariantsConfig } from "./resolve-image-variants-config";
 import { resolveVariantCandidate } from "./resolve-variant-candidate";
-import { variantCacheKey, variantCachePath } from "./variant-cache-key";
+import {
+  variantCacheKey,
+  variantCachePath,
+  variantGenerationTag,
+  variantSourceDirectory,
+  variantSourceKey,
+} from "./variant-cache-key";
 import { variantGenerations } from "./variant-generations";
 
 /**
@@ -144,6 +155,8 @@ export async function generateImageVariants(
   });
 
   const { width: sourceWidth, height: sourceHeight } = await image.metadata();
+  warnIfVariantCacheIsPublic(images.cacheDirectory);
+
   const src = `/uploads/${encodeUploadsPath(source.relativePath)}`;
   const variants: Record<string, GeneratedImageVariant> = {};
 
@@ -163,13 +176,28 @@ export async function generateImageVariants(
         variant,
         format,
       });
-      const target = variantCachePath(images.cacheDirectory, hash, format);
+      const sourceKey = variantSourceKey(source.root, source.relativePath);
+      const generation = variantGenerationTag(stats.size, stats.mtimeMs);
+      const target = variantCachePath(
+        images.cacheDirectory,
+        { sourceKey, generation },
+        hash,
+        format,
+      );
 
       if (!(await exists(target))) {
-        await variantGenerations.run(hash, async () => {
+        // keyed on the target, which includes the disk root (see resolveImageVariant)
+        await variantGenerations.run(target, async () => {
           if (await exists(target)) return;
 
-          await generateImageVariant({ image: image.clone(), variant, format, targetPath: target });
+          await retryOnVanishedDirectory(() =>
+            generateImageVariant({ image: image.clone(), variant, format, targetPath: target }),
+          );
+          await pruneStaleVariantGenerationsIfCurrent(
+            source.absolutePath,
+            variantSourceDirectory(images.cacheDirectory, sourceKey),
+            generation,
+          );
         });
       }
 

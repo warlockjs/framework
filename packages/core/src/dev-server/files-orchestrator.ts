@@ -16,6 +16,7 @@ import { TypescriptHealthChecker } from "./health-checker/checkers/typescript-he
 import type { FileHealthCheckerContract } from "./health-checker/file-health-checker.contract";
 import { FilesHealthcareManager } from "./health-checker/files-healthcare.manager";
 import { buildTranspileInit } from "./loader/build-transpile-init.js";
+import { trackLoaderPortAcks, type LoaderPortAcks } from "./loader/loader-port-acks";
 import { registerLoader } from "./loader/register-loader.js";
 import { ManifestManager } from "./manifest-manager";
 import { ModuleLoader } from "./module-loader";
@@ -24,6 +25,9 @@ import { Path } from "../utils/normalized-path";
 import { SpecialFilesCollector } from "./special-files-collector";
 import { tsconfigManager } from "./tsconfig-manager";
 import { ensureWarlockDirectory, getFilesFromDirectory } from "./utils";
+
+/** Module dictionaries, relative to `src/`; matches what `isLocaleFile` accepts as JSON. */
+export const MODULE_LOCALES_JSON_GLOB = "app/*/utils/locales.json";
 
 /**
  * Register a cleanup callback that fires before the current module is
@@ -72,8 +76,8 @@ export class FilesOrchestrator {
   /** Main-thread end of the MessageChannel to the loader hook worker. */
   private loaderPort: MessagePort | null = null;
 
-  /** Resolve callbacks for pending `flushVersionBumps()` calls. */
-  private readonly pendingFlushes: Array<() => void> = [];
+  /** `sync`/`sync-ack` round trips on {@link loaderPort}; never holds the process open. */
+  private loaderAcks: LoaderPortAcks | null = null;
 
   /**
    * Files bumped since the last `flushVersionBumps()`. They are published to
@@ -168,12 +172,7 @@ export class FilesOrchestrator {
     );
 
     this.loaderPort = await registerLoader(transpileInit);
-
-    this.loaderPort.on("message", (msg: { type: string }) => {
-      if (msg.type === "sync-ack") {
-        this.pendingFlushes.shift()?.();
-      }
-    });
+    this.loaderAcks = trackLoaderPortAcks(this.loaderPort);
   }
 
   /**
@@ -195,24 +194,20 @@ export class FilesOrchestrator {
    * the cached old module.
    */
   public flushVersionBumps(): Promise<void> {
-    if (!this.loaderPort) return Promise.resolve();
+    if (!this.loaderAcks) return Promise.resolve();
 
     // Everything posted before this `sync` message is processed by the hook
     // thread before it answers, so exactly this batch is safe to publish on ack.
     const bumpedPaths = this.pendingBumpedPaths;
     this.pendingBumpedPaths = [];
 
-    return new Promise<void>((resolve) => {
-      this.pendingFlushes.push(() => {
-        const appModules = getDevelopmentAppModuleRegistry();
+    return this.loaderAcks.sync().then(() => {
+      const appModules = getDevelopmentAppModuleRegistry();
 
-        for (const absolutePath of bumpedPaths) appModules.bump(absolutePath);
-
-        resolve();
-      });
-      this.loaderPort!.postMessage({ type: "sync" });
+      for (const absolutePath of bumpedPaths) appModules.bump(absolutePath);
     });
   }
+
 
   /**
    * Discover files on disk, reconcile against the manifest, build the dep
@@ -259,11 +254,22 @@ export class FilesOrchestrator {
   }
 
   /**
-   * Glob the src directory, returning relative paths.
+   * Glob the src directory, returning relative paths: every `.ts`/`.tsx`
+   * file plus each module's `utils/locales.json`.
+   *
+   * The JSON dictionaries must be in the boot set: the module loader
+   * registers them like any other locale file, but a code-only glob left them
+   * out, so `t()` printed raw keys until the watcher reported an edit (FW-02).
    */
   public async getAllFilesFromFilesystem(): Promise<string[]> {
-    const absolutePaths = await getFilesFromDirectory();
-    return absolutePaths.map((absPath) => Path.toRelative(absPath));
+    const [codePaths, localePaths] = await Promise.all([
+      getFilesFromDirectory(),
+      getFilesFromDirectory(undefined, MODULE_LOCALES_JSON_GLOB),
+    ]);
+
+    return Array.from(
+      new Set([...codePaths, ...localePaths].map((absPath) => Path.toRelative(absPath))),
+    );
   }
 
   /**

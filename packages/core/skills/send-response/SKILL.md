@@ -166,7 +166,7 @@ sse.end();
 
 For streams that can outrun the client (terminals, log tails, big feeds), `await sse.write(event, data)` instead of `send()`: it waits until the client has caught up and resolves `false` once the client is gone. `sse.drain()` waits without sending, `sse.backpressured` reports a backed-up transport, and `sse.signal` aborts on disconnect. Sent events are not kept on `response.body`; `response.sse({ retainEvents: n })` keeps the last `n` for logging/tests (default 0).
 
-`response.sse()` returns a controller with `send(event, data, id?)`, `comment(text)`, `end()`, `onDisconnect(handler)`, and an `.ended` getter. The `send` signature is positional — `event` name first, then the `data` payload (JSON-stringified for you), then an optional event `id`. After the client disconnects, `send`/`comment` become silent no-ops and any `onDisconnect` handlers fire — register cleanup there:
+`response.sse()` returns a controller with `send(event, data, id?)`, `comment(text)`, `end()`, `onDisconnect(handler)`, and an `.ended` getter. The `send` signature is positional — `event` name first, then the `data` payload (JSON-stringified for you), then an optional event `id`. Line breaks (and NUL) in the event name and `id` are removed, so values built from user input cannot inject SSE fields. After the client disconnects, `send`/`comment` become silent no-ops and any `onDisconnect` handlers fire (a handler that throws is logged; the rest still run) — register cleanup there:
 
 ```ts
 const sse = response.sse();

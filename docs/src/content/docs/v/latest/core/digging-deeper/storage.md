@@ -302,9 +302,58 @@ console.log(r2File.url); // https://...
 console.log(localFile.url); // /uploads/...
 ```
 
-`storage.use(name)` returns a `ScopedStorage` view with the same surface — `put`, `get`, `delete`, `copy`, `move`, `list`, everything. Use it when you want one call to route somewhere other than the default without flipping the global default.
+`storage.use(name)` returns a `ScopedStorage` view with the same surface — `put`, `get`, `delete`, `copy`, `move`, `list`, everything, including the directory operations (`deleteDirectory`, `copyDirectory`, `moveDirectory`, `emptyDirectory`) and `putFromUrl`. It is typed as `ScopedStorage` (before 5.30 it was typed as the narrower `ScopedStorageContract`, so those calls needed a cast). Use it when you want one call to route somewhere other than the default without flipping the global default.
 
 To change the global default, `storage.setDefault("name")` — but you almost always want per-call scoping for clarity. A wandering `setDefault` in a service is a great way to confuse the next reader.
+
+## Image variant cache
+
+`uploadedFileController` renders image variants (`?variant=thumb`) on demand and caches each derivative on disk, in `uploads.images.cacheDirectory` or `<disk root>/.cache/image-variants`. Every derivative of one source sits in a directory of its own, so the cache follows the source:
+
+- **Deleting or moving** a file through a local disk (`storage.delete`, `deleteMany`, `move`, `deleteDirectory` for every file under the directory, and the same calls on `storage.use("name")`) removes its derivatives.
+- **Rewriting** a source in place (new size or mtime) renders fresh derivatives on the next request and removes the old version's.
+- **Anything else** — a file removed outside storage, a cache you want to reset — call `purgeImageVariants`:
+
+```ts
+import { purgeImageVariants } from "@warlock.js/core";
+
+await purgeImageVariants("machines/12/photo.webp"); // one file's derivatives
+await purgeImageVariants(undefined, { disk: "private" }); // a disk's whole cache
+```
+
+A configured `cacheDirectory` is shared by every local disk (derivatives are keyed by the disk's real root, so they never collide), so purging it without a path clears every disk's derivatives.
+
+:::caution[Keep the cache out of `public/`]
+Because a configured `cacheDirectory` holds every disk's derivatives, a private disk's thumbnails sit next to public ones. Never put it inside `public/` (or `storage.publicRoot`): everything there is served without the checks on the private disk's route. Warlock logs a warning once when it finds the cache there. The default, `<disk root>/.cache/image-variants`, keeps each disk's derivatives under that disk.
+:::
+
+### Variants of other disks
+
+The default route serves the default disk. Serve another local disk with `createUploadedFileController`, behind whatever check the files need:
+
+```ts
+import { createUploadedFileController } from "@warlock.js/core";
+
+router.get("/invoices/*", createUploadedFileController({ disk: "private" }), {
+  middleware: [authMiddleware()],
+});
+```
+
+Or resolve a variant yourself, inside a route that already decides access:
+
+```ts
+import { resolveImageVariant } from "@warlock.js/core";
+
+const variant = await resolveImageVariant({ disk: "private", path, variant: "thumb" });
+
+if (!variant) return response.notFound();
+
+return response.sendBuffer(await fs.readFile(variant.absolutePath), {
+  contentType: variant.contentType,
+});
+```
+
+`resolveImageVariant` applies the same guards as the route: the path must stay inside the disk root and outside the cache, only declared variants and formats render, and source size and pixel limits hold. It returns `undefined` for a missing file and throws `HttpError` (400, 413, 415) for a request the route would refuse.
 
 ## `StorageFile` — the OOP handle
 

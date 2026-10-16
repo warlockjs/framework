@@ -1,6 +1,7 @@
 import { fileExistsAsync, directoryExistsAsync } from "@warlock.js/fs";
 import { type ImportSpecifier, parse } from "es-module-lexer";
 import path from "node:path";
+import ts from "typescript";
 import { Path } from "../utils/normalized-path";
 import { tsconfigManager } from "./tsconfig-manager";
 
@@ -264,13 +265,21 @@ function extractImportPathsWithRegex(
   }
 
   // Pattern 3: Export from - export ... from "path"
-  const exportFromPattern = /export\s+(?:\{[^}]*\}|\*|\w+)\s+from\s+['"]([^'"]+)['"]/g;
+  // A pure `export type { A } from` / `export type * from` re-export is matched
+  // and then skipped: it is erased at compile time, so it is no dependency
+  // edge. That keeps this fallback in line with the lexer path, which never
+  // reports the form, so the graph no longer depends on which path ran.
+  // `export { type A } from` (reported by the lexer) stays a type-only edge.
+  const exportFromPattern =
+    /export\s+(?:type\s+)?(?:\{[^}]*\}|\*(?:\s+as\s+\w+)?|\w+)\s+from\s+['"]([^'"]+)['"]/g;
 
   while ((match = exportFromPattern.exec(source)) !== null) {
     const fullMatch = match[0];
     const exportPath = match[1];
 
     if (exportPath === undefined) continue;
+
+    if (/^export\s+type\s/.test(fullMatch)) continue;
 
     record(exportPath, fullMatch, isExportTypeOnlyStatement(fullMatch));
   }
@@ -312,20 +321,23 @@ export async function parseImports(
       return new Map();
     }
 
-    // Try es-module-lexer first (faster and more accurate for simple cases)
+    // es-module-lexer first: it reads the real statements and skips comments.
     try {
       const [imports] = await parse(source);
 
       if (imports && imports.length > 0) {
         return await resolveImports(imports as ImportSpecifier[], source, filePath);
       }
-    } catch (lexerError) {
-      // es-module-lexer failed, fall back to regex-based extraction
-      // This is common with TypeScript files that have complex syntax
+    } catch {
+      // The lexer rejects some TypeScript syntax; the regex below covers it.
     }
 
-    // Fallback: Use regex-based extraction (more forgiving with TypeScript)
-    const regexImports = extractImportPathsWithRegex(source);
+    // Fallback: regex extraction, for files the lexer rejects and for files
+    // where it finds nothing (it does not report `export type { A } from`).
+    // It runs over the source without comments: scanning them turned a doc
+    // comment such as `(await import("./query-testing"))` in a file with no
+    // imports into a self edge and a false "circular dependency" (FW-13).
+    const regexImports = extractImportPathsWithRegex(stripComments(source, filePath));
     const resolvedImports = new Map<string, ResolvedImport>();
 
     for (const { path: importPath, isTypeOnly } of regexImports) {
@@ -345,7 +357,7 @@ export async function parseImports(
         resolvedPath = await resolveRelativeImport(importPath, filePath);
       }
 
-      if (resolvedPath) {
+      if (resolvedPath && !isSameFile(resolvedPath, filePath)) {
         mergeResolvedImport(resolvedImports, importPath, resolvedPath, isTypeOnly);
       }
     }
@@ -355,6 +367,113 @@ export async function parseImports(
     console.error(`Error parsing imports for ${filePath}:`, error);
 
     return new Map();
+  }
+}
+
+/** True when both paths name the same file (case-insensitively on Windows). */
+function isSameFile(first: string, second: string): boolean {
+  const normalize = (filePath: string) => {
+    const resolved = Path.normalize(path.resolve(filePath));
+    return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+  };
+
+  return normalize(first) === normalize(second);
+}
+
+/**
+ * Remove `//` and `/* *\/` comments, keeping every newline in place (so
+ * line-based matches keep their lines). Only the regex fallback needs it; the
+ * lexer already skips comments.
+ *
+ * Comment ranges come from a real TypeScript parse, never from scanning
+ * characters: only the parser can tell a regex literal (`/\/*$/`), a template
+ * literal or JSX text (`<p>// not a comment</p>`) from a comment. A character
+ * scanner read the `/*` in `p.replace(/\/*$/, "")` as a block comment and
+ * erased every import after it.
+ *
+ * `filePath` picks the dialect (`.tsx`/`.jsx` parse JSX); without it the
+ * source is parsed as TSX.
+ */
+export function stripComments(source: string, filePath = "source.tsx"): string {
+  const sourceFile = ts.createSourceFile(
+    filePath,
+    source,
+    ts.ScriptTarget.Latest,
+    false,
+    scriptKindFor(filePath),
+  );
+  const ranges: ts.CommentRange[] = [];
+  const seen = new Set<number>();
+
+  const collect = (node: ts.Node): void => {
+    // A JSDoc node is itself a comment, already reported as trivia of the
+    // token that follows it; its inner tokens are not code.
+    if (node.kind >= ts.SyntaxKind.FirstJSDocNode && node.kind <= ts.SyntaxKind.LastJSDocNode) {
+      return;
+    }
+
+    const children = node.getChildren(sourceFile);
+
+    if (children.length > 0) {
+      for (const child of children) collect(child);
+
+      return;
+    }
+
+    // JSX text has no trivia: its content starts at `pos` and may contain `//`.
+    if (node.kind === ts.SyntaxKind.JsxText || node.kind === ts.SyntaxKind.JsxTextAllWhiteSpaces) {
+      return;
+    }
+
+    const tokenStart = node.getStart(sourceFile);
+
+    // Trivia before a token holds trailing comments of the previous line
+    // (`a; // x`) and leading comments of this one; collect both.
+    const trivia = [
+      ...(ts.getTrailingCommentRanges(source, node.pos) ?? []),
+      ...(ts.getLeadingCommentRanges(source, node.pos) ?? []),
+    ];
+
+    for (const range of trivia) {
+      if (range.end <= tokenStart && !seen.has(range.pos)) {
+        seen.add(range.pos);
+        ranges.push(range);
+      }
+    }
+  };
+
+  collect(sourceFile);
+  ranges.sort((first, second) => first.pos - second.pos);
+
+  let output = "";
+  let cursor = 0;
+
+  for (const range of ranges) {
+    output += source.slice(cursor, range.pos);
+    output += source.slice(range.pos, range.end).replace(/[^\n]/g, "");
+    cursor = range.end;
+  }
+
+  return output + source.slice(cursor);
+}
+
+/** The parse dialect for a file: JSX only where the extension allows it. */
+function scriptKindFor(filePath: string): ts.ScriptKind {
+  const extension = path.extname(filePath).toLowerCase();
+
+  switch (extension) {
+    case ".ts":
+    case ".mts":
+    case ".cts":
+      return ts.ScriptKind.TS;
+    case ".js":
+    case ".mjs":
+    case ".cjs":
+      return ts.ScriptKind.JS;
+    case ".jsx":
+      return ts.ScriptKind.JSX;
+    default:
+      return ts.ScriptKind.TSX;
   }
 }
 
@@ -416,7 +535,9 @@ async function resolveImports(
       resolvedPath = await resolveRelativeImport(importPath, filePath);
     }
 
-    if (!resolvedPath) {
+    // A file importing itself is no dependency edge, and as one it reads as
+    // a one-file "cycle".
+    if (!resolvedPath || isSameFile(resolvedPath, filePath)) {
       continue;
     }
 

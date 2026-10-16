@@ -17,7 +17,14 @@ import {
 import { rootPath, srcPath } from "../utils";
 import { getWarlockVersion } from "../utils/framework-vesion";
 import { featuresMap } from "./features";
-import { mergePnpmSharpApproval } from "./pnpm-build-approvals";
+import {
+  getPnpmVersion,
+  isInsideParentPnpmWorkspace,
+  mergeOnlyBuiltDependencies,
+  mergePackageJsonBuildApprovals,
+  mergePnpmSharpApproval,
+  pnpmBuildApprovalLayout,
+} from "./pnpm-build-approvals";
 
 export { featuresMap };
 export type { FeatureDefinition } from "./features";
@@ -163,11 +170,7 @@ export async function addCommandAction(options: CommandActionData) {
     const resolvedPackageManager =
       (packageManager as PackageManager | undefined) ?? (await detectPackageManager());
     if (resolvedPackageManager === "pnpm" && dependencies.sharp !== undefined) {
-      const workspacePath = rootPath("pnpm-workspace.yaml");
-      const current = (await fileExistsAsync(workspacePath))
-        ? await getFileAsync(workspacePath)
-        : "";
-      await putFileAsync(workspacePath, mergePnpmSharpApproval(current));
+      await approvePnpmSharpBuild();
     }
     await installDependencies(
       packageManager as PackageManager | undefined,
@@ -207,6 +210,45 @@ export async function addCommandAction(options: CommandActionData) {
 
     console.log(`Scripts added successfully ${colors.green(Object.keys(scripts).join(", "))}`);
   }
+}
+
+/**
+ * Let pnpm run sharp's install script, written where the INSTALLED pnpm reads
+ * approvals (see `pnpmBuildApprovalLayout`). pnpm 9 and 10.0–10.4 reject a
+ * settings-only `pnpm-workspace.yaml`, so for them the approval goes into
+ * package.json and no workspace file is created.
+ *
+ * An app inside a parent pnpm workspace gets no per-app policy: the parent's
+ * workspace owns it, and a nested workspace file would make a second root.
+ */
+async function approvePnpmSharpBuild(): Promise<void> {
+  const workspacePath = rootPath("pnpm-workspace.yaml");
+  const hasWorkspaceFile = await fileExistsAsync(workspacePath);
+
+  if (!hasWorkspaceFile && isInsideParentPnpmWorkspace(rootPath())) {
+    console.log(
+      `${colors.yellowBright("sharp")} needs its install script approved in the parent pnpm workspace's settings.`,
+    );
+    return;
+  }
+
+  const layout = pnpmBuildApprovalLayout(getPnpmVersion(rootPath()));
+
+  if (layout === "packageJson") {
+    const packageJsonPath = rootPath("package.json");
+    const packageJson = await getJsonFileAsync<ProjectPackageJson>(packageJsonPath);
+
+    await putJsonFileAsync(packageJsonPath, mergePackageJsonBuildApprovals(packageJson, ["sharp"]));
+    return;
+  }
+
+  const current = hasWorkspaceFile ? await getFileAsync(workspacePath) : "";
+  const updated =
+    layout === "onlyBuiltDependencies"
+      ? mergeOnlyBuiltDependencies(current, ["sharp"])
+      : mergePnpmSharpApproval(current);
+
+  if (updated !== current) await putFileAsync(workspacePath, updated);
 }
 
 /**

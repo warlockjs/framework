@@ -1211,7 +1211,7 @@ Same shape — TS validates the union; runtime picks the `default` key.
 
 ## Multi-server settings (5.20.0)
 
-- `http.rateLimit` — `@fastify/rate-limit` options (`redis`, `nameSpace`, ...); `enabled: false` disables.
+- `http.rateLimit` — `@fastify/rate-limit` options (`nameSpace`, ...); `store: "cache"` counts in `@warlock.js/cache` so every server shares the limit (per-route `middleware.rateLimit()` follows it; `skipOnError` defaults to `true`, so a cache outage fails open; the `null` and `file` cache drivers are refused); `redis` needs an ioredis client; `enabled: false` disables.
 - `socket.adapter` — adapter factory for cross-server broadcast.
 - `cache.silenceSingleServerWarning`, `storage.silenceSingleServerWarning`, `socket.silenceSingleServerWarning` — silence the production warnings for in-memory cache, local storage, and adapter-less sockets.
 
@@ -4254,14 +4254,21 @@ pnpm 10+ will not run a dependency's install script unless the app names it. esb
 [ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild@0.27.7
 ```
 
-Fix it once in the app's `pnpm-workspace.yaml`:
+Where the approval goes depends on the pnpm version (measured with real installs):
+
+| pnpm             | Approve esbuild in                                                           |
+| ---------------- | ---------------------------------------------------------------------------- |
+| 10.26+, 11, 12   | `pnpm-workspace.yaml`: `allowBuilds:` / `  esbuild: true`                    |
+| 10.5 – 10.25     | `pnpm-workspace.yaml`: `onlyBuiltDependencies:` / `  - esbuild`              |
+| 7 – 9, 10.0–10.4 | `package.json`: `"pnpm": { "onlyBuiltDependencies": ["esbuild"] }`, and no `pnpm-workspace.yaml` |
 
 ```yaml
+# pnpm 10.26 and later
 allowBuilds:
   esbuild: true
 ```
 
-Note pnpm reads this from `pnpm-workspace.yaml`, **not** from `package.json`'s `pnpm` field — pnpm 11 warns that the field is ignored and then carries on, so settings left there fail silently.
+pnpm 11 and 12 ignore `package.json`'s `pnpm` field and fail the install when the workspace file has only `onlyBuiltDependencies`, so keep `allowBuilds` there (listing both keys is fine). pnpm before 10.5 rejects a `pnpm-workspace.yaml` without a `packages:` field (`packages field missing or empty`), and adding `packages: ["."]` makes every later dependency add fail with `ERR_PNPM_ADDING_TO_ROOT` — so on those versions use the `package.json` field instead. `create-warlock` 5.30.0 checks the pnpm version and writes the right one, and `warlock add image` follows the same rule when it approves `sharp`.
 
 `warlock dev` checks for esbuild's native binary before starting (as `warlock build` already did) and fails fast with `EsbuildBinaryMissingError`, naming the same fix, instead of surfacing an opaque low-level error later from inside the bundler.
 
@@ -5042,7 +5049,7 @@ sse.end();
 
 For streams that can outrun the client (terminals, log tails, big feeds), `await sse.write(event, data)` instead of `send()`: it waits until the client has caught up and resolves `false` once the client is gone. `sse.drain()` waits without sending, `sse.backpressured` reports a backed-up transport, and `sse.signal` aborts on disconnect. Sent events are not kept on `response.body`; `response.sse({ retainEvents: n })` keeps the last `n` for logging/tests (default 0).
 
-`response.sse()` returns a controller with `send(event, data, id?)`, `comment(text)`, `end()`, `onDisconnect(handler)`, and an `.ended` getter. The `send` signature is positional — `event` name first, then the `data` payload (JSON-stringified for you), then an optional event `id`. After the client disconnects, `send`/`comment` become silent no-ops and any `onDisconnect` handlers fire — register cleanup there:
+`response.sse()` returns a controller with `send(event, data, id?)`, `comment(text)`, `end()`, `onDisconnect(handler)`, and an `.ended` getter. The `send` signature is positional — `event` name first, then the `data` payload (JSON-stringified for you), then an optional event `id`. Line breaks (and NUL) in the event name and `id` are removed, so values built from user input cannot inject SSE fields. After the client disconnects, `send`/`comment` become silent no-ops and any `onDisconnect` handlers fire (a handler that throws is logged; the rest still run) — register cleanup there:
 
 ```ts
 const sse = response.sse();
@@ -5377,7 +5384,11 @@ console.log(r2File.url);
 console.log(localFile.url);
 ```
 
-`storage.use(name)` returns a `ScopedStorage` with the same surface as `storage`. To change the default permanently, call `storage.setDefault(name)` — but you almost always want per-call scoping for clarity.
+`storage.use(name)` returns a `ScopedStorage` with the same surface as `storage`, directory operations included (`storage.use("private").deleteDirectory(dir)` type-checks; no cast). To change the default permanently, call `storage.setDefault(name)` — but you almost always want per-call scoping for clarity.
+
+## Cached image variants follow their source
+
+On a local disk, `delete`, `deleteMany`, `move` and `deleteDirectory` (for every file under it) also remove the file's cached image derivatives (the `?variant=` renders of `uploadedFileController`). For a file removed some other way, call `purgeImageVariants(path, { disk? })`; with no path it clears the disk's whole derivative cache. Serve another local disk's files and variants with `createUploadedFileController({ disk: "private" })`, or call `resolveImageVariant({ disk, path, variant, format? })` from your own authenticated route. A configured `uploads.images.cacheDirectory` is shared by every disk: never put it inside `public/` (Warlock warns once if you do).
 
 ## `StorageFile` — the OOP handle
 
@@ -7509,7 +7520,7 @@ Each is documented inline (JSDoc + `@example`) — read the file under `@warlock
 - **Rate limit** caps **requests per time window** — 5 logins/minute per IP. Use for abuse prevention, cost-control on cheap-but-spammable endpoints.
 - **Concurrency limit** caps **in-flight requests at any instant** — 3 simultaneous report generations. Use for expensive endpoints where parallel calls would overload the worker (CPU-bound, large memory, slow third-party).
 
-Both counters are **process-local**. With N replicas the effective cap is N × value. For globally-shared rate limits, configure `@fastify/rate-limit` with a Redis store via `http.rateLimit` instead.
+Both counters are **process-local** by default. With N replicas the effective cap is N × value. `rateLimit` can count in `@warlock.js/cache` instead: `store: "cache"` on the limiter, or `http.rateLimit.store: "cache"` for every limiter (give conditionally created limiters a `name`). It needs a counting driver (`redis`, `pg`, or memory for one process): `null` and `file` are refused, and a cache outage fails open with the error logged at most once a minute. The concurrency cap has no shared mode.
 
 ```ts
 import { middleware } from "@warlock.js/core";
@@ -7550,7 +7561,7 @@ Server errors (5xx) are not cached — clients can retry past a 5xx. 4xx respons
 
 ## Rate limit across servers
 
-`http.rateLimit` passes `@fastify/rate-limit` options through — set `redis` for a store shared by all servers; `enabled: false` turns the global limiter off. The per-route `middleware.rateLimit()` counters stay in-process.
+Set `http.rateLimit.store: "cache"` to count in the configured `@warlock.js/cache` driver, shared by every server on a Redis or Postgres cache; the per-route `middleware.rateLimit()` follows it. `http.rateLimit` also passes `@fastify/rate-limit` options through (its own `redis` option needs an ioredis client, not the cache's node-redis one); `enabled: false` turns the global limiter off.
 
 ## `maxBodySize` vs the global `http.bodyLimit`
 

@@ -243,7 +243,7 @@ Same shape — TS validates the union; runtime picks the `default` key.
 
 ## Multi-server settings (5.20.0)
 
-- `http.rateLimit` — `@fastify/rate-limit` options (`redis`, `nameSpace`, ...); `enabled: false` disables.
+- `http.rateLimit` — `@fastify/rate-limit` options (`nameSpace`, ...); `store: "cache"` counts in `@warlock.js/cache` so every server shares the limit (per-route `middleware.rateLimit()` follows it; `skipOnError` defaults to `true`, so a cache outage fails open; the `null` and `file` cache drivers are refused); `redis` needs an ioredis client; `enabled: false` disables.
 - `socket.adapter` — adapter factory for cross-server broadcast.
 - `cache.silenceSingleServerWarning`, `storage.silenceSingleServerWarning`, `socket.silenceSingleServerWarning` — silence the production warnings for in-memory cache, local storage, and adapter-less sockets.
 

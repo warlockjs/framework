@@ -12,7 +12,9 @@ import { copyFile, readFile, readdir, rename, stat, unlink, writeFile } from "fs
 import { basename, dirname, join, resolve } from "path";
 import { Transform, type Readable } from "stream";
 import { pipeline } from "stream/promises";
+import { log } from "@warlock.js/logger";
 import { UploadedFile } from "../../http";
+import { purgeImageVariantsOfFile } from "../../http/uploads/image-variant-cache";
 import { storagePath } from "../../utils/paths";
 import { url } from "../../utils/urls";
 import { storageDriverContext } from "../context/storage-driver-context";
@@ -279,7 +281,7 @@ export class LocalDriver implements StorageDriverContract {
     }
 
     await unlinkAsync(absolutePath);
-
+    await this.purgeImageVariants(absolutePath);
 
     return true;
   }
@@ -323,9 +325,33 @@ export class LocalDriver implements StorageDriverContract {
       );
     }
 
+    // Listed before the delete: once the directory is gone there is nothing
+    // left to tell which files had cached image derivatives.
+    const files = await this.listFilesRecursively(absolutePath);
+
     await removeDirectoryAsync(absolutePath);
 
+    for (const file of files) {
+      await this.purgeImageVariants(file);
+    }
+
     return true;
+  }
+
+  /**
+   * Every file under `directory`, as absolute paths; empty when it cannot be
+   * read. Used to purge the image derivatives of a deleted directory's files.
+   */
+  protected async listFilesRecursively(directory: string): Promise<string[]> {
+    try {
+      const entries = await readdir(directory, { recursive: true, withFileTypes: true });
+
+      return entries
+        .filter((entry) => entry.isFile())
+        .map((entry) => join(entry.parentPath, entry.name));
+    } catch {
+      return [];
+    }
   }
 
   /**
@@ -545,7 +571,7 @@ export class LocalDriver implements StorageDriverContract {
 
     await ensureDirectoryAsync(dirname(toPath));
     await rename(fromPath, toPath);
-
+    await this.purgeImageVariants(fromPath);
 
     const hash = await this.hashFile(toPath);
     const stats = await stat(toPath);
@@ -625,6 +651,23 @@ export class LocalDriver implements StorageDriverContract {
   // ============================================================
   // Utilities
   // ============================================================
+
+  /**
+   * Remove the cached image derivatives of a file that was just deleted or
+   * moved away. Best effort: the file operation has already succeeded, so a
+   * cache that cannot be cleared is logged, never thrown.
+   */
+  protected async purgeImageVariants(absolutePath: string): Promise<void> {
+    try {
+      await purgeImageVariantsOfFile(this.root, absolutePath);
+    } catch (error) {
+      log.warn(
+        "storage.local",
+        "purge-image-variants",
+        `Could not remove cached image variants: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
 
   /**
    * Get absolute file path

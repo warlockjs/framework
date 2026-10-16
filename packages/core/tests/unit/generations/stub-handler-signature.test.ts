@@ -10,7 +10,10 @@ import {
   crudUpdateControllerStub,
 } from "../../../src/cli/commands/generate/templates/stubs";
 import {
-  notificationControllersStub,
+  listNotificationsControllerStub,
+  markAllNotificationsReadControllerStub,
+  markNotificationReadControllerStub,
+  unreadNotificationsCountControllerStub,
   webContactControllerStub,
 } from "../../../src/generations/stubs";
 
@@ -153,14 +156,20 @@ describe("generate.controller stub handlers (src/cli/commands/generate/templates
 });
 
 describe("generation stub handlers (src/generations/stubs.ts)", () => {
-  it("every notificationControllersStub handler emits a single-param object context binding request and response", () => {
-    const parameterLists = findArrowFunctionParameterLists(notificationControllersStub);
+  it("every notifications controller stub emits one single-param object context binding request and response", () => {
+    const stubs = [
+      listNotificationsControllerStub,
+      unreadNotificationsCountControllerStub,
+      markNotificationReadControllerStub,
+      markAllNotificationsReadControllerStub,
+    ];
 
-    // list, unread-count, mark-read, mark-all-read, clear, delete
-    expect(parameterLists).toHaveLength(6);
+    for (const stub of stubs) {
+      const parameterLists = findArrowFunctionParameterLists(stub);
 
-    for (const params of parameterLists) {
-      expect(isV5ContextParam(params, ["request", "response"])).toBe(true);
+      // One controller per file (FW-09).
+      expect(parameterLists).toHaveLength(1);
+      expect(isV5ContextParam(parameterLists[0], ["request", "response"])).toBe(true);
     }
   });
 

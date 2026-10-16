@@ -295,11 +295,13 @@ import { LocalConnector } from "./src/connectors/local"; // ✅ extensionless
 import { storageRoot } from "app/shared/paths";          // ✅ tsconfig paths alias
 ```
 
-`warlock dev` resolves these through its loader. Where the runtime cannot import the config as written — `build`/`start` on Node without native TypeScript, or native type stripping meeting an extensionless or aliased import — Core bundles the config with its **local** import graph through esbuild and imports that once:
+`warlock dev` resolves these through its loader. Where the runtime cannot import the config as written — `build`/`start` on Node without native TypeScript, or native type stripping meeting an extensionless or aliased import, or TypeScript it cannot strip (an `enum`, a parameter property) — Core bundles the config with its **local** import graph through esbuild and imports that once:
 
-- packages (`@warlock.js/*`, npm, `node:*`) stay real imports, so `BaseConnector`, the container and other registries are the application's own instances;
-- each inlined module keeps its own `import.meta.url`, so `new URL("./asset.json", import.meta.url)` still points beside that module;
-- an error thrown by your config is rethrown unchanged, and the temporary `.warlock.config.*.mjs` beside it is removed either way.
+- packages (`@warlock.js/*`, npm, `node:*`) stay real imports, so `BaseConnector`, the container and other registries are the application's own instances. A `paths` alias is inlined only when it resolves outside `node_modules`, so a catch-all pattern such as `"*": ["./types/*"]` never pulls a package into the bundle;
+- each inlined module keeps its own `import.meta.url`, `import.meta.dirname` and `import.meta.filename`, so `new URL("./asset.json", import.meta.url)` still points beside that module. Only real `import.meta` expressions are replaced; the same words inside a string or comment are left alone. `import.meta.resolve()` is not rewritten: resolve from `import.meta.url` instead;
+- an error thrown by your config is rethrown unchanged, and the temporary `.warlock.config.*.mjs` beside it is removed either way. A loading error in the bundled config (a missing package, say) names `warlock.config.ts`, not the temporary file.
+
+A package that is genuinely not installed is not a fallback case: the native import's error is rethrown as is.
 
 ## HMR reload behaviour
 

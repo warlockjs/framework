@@ -1,5 +1,7 @@
 import config from "@mongez/config";
+import { log } from "@warlock.js/logger";
 import Fastify, { type FastifyInstance } from "fastify";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import os from "node:os";
@@ -10,7 +12,15 @@ import { storage } from "../../storage";
 import { Request } from "../request";
 import { Response } from "../response";
 import type { UploadsImagesConfigurations } from "../uploads-types";
-import { uploadedFileController } from "./uploaded-file.controller";
+import { LocalDriver } from "../../storage/drivers/local-driver";
+import {
+  pruneStaleVariantGenerationsIfCurrent,
+  resetVariantCacheWarnings,
+  warnIfVariantCacheIsPublic,
+} from "./image-variant-cache";
+import { purgeImageVariants } from "./purge-image-variants";
+import { resolveImageVariant } from "./resolve-image-variant";
+import { createUploadedFileController, uploadedFileController } from "./uploaded-file.controller";
 
 /**
  * `uploadedFileController` end to end, through a real Fastify instance so the
@@ -494,12 +504,21 @@ describe.skipIf(!sharpAvailable)("uploadedFileController — variants", () => {
     expect((await sharp!(first.rawPayload).metadata()).width).toBe(32);
   });
 
-  it("stores the derivative at <cacheDirectory>/<first 2 hex>/<hash>.<ext>", async () => {
+  it("stores the derivative at <cacheDirectory>/<2 hex>/<sourceKey>/<size-mtime>/<hash>.<ext>", async () => {
     const result = await get("/uploads/hero.jpg?variant=thumb&format=webp");
     const hash = String(result.headers.etag).replaceAll('"', "");
+    const sourceKey = createHash("sha256")
+      .update(JSON.stringify([fs.realpathSync(storageRoot), "hero.jpg"]))
+      .digest("hex");
+    const stats = fs.statSync(source());
+    const generation = `${stats.size}-${Math.trunc(stats.mtimeMs)}`;
 
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(fs.existsSync(path.join(cacheDirectory, hash.slice(0, 2), `${hash}.webp`))).toBe(true);
+    expect(
+      fs.existsSync(
+        path.join(cacheDirectory, sourceKey.slice(0, 2), sourceKey, generation, `${hash}.webp`),
+      ),
+    ).toBe(true);
   });
 
   it("generates once for 10 concurrent misses (single-flight)", async () => {
@@ -559,7 +578,7 @@ describe.skipIf(!sharpAvailable)("uploadedFileController — variants", () => {
     expect((await sharp!(result.rawPayload).metadata()).format).toBe(sharpFormat);
   });
 
-  it("makes a new derivative when the source changes", async () => {
+  it("makes a new derivative when the source changes, and prunes the old one (FW-10)", async () => {
     const save = vi.spyOn(Image.prototype, "save");
     const before = await get("/uploads/hero.jpg?variant=thumb");
 
@@ -572,7 +591,141 @@ describe.skipIf(!sharpAvailable)("uploadedFileController — variants", () => {
     expect(after.statusCode).toBe(200);
     expect(after.headers.etag).not.toBe(before.headers.etag);
     expect(save).toHaveBeenCalledTimes(2);
-    expect(listFiles(cacheDirectory)).toHaveLength(2);
+    expect(listFiles(cacheDirectory)).toHaveLength(1);
+  });
+
+  it("keeps every variant and format of the current version side by side", async () => {
+    await get("/uploads/hero.jpg?variant=thumb");
+    await get("/uploads/hero.jpg?variant=thumb&format=webp");
+    await get("/uploads/hero.jpg?variant=card");
+
+    expect(listFiles(cacheDirectory)).toHaveLength(3);
+  });
+
+  it("removes a file's derivatives when local storage deletes it (FW-10)", async () => {
+    await get("/uploads/hero.jpg?variant=thumb");
+    await get("/uploads/hero.jpg?variant=card&format=webp");
+    fs.writeFileSync(path.join(storageRoot, "other.jpg"), await makeImage("jpeg", 64, 64));
+    await get("/uploads/other.jpg?variant=thumb");
+
+    expect(listFiles(cacheDirectory)).toHaveLength(3);
+
+    const driver = new LocalDriver({ root: storageRoot });
+
+    await expect(driver.delete("hero.jpg")).resolves.toBe(true);
+
+    // only other.jpg's derivative is left
+    expect(listFiles(cacheDirectory)).toHaveLength(1);
+    fs.rmSync(path.join(storageRoot, "other.jpg"), { force: true });
+  });
+
+  it("removes a file's derivatives when local storage moves it (FW-10)", async () => {
+    await get("/uploads/hero.jpg?variant=thumb");
+
+    const driver = new LocalDriver({ root: storageRoot });
+
+    await driver.move("hero.jpg", "moved/hero.jpg");
+
+    expect(listFiles(cacheDirectory)).toEqual([]);
+    fs.rmSync(path.join(storageRoot, "moved"), { recursive: true, force: true });
+  });
+
+  it("purgeImageVariants removes one file's derivatives, or the whole cache (FW-10)", async () => {
+    await get("/uploads/hero.jpg?variant=thumb");
+    fs.writeFileSync(path.join(storageRoot, "other.jpg"), await makeImage("jpeg", 64, 64));
+    await get("/uploads/other.jpg?variant=thumb");
+
+    await expect(purgeImageVariants("hero.jpg")).resolves.toBe(true);
+    expect(listFiles(cacheDirectory)).toHaveLength(1);
+    await expect(purgeImageVariants("hero.jpg")).resolves.toBe(false);
+
+    await expect(purgeImageVariants()).resolves.toBe(true);
+    expect(listFiles(cacheDirectory)).toEqual([]);
+    fs.rmSync(path.join(storageRoot, "other.jpg"), { force: true });
+  });
+
+  it("purgeImageVariants refuses a path outside the disk", async () => {
+    await get("/uploads/hero.jpg?variant=thumb");
+
+    await expect(purgeImageVariants("../outside/secret.txt")).resolves.toBe(false);
+    expect(listFiles(cacheDirectory)).toHaveLength(1);
+  });
+
+  it("serves variants of a second local disk through createUploadedFileController({ disk }) (FW-11)", async () => {
+    const privateRoot = path.join(workspace, "private-disk");
+    fs.mkdirSync(privateRoot, { recursive: true });
+    fs.writeFileSync(path.join(privateRoot, "invoice.png"), await makeImage("png", 64, 64));
+
+    const getDriver = vi
+      .spyOn(storage, "getDriver")
+      .mockReturnValue(new LocalDriver({ root: privateRoot }) as never);
+
+    try {
+      const handler = createUploadedFileController({ disk: "private" as never });
+      const privateApp = Fastify();
+      privateApp.get("/private/*", async (fastifyRequest, fastifyReply) => {
+        const request = new Request();
+        const response = new Response();
+        response.setResponse(fastifyReply);
+        request.response = response;
+        response.request = request;
+        request.setRequest(fastifyRequest).setRoute({ method: "GET", path: "/private/*" } as never);
+
+        await handler({ request, response });
+
+        return fastifyReply;
+      });
+      await privateApp.ready();
+
+      const variant = await privateApp.inject({
+        method: "GET",
+        url: "/private/invoice.png?variant=thumb",
+      });
+      const original = await privateApp.inject({ method: "GET", url: "/private/invoice.png" });
+      const defaultDisk = await privateApp.inject({ method: "GET", url: "/private/hero.jpg" });
+
+      expect(variant.statusCode).toBe(200);
+      expect(variant.headers["content-type"]).toContain("image/png");
+      expect(original.statusCode).toBe(200);
+      // the default disk's file is not reachable through the private disk's route
+      expect(defaultDisk.statusCode).toBe(404);
+
+      await privateApp.close();
+    } finally {
+      getDriver.mockRestore();
+      fs.rmSync(privateRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("resolveImageVariant renders a variant of another local disk for an app's own route (FW-11)", async () => {
+    const privateRoot = path.join(workspace, "private-disk-2");
+    fs.mkdirSync(privateRoot, { recursive: true });
+    fs.writeFileSync(path.join(privateRoot, "photo.jpg"), await makeImage("jpeg", 64, 64));
+
+    const getDriver = vi
+      .spyOn(storage, "getDriver")
+      .mockReturnValue(new LocalDriver({ root: privateRoot }) as never);
+
+    try {
+      const variant = await resolveImageVariant({
+        disk: "private" as never,
+        path: "photo.jpg",
+        variant: "thumb",
+        format: "webp",
+      });
+
+      expect(variant?.contentType).toBe("image/webp");
+      expect(variant && fs.existsSync(variant.absolutePath)).toBe(true);
+      await expect(
+        resolveImageVariant({ disk: "private" as never, path: "missing.jpg", variant: "thumb" }),
+      ).resolves.toBeUndefined();
+      await expect(
+        resolveImageVariant({ disk: "private" as never, path: "photo.jpg", variant: "nope" }),
+      ).rejects.toMatchObject({ status: 400 });
+    } finally {
+      getDriver.mockRestore();
+      fs.rmSync(privateRoot, { recursive: true, force: true });
+    }
   });
 
   it("leaves no .tmp- file after a successful generation", async () => {
@@ -596,5 +749,157 @@ describe.skipIf(!sharpAvailable)("uploadedFileController — variants", () => {
     expect(result.body).not.toContain("secret/internal");
     expect(result.body).not.toContain("exploded");
     expect(listFiles(cacheDirectory)).toEqual([]);
+  });
+  it("removes the derivatives of every file under a directory local storage deletes", async () => {
+    fs.mkdirSync(path.join(storageRoot, "album", "nested"), { recursive: true });
+    fs.writeFileSync(path.join(storageRoot, "album", "one.jpg"), await makeImage("jpeg", 64, 64));
+    fs.writeFileSync(
+      path.join(storageRoot, "album", "nested", "two.jpg"),
+      await makeImage("jpeg", 64, 64),
+    );
+    await get("/uploads/album/one.jpg?variant=thumb");
+    await get("/uploads/album/nested/two.jpg?variant=thumb");
+    await get("/uploads/hero.jpg?variant=thumb");
+
+    expect(listFiles(cacheDirectory)).toHaveLength(3);
+
+    await new LocalDriver({ root: storageRoot }).deleteDirectory("album");
+
+    // only hero.jpg's derivative is left
+    expect(listFiles(cacheDirectory)).toHaveLength(1);
+  });
+
+  it("renders the same file on two disks concurrently without either request failing", async () => {
+    const rootA = path.join(workspace, "mirror-a");
+    const rootB = path.join(workspace, "mirror-b");
+    const bytes = await makeImage("jpeg", 64, 64);
+    const sameTime = new Date(Date.now() - 60_000);
+
+    for (const root of [rootA, rootB]) {
+      fs.mkdirSync(root, { recursive: true });
+      fs.writeFileSync(path.join(root, "photo.jpg"), bytes);
+      // a mirror made with `cp -p` / `rsync -a`: same size, same mtime
+      fs.utimesSync(path.join(root, "photo.jpg"), sameTime, sameTime);
+    }
+
+    const getDriver = vi
+      .spyOn(storage, "getDriver")
+      .mockImplementation(
+        ((name: string) => new LocalDriver({ root: name === "a" ? rootA : rootB })) as never,
+      );
+
+    try {
+      const [a, b] = await Promise.all([
+        resolveImageVariant({ disk: "a" as never, path: "photo.jpg", variant: "thumb" }),
+        resolveImageVariant({ disk: "b" as never, path: "photo.jpg", variant: "thumb" }),
+      ]);
+
+      expect(a?.hash).toBe(b?.hash);
+      expect(a?.absolutePath).not.toBe(b?.absolutePath);
+      expect(a && fs.existsSync(a.absolutePath)).toBe(true);
+      expect(b && fs.existsSync(b.absolutePath)).toBe(true);
+    } finally {
+      getDriver.mockRestore();
+      fs.rmSync(rootA, { recursive: true, force: true });
+      fs.rmSync(rootB, { recursive: true, force: true });
+    }
+  });
+
+  it("renders again when the cached derivative vanished before it was read", async () => {
+    await get("/uploads/hero.jpg?variant=thumb");
+
+    const readFile = fs.promises.readFile;
+    let failed = false;
+    const spy = vi.spyOn(fs.promises, "readFile").mockImplementation((async (
+      ...args: unknown[]
+    ) => {
+      if (!failed && String(args[0]).startsWith(cacheDirectory)) {
+        failed = true;
+        // a newer source version's request pruned this generation directory
+        fs.rmSync(cacheDirectory, { recursive: true, force: true });
+        throw Object.assign(new Error("ENOENT: no such file or directory"), { code: "ENOENT" });
+      }
+
+      return (readFile as (...a: unknown[]) => Promise<unknown>)(...args);
+    }) as never);
+
+    try {
+      const result = await get("/uploads/hero.jpg?variant=thumb");
+
+      expect(failed).toBe(true);
+      expect(result.statusCode).toBe(200);
+      expect((await sharp!(result.rawPayload).metadata()).width).toBe(32);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe("warnIfVariantCacheIsPublic", () => {
+  afterEach(() => {
+    config.set("storage", {});
+    resetVariantCacheWarnings();
+  });
+
+  it("warns once when the cache sits inside the public folder", () => {
+    const warn = vi.spyOn(log, "warn").mockImplementation(() => log);
+    config.set("storage", { publicRoot: path.join(workspace, "public") });
+
+    warnIfVariantCacheIsPublic(path.join(workspace, "public", "variants"));
+    warnIfVariantCacheIsPublic(path.join(workspace, "public", "variants"));
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it("stays quiet for a cache outside the public folder", () => {
+    const warn = vi.spyOn(log, "warn").mockImplementation(() => log);
+    config.set("storage", { publicRoot: path.join(workspace, "public") });
+
+    warnIfVariantCacheIsPublic(path.join(workspace, "storage", ".cache", "image-variants"));
+
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
+
+describe("pruneStaleVariantGenerationsIfCurrent", () => {
+  it("does not prune when the source has moved on to a newer generation", async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "warlock-prune-"));
+    const sourceFile = path.join(directory, "source.jpg");
+    const sourceDirectory = path.join(directory, "cache");
+
+    try {
+      fs.writeFileSync(sourceFile, "new bytes, written after the stale request read the source");
+      fs.mkdirSync(path.join(sourceDirectory, "old-generation"), { recursive: true });
+      fs.mkdirSync(path.join(sourceDirectory, "new-generation"), { recursive: true });
+
+      // a stale request that rendered "old-generation" tries to prune
+      await pruneStaleVariantGenerationsIfCurrent(sourceFile, sourceDirectory, "old-generation");
+
+      expect(fs.readdirSync(sourceDirectory).sort()).toEqual(["new-generation", "old-generation"]);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("prunes older generations when `keep` is the source's current one", async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "warlock-prune-"));
+    const sourceFile = path.join(directory, "source.jpg");
+    const sourceDirectory = path.join(directory, "cache");
+
+    try {
+      fs.writeFileSync(sourceFile, "bytes");
+      const stats = fs.statSync(sourceFile);
+      const current = `${stats.size}-${Math.trunc(stats.mtimeMs)}`;
+      fs.mkdirSync(path.join(sourceDirectory, "old-generation"), { recursive: true });
+      fs.mkdirSync(path.join(sourceDirectory, current), { recursive: true });
+
+      await pruneStaleVariantGenerationsIfCurrent(sourceFile, sourceDirectory, current);
+
+      expect(fs.readdirSync(sourceDirectory)).toEqual([current]);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

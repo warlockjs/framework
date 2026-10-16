@@ -440,7 +440,7 @@ Don't try to do everything in one layer. The global IP limit catches scrapers; p
 ## Gotchas
 
 - **`duration` (global) vs `timeWindow` (per-route).** Same unit (milliseconds), different field names. Mistakes here turn into "my rate limit isn't working" investigations.
-- **The plugin's bucket is in-process by default.** Two workers = two independent IP buckets. Configure the plugin's `redis` option (requires extending the framework's `registerHttpPlugins` call) for distributed rate limiting, or rely on per-user middleware backed by the Redis cache driver.
+- **Buckets are in-process by default.** Two workers = two independent IP buckets. Set `http.rateLimit.store: "cache"` to count in a shared `@warlock.js/cache` driver (Redis, Postgres); `middleware.rateLimit()` follows it, or pass `store: "cache"` per limiter. See [Multiple servers](../digging-deeper/multiple-servers.md#rate-limiting).
 - **`request.ip` honors `X-Forwarded-For` only if `http.trustProxy` is set.** Behind a load balancer without it, every IP looks like your LB's. Set `http.trustProxy` to the narrowest shape your topology allows — a trusted-proxy list or a predicate, not bare `true` — otherwise your "per-IP" limit can become "per-client-chosen-IP" instead of "per-load-balancer". A hop count (`2`) is **not** a valid shape and throws at boot since 5.2. See [Security → `trustProxy` shapes](../digging-deeper/security.md#trustproxy-shapes).
 - **The route-level `errorMessage` is a fixed string.** No placeholders, no locale. Use a custom middleware (Step 5) when you need anything dynamic.
 - **Per-user middleware needs `authMiddleware()` before it.** Without an authenticated `request.locals.user`, your per-user limiter is a no-op. Order matters: auth, then rate limit.

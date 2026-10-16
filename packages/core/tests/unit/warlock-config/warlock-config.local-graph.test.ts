@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   isUnknownTsExtensionError,
   isUnresolvedConfigImportError,
+  isUnsupportedTypeStrippingError,
 } from "../../../src/warlock-config/warlock-config.manager";
 
 const run = promisify(execFile);
@@ -38,11 +39,11 @@ function write(relativePath: string, contents: string) {
   writeFileSync(filePath, contents, "utf8");
 }
 
-function writeFixture(configBody: string) {
-  write(
-    "tsconfig.json",
-    JSON.stringify({ compilerOptions: { baseUrl: ".", paths: { "app/*": ["src/app/*"] } } }),
-  );
+function writeFixture(
+  configBody: string,
+  paths: Record<string, string[]> = { "app/*": ["src/app/*"] },
+) {
+  write("tsconfig.json", JSON.stringify({ compilerOptions: { baseUrl: ".", paths } }));
   write(
     "node_modules/fake-warlock/package.json",
     JSON.stringify({ name: "fake-warlock", type: "module", main: "index.js" }),
@@ -152,6 +153,58 @@ describe("warlock.config.ts with a local TypeScript import graph", () => {
     expect(leftovers()).toEqual([]);
   });
 
+  it("keeps packages external under a catch-all `*` paths pattern", async () => {
+    writeFixture(
+      'import { LocalConnector } from "./src/connectors/local";\n' +
+        "export default { connectors: [new LocalConnector()] };\n",
+      { "*": ["./types/*"], "app/*": ["src/app/*"] },
+    );
+
+    const report = await loadInChild();
+
+    expect(report.error).toBeUndefined();
+    expect(report.label).toBe("aliased");
+    expect(report.sameBaseConnector).toBe(true);
+    expect(report.packageLoads).toBe(1);
+  });
+
+  it("leaves import.meta text inside strings and comments alone", async () => {
+    writeFixture(
+      'import { LocalConnector } from "./src/connectors/local";\n' +
+        'import { note, single, template } from "./src/notes";\n' +
+        "export default { connectors: [new LocalConnector()], assetUrl: note + '|' + single + '|' + template };\n",
+    );
+    write(
+      "src/notes.ts",
+      "// import.meta.url in a comment\n" +
+        'export const note: string = "uses import.meta.url here";\n' +
+        "export const single: string = 'and import.meta.dirname';\n" +
+        "export const template: string = `and import.meta.filename`;\n",
+    );
+
+    const report = await loadInChild();
+
+    expect(report.error).toBeUndefined();
+    expect(report.assetUrl).toBe(
+      "uses import.meta.url here|and import.meta.dirname|and import.meta.filename",
+    );
+  });
+
+  it("names warlock.config.ts, not the temp module, when the bundled config cannot load", async () => {
+    writeFixture(
+      'import "not-installed-package";\n' +
+        'import { LocalConnector } from "./src/connectors/local";\n' +
+        "export default { connectors: [new LocalConnector()] };\n",
+    );
+
+    const report = await loadInChild();
+
+    expect(report.error?.message).toContain("warlock.config.ts");
+    expect(report.error?.message).toContain("not-installed-package");
+    expect(report.error?.message).not.toMatch(/\.warlock\.config\.\d+\.\d+\.mjs/);
+    expect(leftovers()).toEqual([]);
+  });
+
   it("propagates the user's own error and still removes the temp module", async () => {
     writeFixture(
       'import { LocalConnector } from "./src/connectors/local";\n' +
@@ -170,13 +223,66 @@ describe("warlock.config.ts with a local TypeScript import graph", () => {
 });
 
 describe("isUnresolvedConfigImportError", () => {
+  const notFound = (message: string) => ({ code: "ERR_MODULE_NOT_FOUND", message });
+
   it("matches unresolved module and directory imports", () => {
     expect(isUnresolvedConfigImportError({ code: "ERR_MODULE_NOT_FOUND" })).toBe(true);
     expect(isUnresolvedConfigImportError({ code: "ERR_UNSUPPORTED_DIR_IMPORT" })).toBe(true);
+    expect(
+      isUnresolvedConfigImportError(
+        notFound(
+          "Cannot find module '/app/src/connectors/local' imported from /app/warlock.config.ts",
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches a bare specifier only when it is a tsconfig alias", () => {
+    const aliased = notFound("Cannot find package 'app' imported from /app/warlock.config.ts");
+
+    expect(isUnresolvedConfigImportError(aliased, ["app/*"])).toBe(true);
+    expect(isUnresolvedConfigImportError(aliased, [])).toBe(false);
+    expect(
+      isUnresolvedConfigImportError(
+        notFound("Cannot find package '@shared/utils' imported from /app/warlock.config.ts"),
+        ["@shared/*"],
+      ),
+    ).toBe(true);
+  });
+
+  it("does not fall back for a package that is not installed", () => {
+    expect(
+      isUnresolvedConfigImportError(
+        notFound("Cannot find package 'redis' imported from /app/warlock.config.ts"),
+        ["app/*"],
+      ),
+    ).toBe(false);
+  });
+
+  it("does not fall back for a module missing inside node_modules", () => {
+    expect(
+      isUnresolvedConfigImportError(
+        notFound(
+          "Cannot find module '/app/node_modules/pkg/dist/x.js' imported from /app/node_modules/pkg/dist/index.js",
+        ),
+      ),
+    ).toBe(false);
   });
 
   it("ignores errors thrown by the config itself", () => {
     expect(isUnresolvedConfigImportError(new Error("missing DATABASE_URL"))).toBe(false);
     expect(isUnresolvedConfigImportError(undefined)).toBe(false);
+  });
+});
+
+describe("isUnsupportedTypeStrippingError", () => {
+  it("matches the type-stripping refusals that happen before the graph runs", () => {
+    expect(isUnsupportedTypeStrippingError({ code: "ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX" })).toBe(
+      true,
+    );
+    expect(
+      isUnsupportedTypeStrippingError({ code: "ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING" }),
+    ).toBe(true);
+    expect(isUnsupportedTypeStrippingError(new Error("boom"))).toBe(false);
   });
 });

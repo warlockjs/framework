@@ -279,6 +279,8 @@ The controller's surface:
 
 Browsers consume SSE via `new EventSource(url)`. The framework already sets `text/event-stream`, `Cache-Control: no-cache`, and disables nginx buffering for you.
 
+The event name and `id` are single-line fields, so line breaks (and NUL) in them are removed before they are written; a value built from user input cannot inject extra fields or events. A multi-line `sse.comment()` is written as one comment line per line. An `onDisconnect` handler that throws is logged and does not stop the handlers registered after it.
+
 ### Long-lived and high-volume streams
 
 `sse.send()` does not wait: if the producer is faster than the client, the output piles up in memory. For a terminal, a log tail or any stream that can outrun its reader, use `await sse.write(...)` — it resolves once the client has caught up, and resolves `false` when the client is gone, so the loop stops:
