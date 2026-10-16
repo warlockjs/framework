@@ -1187,7 +1187,7 @@ export class Response {
 
   protected isHttp11(): boolean {
     const request = this.baseResponse.raw.req;
-    return request.httpVersionMajor === 1 && request.httpVersionMinor >= 1;
+    return request?.httpVersionMajor === 1 && request.httpVersionMinor >= 1;
   }
 
   /** Apply cache/application overrides without letting callers change framing. */

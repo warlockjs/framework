@@ -595,3 +595,7 @@ On HTTP/2, SSE and stream helpers omit connection-specific and Transfer-Encoding
 headers. Graceful drain sends GOAWAY and closes sessions once active streams finish;
 HTTP/1.1 keeps its existing Connection: close behavior. HTTP/1.0 uses close-delimited responses without Transfer-Encoding. The shutdown timeout still
 bounds a stream that never finishes.
+
+`http.serverOptions: { http2: true }` uses session draining by default. The
+framework maps idle-connection shutdown to session tracking on HTTP/2, so Fastify
+never receives its unsupported `forceCloseConnections: "idle"` setting.

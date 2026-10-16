@@ -189,3 +189,47 @@ it("drains HTTP/2 sessions without connection-specific headers or cutting active
     await new Promise<void>(resolve => raw.close(() => resolve()));
   }
 });
+
+it("starts and drains the framework HTTP/2 server with default options and an idle session", async () => {
+  const app = startHttpServer({ http2: true });
+  const started = gate();
+  const release = gate();
+  app.get("/slow", async (_request, reply) => {
+    started.release();
+    await release.promise;
+    return reply.send("complete");
+  });
+  const url = await listen(app);
+  const active = connect(url);
+  const idle = connect(url);
+  await Promise.all([active, idle].map(client => new Promise<void>((resolve, reject) => {
+    client.once("connect", resolve);
+    client.once("error", reject);
+  })));
+  const request = active.request({ ":path": "/slow" });
+  let connection: unknown;
+  request.on("response", headers => { connection = headers.connection; });
+  const body = new Promise<string>((resolve, reject) => {
+    let text = "";
+    request.setEncoding("utf8");
+    request.on("data", chunk => { text += chunk; });
+    request.once("end", () => resolve(text));
+    request.once("error", reject);
+  });
+  request.end();
+  try {
+    await started.promise;
+    const start = Date.now();
+    const closing = closeServerWithTimeout(app, 2000);
+    release.release();
+    expect(await body).toBe("complete");
+    expect(connection).toBeUndefined();
+    await expect(closing).resolves.toBe(true);
+    expect(Date.now() - start).toBeLessThan(1500);
+  } finally {
+    release.release();
+    active.destroy();
+    idle.destroy();
+    await app.close();
+  }
+});

@@ -61,11 +61,18 @@ export function startHttpServer(options?: HttpServerOptions): FastifyInstance {
 
   const bodyLimit = config.get("http.bodyLimit") ?? undefined;
   const configuredRewriteUrl = options?.rewriteUrl;
-  const forceCloseConnections =
+  const http2 = options?.http2 === true;
+  const requestedForceClose =
     options?.forceCloseConnections ??
-    config.get("http.gracefulShutdown.forceCloseConnections", "idle");
+    config.get("http.gracefulShutdown.forceCloseConnections", http2 ? false : "idle");
+  // HTTP/2 has sessions rather than closeIdleConnections(); session tracking
+  // below supplies graceful draining even when Fastify cannot use idle mode.
+  const forceCloseConnections = http2 && requestedForceClose === "idle" ? false : requestedForceClose;
 
-  server = Fastify({
+  // Keep the framework's established HTTP-compatible reply facade while
+  // accepting Fastify's HTTP/1 and HTTP/2 option overloads at this boundary.
+  const createServer = Fastify as (options: HttpServerOptions) => FastifyInstance;
+  server = createServer({
     // `X-Forwarded-For` is client-settable and spoofable, and `request.ip` is
     // what @fastify/rate-limit keys its buckets on — so trusting it by default
     // makes rate limiting bypassable on any deployment NOT behind a proxy that
@@ -83,8 +90,8 @@ export function startHttpServer(options?: HttpServerOptions): FastifyInstance {
     // Close idle keep-alive connections on shutdown while letting in-flight
     // requests finish — the basis for graceful draining. Override via
     // `http.gracefulShutdown.forceCloseConnections`.
-    forceCloseConnections,
     ...options,
+    forceCloseConnections,
     // Fastify calls this before route matching in both production `scan()` and
     // the development wildcard dispatcher. Compose an app-supplied rewrite
     // first, then apply the one framework request-path normalizer so the two
@@ -103,7 +110,7 @@ export function startHttpServer(options?: HttpServerOptions): FastifyInstance {
   // request finishes DURING the drain stays open and holds `close()` until
   // the shutdown budget expires. Track responses so the drain can
   // retire those connections as they go idle.
-  if (forceCloseConnections === "idle") {
+  if (http2 || forceCloseConnections === "idle") {
     trackConnectionsForDrain(server.server as DrainServer);
   }
 
