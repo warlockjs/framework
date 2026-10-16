@@ -76,6 +76,15 @@ describe("Anthropic built requests", () => {
     expect(create.mock.calls[1]?.[0]).toEqual(request.body);
   });
 
+  it("complete always selects a non-streaming body even with an indexed stream option", async () => {
+    const { model, create } = setup();
+    const options: ModelCallOptions = { stream: true };
+    const response = await model.complete(messages, options);
+    expect(response.content).toBe("hello");
+    expect(response.finishReason).toBe("stop");
+    expect(create.mock.calls[0]?.[0].stream).toBe(false);
+  });
+
   it("snapshots beta options and merged tool results before source inputs change", async () => {
     const { model, betaCreate } = setup();
     const history: Message[] = [

@@ -233,7 +233,9 @@ export class AnthropicModel implements ModelContract {
    * instance's `ModelConfig` defaults for this call only.
    */
   public async complete(messages: Message[], options?: ModelCallOptions): Promise<ModelResponse> {
-    return this.send(this.buildRequest(messages, options), { signal: options?.signal });
+    return this.send(this.buildRequest(messages, { ...options, stream: false }), {
+      signal: options?.signal,
+    });
   }
 
   /** Build a detached request snapshot without sending it to Anthropic. */

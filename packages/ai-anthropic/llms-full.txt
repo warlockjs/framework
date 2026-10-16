@@ -289,7 +289,8 @@ for await (const chunk of model.send(streamingRequest, { signal })) {
 
 `send()` uses the built endpoint, body and beta flags without rebuilding the
 conversation or applying new defaults. Transport cancellation stays separate from
-the audited body. `complete()` and `stream()` use this same build/send path.
+the audited body. `complete()` and `stream()` use this same build/send path and always select their
+respective non-streaming and streaming request modes.
 Treat the snapshot as read-only after hashing it; SDK JSON serialization and beta
 header handling still apply.
 
