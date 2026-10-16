@@ -1,4 +1,4 @@
-import { cancel, confirm, isCancel, multiselect, select } from "@clack/prompts";
+import { cancel, confirm, isCancel, select } from "@clack/prompts";
 import { colors } from "@mongez/copper";
 import { getJsonFile } from "@warlock.js/fs";
 import { resolveAgentTargets } from "../../features/agent-kit-targets";
@@ -11,7 +11,6 @@ import {
   getAiPackageOptions,
   getAiProviderOptions,
   getAllFeatureKeys,
-  getFeatureOptions,
 } from "../../features/features-map";
 import { assertFlagCombinations } from "../../flags/assert-flag-combinations";
 import { assertPackageManagerAvailable } from "../../flags/assert-package-manager";
@@ -28,12 +27,9 @@ import { packageRoot } from "../../helpers/paths";
 import { hasInteractiveStdin } from "../../helpers/tty";
 import { askAgentTargets } from "../../prompts/ask-agent-targets";
 import { askAiFeatures } from "../../prompts/ask-ai-features";
+import { askFeatures } from "../../prompts/ask-features";
 import { askProjectName } from "../../prompts/ask-project-name";
 import { askStack } from "../../prompts/ask-stack";
-import {
-  fitOptionsToWidth,
-  multiselectMaxItems,
-} from "../../prompts/fit-to-terminal";
 import { showIntroBanner } from "../../ui/banner";
 import { createWarlockApp } from "../create-warlock-app";
 import getAppPath from "./get-app-path";
@@ -173,17 +169,8 @@ async function createFullWizard(
 
   const selectedDriver = getDatabaseDriver(databaseDriver as string);
 
-  // Step 4: Features selection
-  // 22 options: page them to the terminal's height and keep each row on one
-  // line, or every redraw prints the list again below the previous copy.
-  const featureOptions = fitOptionsToWidth(getFeatureOptions());
-  const selectedFeatures = await multiselect({
-    message: "Select optional features to include",
-    options: featureOptions,
-    initialValues: seeds.features,
-    required: false,
-    maxItems: multiselectMaxItems(featureOptions.length),
-  });
+  // Step 4: Edit optional features in paged groups.
+  const selectedFeatures = await askFeatures(seeds.features);
 
   if (isCancel(selectedFeatures)) {
     cancel("Feature selection cancelled");

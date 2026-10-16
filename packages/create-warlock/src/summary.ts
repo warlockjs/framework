@@ -28,6 +28,11 @@ export function printDecisionsSummary({
   console.log();
   console.log(colors.cyan(headline));
   console.log(
+    colors.cyan(
+      summarizeFeatures([...options.features, ...options.aiProviders]),
+    ),
+  );
+  console.log(
     colors.dim(
       "  change these — package manager: --pm, database: --db/--no-db, agents: --agents, " +
         "features: --features, ai: --ai, git: --git/--no-git, jwt: --jwt/--no-jwt — " +
@@ -36,4 +41,13 @@ export function printDecisionsSummary({
     ),
   );
   console.log();
+}
+
+/** Keep the decision overview short; the final success screen lists every key. */
+export function summarizeFeatures(keys: readonly string[]): string {
+  const selected = [...new Set(keys)];
+  if (selected.length === 0) return "Features: none";
+  const preview = selected.slice(0, 6).join(", ");
+  const remaining = selected.length - 6;
+  return `Features (${selected.length}): ${preview}${remaining > 0 ? `, +${remaining} more` : ""}`;
 }

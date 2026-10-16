@@ -14,6 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **BREAKING:** Node.js 22.15 or newer is required, both in `engines` and in the scaffolder's own startup check (which used to accept Node 20), matching what the `warlock` CLI needs.
 
+### Added
+
+- Custom-mode optional features now use paged sections with selected counts and a select-all action per section. The decisions overview previews the selected feature/AI count and keys.
+
 ## 5.30.0 - 2026-10-16
 
 ### Fixed

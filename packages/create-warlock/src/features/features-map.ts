@@ -327,3 +327,18 @@ export function getAllFeatureKeys(): string[] {
     ...aiPackages.map(pkg => pkg.key),
   ];
 }
+
+/** Feature sections in manifest order, with short lists for the grouped picker. */
+export function getFeatureGroups() {
+  const labels = [...new Set(features.map(feature => feature.group))];
+  return labels.map(label => ({
+    label,
+    options: features
+      .filter(feature => feature.group === label)
+      .map(feature => ({
+        value: feature.key,
+        label: feature.label,
+        hint: feature.hint,
+      })),
+  }));
+}

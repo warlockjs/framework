@@ -157,3 +157,17 @@ This project is licensed under the MIT License.
 The project-ready summary wraps the complete feature list to your terminal width,
 aligning continuation lines under the value while keeping commands indented.
 Terminals narrower than 50 columns get a plain list; piped output uses 80 columns.
+
+
+### Grouped custom feature selection
+
+In `--customize` mode, optional features are organized into sections such as
+Auth & Access, Rendering & Mail, and Jobs & Messaging. Open a section to edit its
+checklist or choose **Select all** for that section, then return to the menu.
+Each section shows its selected count; **Continue** keeps the current choices.
+Existing `--features` and `--stack=web` selections stay preselected. Lists remain
+paged to the terminal height and hints fit the available width.
+
+The decisions overview shows the total selected feature/AI count and up to six
+keys, followed by `+N more` for longer selections. The final success screen lists
+all selected feature keys.

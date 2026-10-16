@@ -35,6 +35,12 @@ vi.mock("@clack/prompts", () => ({
   log: { error: vi.fn(), warn: vi.fn() },
 }));
 
+// The grouped picker's interactions have their own focused specs. Keep this
+// command-level harness's feature answer in the existing prompt queue.
+vi.mock("../src/prompts/ask-features", () => ({
+  askFeatures: (initialValues: string[]) => multiselect({ initialValues }),
+}));
+
 // --- @warlock.js/fs (version read) ------------------------------------------
 vi.mock("@warlock.js/fs", () => ({
   getJsonFile: () => ({ version: "9.9.9" }),
