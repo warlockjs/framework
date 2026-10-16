@@ -5,6 +5,7 @@ import { isEmpty } from "@mongez/supportive-is";
 import { log } from "@warlock.js/logger";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { container } from "../container";
+import { registerLazyStatic } from "../http/lazy-static";
 import { buildCorsOptions } from "../http/build-cors-options";
 import { Request } from "../http/request";
 import { buildRequestLogSnapshot } from "../http/request-log-snapshot";
@@ -259,22 +260,10 @@ export class Router {
     return this;
   }
 
-  /**
-   * Register every `directory()` with `@fastify/static`. The plugin is
-   * imported only when at least one directory was declared: loading it is not
-   * free (its directory-listing module calls `os.cpus()` at load), and an app
-   * that serves no static folder should not pay for it.
-   */
+  /** Declare static routes at boot; load the upstream sender on the first file request. */
   protected registerStaticDirectories(server: FastifyInstance) {
-    if (this.staticDirectories.length === 0) return;
-
-    const fastifyStatic = import("@fastify/static");
-
     for (const directoryOptions of this.staticDirectories) {
-      server.register(fastifyStatic, {
-        ...directoryOptions,
-        decorateReply: false,
-      });
+      registerLazyStatic(server, { ...directoryOptions, decorateReply: false });
     }
   }
 

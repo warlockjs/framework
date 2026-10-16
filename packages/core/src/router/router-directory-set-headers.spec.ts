@@ -2,8 +2,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import Fastify, { type FastifyInstance } from "fastify";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { router } from "./router";
+
+const staticModule = vi.hoisted(() => ({ loaded: 0 }));
+vi.mock("@fastify/static", async () => {
+  staticModule.loaded++;
+  return await vi.importActual("@fastify/static");
+});
 
 describe("router.directory setHeaders", () => {
   let server: FastifyInstance | undefined;
@@ -35,9 +41,11 @@ describe("router.directory setHeaders", () => {
     server = Fastify();
     router.scan(server);
     await server.ready();
+    expect(staticModule.loaded).toBe(0);
 
     const response = await server.inject({ method: "GET", url: "/assets/asset.txt" });
 
+    expect(staticModule.loaded).toBe(1);
     expect(response.statusCode).toBe(200);
     expect(received).toEqual(expect.objectContaining({ header: expect.any(Function) }));
     expect(response.headers["x-directory-set-headers"]).toBe("set");

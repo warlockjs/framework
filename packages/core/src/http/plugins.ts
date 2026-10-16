@@ -7,6 +7,7 @@ import { router } from "../router";
 import { rootPath } from "../utils";
 import { buildCorsOptions } from "./build-cors-options";
 import { buildRateLimitOptions } from "./build-rate-limit-options";
+import { registerLazyStatic } from "./lazy-static";
 import { parseUrlencodedBody } from "./parse-urlencoded-body";
 import type { FastifyInstance } from "./server";
 
@@ -64,13 +65,12 @@ export async function registerHttpPlugins(server: FastifyInstance) {
   );
 
   // 👇🏻 serve the public folder. Importing `@fastify/static` is not free (its
-  // directory-listing module calls `os.cpus()` at load), so it is only loaded
-  // when there is a folder to serve: `storage.publicRoot: false` turns public
-  // serving off, and a missing folder skips it.
+  // directory-listing module calls `os.cpus()` at load), so defer loading to
+  // the first file request even when the public folder already exists.
   const publicRoot = resolvePublicRoot(config.get("storage.publicRoot", rootPath("public")));
 
   if (publicRoot !== undefined) {
-    server.register(import("@fastify/static"), {
+    registerLazyStatic(server, {
       root: publicRoot,
       prefix: config.get("storage.publicPrefix", "/public/"),
     });

@@ -391,11 +391,26 @@ router.directory({
 });
 ```
 
-Backed by `@fastify/static`. Every file in `root` becomes reachable under `prefix`. The full `FastifyStaticOptions` surface applies — `decorateReply`, `index`, `dotfiles`, `serve`, `wildcard`, etc.
+Backed by `@fastify/static`. Every file in `root` becomes reachable under `prefix`. The `FastifyStaticOptions` serving options apply — `index`, `dotfiles`, `serve`, `wildcard`, etc.
 
 The framework collects `directory(...)` calls during route registration and replays them when the router scans (so they register against Fastify at scan time, not registration time).
 
-`@fastify/static` is loaded only when it has something to serve: when at least one `directory(...)` was declared, or when the app's public folder (`storage.publicRoot`, default `public/`, served under `storage.publicPrefix`, default `/public/`) exists. An app with neither never loads it, which keeps its start-up time down (the plugin's directory-listing module calls `os.cpus()` when it loads). Set `storage.publicRoot: false` to turn the public folder off explicitly.
+`@fastify/static` is loaded on the first static file request, including when a
+`directory(...)` or an existing public folder was declared at boot. Routes are
+registered before Fastify becomes ready; concurrent first requests share one
+sender initialization. `wildcard: false` still enumerates files at boot and keeps
+its exact route snapshot and application fallback behavior. The upstream sender
+continues to handle ranges, cache headers, listings, allowed paths and compressed
+files. `setHeaders` receives the real Fastify reply.
+
+The app's public folder defaults to `public/`, under `/public/`; configure
+`storage.publicRoot` and `storage.publicPrefix` to change them, or set
+`storage.publicRoot: false` to disable public serving. A missing public folder
+creates no static routes. The public folder installs lazy `reply.sendFile` and
+`reply.download` decorators; `router.directory(...)` keeps `decorateReply: false`
+so additional mounts do not replace them. The first request that invokes a
+file decorator also initializes the sender. Load failures reach the application's
+normal error handler.
 
 ### `file(path, location, cacheTime?)` — single file
 

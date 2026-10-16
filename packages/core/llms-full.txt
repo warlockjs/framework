@@ -3297,6 +3297,26 @@ router.post("/accounts/credentials", accountsController.store, {
 
 Request log entries otherwise include the body as received (before validation), so rejected fields would be logged too.
 
+## Static directories and public files
+
+```ts
+router.directory({ root: Application.publicPath, prefix: "/assets/" });
+```
+
+Static routes are declared at scan time. `@fastify/static` itself loads only on
+the first static file request, even with an existing public folder; concurrent
+first requests share initialization. The upstream sender retains ranges, caching,
+listings, precompressed files, `allowedPath` and `setHeaders` behavior. The
+`setHeaders` callback receives the real Fastify reply.
+
+`wildcard: false` still enumerates exact file routes at boot, so files added later
+follow the application's ordinary fallback until restart. The public folder uses
+`storage.publicRoot` (default `public/`) and `storage.publicPrefix` (default
+`/public/`); `false` disables it and missing folders add no routes. Its
+`reply.sendFile`/`reply.download` decorators are lazy too. `router.directory`
+keeps `decorateReply: false` for additional mounts. Initialization failures reach
+the application's normal error handler.
+
 ## Gotchas
 
 - **Never import `routes.ts`.** The framework auto-loads it. Importing causes a double-registration error.

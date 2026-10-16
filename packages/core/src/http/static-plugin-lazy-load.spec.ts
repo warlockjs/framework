@@ -1,22 +1,23 @@
 /**
  * `@fastify/static` is not free to load (its directory-listing module
  * calls `os.cpus()` at import), so the HTTP stack may only reach it through
- * `import()` and only when there is something to serve.
+ * `import()` and only when a file request needs the sender.
  */
 import config from "@mongez/config";
 import { build } from "esbuild";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import Fastify, { type FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { registerHttpPlugins, resolvePublicRoot } from "./plugins";
 
 const staticModule = vi.hoisted(() => ({ loaded: 0 }));
 
-vi.mock("@fastify/static", () => {
+vi.mock("@fastify/static", async () => {
   staticModule.loaded++;
 
-  return { default: "static" };
+  return await vi.importActual("@fastify/static");
 });
 
 /** Every external specifier reached through static `import` statements. */
@@ -58,22 +59,21 @@ async function staticExternalImports(entry: string): Promise<Set<string>> {
   return externals;
 }
 
-async function registeredStaticOptions() {
-  const register = vi.fn();
-
-  await registerHttpPlugins({ register, addContentTypeParser: vi.fn() } as any);
-
-  // `register(import("@fastify/static"), options)`: let the import settle so
-  // the mock factory has run if it was going to.
-  await Promise.all(register.mock.calls.map((call) => call[0]));
-
-  return register.mock.calls.filter((call) => call[1]?.prefix !== undefined).map((call) => call[1]);
-}
-
 describe("@fastify/static is loaded lazily", () => {
   const temporaryRoots: string[] = [];
+  const servers: FastifyInstance[] = [];
 
-  afterEach(() => {
+  async function configuredServer() {
+    const server = Fastify();
+    servers.push(server);
+    await registerHttpPlugins(server);
+    server.get("/health", async () => "ok");
+    await server.ready();
+    return server;
+  }
+
+  afterEach(async () => {
+    await Promise.all(servers.splice(0).map((server) => server.close()));
     config.set("storage.publicRoot", undefined);
     config.set("storage.publicPrefix", undefined);
     staticModule.loaded = 0;
@@ -94,25 +94,39 @@ describe("@fastify/static is loaded lazily", () => {
   );
 
   it("does not load @fastify/static when the public folder does not exist", async () => {
-    config.set("storage.publicRoot", path.join(tmpdir(), "warlock-no-such-public-folder-wr027"));
+    config.set("storage.publicRoot", path.join(tmpdir(), "warlock-no-such-public-folder"));
 
-    expect(await registeredStaticOptions()).toEqual([]);
+    expect((await configuredServer()).hasRoute({ method: "GET", url: "/public/*" })).toBe(false);
     expect(staticModule.loaded).toBe(0);
   });
 
   it("does not load @fastify/static when publicRoot is false", async () => {
     config.set("storage.publicRoot", false);
 
-    expect(await registeredStaticOptions()).toEqual([]);
+    expect((await configuredServer()).hasRoute({ method: "GET", url: "/public/*" })).toBe(false);
     expect(staticModule.loaded).toBe(0);
   });
 
-  it("serves an existing public folder exactly as before", async () => {
+  it("defers an existing public folder until its first file request, sharing initialization across concurrent requests", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "warlock-public-"));
     temporaryRoots.push(root);
+    writeFileSync(path.join(root, "asset.txt"), "asset");
     config.set("storage.publicRoot", root);
-
-    expect(await registeredStaticOptions()).toEqual([{ root, prefix: "/public/" }]);
+    const server = await configuredServer();
+    expect(server.hasRoute({ method: "GET", url: "/public/*" })).toBe(true);
+    expect(staticModule.loaded).toBe(0);
+    expect((await server.inject({ url: "/health" })).body).toBe("ok");
+    expect(staticModule.loaded).toBe(0);
+    const responses = await Promise.all([
+      server.inject({ url: "/public/asset.txt" }),
+      server.inject({ method: "HEAD", url: "/public/asset.txt" }),
+    ]);
+    expect(responses[0]?.statusCode).toBe(200);
+    expect(responses[0]?.body).toBe("asset");
+    expect(responses[1]?.statusCode).toBe(200);
+    expect(responses[1]?.body).toBe("");
+    expect(staticModule.loaded).toBe(1);
+    expect((await server.inject({ url: "/public/asset.txt" })).body).toBe("asset");
     expect(staticModule.loaded).toBe(1);
   });
 });
