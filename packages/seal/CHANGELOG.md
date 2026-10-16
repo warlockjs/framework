@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Standalone string replacement mutators accept an omitted context or options and preserve the stringified input instead of throwing.
+
 - Object `.merge()` retains refinements from both schemas, in their original order; cloning, extending and selecting fields preserve the original schema's refinements.
 - Union and record Standard Schema types now distinguish child input from validated output; `Infer.Output` reads the Standard Schema output parameter. Defaults and catches remain guaranteed in output.
 - Object, array, tuple and lazy Standard Schema output declarations preserve child defaults and catches independently of their input types.

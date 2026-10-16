@@ -143,6 +143,16 @@ describe("String Mutators", () => {
       expect(await replaceAllMutator("hello world", context)).toBe("hell0 w0rld");
     });
 
+    it.each([replaceMutator, replaceAllMutator])(
+      "keeps the string value when replacement options are absent: %s",
+      async mutate => {
+        for (const context of [undefined, {}, { options: undefined }, { options: null }]) {
+          expect(await mutate("hello world", context as any)).toBe("hello world");
+          expect(await mutate(123, context as any)).toBe("123");
+        }
+      },
+    );
+
     it("truncate", async () => {
       const context = { options: { maxLength: 7, suffix: "..." } } as any;
       expect(await truncateMutator("hello world this is a test", context)).toBe("hello w...");

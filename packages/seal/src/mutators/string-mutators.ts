@@ -151,14 +151,14 @@ export const base64DecodeMutator: Mutator = async (value) => {
 
 /** Replace substring or pattern */
 export const replaceMutator: Mutator = async (value, context) => {
-  const { search, replace } = context?.options;
+  const { search, replace } = context?.options ?? {};
   if (!search) return value?.toString();
   return value?.toString().replace(search, replace ?? "");
 };
 
 /** Replace all occurrences of substring or pattern */
 export const replaceAllMutator: Mutator = async (value, context) => {
-  const { search, replace } = context?.options;
+  const { search, replace } = context?.options ?? {};
   if (!search) return value?.toString();
   const searchValue = typeof search === "string" ? new RegExp(search, "g") : search;
   return value?.toString().replace(searchValue, replace ?? "");

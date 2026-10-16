@@ -167,3 +167,6 @@ v.string().pattern(/^\+\d{8,}$/).mask(3, -2)
 // Optional with default
 v.string().email().default("guest@example.com").optional()
 ```
+
+The standalone `replaceMutator` and `replaceAllMutator` preserve the stringified
+value when called without a context or replacement options.
