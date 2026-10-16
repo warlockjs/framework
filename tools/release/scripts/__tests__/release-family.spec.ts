@@ -10,6 +10,7 @@ import {
   assertSinglePhysicalCore,
   checkPackageTreeIsClean,
   confirmSubjectsAtOrigin,
+  confirmAtOrigin,
   formatCommandFailureOutput,
   parseArguments,
   parseGitPorcelain,
@@ -2698,12 +2699,6 @@ describe("confirmSubjectsAtOrigin — propagation lag vs. a partial release (D2)
     );
     assert.equal(sleeps[0], 3_000);
     assert.ok(sleeps.every((ms) => ms <= 60_000));
-    assert.ok(reported.some((line) => line.includes(`git tag v${VERSION}`)));
-    assert.ok(
-      reported.some(
-        (line) => line.includes("gh workflow run blog-check.yml") && line.includes("mode=registry"),
-      ),
-    );
   });
 
   it("keeps polling beyond ten minutes and recovers from registry errors", async () => {
@@ -2743,6 +2738,34 @@ describe("confirmSubjectsAtOrigin — propagation lag vs. a partial release (D2)
     );
   });
 
+  it("clears read errors for subjects that later become live", async () => {
+    const handoff: ReleaseHandoff = {
+      kind: "warlock-family-publish-handoff",
+      candidateVersion: VERSION,
+      subjects: ["@warlock.js/notifications", "create-warlock"],
+      artifacts: [],
+      verifiedAt: "2026-09-02T12:00:00.000Z",
+    };
+    const { runtime } = fakeRuntime(new Map());
+    let reads = 0;
+    runtime.runCommand = async (request) => {
+      if (request.args[2]?.startsWith("@warlock.js/notifications")) {
+        if (reads++ === 0) throw new Error("stale resolved read error");
+        return { stdout: JSON.stringify(VERSION), stderr: "" };
+      }
+      throw new Error("unresolved create read error");
+    };
+    await assert.rejects(
+      confirmSubjectsAtOrigin(handoff, runtime, ROOT, CACHE, NPMRC, GLOBAL_NPMRC, ENV),
+      (error) => {
+        assert.ok(error instanceof Error);
+        assert.match(error.message, /unresolved create read error/);
+        assert.doesNotMatch(error.message, /stale resolved read error/);
+        return true;
+      },
+    );
+  });
+
   it("never asks npm's write path a read question -- no argument list anywhere contains --dry-run", async () => {
     const handoff: ReleaseHandoff = {
       kind: "warlock-family-publish-handoff",
@@ -2765,6 +2788,140 @@ describe("confirmSubjectsAtOrigin — propagation lag vs. a partial release (D2)
 
     assert.ok(seenArgs.length > 0);
     assert.ok(seenArgs.every((args) => !args.includes("--dry-run")));
+  });
+});
+
+describe("origin install retries and runner recovery", () => {
+  function originFixture() {
+    const handoff: ReleaseHandoff = {
+      kind: "warlock-family-publish-handoff",
+      candidateVersion: VERSION,
+      subjects: ["@warlock.js/notifications"],
+      artifacts: [],
+      verifiedAt: "2026-09-02T12:00:00.000Z",
+    };
+    const reported: string[] = [];
+    const sleeps: number[] = [];
+    const removed: string[] = [];
+    let clock = 0;
+    const control = fixture({
+      report: (line) => reported.push(line),
+      now: () => new Date(clock),
+      sleep: async (ms) => {
+        sleeps.push(ms);
+        clock += ms;
+      },
+      removeDirectory: async (directory) => {
+        removed.push(directory);
+      },
+      readTextFile: async (filePath) => {
+        if (path.basename(filePath) === "build-provenance.json") {
+          return JSON.stringify({
+            schemaVersion: 1,
+            version: VERSION,
+            members: [
+              {
+                name: "@warlock.js/notifications",
+                releaseCommitSha: "a".repeat(40),
+                gitHead: "a".repeat(40),
+                checkedOutBranch: "main",
+              },
+            ],
+          });
+        }
+        return JSON.stringify({ dependencies: { "@warlock.js/core": VERSION } });
+      },
+    });
+    control.dependencies.runCommand = async (request) => {
+      control.commands.push(request);
+      if (request.args[1] === "view") return { stdout: JSON.stringify(VERSION), stderr: "" };
+      if (request.args.includes("--parseable"))
+        return { stdout: path.join(request.cwd, "node_modules/@warlock.js/core"), stderr: "" };
+      return { stdout: "", stderr: "" };
+    };
+    return {
+      ...control,
+      handoff,
+      reported,
+      sleeps,
+      removed,
+      advance: (ms: number) => {
+        clock += ms;
+      },
+    };
+  }
+
+  for (const phase of ["install", "create", "ls"]) {
+    it(`retries ${phase} after views are live and the first attempt sees E404`, async () => {
+      const control = originFixture();
+      const base = control.dependencies.runCommand!;
+      let attempts = 0;
+      control.dependencies.runCommand = async (request) => {
+        if (request.args[1] === phase && attempts++ === 0)
+          throw new Error("E404 abbreviated packument lag");
+        return base(request);
+      };
+      await confirmAtOrigin(control.handoff, control.dependencies);
+      assert.ok(attempts >= 2);
+      assert.deepEqual(control.sleeps, [3_000]);
+      assert.equal(control.commands.filter((request) => request.args[1] === "view").length, 1);
+      assert.equal(control.removed.filter((directory) => directory.endsWith("scaffold")).length, 2);
+      assert.ok(!control.commands.some((request) => request.command === "git"));
+    });
+  }
+
+  it("shares the view deadline, preserves the commit bundle, and prints complete recovery on final install failure", async () => {
+    const control = originFixture();
+    const base = control.dependencies.runCommand!;
+    control.dependencies.runCommand = async (request) => {
+      if (request.args[1] === "view") control.advance(29 * 60_000);
+      if (request.args[1] === "install") throw new Error("E404 install still unavailable");
+      return base(request);
+    };
+    await assert.rejects(
+      confirmAtOrigin(control.handoff, control.dependencies),
+      /E404 install still unavailable/,
+    );
+    assert.equal(
+      control.sleeps.reduce((sum, ms) => sum + ms, 0),
+      60_000,
+    );
+    const git = control.commands.filter((request) => request.command === "git");
+    const bundle = git.find((request) => request.args[0] === "bundle");
+    assert.equal(bundle?.args[1], "create");
+    assert.match(bundle?.args[2] ?? "", /release-commit\.bundle$/);
+    assert.deepEqual(
+      git.map((request) => request.args[0]),
+      ["update-ref", "bundle", "update-ref"],
+    );
+    assert.ok(!git.some((request) => request.args[0] === "push" || request.args[0] === "tag"));
+    const report = control.reported.join("\n");
+    assert.match(report, /warlock-5\.3\.0-artifacts -D tools\/release/);
+    assert.match(report, /build-provenance\.json/);
+    assert.match(report, /git fetch \.\/release-logs\/release-commit\.bundle/);
+    assert.match(report, /merge-base --is-ancestor FETCH_HEAD/);
+    assert.match(report, /git tag v5\.3\.0/);
+    assert.match(report, /git push origin "\$release_sha:refs\/heads\/\$release_branch"/);
+    assert.match(report, /blog-check\.yml.*mode=registry/);
+    assert.match(report, /no-op.*dispatched commit/);
+  });
+
+  it("preserves the bundle when registry views exhaust the window", async () => {
+    const control = originFixture();
+    const base = control.dependencies.runCommand!;
+    control.dependencies.runCommand = async (request) => {
+      if (request.args[1] === "view") throw new Error("E404 view unavailable");
+      return base(request);
+    };
+    await assert.rejects(confirmAtOrigin(control.handoff, control.dependencies), /did not confirm/);
+    assert.equal(
+      control.sleeps.reduce((sum, ms) => sum + ms, 0),
+      30 * 60_000,
+    );
+    assert.ok(
+      control.commands.some((request) => request.command === "git" && request.args[0] === "bundle"),
+    );
+    assert.ok(control.reported.some((line) => line.includes("Manual recovery")));
   });
 });
 

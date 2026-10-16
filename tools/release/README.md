@@ -19,13 +19,18 @@ Releases run in GitHub Actions on this repository
    pack, local-registry install, generator matrix at the stated scope.
 2. **publish** — every tarball to npm, re-hashed immediately before each publish.
 3. **confirm** — install/import from the npm origin, then tag `v<version>` once on
-   the release commit and push the tag and the branch. Registry reads retry for
-   thirty minutes, with exponential backoff from three to sixty seconds. Failed
-   reads remain pending until the deadline; already-live packages are not re-polled.
-   On exhaustion, the log prints origin reads for every subject and recovery
-   commands to recover the release SHA from build provenance, tag and push it,
-   and dispatch `blog-check.yml` with `mode=registry`. Wait for every subject to
-   be visible before following those commands; do not republish.
+   the release commit and push the tag and the branch. Registry reads and the
+   install/import/scaffold checks share one thirty-minute deadline, with
+   exponential backoff from three to sixty seconds. Already-live packages are
+   not re-polled; retries start with clean consumer and scaffold directories.
+   On exhaustion, the runner saves its recorded release commit in
+   `$LOGS/release-commit.bundle`, uploaded with `warlock-<version>-logs`.
+   Recovery output explains how to download that bundle and the
+   `warlock-<version>-artifacts` upload, restore `build-provenance.json`, import
+   the commit, check that the origin branch is its ancestor, push the recorded
+   commit and tag, and dispatch the registry blog check. When release edits are
+   a no-op, the recorded commit is the dispatched commit. Wait for every subject
+   to be visible before recovery; do not republish.
 
 ```bash
 npm ci

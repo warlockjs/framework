@@ -1949,6 +1949,7 @@ function stagedPublishError(error: unknown, name: string, version: string): unkn
 }
 
 type SubjectConfirmationStatus = "live" | "pending" | "missing";
+type ConfirmationBudget = { deadline: number; delay: number };
 
 /**
  * Poll every subject, never throwing on the first miss. A subject
@@ -1967,14 +1968,16 @@ export async function confirmSubjectsAtOrigin(
   npmrc: string,
   globalNpmrc: string,
   env: NodeJS.ProcessEnv,
+  budget: ConfirmationBudget = {
+    deadline: runtime.now().getTime() + CONFIRMATION_WINDOW_MS,
+    delay: CONFIRMATION_INITIAL_DELAY_MS,
+  },
 ): Promise<void> {
   const statuses = new Map<string, SubjectConfirmationStatus>(
     handoff.subjects.map((name) => [name, "pending"]),
   );
 
-  const deadline = runtime.now().getTime() + CONFIRMATION_WINDOW_MS;
   const errors = new Map<string, string>();
-  let delay = CONFIRMATION_INITIAL_DELAY_MS;
 
   runtime.report(
     `Confirming ${handoff.subjects.length} package(s) at ${handoff.candidateVersion} ` +
@@ -2017,6 +2020,7 @@ export async function confirmSubjectsAtOrigin(
       }
       if (observed === handoff.candidateVersion) {
         statuses.set(name, "live");
+        errors.delete(name);
         runtime.report(`${name}: live (confirmed on attempt ${attempt})`);
       } else {
         runtime.report(`${name}: PENDING (attempt ${attempt})`);
@@ -2025,7 +2029,7 @@ export async function confirmSubjectsAtOrigin(
 
     const pending = [...statuses.entries()].filter(([, status]) => status === "pending");
     if (!pending.length) break;
-    const remaining = deadline - runtime.now().getTime();
+    const remaining = budget.deadline - runtime.now().getTime();
     if (remaining <= 0) {
       for (const [name] of pending) {
         statuses.set(name, "missing");
@@ -2033,8 +2037,8 @@ export async function confirmSubjectsAtOrigin(
       }
       break;
     }
-    await runtime.sleep(Math.min(delay, remaining));
-    delay = Math.min(delay * 2, CONFIRMATION_MAX_DELAY_MS);
+    await runtime.sleep(Math.min(budget.delay, remaining));
+    budget.delay = Math.min(budget.delay * 2, CONFIRMATION_MAX_DELAY_MS);
   }
 
   const live = [...statuses.entries()]
@@ -2050,20 +2054,6 @@ export async function confirmSubjectsAtOrigin(
   );
 
   if (missing.length > 0) {
-    runtime.report("Manual recovery after all packages become visible (run from repository root):");
-    for (const name of handoff.subjects) {
-      runtime.report(
-        `npm view ${name}@${handoff.candidateVersion} version --registry ${NPM_ORIGIN} --prefer-online`,
-      );
-    }
-    runtime.report(
-      `release_sha=$(node -p "require('./tools/release/release-artifacts/${handoff.candidateVersion}/build-provenance.json').members[0].releaseCommitSha")`,
-    );
-    runtime.report(`git tag v${handoff.candidateVersion} "$release_sha"`);
-    runtime.report(`git push origin v${handoff.candidateVersion}`);
-    runtime.report(
-      `gh workflow run blog-check.yml -f version=${handoff.candidateVersion} -f mode=registry`,
-    );
     throw new Error(
       `npm origin did not confirm ${missing.length} of ${handoff.subjects.length} package(s) at ` +
         `${handoff.candidateVersion} within 30 minutes: ${missing.join(", ")}. ` +
@@ -2072,7 +2062,15 @@ export async function confirmSubjectsAtOrigin(
   }
 }
 
-async function confirmAtOrigin(handoff: ReleaseHandoff, runtime: Runtime): Promise<void> {
+export async function confirmAtOrigin(
+  handoff: ReleaseHandoff,
+  dependencies: ReleaseFamilyDependencies,
+): Promise<void> {
+  const runtime = withDefaults(dependencies);
+  const budget: ConfirmationBudget = {
+    deadline: runtime.now().getTime() + CONFIRMATION_WINDOW_MS,
+    delay: CONFIRMATION_INITIAL_DELAY_MS,
+  };
   const root = await runtime.makeTemporaryDirectory("warlock-origin-confirm-");
   const cache = path.join(root, "npm-cache");
   const npmrc = path.join(root, ".npmrc");
@@ -2087,71 +2085,179 @@ async function confirmAtOrigin(handoff: ReleaseHandoff, runtime: Runtime): Promi
   const env = originEnvironment(process.env, cache, npmrc, globalNpmrc);
 
   try {
-    await confirmSubjectsAtOrigin(handoff, runtime, root, cache, npmrc, globalNpmrc, env);
+    await confirmSubjectsAtOrigin(handoff, runtime, root, cache, npmrc, globalNpmrc, env, budget);
 
-    await runtime.writeTextFile(
-      path.join(consumer, "package.json"),
-      `${JSON.stringify({ name: "warlock-origin-confirm", private: true, type: "module" }, null, 2)}\n`,
-    );
-    await runtime.runCommand({
-      command: process.execPath,
-      args: [
-        runtime.resolveNpmCli(),
-        "install",
-        `@warlock.js/core@${handoff.candidateVersion}`,
-        `@warlock.js/notifications@${handoff.candidateVersion}`,
-        "--save-exact",
-        "--strict-peer-deps",
-        "--registry",
-        NPM_ORIGIN,
-        "--prefer-online",
-        "--cache",
-        cache,
-        "--userconfig",
-        npmrc,
-        "--globalconfig",
-        globalNpmrc,
-      ],
-      cwd: consumer,
-      env,
-    });
-    await npmLsAndExecute(consumer, cache, npmrc, globalNpmrc, env, runtime, true);
+    for (let attempt = 1; ; attempt++) {
+      try {
+        // A failed scaffold may have left files behind; every attempt starts clean.
+        await runtime.removeDirectory(consumer);
+        await runtime.removeDirectory(scaffoldParent);
+        await runtime.makeDirectory(consumer);
+        await runtime.makeDirectory(scaffoldParent);
 
-    await runtime.runCommand({
-      command: process.execPath,
-      args: [
-        runtime.resolveNpmCli(),
-        "create",
-        `warlock@${handoff.candidateVersion}`,
-        "--registry",
-        NPM_ORIGIN,
-        "--prefer-online",
-        "--cache",
-        cache,
-        "--userconfig",
-        npmrc,
-        "--globalconfig",
-        globalNpmrc,
-        "--",
-        "origin-app",
-        "--yes",
-        "--no-db",
-        "--no-git",
-        "--no-jwt",
-        "--pm=npm",
-      ],
-      cwd: scaffoldParent,
-      env,
-    });
-    const scaffold = path.join(scaffoldParent, "origin-app");
-    assertGeneratedPins(
-      parseManifest(await runtime.readTextFile(path.join(scaffold, "package.json")), "origin-app"),
-      handoff.candidateVersion,
-    );
-    await npmLsAndExecute(scaffold, cache, npmrc, globalNpmrc, env, runtime, false);
+        await runtime.writeTextFile(
+          path.join(consumer, "package.json"),
+          `${JSON.stringify({ name: "warlock-origin-confirm", private: true, type: "module" }, null, 2)}\n`,
+        );
+        await runtime.runCommand({
+          command: process.execPath,
+          args: [
+            runtime.resolveNpmCli(),
+            "install",
+            `@warlock.js/core@${handoff.candidateVersion}`,
+            `@warlock.js/notifications@${handoff.candidateVersion}`,
+            "--save-exact",
+            "--strict-peer-deps",
+            "--registry",
+            NPM_ORIGIN,
+            "--prefer-online",
+            "--cache",
+            cache,
+            "--userconfig",
+            npmrc,
+            "--globalconfig",
+            globalNpmrc,
+          ],
+          cwd: consumer,
+          env,
+        });
+        await npmLsAndExecute(consumer, cache, npmrc, globalNpmrc, env, runtime, true);
+
+        await runtime.runCommand({
+          command: process.execPath,
+          args: [
+            runtime.resolveNpmCli(),
+            "create",
+            `warlock@${handoff.candidateVersion}`,
+            "--registry",
+            NPM_ORIGIN,
+            "--prefer-online",
+            "--cache",
+            cache,
+            "--userconfig",
+            npmrc,
+            "--globalconfig",
+            globalNpmrc,
+            "--",
+            "origin-app",
+            "--yes",
+            "--no-db",
+            "--no-git",
+            "--no-jwt",
+            "--pm=npm",
+          ],
+          cwd: scaffoldParent,
+          env,
+        });
+        const scaffold = path.join(scaffoldParent, "origin-app");
+        assertGeneratedPins(
+          parseManifest(
+            await runtime.readTextFile(path.join(scaffold, "package.json")),
+            "origin-app",
+          ),
+          handoff.candidateVersion,
+        );
+        await npmLsAndExecute(scaffold, cache, npmrc, globalNpmrc, env, runtime, false);
+        break;
+      } catch (error) {
+        const remaining = budget.deadline - runtime.now().getTime();
+        runtime.report(`Origin install/scaffold attempt ${attempt} failed: ${formatError(error)}`);
+        if (remaining <= 0) throw error;
+        await runtime.sleep(Math.min(budget.delay, remaining));
+        budget.delay = Math.min(budget.delay * 2, CONFIRMATION_MAX_DELAY_MS);
+      }
+    }
+  } catch (error) {
+    await preserveConfirmationRecovery(handoff, runtime);
+    throw error;
   } finally {
     await runtime.removeDirectory(root);
   }
+}
+
+/** Preserve the runner's release commit before failed confirmation discards the checkout. */
+async function preserveConfirmationRecovery(
+  handoff: ReleaseHandoff,
+  runtime: Runtime,
+): Promise<void> {
+  const version = handoff.candidateVersion;
+  const logs = path.resolve(process.env.LOGS ?? path.join(REPO_ROOT, "release-logs"));
+  const bundle = path.join(logs, "release-commit.bundle");
+  const ref = `refs/warlock-release-recovery/v${version}`;
+  try {
+    const provenance = await readProvenance(path.join(ARTIFACT_ROOT, version), version, runtime);
+    const entries = handoff.subjects.map((name) =>
+      provenance?.members.find((entry) => entry.name === name),
+    );
+    const shas = new Set(entries.map((entry) => entry?.releaseCommitSha));
+    const [sha] = [...shas];
+    if (
+      entries.some((entry) => !entry) ||
+      shas.size !== 1 ||
+      !sha ||
+      !/^[a-f0-9]{40}$/i.test(sha)
+    ) {
+      throw new Error("Build provenance does not identify one release commit for every subject.");
+    }
+    await runtime.makeDirectory(logs);
+    await runtime.runCommand({
+      command: "git",
+      args: ["update-ref", ref, sha],
+      cwd: REPO_ROOT,
+      env: { ...process.env },
+    });
+    try {
+      await runtime.runCommand({
+        command: "git",
+        args: ["bundle", "create", bundle, ref],
+        cwd: REPO_ROOT,
+        env: { ...process.env },
+      });
+    } finally {
+      await runtime.runCommand({
+        command: "git",
+        args: ["update-ref", "-d", ref],
+        cwd: REPO_ROOT,
+        env: { ...process.env },
+      });
+    }
+    runtime.report(`Preserved release commit ${sha} in ${bundle} (uploaded with logs).`);
+    if (entries.every((entry) => entry?.gitHead === sha)) {
+      runtime.report(
+        "The release edits were a no-op; the release tag belongs on the dispatched commit recorded in provenance.",
+      );
+    }
+  } catch (error) {
+    runtime.report(
+      `RELEASE COMMIT RECOVERY FAILED: ${formatError(error)}. Preserve this runner checkout before it is discarded.`,
+    );
+  }
+  runtime.report(
+    "Manual recovery after all packages become visible (run from repository root; never republish):",
+  );
+  runtime.report("Set run_id to the failed GitHub Actions run id.");
+  runtime.report(`gh run download "$run_id" -n warlock-${version}-logs -D release-logs`);
+  runtime.report(`gh run download "$run_id" -n warlock-${version}-artifacts -D tools/release`);
+  runtime.report(`test -f tools/release/release-artifacts/${version}/build-provenance.json`);
+  runtime.report(
+    `release_sha=$(node -p "require('./tools/release/release-artifacts/${version}/build-provenance.json').members[0].releaseCommitSha")`,
+  );
+  runtime.report(
+    `release_branch=$(node -p "require('./tools/release/release-artifacts/${version}/build-provenance.json').members[0].checkedOutBranch")`,
+  );
+  runtime.report(`git bundle verify release-logs/release-commit.bundle`);
+  runtime.report(`git fetch ./release-logs/release-commit.bundle ${ref}:${ref}`);
+  runtime.report(`test "$(git rev-parse ${ref})" = "$release_sha"`);
+  for (const name of handoff.subjects)
+    runtime.report(`npm view ${name}@${version} version --registry ${NPM_ORIGIN} --prefer-online`);
+  runtime.report('git fetch origin "$release_branch"');
+  runtime.report(
+    'git merge-base --is-ancestor FETCH_HEAD "$release_sha" || { echo "Origin has commits outside this release; stop and investigate."; exit 1; }',
+  );
+  runtime.report(`git tag v${version} "$release_sha"`);
+  runtime.report(`git push origin refs/tags/v${version}`);
+  runtime.report('git push origin "$release_sha:refs/heads/$release_branch"');
+  runtime.report(`gh workflow run blog-check.yml -f version=${version} -f mode=registry`);
 }
 
 /** `v<version>` -- one tag per release on the monorepo, the format the family has always used (e.g. `v5.6.0`). */

@@ -84,7 +84,7 @@ required reviewer, by owner choice: a green gate authorises the publish.
    `package.json` version and every literal `@warlock.js/*` pin, date each
    `CHANGELOG.md` heading, run the llms projections (see "Docs are part of the
    release"). `main` clean and pushed; check `git ls-remote origin
-   refs/heads/main` against local `HEAD`. If any dependency changed, the root
+refs/heads/main` against local `HEAD`. If any dependency changed, the root
    `pnpm-lock.yaml` must be committed with it (CI installs `--frozen-lockfile`).
 2. **Test run**: dispatch `release.yml` with `publish` off. It must be green
    through the blog step. Fix, push, repeat.
@@ -460,13 +460,22 @@ node --import tsx scripts/release-family.ts confirm  --version 5.9.0
 - **Publish auth (since builder `8304b52`):** the publish env falls back to the
   token in the user's global `~/.npmrc` when `NPM_TOKEN` is not set — so an
   interactive release needs neither a per-release env var nor a manual `npm
-  publish`. `NPM_TOKEN` still wins when present (CI).
-- **`confirm` after publish: a 404 is propagation lag, NOT a failure — never
-  re-publish (canon `c44fcb2f`).** A newly published version can take a minute+ to
-  propagate across the registry's edges, and `confirm` aborts on the first member
-  whose per-package retries exhaust. Just re-run `confirm` (loop it with a short
-  wait until `CONFIRM_EXIT=0`); different members lag on each pass as it catches
-  up. `confirm` then tags `vX.Y.Z` once on the release commit and pushes the tag and the branch.
+publish`. `NPM_TOKEN` still wins when present (CI).
+- **`confirm` after publish:** a 404 can be propagation lag; never republish.
+  Registry views and install/import/scaffold checks share one thirty-minute
+  deadline with three-to-sixty-second exponential backoff. Already-live
+  packages are not re-polled, and failed consumer/scaffold checks retry in clean
+  directories. Confirmation success tags the recorded commit and pushes its
+  tag and branch.
+- **Failed confirmation on a runner:** preserve the uploaded
+  `warlock-<version>-logs` and `warlock-<version>-artifacts` artifacts. The logs
+  contain `release-commit.bundle`; the artifacts contain
+  `release-artifacts/<version>/build-provenance.json`. Follow the printed
+  recovery commands from the repository root to restore provenance, import the
+  bundle, verify the recorded SHA and origin ancestry, push the recorded tag
+  and branch, then run `blog-check.yml` with `mode=registry`. Wait for every
+  subject to become visible first. A no-op release uses the dispatched commit
+  recorded in provenance; do not create a replacement release commit.
 - **Read the run's own EXIT= line, not the harness exit code** (canon `6c7ca5ab`).
 
 ## Mandatory local-registry pre-gate — before npm origin
