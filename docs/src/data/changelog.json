@@ -1187,7 +1187,7 @@
       "id": "v5-29-0",
       "date": "October 1, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Fixes from FORMAI's 5.27 upgrade, typed nullable and list resources, and one module graph in dev.</strong> <code>locales.json</code> files under <code>$sites/&lt;site&gt;/…</code> (and other <code>$</code> folders) work again: the folder only names the group when <code>$group</code> is missing (a 5.27 regression). In <code>warlock dev</code>, the dev server has its own Vite cache so a vitest run no longer breaks it, multi-site roots get their site's translations, the original error of a broken page is logged first instead of a follow-on <code>useLocale()</code> error, and <code>src/app</code> modules imported by pages share the instance the API side uses. New in <code>@warlock.js/core</code>: <code>nullable(Resource)</code> for resources that may be <code>null</code> (resources, <code>responseSchema</code>, OpenAPI, route types) and <code>[Resource]</code> list fields in <code>defineResource</code>; cast strings inside <code>arrayOf</code> item schemas are no longer dropped. <code>useTrans()</code> returns <code>string</code> instead of <code>any</code>. Every package's skills now refer to other topics by name, so the links work after they are copied into an app. Lockstep release across all 31 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.29.0 tarballs passed install, typecheck, a fresh migrate and seed, devtools in dev with the API docs, a production build with browser smoke, and the <code>--role=worker</code> and <code>--role=api</code> starts; after publishing, the same check passed against npm.",
+      "summaryHtml": "<strong>Fixes for applications upgrading from 5.27, typed nullable and list resources, and one module graph in dev.</strong> <code>locales.json</code> files under <code>$sites/&lt;site&gt;/…</code> (and other <code>$</code> folders) work again: the folder only names the group when <code>$group</code> is missing (a 5.27 regression). In <code>warlock dev</code>, the dev server has its own Vite cache so a vitest run no longer breaks it, multi-site roots get their site's translations, the original error of a broken page is logged first instead of a follow-on <code>useLocale()</code> error, and <code>src/app</code> modules imported by pages share the instance the API side uses. New in <code>@warlock.js/core</code>: <code>nullable(Resource)</code> for resources that may be <code>null</code> (resources, <code>responseSchema</code>, OpenAPI, route types) and <code>[Resource]</code> list fields in <code>defineResource</code>; cast strings inside <code>arrayOf</code> item schemas are no longer dropped. <code>useTrans()</code> returns <code>string</code> instead of <code>any</code>. Every package's skills now refer to other topics by name, so the links work after they are copied into an app. Lockstep release across all 31 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.29.0 tarballs passed install, typecheck, a fresh migrate and seed, devtools in dev with the API docs, a production build with browser smoke, and the <code>--role=worker</code> and <code>--role=api</code> starts; after publishing, the same check passed against npm.",
       "matrix": "none",
       "matrixRows": null,
       "mode": "detail",
@@ -1205,23 +1205,23 @@
           "items": [
             {
               "type": "Fixed",
-              "html": "<code>warlock dev</code> uses its own Vite cache (<code>node_modules/.vite/warlock-dev</code>), so a vitest run that re-optimizes dependencies no longer wipes the dev server's cache and 500s every SSR page until a restart (FORMAI)."
+              "html": "<code>warlock dev</code> uses its own Vite cache (<code>node_modules/.vite/warlock-dev</code>), so a vitest run that re-optimizes dependencies no longer wipes the dev server's cache and 500s every SSR page until a restart."
             },
             {
               "type": "Fixed",
-              "html": "The original error is no longer hidden behind a follow-on one (FORMAI). When a client navigation cannot build the page tree (e.g. a server-only barrel imported from browser code), the original error is kept across the forced reload and logged first as the ROOT CAUSE; later errors in that document, such as \"useLocale() was called outside Warlock's LocaleProvider\", are marked as probable consequences. On the server, a page module that fails to load logs its original error at install time, and an error page that itself fails is reported as a consequence naming the root cause. <code>onClientError</code> receives the new <code>\"navigation\"</code> kind."
+              "html": "The original error is no longer hidden behind a follow-on one. When a client navigation cannot build the page tree (e.g. a server-only barrel imported from browser code), the original error is kept across the forced reload and logged first as the ROOT CAUSE; later errors in that document, such as \"useLocale() was called outside Warlock's LocaleProvider\", are marked as probable consequences. On the server, a page module that fails to load logs its original error at install time, and an error page that itself fails is reported as a consequence naming the root cause. <code>onClientError</code> receives the new <code>\"navigation\"</code> kind."
             },
             {
               "type": "Fixed",
-              "html": "<code>useTrans()</code> returns a typed translator: it returns <code>string</code>, not <code>any</code>, and keys are still checked against <code>TranslationKeyRegistry</code>. <code>Translate</code> is one plain signature, so a lambda passed where a <code>Translate</code> is expected (<code>label((key) =&gt; t(key))</code>) keeps its parameter type. New type exports: <code>TranslateFor</code>, <code>TranslationConverter</code>, <code>InlineTranslation</code> (FORMAI)."
+              "html": "<code>useTrans()</code> returns a typed translator: it returns <code>string</code>, not <code>any</code>, and keys are still checked against <code>TranslationKeyRegistry</code>. <code>Translate</code> is one plain signature, so a lambda passed where a <code>Translate</code> is expected (<code>label((key) =&gt; t(key))</code>) keeps its parameter type. New type exports: <code>TranslateFor</code>, <code>TranslationConverter</code>, <code>InlineTranslation</code>."
             },
             {
               "type": "Fixed",
-              "html": "Multi-site apps in <code>warlock dev</code>: a site's <code>root.tsx</code> and its <code>locales.json</code> are keyed by the same site folder (as in production), so the root <code>LocaleProvider</code> gets the site dictionary instead of <code>{}</code>, including when the client rebuilds after an SSR failure (FORMAI)."
+              "html": "Multi-site apps in <code>warlock dev</code>: a site's <code>root.tsx</code> and its <code>locales.json</code> are keyed by the same site folder (as in production), so the root <code>LocaleProvider</code> gets the site dictionary instead of <code>{}</code>, including when the client rebuilds after an SSR failure."
             },
             {
               "type": "Fixed",
-              "html": "<code>locales.json</code> under `﻿# Changelog"
+              "html": "<code>locales.json</code> files under <code>$</code>-prefixed folders (<code>src/web/$sites/&lt;site&gt;/...</code>, guard folders) no longer fail <code>warlock generate.typings</code>, dev or build with \"segments must match …\" (5.27 regression). The folder-derived namespace is computed only when the file declares no <code>$group</code>, and skips <code>$</code> folders and the site name after <code>$sites</code>."
             },
             {
               "type": "Fixed",
@@ -1246,11 +1246,11 @@
           "items": [
             {
               "type": "Added",
-              "html": "<strong><code>nullable(Resource)</code></strong>: a resource that may be <code>null</code>, accepted as a <code>defineResource</code> field and in <code>responseSchema</code> bodies. A field outputs <code>null</code> (not omitted) for null/undefined input; <code>ResourceOutput</code>/<code>ResponseBodyOutput</code> type it as <code>Output | null</code>; OpenAPI documents it as <code>oneOf [resource, null]</code>; route types emit <code>… | null</code> (FORMAI)."
+              "html": "<strong><code>nullable(Resource)</code></strong>: a resource that may be <code>null</code>, accepted as a <code>defineResource</code> field and in <code>responseSchema</code> bodies. A field outputs <code>null</code> (not omitted) for null/undefined input; <code>ResourceOutput</code>/<code>ResponseBodyOutput</code> type it as <code>Output | null</code>; OpenAPI documents it as <code>oneOf [resource, null]</code>; route types emit <code>… | null</code>."
             },
             {
               "type": "Added",
-              "html": "<strong><code>[Resource]</code> list fields in <code>defineResource</code></strong>: each item is mapped through the resource, <code>[]</code> stays <code>[]</code>, and the output type is an array (the same syntax <code>responseSchema</code> already accepts). Plain <code>Resource</code> fields behave as before (FORMAI)."
+              "html": "<strong><code>[Resource]</code> list fields in <code>defineResource</code></strong>: each item is mapped through the resource, <code>[]</code> stays <code>[]</code>, and the output type is an array (the same syntax <code>responseSchema</code> already accepts). Plain <code>Resource</code> fields behave as before."
             },
             {
               "type": "Fixed",

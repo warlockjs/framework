@@ -82,7 +82,7 @@ describe("OpenAIModel.complete()", () => {
   });
 
   // Current OpenAI models answer 400 unsupported_parameter to `max_tokens`
-  // (FORMAI, 5.26 P0). The adapter targets current request shapes only.
+  // (5.26 regression). The adapter targets current request shapes only.
   it("never sends the legacy max_tokens key", async () => {
     const { client, calls } = makeFakeClient({ completion: baseCompletion });
     const model = new OpenAIModel(client, { name: "gpt-5.6-luna", maxTokens: 512 });

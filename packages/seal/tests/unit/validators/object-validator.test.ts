@@ -80,7 +80,7 @@ describe("ObjectValidator", () => {
     expect(topLevelNull.data).toBe(null);
   });
 
-  // FORMAI (5.24): `.nullish()` objects validated their children on null.
+  // In 5.24: `.nullish()` objects validated their children on null.
   // `.nullish()` is `.optional().nullable()`, so the 5.25 nullable fix covers it.
   it("accepts null and a missing value on a nullish object without validating its children", async () => {
     const schema = v.object({

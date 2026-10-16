@@ -240,8 +240,7 @@ when the real number was 2). Always re-run before believing a failure count.
 
 ### Environment note
 
-The machine was running ~40 unrelated node processes (Hasan's own dev servers across mentoor /
-consumer app / consumer app). Test and tsc runs that previously took 15-90s were taking 5-10+ minutes and had
+The machine was running ~40 unrelated node processes (development servers across several other projects). Test and tsc runs that previously took 15-90s were taking 5-10+ minutes and had
 to be backgrounded. Nothing of mine was left running; nothing was killed.
 
 ## Next step

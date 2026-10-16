@@ -89,8 +89,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- **`nullable(Resource)`**: a resource that may be `null`, accepted as a `defineResource` field and in `responseSchema` bodies. A field outputs `null` (not omitted) for null/undefined input; `ResourceOutput`/`ResponseBodyOutput` type it as `Output | null`; OpenAPI documents it as `oneOf [resource, null]`; route types emit `… | null` (FORMAI).
-- **`[Resource]` list fields in `defineResource`**: each item is mapped through the resource, `[]` stays `[]`, and the output type is an array (the same syntax `responseSchema` already accepts). Plain `Resource` fields behave as before (FORMAI).
+- **`nullable(Resource)`**: a resource that may be `null`, accepted as a `defineResource` field and in `responseSchema` bodies. A field outputs `null` (not omitted) for null/undefined input; `ResourceOutput`/`ResponseBodyOutput` type it as `Output | null`; OpenAPI documents it as `oneOf [resource, null]`; route types emit `… | null`.
+- **`[Resource]` list fields in `defineResource`**: each item is mapped through the resource, `[]` stays `[]`, and the output type is an array (the same syntax `responseSchema` already accepts). Plain `Resource` fields behave as before.
 
 ### Fixed
 

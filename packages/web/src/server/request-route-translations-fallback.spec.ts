@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { bindRequestRouteTranslations } from "./request-route-translations";
 import type { RouteTranslationsResolver } from "./route-translations";
 
-// FORMAI #14: core `t()` is `request.trans(k) || trans(k)`. These pin how the
+// Route translation fallback: core `t()` is `request.trans(k) || trans(k)`. These pin how the
 // snapshot-vs-registry fallback behaves for keys registered with groupedTranslations.
 const bind = (keywords: Record<string, unknown>, locale = "en") => {
   const resolver: RouteTranslationsResolver = (_s, l) => ({
@@ -17,7 +17,7 @@ const bind = (keywords: Record<string, unknown>, locale = "en") => {
 };
 const coreT = (request: any, key: string) => request.trans(key) || trans(key);
 
-describe("route translation snapshot fallback (FORMAI #14)", () => {
+describe("route translation snapshot fallback", () => {
   afterEach(() => setTranslationsList({}));
 
   it("falls back to the global registry when the snapshot lacks the key", () => {

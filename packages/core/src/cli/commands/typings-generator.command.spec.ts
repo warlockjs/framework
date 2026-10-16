@@ -33,7 +33,7 @@ describe("warlock generate.typings — route registration timeout", () => {
     hoisted.collectRoutes = undefined;
   });
 
-  it("uses the same resolved timeout as warlock build (FORMAI: 30s default failed loaded builds)", async () => {
+  it("uses the same resolved timeout as warlock build (30s default failed loaded builds)", async () => {
     process.env.WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS = "120000";
 
     await typingsGeneratorCommand.execute({ args: [], options: {} } as never);

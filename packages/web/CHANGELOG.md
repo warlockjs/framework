@@ -51,19 +51,11 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ### Fixed
 
-- `warlock dev` uses its own Vite cache (`node_modules/.vite/warlock-dev`), so a vitest run that re-optimizes dependencies no longer wipes the dev server's cache and 500s every SSR page until a restart (FORMAI).
-- The original error is no longer hidden behind a follow-on one (FORMAI). When a client navigation cannot build the page tree (e.g. a server-only barrel imported from browser code), the original error is kept across the forced reload and logged first as the ROOT CAUSE; later errors in that document, such as "useLocale() was called outside Warlock's LocaleProvider", are marked as probable consequences. On the server, a page module that fails to load logs its original error at install time, and an error page that itself fails is reported as a consequence naming the root cause. `onClientError` receives the new `"navigation"` kind.
-- `useTrans()` returns a typed translator: it returns `string`, not `any`, and keys are still checked against `TranslationKeyRegistry`. `Translate` is one plain signature, so a lambda passed where a `Translate` is expected (`label((key) => t(key))`) keeps its parameter type. New type exports: `TranslateFor`, `TranslationConverter`, `InlineTranslation` (FORMAI).
-- Multi-site apps in `warlock dev`: a site's `root.tsx` and its `locales.json` are keyed by the same site folder (as in production), so the root `LocaleProvider` gets the site dictionary instead of `{}`, including when the client rebuilds after an SSR failure (FORMAI).
-- `locales.json` under `﻿# Changelog
-
-All notable changes to `@warlock.js/web` are documented here.
-
--prefixed folders (`src/web/$sites/<site>/...`, guard folders) no longer fails `warlock generate.typings`, dev or build with "segments must match …" (5.27 regression, FORMAI). The folder-derived namespace is computed only when the file declares no `$group`, and it skips `﻿# Changelog
-
-All notable changes to `@warlock.js/web` are documented here.
-
-folders and the site name after `$sites`.
+- `warlock dev` uses its own Vite cache (`node_modules/.vite/warlock-dev`), so a vitest run that re-optimizes dependencies no longer wipes the dev server's cache and 500s every SSR page until a restart.
+- The original error is no longer hidden behind a follow-on one. When a client navigation cannot build the page tree (e.g. a server-only barrel imported from browser code), the original error is kept across the forced reload and logged first as the ROOT CAUSE; later errors in that document, such as "useLocale() was called outside Warlock's LocaleProvider", are marked as probable consequences. On the server, a page module that fails to load logs its original error at install time, and an error page that itself fails is reported as a consequence naming the root cause. `onClientError` receives the new `"navigation"` kind.
+- `useTrans()` returns a typed translator: it returns `string`, not `any`, and keys are still checked against `TranslationKeyRegistry`. `Translate` is one plain signature, so a lambda passed where a `Translate` is expected (`label((key) => t(key))`) keeps its parameter type. New type exports: `TranslateFor`, `TranslationConverter`, `InlineTranslation`.
+- Multi-site apps in `warlock dev`: a site's `root.tsx` and its `locales.json` are keyed by the same site folder (as in production), so the root `LocaleProvider` gets the site dictionary instead of `{}`, including when the client rebuilds after an SSR failure.
+- `locales.json` files under `$`-prefixed folders (`src/web/$sites/<site>/...`, guard folders) no longer fail `warlock generate.typings`, dev or build with "segments must match …" (5.27 regression). The folder-derived namespace is computed only when the file declares no `$group`, and skips `$` folders and the site name after `$sites`.
 
 - `warlock dev`: an `src/app` module imported by a page, layout or root is the same instance the API side uses (one module graph), so module state such as an `AsyncLocalStorage` set in middleware, caches and registries is shared between controllers and page loaders. Pages reach those modules through a trampoline to the native module core already loaded. Modules that (transitively) import `@warlock.js/web`, live in `src/web`, are client-bound, or need Vite (`import.meta.env`/`glob`/`hot`, CSS or asset imports) keep loading through Vite as before. Dev only; production builds are unchanged.
 

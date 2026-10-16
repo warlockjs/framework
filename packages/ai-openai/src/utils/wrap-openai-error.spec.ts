@@ -145,7 +145,7 @@ describe("wrapOpenAIError", () => {
     expect(wrapped).toBeInstanceOf(InvalidRequestError);
   });
 
-  // FORMAI couldn't see why every call failed. The SDK's own APIError carries
+  // The caller couldn't see why every call failed. The SDK's own APIError carries
   // the rejected `param` and the `requestID`; both must reach the caller.
   it("keeps the provider's message, code, rejected param and request id from a real SDK error", () => {
     const apiError = OpenAI.APIError.generate(
