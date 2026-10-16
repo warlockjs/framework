@@ -28,9 +28,12 @@ import { packageRoot } from "../../helpers/paths";
 import { hasInteractiveStdin } from "../../helpers/tty";
 import { askAgentTargets } from "../../prompts/ask-agent-targets";
 import { askAiFeatures } from "../../prompts/ask-ai-features";
-import { fitOptionsToWidth, multiselectMaxItems } from "../../prompts/fit-to-terminal";
 import { askProjectName } from "../../prompts/ask-project-name";
 import { askStack } from "../../prompts/ask-stack";
+import {
+  fitOptionsToWidth,
+  multiselectMaxItems,
+} from "../../prompts/fit-to-terminal";
 import { showIntroBanner } from "../../ui/banner";
 import { createWarlockApp } from "../create-warlock-app";
 import getAppPath from "./get-app-path";

@@ -153,8 +153,13 @@ posixOnly("moveDirectoryNoReplaceAsync — interleavings", () => {
     const third = path.join(dir, "third");
     vi.mocked(rename).mockImplementationOnce(async (from, to) => {
       await original.rename(from, third);
+      // Make the stranger while the placeholder still exists, so the file
+      // system cannot hand it the placeholder's freed inode (ext4 reuses
+      // them at once, which would make the stranger look like our claim).
+      const stranger = path.join(dir, "stranger");
+      await original.mkdir(stranger);
       await original.rmdir(to);
-      await original.mkdir(to);
+      await original.rename(stranger, String(to));
       throw Object.assign(new Error("I/O error"), { code: "EIO" });
     });
 

@@ -702,9 +702,18 @@ describe("createOps concurrent mutations on one path", () => {
       ops.editFile({ path: "shared.ts", oldString: "const b = 2;", newString: "const b = 20;", expectHash: hash }),
     ]);
 
-    expect(results[0]?.status).toBe("fulfilled");
-    expect(results[1]).toMatchObject({ status: "rejected", reason: { type: "stale-hash" } });
-    expect(backend.files.get(abs("shared.ts"))).toBe("const a = 10;\nconst b = 2;\n");
+    // Which edit takes the lock first is not part of the contract; exactly one
+    // must apply, and the other must be refused as stale rather than lost.
+    const applied = results.filter((result) => result.status === "fulfilled");
+    const refused = results.filter((result) => result.status === "rejected");
+
+    expect(applied).toHaveLength(1);
+    expect(refused).toHaveLength(1);
+    expect(refused[0]).toMatchObject({ reason: { type: "stale-hash" } });
+    expect([
+      "const a = 10;\nconst b = 2;\n",
+      "const a = 1;\nconst b = 20;\n",
+    ]).toContain(backend.files.get(abs("shared.ts")));
   });
 
   it("does not hold up mutations of other paths", async () => {

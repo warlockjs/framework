@@ -107,8 +107,14 @@ export class App {
       // minimumReleaseAgeExclude, does not exist before pnpm 10.16.
       rmSync(workspacePath, { force: true });
       const packageJsonPath = path.join(this.path, "package.json");
-      const packageJson = getJsonFile(packageJsonPath) as Record<string, unknown>;
-      putJsonFile(packageJsonPath, mergePackageJsonBuildApprovals(packageJson, packages));
+      const packageJson = getJsonFile(packageJsonPath) as Record<
+        string,
+        unknown
+      >;
+      putJsonFile(
+        packageJsonPath,
+        mergePackageJsonBuildApprovals(packageJson, packages),
+      );
       // Drop any cached copy so later package.json edits start from this one.
       delete this.jsonFiles[path.resolve(packageJsonPath)];
       return;
