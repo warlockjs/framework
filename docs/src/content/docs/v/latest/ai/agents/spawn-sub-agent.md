@@ -92,13 +92,15 @@ type SpawnSubAgentSpec<TOutput> = {
 };
 ```
 
-## Related
-
-- [Run agent](/v/latest/ai/agents/run-agent/) — the full agent surface `spawnSubAgent` builds on (history, streaming, events, repair).
-- [Middleware](/v/latest/ai/architecture-concepts/middleware/) — the `budget` middleware the `budget` field wires up for you.
-- [Planner](/v/latest/ai/architecture-concepts/planner/) — generates and runs a plan; a step can delegate via `spawnSubAgent`, but the planner does not require it.
+## Tool dispatch
 
 Tool calls in one trip run concurrently, up to four at once by default. Set
 `toolDispatch: "sequential"` for tools with ordered side effects, or
 `maxConcurrentTools: 2` to lower the concurrency cap. This also applies when
 upgrading a `spawnSubAgent` caller from 5.29 to the concurrent default in 5.30.
+
+## Related
+
+- [Run agent](/v/latest/ai/agents/run-agent/) — the full agent surface `spawnSubAgent` builds on (history, streaming, events, repair).
+- [Middleware](/v/latest/ai/architecture-concepts/middleware/) — the `budget` middleware the `budget` field wires up for you.
+- [Planner](/v/latest/ai/architecture-concepts/planner/) — generates and runs a plan; a step can delegate via `spawnSubAgent`, but the planner does not require it.

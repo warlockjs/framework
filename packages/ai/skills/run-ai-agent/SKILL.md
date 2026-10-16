@@ -366,9 +366,8 @@ import { ai } from "@warlock.js/ai";
 const result = await ai.spawnSubAgent({
   name: "extract-entities",
   model,
+  tools: [extractEntitiesTool],
   toolDispatch: "sequential", // ordered tool effects; default is concurrent
-  maxConcurrentTools: 2, // cap in concurrent mode (default 4)
-
   task: "Pull every company name from this article: ...",
   budget: { maxCostUSD: 0.05 }, // per-task spend cap — aborts when crossed
   output: companiesSchema,
