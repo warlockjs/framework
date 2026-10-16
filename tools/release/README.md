@@ -435,4 +435,5 @@ Skill compilation maps source package subpaths independently of root barrels,
 resolves installed dependencies from the skill's owning package, and isolates
 application registry augmentations between skills. Missing app support files
 remain compiler errors; examples must include those files or state a complete
-replacement. Existing failure allowances cannot increase.
+replacement. Existing failure allowances cannot increase; lower them to the
+measured package counts after fixes and the final formatting pass.

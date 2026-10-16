@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Lowered skill compilation allowances to the measured 280 remaining failures and the AI Tools strictness allowance to 68 after final formatting, preserving every package's ratchet.
+
 - Repository formatting uses one pinned Oxfmt configuration and a blocking CI check; generated outputs, locks and archives keep their own projection checks. Scaffolder source tests share the root formatter while generated-app templates retain their toolchain gates.
 
 - Release CI and local gate quality commands require real Redis integration specs; configured-port reporting tests mock availability checks and no longer need fixed ports free.
