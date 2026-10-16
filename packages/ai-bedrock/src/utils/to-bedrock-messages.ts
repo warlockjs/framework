@@ -116,8 +116,22 @@ export function toBedrockMessages(messages: Message[]): BedrockMessages {
 
   return {
     system: system.length > 0 ? system : undefined,
-    messages: mapped,
+    messages: mergeAdjacentTurns(mapped),
   };
+}
+
+/** Converse requires alternating turns; preserve every content block in order. */
+function mergeAdjacentTurns(messages: BedrockMessage[]): BedrockMessage[] {
+  const merged: BedrockMessage[] = [];
+  for (const message of messages) {
+    const previous = merged[merged.length - 1];
+    if (previous?.role === message.role) {
+      previous.content!.push(...(message.content ?? []));
+    } else {
+      merged.push({ ...message, content: [...(message.content ?? [])] });
+    }
+  }
+  return merged;
 }
 
 /**
@@ -133,9 +147,9 @@ function getReasoningBlocks(toolCalls: NonNullable<Message["toolCalls"]>): Conte
       continue;
     }
 
-    return bedrock.reasoningBlocks.map(fromReasoningMetadata).filter(
-      (block): block is ContentBlock => block !== undefined,
-    );
+    return bedrock.reasoningBlocks
+      .map(fromReasoningMetadata)
+      .filter((block): block is ContentBlock => block !== undefined);
   }
 
   return [];
@@ -196,9 +210,7 @@ function toBedrockContentBlock(part: ContentPart): ContentBlock {
 
   // Bedrock Converse has no audio content block (capability stays false).
   if (part.type === "audio") {
-    throw new InvalidRequestError(
-      "Bedrock Converse does not support audio attachments.",
-    );
+    throw new InvalidRequestError("Bedrock Converse does not support audio attachments.");
   }
 
   const format = MEDIA_TYPE_TO_FORMAT[part.source.mediaType];

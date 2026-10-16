@@ -223,3 +223,11 @@ if (model.countTokens) {
   const inputTokens = await model.countTokens(messages, options);
 }
 ```
+
+## Adjacent conversation turns
+
+Converse messages combine adjacent turns of the same role, retaining every
+content block in order. This keeps parallel tool results in one user turn and
+allows an automatic compaction summary beside an assistant tool-call turn
+without creating consecutive assistant turns. Agent compaction frames a summary
+as user context when it replaces the first non-system turn.

@@ -50,6 +50,7 @@ export type PersistAgentParams = {
   promptName?: string;
   promptVersion?: string;
   messages: Message[];
+  inputMessageIndex?: number;
   trips: LLMTrip[];
   compactions?: AgentCompactionRecord[];
   toolCalls: ToolCall[];
@@ -87,6 +88,9 @@ export async function persistAgentSnapshot(params: PersistAgentParams): Promise<
     promptName: params.promptName,
     promptVersion: params.promptVersion,
     messages: params.messages,
+    ...(params.inputMessageIndex !== undefined
+      ? { inputMessageIndex: params.inputMessageIndex }
+      : {}),
     trips: params.trips,
     ...(params.compactions?.length ? { compactions: params.compactions } : {}),
     toolCalls: params.toolCalls,

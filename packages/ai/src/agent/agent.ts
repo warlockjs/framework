@@ -543,6 +543,7 @@ class Execution<TOutput> {
   private readonly toolCalls: ToolCall[] = [];
   private readonly usage: Usage = { input: 0, output: 0, total: 0 };
   private readonly messages: Message[] = [];
+  private inputMessageIndex: number | undefined;
   /** Resolved system-prompt text sent to the model, captured for the report. */
   private systemPrompt?: string;
   /**
@@ -627,6 +628,8 @@ class Execution<TOutput> {
     // stays empty, so the non-durable path is byte-for-byte unchanged.
     if (resumeFrom) {
       this.messages.push(...resumeFrom.messages);
+      this.inputMessageIndex =
+        resumeFrom.inputMessageIndex ?? findExecutionInputIndex(this.messages, this.input);
       this.trips.push(...resumeFrom.trips);
       this.compactions.push(...(resumeFrom.compactions ?? []));
       this.toolCalls.push(...resumeFrom.toolCalls);
@@ -825,6 +828,9 @@ class Execution<TOutput> {
     this.promptVersion = promptVersion;
 
     await this.injectSkills();
+    // The input builder appends the execution input after caller history;
+    // skill injection may prepend a system message, so record the index last.
+    this.inputMessageIndex = this.messages.length - 1;
   }
 
   /**
@@ -1092,10 +1098,14 @@ class Execution<TOutput> {
         this.messages,
         callOptions,
         tripIndex,
+        this.inputMessageIndex,
       );
       if (callOptions.signal?.aborted) throw this.makeCancelledError();
       if (outcome.record) this.compactions.push(outcome.record);
-      if (outcome.messages) this.messages.splice(0, this.messages.length, ...outcome.messages);
+      if (outcome.messages) {
+        this.messages.splice(0, this.messages.length, ...outcome.messages);
+        this.inputMessageIndex = outcome.inputMessageIndex;
+      }
     }
     const context: MiddlewareTripContext = {
       ...this.buildExecuteContext(),
@@ -1800,6 +1810,9 @@ class Execution<TOutput> {
       promptName: this.promptName,
       promptVersion: this.promptVersion,
       messages: this.captureMessages() as unknown as Message[],
+      ...(this.config.compaction && this.inputMessageIndex !== undefined
+        ? { inputMessageIndex: this.inputMessageIndex }
+        : {}),
       trips: this.trips,
       ...(this.compactions.length ? { compactions: this.compactions } : {}),
       toolCalls: this.toolCalls,
@@ -2197,4 +2210,23 @@ function resolveToolAction(
   } catch {
     return undefined;
   }
+}
+
+/** Locate the original input in older snapshots that predate its persisted index. */
+function findExecutionInputIndex(messages: Message[], input: string): number | undefined {
+  let found: number | undefined;
+  for (let index = 0; index < messages.length; index++) {
+    const message = messages[index];
+    if (message?.role !== "user") continue;
+    const text =
+      typeof message.content === "string"
+        ? message.content
+        : message.content.find((part) => part.type === "text")?.text;
+    if (text !== input) continue;
+    // Older snapshots lack provenance. An ambiguous match cannot safely pin
+    // the execution input, so automatic compaction remains disabled for it.
+    if (found !== undefined) return undefined;
+    found = index;
+  }
+  return found;
 }

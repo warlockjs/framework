@@ -479,7 +479,8 @@ counter receives the same call options as generation and runs once before each
 trip, plus once to check a proposed replacement. Use `model.countTokens` only
 when present and when its endpoint can count the entire request.
 
-Original system messages and the latest user input remain intact. `keep` defaults
+Original system messages, the original execution input and the latest user
+message remain intact, including during output repair. `keep` defaults
 to eight recent messages and expands to preserve complete assistant/tool-result
 groups. The agent skips compaction when the retained conversation contains
 provider blocks or tool-call replay metadata, since modifying earlier turns can
@@ -498,7 +499,15 @@ After an applied compaction, `result.blocks` is absent even for one generation
 trip: final thinking is signed against the compacted history. Enable
 `captureMessages` and persist `report.messages` plus the final trip's `output`
 and `blocks` for replay. The original caller history is unchanged.
-Durable snapshots preserve decisions and the compacted conversation. Changing
+A summary replacing the first non-system turn is framed as user-supplied
+conversation context, so the transcript remains user-first. Bedrock combines
+adjacent turns of the same role while preserving their content blocks, including
+parallel tool results and a summary beside an assistant tool-call turn.
+
+Durable snapshots preserve decisions, the compacted conversation and the original
+input message's index. Older snapshots derive the index from an unambiguous
+matching user input; if the input is missing or ambiguous, compaction records
+`no-safe-range` and leaves the conversation intact. Changing
 the threshold or `keep` triggers durable drift detection; bump the agent's
 `version` when changing summary callback semantics.
 

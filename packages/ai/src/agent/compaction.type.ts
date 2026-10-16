@@ -18,7 +18,8 @@ export type AgentCompactionConfig = {
   keep?: number;
   /**
    * Receives a detached, safe old slice. Return an assistant text summary replacing
-   * the entire slice (indices 0 through history.length - 1). The callback owns its
+   * the entire slice (indices 0 through history.length - 1). A first-turn summary
+   * is framed as user context before generation. The callback owns its
    * model calls, billing and usage; no hidden summarizer is invoked by the agent.
    */
   summarize: (history: Message[], context: AgentCompactionContext) => ReturnType<SummarizeCallback>;

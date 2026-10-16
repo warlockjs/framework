@@ -37,10 +37,11 @@ function estimateInput(messages: Message[], options: ModelCallOptions): number {
   );
 }
 
-/** Pick a contiguous old range without splitting tool calls/results or removing the latest user input. */
+/** Pick a settled range without splitting tool groups or replacing protected user inputs. */
 function selectRange(
   messages: Message[],
   keep: number,
+  inputMessageIndex: number,
 ): { start: number; end: number } | undefined {
   let start = messages.findIndex((message) => message.role !== "system");
   if (start < 0) return undefined;
@@ -53,9 +54,14 @@ function selectRange(
       break;
     }
   }
-  if (latestUser >= start && latestUser < end) {
-    if (latestUser === start) start++;
-    else end = latestUser;
+  for (const protectedIndex of [inputMessageIndex, latestUser].sort(
+    (left, right) => left - right,
+  )) {
+    if (protectedIndex < start || protectedIndex >= end) continue;
+    // Prefer the oldest prefix; after it becomes a single memo, compact the
+    // settled tool history following the protected input instead.
+    if (protectedIndex - start >= 2) end = protectedIndex;
+    else start = protectedIndex + 1;
   }
   const systemIndex = messages.findIndex(
     (message, index) => index >= start && index < end && message.role === "system",
@@ -90,7 +96,8 @@ export async function compactAgentMessages(
   messages: Message[],
   options: ModelCallOptions,
   tripIndex: number,
-): Promise<{ record?: AgentCompactionRecord; messages?: Message[] }> {
+  inputMessageIndex: number | undefined,
+): Promise<{ record?: AgentCompactionRecord; messages?: Message[]; inputMessageIndex?: number }> {
   const counting = config.countTokens ? "custom" : "estimate";
   const record: AgentCompactionRecord = { type: "skipped", tripIndex, counting };
   const count = async (history: Message[]): Promise<number> => {
@@ -105,7 +112,8 @@ export async function compactAgentMessages(
     const before = await count(messages);
     record.inputTokens = before;
     if (options.signal?.aborted || before < config.afterTokens) return {};
-    const range = selectRange(messages, config.keep ?? 8);
+    if (inputMessageIndex === undefined) return { record: { ...record, reason: "no-safe-range" } };
+    const range = selectRange(messages, config.keep ?? 8, inputMessageIndex);
     if (!range) return { record: { ...record, reason: "no-safe-range" } };
     if (
       messages.some(
@@ -134,13 +142,20 @@ export async function compactAgentMessages(
       throw new Error(
         "compaction summarize must replace the entire supplied slice with a non-empty assistant text summary.",
       );
-    const summary: Message = { role: "assistant", content: result.summary.content };
+    const isFirstTurn = range.start === messages.findIndex((message) => message.role !== "system");
+    const summary: Message = isFirstTurn
+      ? { role: "user", content: `Summary of earlier conversation:\n${result.summary.content}` }
+      : { role: "assistant", content: result.summary.content };
     const replacement = [...messages.slice(0, range.start), summary, ...messages.slice(range.end)];
     const after = await count(replacement);
     if (options.signal?.aborted) return {};
     if (after >= before) return { record: { ...record, reason: "not-smaller" } };
     return {
       messages: replacement,
+      inputMessageIndex:
+        inputMessageIndex >= range.end
+          ? inputMessageIndex - (range.end - range.start) + 1
+          : inputMessageIndex,
       record: {
         ...record,
         type: "applied",

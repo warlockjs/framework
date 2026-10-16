@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Provider body options merge plain-object fields one level deep, preserving neutral reasoning, generation and structured-output settings unless the caller overrides their keys.
 
+- Converse conversion combines adjacent same-role turns in content order, preserving parallel tool results and automatic compaction summaries beside assistant tool calls.
+
 ### Added
 
 - `providerOptions.bedrock.body` forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions.

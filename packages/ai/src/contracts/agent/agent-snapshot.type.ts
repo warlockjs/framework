@@ -82,6 +82,8 @@ export type AgentSnapshot = {
    * Re-hydrated verbatim so the next trip sees the full history.
    */
   messages: Message[];
+  /** Original execution input's index, persisted only for automatic compaction. */
+  inputMessageIndex?: number;
   /**
    * Every settled trip so far. `trips.length` is the next `tripIndex`
    * the resumed loop starts at, so completed trips never re-run.

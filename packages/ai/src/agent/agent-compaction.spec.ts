@@ -1,3 +1,4 @@
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type {
   Message,
   ModelCallOptions,
@@ -106,13 +107,21 @@ describe("agent automatic compaction", () => {
     expect(input).toEqual(history);
     expect(calls[0]?.messages[0]).toEqual({ role: "system", content: "keep rules" });
     expect(calls[0]?.messages.at(-1)).toEqual({ role: "user", content: "current input" });
-    expect(calls[0]?.messages.some((message) => message.content === "memo")).toBe(true);
+    expect(
+      calls[0]?.messages.some(
+        (message) => typeof message.content === "string" && message.content.endsWith("memo"),
+      ),
+    ).toBe(true);
     expect(result.report.compactions?.[0]).toMatchObject({
       type: "applied",
       counting: "custom",
       tripIndex: 0,
     });
-    expect(result.report.messages?.some((message) => message.content === "memo")).toBe(true);
+    expect(
+      result.report.messages?.some(
+        (message) => typeof message.content === "string" && message.content.endsWith("memo"),
+      ),
+    ).toBe(true);
     expect(countTokens).toHaveBeenCalledTimes(2);
   });
 
@@ -227,7 +236,11 @@ describe("agent automatic compaction", () => {
     );
     expect(result.blocks).toBeUndefined();
     expect(result.report.trips[0]?.blocks).toEqual(blocks);
-    expect(result.report.messages?.some((message) => message.content === "memo")).toBe(true);
+    expect(
+      result.report.messages?.some(
+        (message) => typeof message.content === "string" && message.content.endsWith("memo"),
+      ),
+    ).toBe(true);
   });
 
   it("skips non-shrinking/invalid summaries and callback/count errors without altering the live input", async () => {
@@ -311,7 +324,11 @@ describe("agent automatic compaction", () => {
     const result = await worker.execute("go", { history, runId: "compact-run" });
     const saved = await store.load("compact-run");
     expect(saved?.compactions).toEqual(result.report.compactions);
-    expect(saved?.messages.some((message) => message.content === "memo")).toBe(true);
+    expect(
+      saved?.messages.some(
+        (message) => typeof message.content === "string" && message.content.endsWith("memo"),
+      ),
+    ).toBe(true);
     const resumed = await worker.resume("compact-run");
     expect(resumed.report.compactions).toEqual(result.report.compactions);
     expect(calls).toHaveLength(1);
@@ -323,6 +340,116 @@ describe("agent automatic compaction", () => {
     });
     await expect(changed.resume("compact-run")).rejects.toThrow(AgentDriftError);
   });
+
+  for (const mode of ["execute", "stream"] as const) {
+    it(`preserves the original input when ${mode} enters a repair trip after tool history`, async () => {
+      const { model, calls } = modelFixture([
+        ...["one", "two", "three"].map((id) => ({
+          content: "",
+          finishReason: "tool_calls" as const,
+          toolCalls: [{ id, name: "echo", input: {} }],
+        })),
+        { content: "invalid", finishReason: "stop" },
+        { content: '{"ok":true}', finishReason: "stop" },
+      ]);
+      const worker = agent({
+        model,
+        tools: [echo],
+        output: validOutput,
+        maxTrips: 6,
+        compaction: policy({ countTokens: repairOnlyCount }),
+      });
+      const result =
+        mode === "execute"
+          ? await worker.execute("original task verbatim", { repair: { maxAttempts: 1 } })
+          : await worker.stream("original task verbatim", { repair: { maxAttempts: 1 } }).result;
+      expect(result.error).toBeUndefined();
+      expect(result.data).toEqual({ ok: true });
+      expect(
+        result.report.compactions?.some(
+          (record) => record.type === "applied" && record.tripIndex === 4,
+        ),
+      ).toBe(true);
+      expect(calls[4]?.messages).toContainEqual({
+        role: "user",
+        content: "original task verbatim",
+      });
+      expect(calls[4]?.messages.at(-1)?.content).toContain("previous response failed validation");
+      expect(calls[4]?.messages.filter((message) => message.role === "tool")).toHaveLength(0);
+    });
+  }
+
+  it.each(["persisted", "legacy", "missing", "ambiguous"] as const)(
+    "preserves input provenance across failed-run resume (%s)",
+    async (provenance) => {
+      const { model, calls } = modelFixture([
+        ...["one", "two", "three"].map((id) => ({
+          content: "",
+          finishReason: "tool_calls" as const,
+          toolCalls: [{ id, name: "echo", input: {} }],
+        })),
+        { content: "invalid", finishReason: "stop" },
+        { content: '{"ok":true}', finishReason: "stop" },
+      ]);
+      const complete = model.complete.bind(model);
+      let interrupted = false;
+      model.complete = async (messages, options) => {
+        if (!interrupted && calls.length === 3) {
+          interrupted = true;
+          throw new Error("interrupted before final response");
+        }
+        return complete(messages, options);
+      };
+      const store = snapshotMemory<AgentSnapshot>();
+      const worker = agent({
+        name: "repair-resume",
+        model,
+        tools: [echo],
+        output: validOutput,
+        maxTrips: 7,
+        durable: { store },
+        compaction: policy({
+          countTokens: (messages) =>
+            calls.length === 0 ? count(messages) : repairOnlyCount(messages),
+        }),
+      });
+      const first = await worker.execute("persisted task", { history, runId: "repair-run" });
+      expect(first.error).toBeDefined();
+      const saved = (await store.load("repair-run"))!;
+      expect(saved.inputMessageIndex).toBe(3); // system, memo, retained history, original input
+      expect(saved.messages[saved.inputMessageIndex!]).toEqual({
+        role: "user",
+        content: "persisted task",
+      });
+      if (provenance !== "persisted") {
+        if (provenance === "missing") saved.messages.splice(saved.inputMessageIndex!, 1);
+        if (provenance === "ambiguous")
+          saved.messages.splice(
+            saved.inputMessageIndex! + 1,
+            0,
+            structuredClone(saved.messages[saved.inputMessageIndex!]!),
+          );
+        delete saved.inputMessageIndex;
+        await store.save(saved);
+      }
+      const resumed = await worker.resume("repair-run", { repair: { maxAttempts: 1 } });
+      expect(resumed.error).toBeUndefined();
+      expect(resumed.data).toEqual({ ok: true });
+      if (provenance === "persisted" || provenance === "legacy") {
+        expect(calls.at(-1)?.messages).toContainEqual({ role: "user", content: "persisted task" });
+        expect(
+          resumed.report.compactions?.some(
+            (record) => record.type === "applied" && record.tripIndex === 5,
+          ),
+        ).toBe(true);
+      } else {
+        expect(resumed.report.compactions?.find((record) => record.tripIndex === 5)).toMatchObject({
+          type: "skipped",
+          reason: "no-safe-range",
+        });
+      }
+    },
+  );
 
   it("rejects invalid policies at authoring time", () => {
     const { model } = modelFixture();
@@ -344,3 +471,24 @@ describe("agent automatic compaction", () => {
     }
   });
 });
+
+const validOutput: StandardSchemaV1<{ ok: true }> = {
+  "~standard": {
+    version: 1,
+    vendor: "test",
+    validate(value) {
+      return value && typeof value === "object" && "ok" in value && value.ok === true
+        ? { value: { ok: true } }
+        : { issues: [{ message: "expected ok" }] };
+    },
+  },
+};
+
+function repairOnlyCount(messages: Message[]): number {
+  const latest = messages.at(-1);
+  return latest?.role === "user" &&
+    typeof latest.content === "string" &&
+    latest.content.includes("previous response failed validation")
+    ? count(messages)
+    : 0;
+}

@@ -232,4 +232,12 @@ if (model.countTokens) {
 - The `pick-ai-provider` topic of the `warlock-js-ai` skill
 - The `embed-text` topic of the `warlock-js-ai` skill
 
+## Adjacent conversation turns
+
+Converse messages combine adjacent turns of the same role, retaining every
+content block in order. This keeps parallel tool results in one user turn and
+allows an automatic compaction summary beside an assistant tool-call turn
+without creating consecutive assistant turns. Agent compaction frames a summary
+as user context when it replaces the first non-system turn.
+
 
