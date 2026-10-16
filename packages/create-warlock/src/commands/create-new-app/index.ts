@@ -28,6 +28,7 @@ import { packageRoot } from "../../helpers/paths";
 import { hasInteractiveStdin } from "../../helpers/tty";
 import { askAgentTargets } from "../../prompts/ask-agent-targets";
 import { askAiFeatures } from "../../prompts/ask-ai-features";
+import { fitOptionsToWidth, multiselectMaxItems } from "../../prompts/fit-to-terminal";
 import { askProjectName } from "../../prompts/ask-project-name";
 import { askStack } from "../../prompts/ask-stack";
 import { showIntroBanner } from "../../ui/banner";
@@ -168,11 +169,15 @@ async function createFullWizard(
   const selectedDriver = getDatabaseDriver(databaseDriver as string);
 
   // Step 4: Features selection
+  // 22 options: page them to the terminal's height and keep each row on one
+  // line, or every redraw prints the list again below the previous copy.
+  const featureOptions = fitOptionsToWidth(getFeatureOptions());
   const selectedFeatures = await multiselect({
     message: "Select optional features to include",
-    options: getFeatureOptions(),
+    options: featureOptions,
     initialValues: seeds.features,
     required: false,
+    maxItems: multiselectMaxItems(featureOptions.length),
   });
 
   if (isCancel(selectedFeatures)) {

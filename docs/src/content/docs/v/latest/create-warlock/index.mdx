@@ -101,6 +101,18 @@ pnpm create warlock my-api --yes --no-db --features=test
 You can add a database back at any time by creating a `src/config/database.ts` (the `DB_*` variables are still present in `.env`) and installing the driver package.
 :::
 
+## pnpm versions
+
+With `--pm=pnpm`, `create-warlock` reads `pnpm --version` and writes the pnpm settings that version understands, so esbuild's install script (which `warlock dev` and `warlock build` need) is allowed and installs succeed:
+
+| pnpm             | What the app gets                                                                                   |
+| ---------------- | --------------------------------------------------------------------------------------------------- |
+| 10.26+, 11, 12   | `pnpm-workspace.yaml` with `allowBuilds` (and `minimumReleaseAgeExclude` for `@warlock.js/*`)       |
+| 10.5 – 10.25     | the same file, plus an `onlyBuiltDependencies` list, which these versions read instead              |
+| 7 – 9, 10.0–10.4 | no `pnpm-workspace.yaml` (these versions reject one without `packages:`); `pnpm.onlyBuiltDependencies` in `package.json` |
+
+Inside an existing pnpm workspace the app gets neither: the parent workspace's settings apply. If you upgrade pnpm later, move the approvals to the row for the new version.
+
 ## Where to go next
 
 - **Full walkthrough** → [Core · Installation](/v/latest/core/getting-started/02-installation/) — every question, the scaffolded file tree, and booting the dev server, step by step.

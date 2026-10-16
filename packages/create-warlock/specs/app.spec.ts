@@ -28,6 +28,7 @@ const getPackageManager = vi.fn(() => "yarn");
 
 vi.mock("../src/helpers/package-manager", () => ({
   getPackageManager: (...args: unknown[]) => getPackageManager(...args),
+  getPnpmVersion: () => undefined,
 }));
 
 const initializeGitRepository = vi.fn(async () => true);

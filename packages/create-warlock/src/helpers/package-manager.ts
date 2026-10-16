@@ -127,6 +127,27 @@ export function setPackageManager(packageManager: string) {
   detectedPackageManager = packageManager;
 }
 
+let cachedPnpmVersion: string | null | undefined;
+
+/**
+ * The version `pnpm --version` reports, or undefined when pnpm cannot be run.
+ * The scaffold's pnpm settings depend on it (see pnpmBuildApprovalLayout).
+ */
+export function getPnpmVersion(): string | undefined {
+  if (cachedPnpmVersion === undefined) {
+    try {
+      cachedPnpmVersion = execSync("pnpm --version", {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+    } catch {
+      cachedPnpmVersion = null;
+    }
+  }
+
+  return cachedPnpmVersion ?? undefined;
+}
+
 export function installCommand() {
   return `${getPackageManager()} install`;
 }

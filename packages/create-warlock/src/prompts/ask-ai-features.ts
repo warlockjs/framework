@@ -3,6 +3,7 @@ import {
   getAiPackageOptions,
   getAiProviderOptions,
 } from "../features/features-map";
+import { fitOptionsToWidth, multiselectMaxItems } from "./fit-to-terminal";
 
 const NO_AI = "none";
 
@@ -26,9 +27,10 @@ export async function askAiFeatures(
     const answer = await multiselect({
       message:
         "Add AI packages? Providers + capabilities — the core AI package is included automatically",
-      options: aiOptions,
+      options: fitOptionsToWidth(aiOptions),
       initialValues: selectedValues,
       required: false,
+      maxItems: multiselectMaxItems(aiOptions.length),
     });
 
     if (isCancel(answer)) return answer;

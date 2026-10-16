@@ -16,6 +16,11 @@ export default function App({ children }: AppProps) {
     <html lang={locale} dir={direction}>
       <head>
         {/*
+          <Head /> also renders the viewport tag (width=device-width,
+          initial-scale=1). Change it with `metadata.viewport`,
+          or set it to false to leave it out; do not add a second one here.
+        */}
+        {/*
           Placement only. The framework injects the page's `metadata`, the
           stylesheet and preload tags for this route, and the canonical links
           into <head> by default — <Head /> just says WHERE they land.

@@ -76,9 +76,13 @@ Using npm · database: none · agent-kit targets: claude
 | `--git` / `--no-git`        | no          | off            | Initialize a Git repo (`git init` + `main` branch + initial commit).|
 | `--jwt` / `--no-jwt`        | no          | off            | Generate JWT secrets via the project's `jwt` script.               |
 
-With `--pm=pnpm`, selecting the `image` feature records only Sharp's required
-native build approval in the generated `pnpm-workspace.yaml` before install.
-An explicit existing denial is retained. If selected feature dependencies do
+With `--pm=pnpm`, the scaffold reads `pnpm --version` and records install-script
+approvals (esbuild, and Sharp when the `image` feature is selected) where that
+version reads them: `allowBuilds` in `pnpm-workspace.yaml` on pnpm 10.26+, 11
+and 12; that file plus `onlyBuiltDependencies` on 10.5–10.25; and, before 10.5,
+no workspace file (those versions reject one without `packages:`) but
+`pnpm.onlyBuiltDependencies` in `package.json`. An explicit existing denial is
+retained. If selected feature dependencies do
 not install, JWT generation is skipped and reported rather than retried through
 the package manager.
 | `--yes` / `-y`              | no          | off            | Fully headless mode.                                                 |

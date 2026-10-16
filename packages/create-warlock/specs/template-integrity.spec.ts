@@ -431,3 +431,12 @@ describe("cache config's globalPrefix is fixed and app-owned, not request-derive
     expect(source).not.toMatch(/input\(\s*["']domain["']\s*\)/);
   });
 });
+
+describe("the scaffolded root is mobile-ready (FW-03)", () => {
+  it("leaves the viewport tag to <Head />, so the document never carries two", () => {
+    const root = stripComments(read("src/web/root.tsx"));
+
+    expect(root).toContain("<Head />");
+    expect(root).not.toMatch(/<meta\s+name="viewport"/);
+  });
+});

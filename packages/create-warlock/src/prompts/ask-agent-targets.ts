@@ -4,6 +4,7 @@ import {
   DEFAULT_AGENT_KIT_TARGET,
   getValidAgentKitTargets,
 } from "../features/agent-kit-targets";
+import { multiselectMaxItems } from "./fit-to-terminal";
 
 /**
  * Which `agent-kit` targets to derive per-agent docs and skills for.
@@ -33,6 +34,7 @@ export async function askAgentTargets(
     options: targets.map(target => ({ value: target, label: target })),
     initialValues: initialSelection(requested, targets),
     required: false,
+    maxItems: multiselectMaxItems(targets.length),
   });
 
   if (isCancel(answer)) {

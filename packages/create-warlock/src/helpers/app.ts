@@ -14,10 +14,14 @@ import { Application, AppOptions } from "../commands/create-new-app/types";
 import { getDatabaseDriver } from "../features/database-drivers";
 import { executeCommand, runCommand } from "./exec";
 import { insertImportInSortedPosition } from "./insert-import";
-import { getPackageManager } from "./package-manager";
+import { getPackageManager, getPnpmVersion } from "./package-manager";
 import { packageRoot, Template, template } from "./paths";
 import {
+  BASE_PNPM_BUILD_APPROVALS,
+  mergeOnlyBuiltDependencies,
+  mergePackageJsonBuildApprovals,
   mergePnpmBuildApprovals,
+  pnpmBuildApprovalLayout,
   requiredPnpmBuildApprovals,
 } from "./pnpm-build-approvals";
 import { fallbackRange } from "./warlock-versions";
@@ -80,9 +84,46 @@ export class App {
     // workspace file would nest a second workspace root.
     if (isInsidePnpmWorkspace(this.path)) {
       rmSync(path.join(this.path, "pnpm-workspace.yaml"), { force: true });
+    } else if (getPackageManager() === "pnpm") {
+      this.fitPnpmSettingsToVersion(BASE_PNPM_BUILD_APPROVALS);
     }
 
     return this;
+  }
+
+  /**
+   * Write install-script approvals where the user's pnpm reads them. The
+   * template ships the pnpm 10.26+ layout (settings-only pnpm-workspace.yaml
+   * with `allowBuilds`); see pnpmBuildApprovalLayout for what older versions
+   * need and why.
+   */
+  protected fitPnpmSettingsToVersion(packages: readonly string[]) {
+    const workspacePath = path.join(this.path, "pnpm-workspace.yaml");
+    const layout = pnpmBuildApprovalLayout(getPnpmVersion());
+
+    if (layout === "packageJson") {
+      // pnpm 7-10.4 refuse a workspace file without `packages:`, and adding
+      // one breaks `pnpm add` in the app. The template's other setting,
+      // minimumReleaseAgeExclude, does not exist before pnpm 10.16.
+      rmSync(workspacePath, { force: true });
+      const packageJsonPath = path.join(this.path, "package.json");
+      const packageJson = getJsonFile(packageJsonPath) as Record<string, unknown>;
+      putJsonFile(packageJsonPath, mergePackageJsonBuildApprovals(packageJson, packages));
+      // Drop any cached copy so later package.json edits start from this one.
+      delete this.jsonFiles[path.resolve(packageJsonPath)];
+      return;
+    }
+
+    if (!fileExists(workspacePath)) return;
+
+    const current = getFile(workspacePath) as string;
+    let next = mergePnpmBuildApprovals(current, packages);
+
+    if (layout === "onlyBuiltDependencies") {
+      next = mergeOnlyBuiltDependencies(next, packages);
+    }
+
+    if (next !== current) putFile(workspacePath, next);
   }
 
   public init() {
@@ -104,10 +145,9 @@ export class App {
     if (getPackageManager() !== "pnpm") return this;
     const packages = requiredPnpmBuildApprovals(features);
     if (packages.length === 0) return this;
-    const workspacePath = path.join(this.path, "pnpm-workspace.yaml");
-    if (!fileExists(workspacePath)) return this;
-    const current = getFile(workspacePath) as string;
-    putFile(workspacePath, mergePnpmBuildApprovals(current, packages));
+    // Inside a parent workspace the parent's policy decides; leave it alone.
+    if (isInsidePnpmWorkspace(this.path)) return this;
+    this.fitPnpmSettingsToVersion(packages);
     return this;
   }
 
