@@ -190,7 +190,7 @@ export type GeneratePagesBarrelOptions = {
   sites?: SitesConfig;
   /**
    * App-root-relative folders or files holding test-only code, skipped by the
-   * build's page-graph scan (FW-15). Spec/test files and `__tests__` /
+   * build's page-graph scan. Spec/test files and `__tests__` /
    * `__mocks__` folders are always skipped.
    */
   testOnly?: readonly string[];
@@ -343,7 +343,7 @@ const TEST_FILE_PATTERN = /\.(spec|test)\.tsx?$/;
 const TEST_ONLY_DIRECTORY_NAMES = new Set(["__tests__", "__mocks__"]);
 
 /**
- * What the tripwire may skip (FW-15). `graphFiles` are the files the page
+ * What the tripwire may skip. `graphFiles` are the files the page
  * graph itself is built from (pages, layouts, roots, setup files): they are
  * never skipped, even inside a `testOnly` folder, because they ARE the bundle.
  */
@@ -423,7 +423,7 @@ function pageGraphFiles(pages: readonly DiscoveredPage[], appFiles: readonly str
  * inside a template literal (a code sample in a docs page, say) still matches.
  * Rare, and it fails loudly rather than silently, but it is not impossible.
  *
- * TEST CODE IS SKIPPED (FW-15). Spec/test files, `__tests__`/`__mocks__`
+ * TEST CODE IS SKIPPED. Spec/test files, `__tests__`/`__mocks__`
  * folders and the app's `build.testOnly` paths never reach the server bundle,
  * so a test helper may use `import.meta.url` like test code anywhere else. A
  * page-graph file (page, layout, root, setup) is scanned wherever it lives.

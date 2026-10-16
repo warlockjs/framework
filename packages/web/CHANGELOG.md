@@ -6,22 +6,22 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ### Upgrading
 
-- `<Head />` now emits a viewport `<meta>` (FW-03). If `root.tsx` hard-codes `<meta name="viewport" …>`, remove it (or move its value to `metadata.viewport`) to avoid two tags.
+- `<Head />` now emits a viewport `<meta>`. If `root.tsx` hard-codes `<meta name="viewport" …>`, remove it (or move its value to `metadata.viewport`) to avoid two tags.
 
 ### Added
 
-- `<Form query={{ … }}>` sets the query string of the URL the form posts to (the current page, or `to`'s page), without touching the body or the named `action` (WR-011).
-- `<Form independent>` submits alongside a pending submission instead of sharing it: a Cancel next to a long-running Start. Neither aborts the other; a double submit of the same form with the same fields still shares one request, another form posting the same action (a Cancel per row) never does, and unmounting a form cancels only its own submission. Its result, redirect included, is dropped once the user has moved to another page (WR-013).
-- `LinkPropsWithout<K>` and `DistributiveOmit<T, K>`: omit props from `LinkProps` without collapsing its destination union, so a wrapper keeps the required-params check (WR-021).
-- `isRouteName(name)` narrows a data-driven string to a route name after checking the published route table, so it reaches `<Link to>` or `href()` without a cast (WR-021).
-- `metadata.viewport` (`string | false`). `<Head />` now emits `<meta name="viewport" content="width=device-width, initial-scale=1">` by default, so a new app lays out at device width on phones; a `meta` entry named `viewport` is still honoured. Like the charset it is document-level: client navigation never rewrites it, nor a viewport tag `root.tsx` writes itself (FW-03).
-- `webConnector({ build: { testOnly } })`: app-root-relative folders or files the production build's page-graph scan skips (FW-15).
+- `<Form query={{ … }}>` sets the query string of the URL the form posts to (the current page, or `to`'s page), without touching the body or the named `action`.
+- `<Form independent>` submits alongside a pending submission instead of sharing it: a Cancel next to a long-running Start. Neither aborts the other; a double submit of the same form with the same fields still shares one request, another form posting the same action (a Cancel per row) never does, and unmounting a form cancels only its own submission. Its result, redirect included, is dropped once the user has moved to another page.
+- `LinkPropsWithout<K>` and `DistributiveOmit<T, K>`: omit props from `LinkProps` without collapsing its destination union, so a wrapper keeps the required-params check.
+- `isRouteName(name)` narrows a data-driven string to a route name after checking the published route table, so it reaches `<Link to>` or `href()` without a cast.
+- `metadata.viewport` (`string | false`). `<Head />` now emits `<meta name="viewport" content="width=device-width, initial-scale=1">` by default, so a new app lays out at device width on phones; a `meta` entry named `viewport` is still honoured. Like the charset it is document-level: client navigation never rewrites it, nor a viewport tag `root.tsx` writes itself.
+- `webConnector({ build: { testOnly } })`: app-root-relative folders or files the production build's page-graph scan skips.
 
 ### Changed
 
-- A page action that redirects now ends its submission once the redirected page is on screen: `useIsSubmitting()` stays `true` and `onSuccess` waits until the destination's fresh loader data has committed, so a revision-guarded form cannot resubmit stale data (WR-002).
+- A page action that redirects now ends its submission once the redirected page is on screen: `useIsSubmitting()` stays `true` and `onSuccess` waits until the destination's fresh loader data has committed, so a revision-guarded form cannot resubmit stale data.
 - `useIsSubmitting()` is `true` while any submission is in flight, including independent ones.
-- A production start no longer loads Vite, Rollup or `@babel/parser`: the web connector imports its Vite dev-server config, page-registry plugin, dev route installer, dev 404 reporter and the sitemap's page-walk fallback only on the development path, so its static graph shrinks from 185 to 67 modules (WR-027).
+- A production start no longer loads Vite, Rollup or `@babel/parser`: the web connector imports its Vite dev-server config, page-registry plugin, dev route installer, dev 404 reporter and the sitemap's page-walk fallback only on the development path, so its static graph shrinks from 185 to 67 modules.
 
 ### Security
 
@@ -30,15 +30,15 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ### Fixed
 
-- `<Form>` honours the submit button's `formAction` and its `name`/`value`. The enhanced path posted to the form's URL; with no navigation runtime the fallback called `form.submit()`, which dropped both. Without a runtime the browser now submits natively, and a late fallback re-submits through the same button (WR-011).
-- A page request the client abandoned before its loaders finished no longer renders: it stops with `ClientDisconnectedError` before anything is committed, and the page handler neither reports it nor writes a response. It used to render layouts without their loader data and log a 500. A loader timeout on a connected request still renders its 504 (WR-016).
-- A 4xx error page (a thrown `ForbiddenError`/`BadRequestError`, a failed page validation) now hydrates. The client payload gate accepted only 500–599 and only `name`/`message`/`stack`, so it refused the 4xx status, the validation `errors` and the production `errorCode` the server sends, and logged "hydration payload … could not be read" (FW-01).
-- The production build's `import.meta.url` / static-asset scan skips `*.spec.*` and `*.test.*` files and `__tests__` / `__mocks__` folders; a test helper under `src/web` no longer fails `warlock build` (FW-15).
-- Web's React contexts (locale, document, session) live in one `Symbol.for` registry on `globalThis`, so a second evaluation of their module under `warlock dev` reuses them instead of making `useLocale()` throw "called outside Warlock's LocaleProvider" until restart (FW-07).
-- A request abandoned between the layout and page loaders no longer renders the page with `data` undefined; covered by the abandoned-request fix above, with a regression test for this case (FW-08).
+- `<Form>` honours the submit button's `formAction` and its `name`/`value`. The enhanced path posted to the form's URL; with no navigation runtime the fallback called `form.submit()`, which dropped both. Without a runtime the browser now submits natively, and a late fallback re-submits through the same button.
+- A page request the client abandoned before its loaders finished no longer renders: it stops with `ClientDisconnectedError` before anything is committed, and the page handler neither reports it nor writes a response. It used to render layouts without their loader data and log a 500. A loader timeout on a connected request still renders its 504.
+- A 4xx error page (a thrown `ForbiddenError`/`BadRequestError`, a failed page validation) now hydrates. The client payload gate accepted only 500–599 and only `name`/`message`/`stack`, so it refused the 4xx status, the validation `errors` and the production `errorCode` the server sends, and logged "hydration payload … could not be read".
+- The production build's `import.meta.url` / static-asset scan skips `*.spec.*` and `*.test.*` files and `__tests__` / `__mocks__` folders; a test helper under `src/web` no longer fails `warlock build`.
+- Web's React contexts (locale, document, session) live in one `Symbol.for` registry on `globalThis`, so a second evaluation of their module under `warlock dev` reuses them instead of making `useLocale()` throw "called outside Warlock's LocaleProvider" until restart.
+- A request abandoned between the layout and page loaders no longer renders the page with `data` undefined; covered by the abandoned-request fix above, with a regression test for this case.
 - An abandoned page request still reports a genuine failure (a loader or session-resolver bug) that happened before the disconnect; only failures the abort itself caused stay silent.
 - An independent submission no longer draws the page the user left over the page a navigation already in flight committed, and a page swap no longer leaves another operation's pending commit unresolved, which could keep `useIsNavigating()` true and hang a redirect's wait.
-- The FW-15 test-folder skip reads folder names below the web root, so an app located under a `__tests__` folder is still scanned.
+- The build's test-folder skip reads folder names below the web root, so an app located under a `__tests__` folder is still scanned.
 
 ## 5.29.0 - 2026-10-01
 

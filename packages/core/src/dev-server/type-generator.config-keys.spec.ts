@@ -10,7 +10,7 @@ import type {
 } from "./type-generator";
 
 /**
- * FW-06: config keys were read with `getText()`, which keeps a string-literal
+ * config keys were read with `getText()`, which keeps a string-literal
  * key's quotes, so `"machine-thumb"` under `images.variants` was written as
  * `"uploads.images.variants."machine-thumb"": true;` and broke the generated
  * `config.d.ts`. A single-quoted key produced a wrong key instead.
@@ -18,7 +18,7 @@ import type {
  * Same chdir-before-import setup as `type-generator.spec.ts`: the generator
  * resolves its output directory from `process.cwd()` once, at import.
  */
-describe("TypeGenerator — quoted config keys (FW-06)", () => {
+describe("TypeGenerator — quoted config keys", () => {
   let tempRoot: string;
   let previousCwd: string;
   let filesOrchestrator: FilesOrchestratorType;

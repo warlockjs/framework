@@ -193,11 +193,11 @@ function normalizeAuthors(value: MetadataOutput["authors"]): { name: string; url
 
 const VIEWPORT_KEY = 'meta[name="viewport"]';
 
-/** The viewport every page gets unless its metadata says otherwise (FW-03). */
+/** The viewport every page gets unless its metadata says otherwise. */
 export const DEFAULT_VIEWPORT = "width=device-width, initial-scale=1";
 
 /**
- * The viewport `<Head/>` renders (FW-03). `metadata.viewport` wins; `false`
+ * The viewport `<Head/>` renders. `metadata.viewport` wins; `false`
  * emits none. When the field is absent, a `metadata.meta` entry named
  * `viewport` is used, then the default.
  *

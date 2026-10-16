@@ -5,7 +5,7 @@ import { createContext, type Context } from "react";
  * `Symbol.for` slot on `globalThis` — the same realm-wide slot pattern
  * `routing/route-table` uses for its table.
  *
- * Why (FW-07): a context is identified by its OBJECT. When the dev server
+ * Why: a context is identified by its OBJECT. When the dev server
  * evaluates a framework module a second time (an SSR module-graph
  * invalidation after an app edit, or a second copy of the package), a plain
  * module-level `createContext()` yields a new context, and a provider from one

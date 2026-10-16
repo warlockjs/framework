@@ -6,12 +6,12 @@ import { Path } from "../utils/normalized-path";
 import { clearFileExistsCache, parseImports, stripComments } from "./parse-imports";
 
 /**
- * FW-13: a file with no real imports fell through to the regex fallback, which
+ * a file with no real imports fell through to the regex fallback, which
  * scanned comments too. A doc comment showing `(await import("./query-testing"))`
  * resolved to the file itself, and the dependency graph reported a one-file
  * "circular dependency".
  */
-describe("parseImports — comments and self edges (FW-13)", () => {
+describe("parseImports — comments and self edges", () => {
   let root: string;
 
   beforeEach(() => {

@@ -97,7 +97,7 @@ export function startHttpServer(options?: HttpServerOptions): FastifyInstance {
   // `"idle"` promises that idle keep-alive connections close on shutdown. Fastify
   // only reaps the ones idle at the moment close starts; a connection whose
   // request finishes DURING the drain stays open and holds `close()` until
-  // the shutdown budget expires (WR-014). Track responses so the drain can
+  // the shutdown budget expires. Track responses so the drain can
   // retire those connections as they go idle.
   if (forceCloseConnections === "idle") {
     trackConnectionsForDrain(server.server as NodeHttpServer);

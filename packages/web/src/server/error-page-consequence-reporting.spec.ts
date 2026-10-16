@@ -17,7 +17,7 @@ const CONTEXT_REGISTRY_SLOT = Symbol.for("warlock.web.reactContexts");
 /**
  * A SECOND copy of the localization module with its own `LocaleContext`, which
  * the framework's `LocaleProvider` (the first copy) never fills, and it throws
- * the real error. A plain re-evaluation now shares the first context (FW-07,
+ * the real error. A plain re-evaluation now shares the first context (see
  * `shared/shared-context.ts`), so the shared registry is hidden while the copy
  * loads — the case a graph that cannot share it at all still produces — and
  * put back afterwards.

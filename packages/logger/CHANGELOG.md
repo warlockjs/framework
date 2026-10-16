@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Logging is fire-and-forget: level methods no longer return a promise, so `@typescript-eslint/no-floating-promises` no longer flags every call site (WR-019).
+- Logging is fire-and-forget: level methods no longer return a promise, so `@typescript-eslint/no-floating-promises` no longer flags every call site.
 - `log.flush()` drains every channel concurrently: each waits for its own in-flight async deliveries (including entries logged while the flush runs), then runs its `flush()`, so a hung network channel no longer holds up the file channel.
 - `log.flush({ timeout })` is bounded: it resolves after `timeout` ms (default 5000, `DEFAULT_FLUSH_TIMEOUT_MS`; `Infinity` waits without a limit) and reports each channel still draining to the channel error handler. Before, one delivery that never settled made `flush()` (and a graceful shutdown awaiting it) wait forever.
 - `maskEmailsInText` cuts text longer than `MASK_EMAILS_MAX_LENGTH` (16,384 characters) and marks the cut, so masking a huge cache key or message has a bounded cost.
@@ -20,7 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `log.onChannelError(handler)` / `configure({ onChannelError })` and the `ChannelErrorHandler` type: receives a channel's sync throw or async rejection from `log()`, a redaction that threw, or a timed-out `flush()`. Default: one stderr line. The handler may be async; a rejection is swallowed.
-- `maskEmail(address)` and `maskEmailsInText(text)`: mask email addresses (`m***@example.com`) inside message strings and cache keys, which key-based redaction cannot reach. Core's mail logs and the cache drivers' key logs use them (FW-04).
+- `maskEmail(address)` and `maskEmailsInText(text)`: mask email addresses (`m***@example.com`) inside message strings and cache keys, which key-based redaction cannot reach. Core's mail logs and the cache drivers' key logs use them.
 
 ### Fixed
 

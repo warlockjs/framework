@@ -8,13 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- New apps get the viewport tag from `<Head />` (`@warlock.js/web` 5.30.0), so phones lay pages out at device width and responsive CSS applies; the scaffolded `src/web/root.tsx` says so and does not hand-write a second one (FW-03).
+- New apps get the viewport tag from `<Head />` (`@warlock.js/web` 5.30.0), so phones lay pages out at device width and responsive CSS applies; the scaffolded `src/web/root.tsx` says so and does not hand-write a second one.
 - **pnpm before 10.5 could not install a new app** (`ERROR packages field missing or empty`): pnpm 7–9 and 10.0–10.4 reject the settings-only `pnpm-workspace.yaml`. The scaffold now reads `pnpm --version` and writes approvals where that version reads them: no workspace file and `pnpm.onlyBuiltDependencies` in `package.json` before 10.5; the workspace file plus `onlyBuiltDependencies` on 10.5–10.25 (which ignore `allowBuilds`); the unchanged `allowBuilds` file on 10.26+, 11 and 12. It does not add `packages: ["."]`, which fails every later `pnpm add` on those versions (`ERR_PNPM_ADDING_TO_ROOT`). Feature approvals (sharp) follow the same rule; apps inside an existing workspace still get neither.
 - **The feature multiselect no longer prints stacked copies of itself** in a short or narrow terminal: the 22-option list pages to the terminal's height, and each row's hint is shortened to fit one line (a wrapped row made clack redraw below the previous frame). The AI and agent-target multiselects use the same sizing. `@clack/prompts` is now `^0.8.2`, the first version whose multiselect pages.
 
 ### Changed
 
-- Selecting notifications scaffolds the smaller, convention-following `src/app/notifications` module that `warlock add notifications` now writes (FW-09; see `@warlock.js/core`).
+- Selecting notifications scaffolds the smaller, convention-following `src/app/notifications` module that `warlock add notifications` now writes (see `@warlock.js/core`).
 
 ## 5.29.0 - 2026-10-01
 

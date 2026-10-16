@@ -15,18 +15,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- **Provider content blocks**: `ProviderContentBlock` (`{ provider, type, data }`) on `ModelResponse.blocks`, the streaming `done` chunk, `Message.blocks`, `CapturedMessage.blocks`, `LLMTrip.blocks` and `AgentResult.blocks`. The agent copies a response's blocks onto the assistant turn so the adapter can replay it verbatim (thinking, compaction) (WR-022).
-- `FinishReason` values `context_exceeded`, `pause_turn` and `refusal`. The agent resumes a `pause_turn` by replaying the paused turn, within `maxTrips` (WR-023).
-- `toolDispatch: "concurrent" | "sequential"` on `AgentConfig` and `AgentExecuteOptions` (`ToolDispatchMode`), concurrent by default (WR-024).
+- **Provider content blocks**: `ProviderContentBlock` (`{ provider, type, data }`) on `ModelResponse.blocks`, the streaming `done` chunk, `Message.blocks`, `CapturedMessage.blocks`, `LLMTrip.blocks` and `AgentResult.blocks`. The agent copies a response's blocks onto the assistant turn so the adapter can replay it verbatim (thinking, compaction).
+- `FinishReason` values `context_exceeded`, `pause_turn` and `refusal`. The agent resumes a `pause_turn` by replaying the paused turn, within `maxTrips`.
+- `toolDispatch: "concurrent" | "sequential"` on `AgentConfig` and `AgentExecuteOptions` (`ToolDispatchMode`), concurrent by default.
 - `maxConcurrentTools` on `AgentConfig` and `AgentExecuteOptions` (default `4`): the cap on a trip's tool calls running at once, so a model (or a prompt injected into its context) cannot start an unbounded number of tool calls in one turn.
 - `mapWithConcurrency(items, limit, mapper)` utility: an order-preserving `Promise.all` with a concurrency cap.
-- `ModelCallOptions.providerOptions` (adapter-only options keyed by wire format) and `cacheControl.ttl` (`"5m" | "1h"`) (WR-025).
+- `ModelCallOptions.providerOptions` (adapter-only options keyed by wire format) and `cacheControl.ttl` (`"5m" | "1h"`).
 - `MockModelResponse.blocks` for scripting provider blocks in tests.
 
 ### Fixed
 
 - The semantic cache no longer stores a paused (`pause_turn`) turn as a final answer, and stores a resumed turn whole (every segment), not only its last segment.
-- VCR request hashes include `providerOptions`, so two calls that differ only in provider options (betas, `context_management`, …) no longer replay the same recording. It joins the hash only when a provider entry carries a value — `{}`, `{ anthropic: {} }` and `{ anthropic: { betas: undefined } }` hash like no `providerOptions` — so existing cassettes recorded without it still match. `cacheControl` (breakpoints, `ttl`) stays out of the hash: it changes billing, not output (WR-025).
+- VCR request hashes include `providerOptions`, so two calls that differ only in provider options (betas, `context_management`, …) no longer replay the same recording. It joins the hash only when a provider entry carries a value — `{}`, `{ anthropic: {} }` and `{ anthropic: { betas: undefined } }` hash like no `providerOptions` — so existing cassettes recorded without it still match. `cacheControl` (breakpoints, `ttl`) stays out of the hash: it changes billing, not output.
 
 ## 5.29.0 - 2026-10-01
 

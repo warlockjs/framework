@@ -4,12 +4,12 @@ import type { Storage } from "./storage";
 import type { StorageManagerContract } from "./types";
 
 /**
- * FW-12: `storage.use(name)` returned `ScopedStorageContract`, which omits the
+ * `storage.use(name)` returned `ScopedStorageContract`, which omits the
  * directory operations the returned `ScopedStorage` has, so
  * `storage.use("private").deleteDirectory(...)` did not type-check. Type-level
  * only: `pnpm typecheck` compiles this file.
  */
-describe("storage.use() typing (FW-12)", () => {
+describe("storage.use() typing", () => {
   it("is typed as the ScopedStorage it returns", () => {
     expectTypeOf<ReturnType<Storage["use"]>>().toEqualTypeOf<ScopedStorage>();
     expectTypeOf<ReturnType<StorageManagerContract["use"]>>().toEqualTypeOf<ScopedStorage>();

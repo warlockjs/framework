@@ -61,7 +61,7 @@ export function Head(): ReactElement {
     Fragment,
     null,
     createElement("meta", { charSet: "utf-8" }),
-    // Document-level like the charset (FW-03): rendered here, never managed
+    // Document-level like the charset: rendered here, never managed
     // by client navigation. See `resolveViewport`.
     ...(viewport === undefined
       ? []

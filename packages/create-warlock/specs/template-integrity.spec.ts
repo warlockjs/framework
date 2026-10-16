@@ -432,7 +432,7 @@ describe("cache config's globalPrefix is fixed and app-owned, not request-derive
   });
 });
 
-describe("the scaffolded root is mobile-ready (FW-03)", () => {
+describe("the scaffolded root is mobile-ready", () => {
   it("leaves the viewport tag to <Head />, so the document never carries two", () => {
     const root = stripComments(read("src/web/root.tsx"));
 

@@ -132,7 +132,7 @@
       "id": "v5-30-0",
       "date": "October 16, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Framework findings from the Bureau 0.30 and Kazlak Care builds, plus a security and correctness review.</strong> Security: request logs no longer carry OAuth codes, signed-URL credentials or raw <code>Request</code>/<code>Response</code> objects (route <code>logging</code> policy, masked URLs and query), log and cache output masks email addresses with a linear pattern, <code>&lt;Form&gt;</code> only enhances same-origin targets and redirects refuse <code>javascript:</code> targets on the server and the client, SSE event names and ids are stripped of line breaks, login throttles key by an HMAC of the credential, and parallel AI tool calls are capped and serialised per file. HTTP: a request-lifetime <code>request.signal</code>, bounded SSE and stream retention with backpressure, graceful shutdown that closes idle keep-alive connections, typed <code>http.serverOptions</code>, <code>http.errorMapper</code>, shared rate limits through <code>@warlock.js/cache</code>, and <code>@warlock.js/core/errors</code>. Seal: <code>v.literal(\"\")</code> and <code>.default(\"\")</code> keep empty strings, optional discriminated unions accept omitted fields, and <code>validate()</code> returns typed output. Web: 4xx error pages hydrate, <code>&lt;Head /&gt;</code> renders the viewport, <code>&lt;Form independent&gt;</code>, redirect submissions wait for the new page, and production starts without Vite or Babel. <strong>Breaking:</strong> log methods return the logger instead of a promise (<code>await log.flush()</code> waits), and AI tool calls in one trip run concurrently by default (<code>toolDispatch: \"sequential\"</code>). <code>create-warlock</code> works on pnpm 9 and 10 again. Lockstep release across all 31 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.30.0 tarballs passed the release gate; after publishing, the registry confirm timed out on a delayed <code>@warlock.js/ai-mistral</code> publish, every package was then confirmed at npm origin and the family installed from npm, and the blog check against npm was not run in that job.",
+      "summaryHtml": "<strong>Fixes for issues found while building real apps on 5.29, plus a security and correctness review.</strong> Security: request logs no longer carry OAuth codes, signed-URL credentials or raw <code>Request</code>/<code>Response</code> objects (route <code>logging</code> policy, masked URLs and query), log and cache output masks email addresses with a linear pattern, <code>&lt;Form&gt;</code> only enhances same-origin targets and redirects refuse <code>javascript:</code> targets on the server and the client, SSE event names and ids are stripped of line breaks, login throttles key by an HMAC of the credential, and parallel AI tool calls are capped and serialised per file. HTTP: a request-lifetime <code>request.signal</code>, bounded SSE and stream retention with backpressure, graceful shutdown that closes idle keep-alive connections, typed <code>http.serverOptions</code>, <code>http.errorMapper</code>, shared rate limits through <code>@warlock.js/cache</code>, and <code>@warlock.js/core/errors</code>. Seal: <code>v.literal(\"\")</code> and <code>.default(\"\")</code> keep empty strings, optional discriminated unions accept omitted fields, and <code>validate()</code> returns typed output. Web: 4xx error pages hydrate, <code>&lt;Head /&gt;</code> renders the viewport, <code>&lt;Form independent&gt;</code>, redirect submissions wait for the new page, and production starts without Vite or Babel. <strong>Breaking:</strong> log methods return the logger instead of a promise (<code>await log.flush()</code> waits), and AI tool calls in one trip run concurrently by default (<code>toolDispatch: \"sequential\"</code>). <code>create-warlock</code> works on pnpm 9 and 10 again. Lockstep release across all 31 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.30.0 tarballs passed the release gate; after publishing, the registry confirm timed out on a delayed <code>@warlock.js/ai-mistral</code> publish, every package was then confirmed at npm origin and the family installed from npm, and the blog check against npm was not run in that job.",
       "matrix": "none",
       "matrixRows": null,
       "mode": "detail",
@@ -158,51 +158,51 @@
           "items": [
             {
               "type": "Added",
-              "html": "<strong><code>request.signal</code></strong>: an <code>AbortSignal</code> that aborts when the client disconnects before the response finishes (not when the request body finishes reading, never on normal completion); its listener is attached on first access and removed when the response closes (WR-012)."
+              "html": "<strong><code>request.signal</code></strong>: an <code>AbortSignal</code> that aborts when the client disconnects before the response finishes (not when the request body finishes reading, never on normal completion); its listener is attached on first access and removed when the response closes."
             },
             {
               "type": "Added",
-              "html": "<strong>Stream backpressure</strong>: <code>response.stream()</code>'s controller gains <code>write(data)</code> (sends, then waits until the client can take more; <code>false</code> once it is gone), <code>drain()</code>, <code>backpressured</code>, <code>signal</code> (aborted on client disconnect, not on <code>end()</code>) and <code>onDisconnect(fn)</code>, matching <code>response.sse()</code> (WR-006)."
+              "html": "<strong>Stream backpressure</strong>: <code>response.stream()</code>'s controller gains <code>write(data)</code> (sends, then waits until the client can take more; <code>false</code> once it is gone), <code>drain()</code>, <code>backpressured</code>, <code>signal</code> (aborted on client disconnect, not on <code>end()</code>) and <code>onDisconnect(fn)</code>, matching <code>response.sse()</code>."
             },
             {
               "type": "Added",
-              "html": "<strong>SSE backpressure</strong>: <code>sse.write(event, data, id?)</code> sends and waits until the client can take more (<code>false</code> once it is gone), plus <code>sse.drain()</code>, <code>sse.backpressured</code> and <code>sse.signal</code> (aborted on disconnect) (WR-006)."
+              "html": "<strong>SSE backpressure</strong>: <code>sse.write(event, data, id?)</code> sends and waits until the client can take more (<code>false</code> once it is gone), plus <code>sse.drain()</code>, <code>sse.backpressured</code> and <code>sse.signal</code> (aborted on disconnect)."
             },
             {
               "type": "Added",
-              "html": "<strong><code>http.serverOptions</code> is typed</strong> (<code>HttpServerOptions</code>), including Node's native <code>http</code> options such as <code>serverOptions.http.maxHeaderSize</code>; it was already forwarded to Fastify but the config type could not express it (WR-005)."
+              "html": "<strong><code>http.serverOptions</code> is typed</strong> (<code>HttpServerOptions</code>), including Node's native <code>http</code> options such as <code>serverOptions.http.maxHeaderSize</code>; it was already forwarded to Fastify but the config type could not express it."
             },
             {
               "type": "Added",
-              "html": "<strong><code>@warlock.js/core/errors</code></strong>: a side-effect-free subpath with <code>HttpError</code> and its subclasses (<code>BadRequestError</code>, <code>ResourceNotFoundError</code>, …). A standalone helper or worker can import it without bundling Cascade, Cache or the MongoDB driver; the classes are the same ones the root exports, so <code>instanceof</code> holds across both (WR-017)."
+              "html": "<strong><code>@warlock.js/core/errors</code></strong>: a side-effect-free subpath with <code>HttpError</code> and its subclasses (<code>BadRequestError</code>, <code>ResourceNotFoundError</code>, …). A standalone helper or worker can import it without bundling Cascade, Cache or the MongoDB driver; the classes are the same ones the root exports, so <code>instanceof</code> holds across both."
             },
             {
               "type": "Added",
-              "html": "<strong><code>http.errorMapper</code></strong>: map errors that are not an <code>HttpError</code> to <code>{ status, message?, payload? }</code> (or an <code>HttpError</code>), so domain errors shared with non-HTTP processes need not extend Core. A mapped 5xx stays opaque unless the mapper sets a message; a mapper that throws is logged and ignored (WR-018)."
+              "html": "<strong><code>http.errorMapper</code></strong>: map errors that are not an <code>HttpError</code> to <code>{ status, message?, payload? }</code> (or an <code>HttpError</code>), so domain errors shared with non-HTTP processes need not extend Core. A mapped 5xx stays opaque unless the mapper sets a message; a mapper that throws is logged and ignored."
             },
             {
               "type": "Added",
-              "html": "<strong>Per-route request logging policy</strong>: <code>logging: { body?: boolean, query?: boolean }</code> on a route, with app-wide defaults under <code>http.logging</code> (plus <code>redactQueryParams</code>). It is applied before any log entry is built, so a schema- or middleware-rejected body never reaches a log channel (WR-003)."
+              "html": "<strong>Per-route request logging policy</strong>: <code>logging: { body?: boolean, query?: boolean }</code> on a route, with app-wide defaults under <code>http.logging</code> (plus <code>redactQueryParams</code>). It is applied before any log entry is built, so a schema- or middleware-rejected body never reaches a log channel."
             },
             {
               "type": "Added",
-              "html": "<strong><code>request.toLogSnapshot()</code></strong>, <code>buildRequestLogSnapshot()</code> and <code>redactUrlCredentials()</code>: the bounded, plain-data view of a request that log entries now carry (WR-003)."
+              "html": "<strong><code>request.toLogSnapshot()</code></strong>, <code>buildRequestLogSnapshot()</code> and <code>redactUrlCredentials()</code>: the bounded, plain-data view of a request that log entries now carry."
             },
             {
               "type": "Added",
-              "html": "<strong><code>purgeImageVariants(path?, { disk? })</code></strong> removes one file's cached image derivatives, or a disk's whole derivative cache (FW-10)."
+              "html": "<strong><code>purgeImageVariants(path?, { disk? })</code></strong> removes one file's cached image derivatives, or a disk's whole derivative cache."
             },
             {
               "type": "Added",
-              "html": "<strong><code>createUploadedFileController({ disk })</code></strong> serves the originals and variants of any local disk, and <strong><code>resolveImageVariant({ disk?, path, variant, format? })</code></strong> resolves (and renders on a miss) one variant for an app's own route, e.g. a private disk behind auth. <code>uploadedFileController</code> is <code>createUploadedFileController()</code> (FW-11)."
+              "html": "<strong><code>createUploadedFileController({ disk })</code></strong> serves the originals and variants of any local disk, and <strong><code>resolveImageVariant({ disk?, path, variant, format? })</code></strong> resolves (and renders on a miss) one variant for an app's own route, e.g. a private disk behind auth. <code>uploadedFileController</code> is <code>createUploadedFileController()</code>."
             },
             {
               "type": "Added",
-              "html": "<strong>Shared rate limits:</strong> <code>http.rateLimit.store: \"cache\"</code> counts in <code>@warlock.js/cache</code>, so every process on a shared driver (Redis, Postgres) shares the limit; <code>middleware.rateLimit()</code> follows it or takes its own <code>store</code> and a stable <code>name</code>. A <code>@fastify/rate-limit</code> store class can be passed as <code>store</code> too. Windows are fixed and clock-aligned. Each route with its own <code>rateLimit</code> counts separately (namespaced by method and URL from the plugin's <code>routeInfo</code>, hashed so <code>/users/:id</code> and <code>/users/id</code> never merge). A cache outage fails open on both limiters (<code>skipOnError</code> defaults to <code>true</code> for this store) and is logged at most once a minute. The <code>null</code> and <code>file</code> cache drivers are refused with <code>UnsupportedRateLimitDriverError</code> (one stores nothing, the other never sweeps expired windows and does not share increments between processes) (FW-14)."
+              "html": "<strong>Shared rate limits:</strong> <code>http.rateLimit.store: \"cache\"</code> counts in <code>@warlock.js/cache</code>, so every process on a shared driver (Redis, Postgres) shares the limit; <code>middleware.rateLimit()</code> follows it or takes its own <code>store</code> and a stable <code>name</code>. A <code>@fastify/rate-limit</code> store class can be passed as <code>store</code> too. Windows are fixed and clock-aligned. Each route with its own <code>rateLimit</code> counts separately (namespaced by method and URL from the plugin's <code>routeInfo</code>, hashed so <code>/users/:id</code> and <code>/users/id</code> never merge). A cache outage fails open on both limiters (<code>skipOnError</code> defaults to <code>true</code> for this store) and is logged at most once a minute. The <code>null</code> and <code>file</code> cache drivers are refused with <code>UnsupportedRateLimitDriverError</code> (one stores nothing, the other never sweeps expired windows and does not share increments between processes)."
             },
             {
               "type": "Changed",
-              "html": "<strong><code>response.stream()</code> no longer keeps rendered chunks.</strong> <code>response.body</code> after <code>end()</code> holds the last <code>retainChunks</code> chunks written by <code>send()</code>, <code>write()</code> or <code>render()</code> (<code>response.stream(type, { retainChunks })</code>, default 0); it used to hold every <code>render()</code> chunk (WR-006)."
+              "html": "<strong><code>response.stream()</code> no longer keeps rendered chunks.</strong> <code>response.body</code> after <code>end()</code> holds the last <code>retainChunks</code> chunks written by <code>send()</code>, <code>write()</code> or <code>render()</code> (<code>response.stream(type, { retainChunks })</code>, default 0); it used to hold every <code>render()</code> chunk."
             },
             {
               "type": "Changed",
@@ -210,31 +210,31 @@
             },
             {
               "type": "Changed",
-              "html": "<strong><code>@fastify/static</code> is only loaded when there is something to serve</strong> — at least one <code>router.directory()</code>, or an existing public folder (<code>storage.publicRoot</code>, which now also accepts <code>false</code> to turn it off). Its directory-listing module calls <code>os.cpus()</code> at load, which cost a measured ~0.4–0.5 s of cold start in an app that served neither (WR-027). With no public folder, <code>reply.sendFile</code> is no longer decorated by that plugin; <code>response.sendFile()</code> is unaffected."
+              "html": "<strong><code>@fastify/static</code> is only loaded when there is something to serve</strong> — at least one <code>router.directory()</code>, or an existing public folder (<code>storage.publicRoot</code>, which now also accepts <code>false</code> to turn it off). Its directory-listing module calls <code>os.cpus()</code> at load, which cost a measured ~0.4–0.5 s of cold start in an app that served neither. With no public folder, <code>reply.sendFile</code> is no longer decorated by that plugin; <code>response.sendFile()</code> is unaffected."
             },
             {
               "type": "Changed",
-              "html": "<code>@warlock.js/core/errors</code> also resolves inside the framework repository (a root <code>errors/index.ts</code> re-export, not published), so workspace packages and tests can import it by its package name (WR-017)."
+              "html": "<code>@warlock.js/core/errors</code> also resolves inside the framework repository (a root <code>errors/index.ts</code> re-export, not published), so workspace packages and tests can import it by its package name."
             },
             {
               "type": "Changed",
-              "html": "<strong><code>response.sse()</code> no longer keeps every sent event.</strong> <code>response.body</code> after <code>end()</code> holds the last <code>retainEvents</code> events (<code>response.sse({ retainEvents })</code>, default 0), so long-lived streams no longer grow with their history (WR-006)."
+              "html": "<strong><code>response.sse()</code> no longer keeps every sent event.</strong> <code>response.body</code> after <code>end()</code> holds the last <code>retainEvents</code> events (<code>response.sse({ retainEvents })</code>, default 0), so long-lived streams no longer grow with their history."
             },
             {
               "type": "Changed",
-              "html": "<strong>BREAKING (only for a custom log channel that reads <code>context.request</code>/<code>context.response</code>):</strong> <strong>request log entries carry a <code>RequestLogSnapshot</code>, not the <code>Request</code>/<code>Response</code> instances</strong> (<code>context.request</code> is <code>{ id, method, url, route, name, ip, userAgent, query?, body? }</code>; <code>response.log</code> adds <code>{ statusCode }</code>). Native request/reply graphs no longer reach log channels, and credential-bearing query values (<code>secret</code>, <code>token</code>, <code>apiKey</code>, <code>signature</code>, <code>code</code>, <code>X-Amz-*</code>, …) are masked in the logged URL (WR-003)."
+              "html": "<strong>BREAKING (only for a custom log channel that reads <code>context.request</code>/<code>context.response</code>):</strong> <strong>request log entries carry a <code>RequestLogSnapshot</code>, not the <code>Request</code>/<code>Response</code> instances</strong> (<code>context.request</code> is <code>{ id, method, url, route, name, ip, userAgent, query?, body? }</code>; <code>response.log</code> adds <code>{ statusCode }</code>). Native request/reply graphs no longer reach log channels, and credential-bearing query values (<code>secret</code>, <code>token</code>, <code>apiKey</code>, <code>signature</code>, <code>code</code>, <code>X-Amz-*</code>, …) are masked in the logged URL."
             },
             {
               "type": "Changed",
-              "html": "<strong><code>warlock add notifications</code> writes a smaller, convention-following module</strong> (FW-09): <code>models/notification/</code> (model with a <code>NotificationResource</code>, migration), <code>resources/</code>, a validated <code>schema/list-notifications.schema.ts</code> (<code>limit</code> capped at 50, no <code>request.all()</code>), a guarded <code>types/notifications-request.type.ts</code>, <code>services/</code>, <code>utils/locales.json</code>, one controller per file for list / unread-count / mark-read / mark-all-read registered through <code>router.route()</code>, a commented <code>gate()</code> permission hook, and a 401 spec per controller when the app has the test feature. The clear-all and delete endpoints are no longer generated. Apps that already have a notification model (5.29 layout included) are skipped, and a freshly ejected <code>config/notifications.ts</code> then imports the 5.29 model path. In an app that already has <code>src/app/notifications</code>, no second model or migration is added, existing files are kept (and listed), and <code>notFound</code> is merged into an existing <code>utils/locales.json</code>. The mark-read controller turns a numeric <code>:id</code> into a number (integer ids on the default MongoDB stack) and keeps other ids as strings; the list query drops unknown keys such as a cache-busting <code>_</code> instead of rejecting them."
+              "html": "<strong><code>warlock add notifications</code> writes a smaller, convention-following module</strong>: <code>models/notification/</code> (model with a <code>NotificationResource</code>, migration), <code>resources/</code>, a validated <code>schema/list-notifications.schema.ts</code> (<code>limit</code> capped at 50, no <code>request.all()</code>), a guarded <code>types/notifications-request.type.ts</code>, <code>services/</code>, <code>utils/locales.json</code>, one controller per file for list / unread-count / mark-read / mark-all-read registered through <code>router.route()</code>, a commented <code>gate()</code> permission hook, and a 401 spec per controller when the app has the test feature. The clear-all and delete endpoints are no longer generated. Apps that already have a notification model (5.29 layout included) are skipped, and a freshly ejected <code>config/notifications.ts</code> then imports the 5.29 model path. In an app that already has <code>src/app/notifications</code>, no second model or migration is added, existing files are kept (and listed), and <code>notFound</code> is merged into an existing <code>utils/locales.json</code>. The mark-read controller turns a numeric <code>:id</code> into a number (integer ids on the default MongoDB stack) and keeps other ids as strings; the list query drops unknown keys such as a cache-busting <code>_</code> instead of rejecting them."
             },
             {
               "type": "Changed",
-              "html": "Image derivatives are cached per source (<code>&lt;cacheDirectory&gt;/&lt;2 hex&gt;/&lt;sourceKey&gt;/&lt;size-mtime&gt;/&lt;hash&gt;.&lt;ext&gt;</code>). Deleting or moving a file through a local disk (<code>delete</code>, <code>deleteMany</code>, <code>move</code>, and <code>deleteDirectory</code> for every file under it) removes its derivatives, and a rewritten source's old derivatives are pruned once a new one is written, so the cache no longer grows forever. Pruning re-checks the source first, so a request that read an older version never deletes the newer version's derivatives, and a derivative pruned mid-request is rendered again instead of answering 500 (FW-10)."
+              "html": "Image derivatives are cached per source (<code>&lt;cacheDirectory&gt;/&lt;2 hex&gt;/&lt;sourceKey&gt;/&lt;size-mtime&gt;/&lt;hash&gt;.&lt;ext&gt;</code>). Deleting or moving a file through a local disk (<code>delete</code>, <code>deleteMany</code>, <code>move</code>, and <code>deleteDirectory</code> for every file under it) removes its derivatives, and a rewritten source's old derivatives are pruned once a new one is written, so the cache no longer grows forever. Pruning re-checks the source first, so a request that read an older version never deletes the newer version's derivatives, and a derivative pruned mid-request is rendered again instead of answering 500."
             },
             {
               "type": "Changed",
-              "html": "Concurrent variant requests for the same file on two disks (a mirror copied with its mtime) no longer share one generation, which left the second target unwritten and answered 500 (FW-11)."
+              "html": "Concurrent variant requests for the same file on two disks (a mirror copied with its mtime) no longer share one generation, which left the second target unwritten and answered 500."
             },
             {
               "type": "Changed",
@@ -242,7 +242,7 @@
             },
             {
               "type": "Changed",
-              "html": "<code>storage.use(name)</code> (and <code>StorageManagerContract.use</code>) is typed as <code>ScopedStorage</code>, the class it returns, so <code>deleteDirectory</code>, <code>copyDirectory</code>, <code>moveDirectory</code>, <code>emptyDirectory</code>, <code>putFromUrl</code>, <code>prepend</code> and <code>append</code> type-check without a cast (FW-12)."
+              "html": "<code>storage.use(name)</code> (and <code>StorageManagerContract.use</code>) is typed as <code>ScopedStorage</code>, the class it returns, so <code>deleteDirectory</code>, <code>copyDirectory</code>, <code>moveDirectory</code>, <code>emptyDirectory</code>, <code>putFromUrl</code>, <code>prepend</code> and <code>append</code> type-check without a cast."
             },
             {
               "type": "Changed",
@@ -254,7 +254,7 @@
             },
             {
               "type": "Fixed",
-              "html": "Graceful shutdown no longer waits out its timeout on keep-alive connections whose request finished during the drain: in-flight responses answer <code>Connection: close</code> and connections are closed as they go idle (default <code>forceCloseConnections: \"idle\"</code>), so later connectors still shut down. Active responses are never cut short (WR-014)."
+              "html": "Graceful shutdown no longer waits out its timeout on keep-alive connections whose request finished during the drain: in-flight responses answer <code>Connection: close</code> and connections are closed as they go idle (default <code>forceCloseConnections: \"idle\"</code>), so later connectors still shut down. Active responses are never cut short."
             },
             {
               "type": "Fixed",
@@ -270,39 +270,39 @@
             },
             {
               "type": "Fixed",
-              "html": "<code>warlock.config.ts</code> loads when it imports local TypeScript without an extension (<code>./src/connectors/local</code>) or through a tsconfig <code>paths</code> alias, on Node without native TypeScript and with native type stripping alike. The fallback bundles the config's local graph with esbuild, keeps packages external (one <code>BaseConnector</code>/container identity), runs the config once, rethrows its own errors unchanged, keeps each inlined module's <code>import.meta.url</code>, and removes its temp file (WR-004)."
+              "html": "<code>warlock.config.ts</code> loads when it imports local TypeScript without an extension (<code>./src/connectors/local</code>) or through a tsconfig <code>paths</code> alias, on Node without native TypeScript and with native type stripping alike. The fallback bundles the config's local graph with esbuild, keeps packages external (one <code>BaseConnector</code>/container identity), runs the config once, rethrows its own errors unchanged, keeps each inlined module's <code>import.meta.url</code>, and removes its temp file."
             },
             {
               "type": "Fixed",
-              "html": "<code>v.file()</code> rule methods (<code>maxSize</code>, <code>image</code>, <code>accept</code>, <code>mimeType</code>, …) return <code>this</code>, so the <code>UploadedFile</code> output type survives the chain; <code>saveTo()</code> is typed as a <code>string</code> output (WR-020)."
+              "html": "<code>v.file()</code> rule methods (<code>maxSize</code>, <code>image</code>, <code>accept</code>, <code>mimeType</code>, …) return <code>this</code>, so the <code>UploadedFile</code> output type survives the chain; <code>saveTo()</code> is typed as a <code>string</code> output."
             },
             {
               "type": "Fixed",
-              "html": "The dev server and the HTTP test server register module <code>src/app/&lt;module&gt;/utils/locales.json</code> dictionaries at boot; they were left out of the boot file set, so <code>t()</code> printed raw keys until the file was edited (FW-02)."
+              "html": "The dev server and the HTTP test server register module <code>src/app/&lt;module&gt;/utils/locales.json</code> dictionaries at boot; they were left out of the boot file set, so <code>t()</code> printed raw keys until the file was edited."
             },
             {
               "type": "Fixed",
-              "html": "The HTTP test server no longer keeps Vitest's main process alive after teardown: the loader-hook <code>MessagePort</code> is unreferenced except while a version-bump flush waits for its acknowledgement (FW-05)."
+              "html": "The HTTP test server no longer keeps Vitest's main process alive after teardown: the loader-hook <code>MessagePort</code> is unreferenced except while a version-bump flush waits for its acknowledgement."
             },
             {
               "type": "Fixed",
-              "html": "A quoted config key (<code>\"machine-thumb\"</code>, <code>'single-quoted'</code>) is written to <code>.warlock/typings/config.d.ts</code> without its quotes, so the generated file stays valid TypeScript; computed keys are skipped, and a quoted storage driver name is no longer quoted twice (FW-06). The typings manifest now records its generator version, and a manifest written by an older version is discarded, so a <code>config.d.ts</code> broken by 5.29 is regenerated on the first boot after upgrading instead of only when a config file changes."
+              "html": "A quoted config key (<code>\"machine-thumb\"</code>, <code>'single-quoted'</code>) is written to <code>.warlock/typings/config.d.ts</code> without its quotes, so the generated file stays valid TypeScript; computed keys are skipped, and a quoted storage driver name is no longer quoted twice. The typings manifest now records its generator version, and a manifest written by an older version is discarded, so a <code>config.d.ts</code> broken by 5.29 is regenerated on the first boot after upgrading instead of only when a config file changes."
             },
             {
               "type": "Fixed",
-              "html": "The circular-dependency check no longer reports a file as importing itself because a comment mentions <code>import(\"./same-file\")</code>: the regex fallback ignores comments and self imports are not dependency edges (FW-13). Comments are found with the TypeScript parser, so a regex literal such as <code>/\\/*$/</code> or <code>//</code> inside JSX text is never mistaken for one and the imports after it are kept. A pure <code>export type { X } from</code> re-export adds no dependency edge on either parsing path."
+              "html": "The circular-dependency check no longer reports a file as importing itself because a comment mentions <code>import(\"./same-file\")</code>: the regex fallback ignores comments and self imports are not dependency edges. Comments are found with the TypeScript parser, so a regex literal such as <code>/\\/*$/</code> or <code>//</code> inside JSX text is never mistaken for one and the imports after it are kept. A pure <code>export type { X } from</code> re-export adds no dependency edge on either parsing path."
             },
             {
               "type": "Fixed",
-              "html": "<code>warlock add web</code>'s <code>src/web/root.tsx</code> stub notes that <code>&lt;Head /&gt;</code> renders the viewport tag (<code>metadata.viewport</code> changes or disables it) and does not hand-write a second one (FW-03)."
+              "html": "<code>warlock add web</code>'s <code>src/web/root.tsx</code> stub notes that <code>&lt;Head /&gt;</code> renders the viewport tag (<code>metadata.viewport</code> changes or disables it) and does not hand-write a second one."
             },
             {
               "type": "Fixed",
-              "html": "Mail logs no longer print recipient addresses: send, development, test-mode, partial-rejection and error lines show <code>m***@example.com</code> (FW-04). <code>MailResult</code> and a thrown <code>MailError</code> still carry the real addresses."
+              "html": "Mail logs no longer print recipient addresses: send, development, test-mode, partial-rejection and error lines show <code>m***@example.com</code>. <code>MailResult</code> and a thrown <code>MailError</code> still carry the real addresses."
             },
             {
               "type": "Fixed",
-              "html": "<code>http.rateLimit</code> had no way to share counts between processes except an ioredis client, which the node-redis connection of <code>@warlock.js/cache</code> cannot provide (FW-14)."
+              "html": "<code>http.rateLimit</code> had no way to share counts between processes except an ioredis client, which the node-redis connection of <code>@warlock.js/cache</code> cannot provide."
             },
             {
               "type": "Fixed",
@@ -351,31 +351,31 @@
           "items": [
             {
               "type": "Added",
-              "html": "<code>&lt;Form query={{ … }}&gt;</code> sets the query string of the URL the form posts to (the current page, or <code>to</code>'s page), without touching the body or the named <code>action</code> (WR-011)."
+              "html": "<code>&lt;Form query={{ … }}&gt;</code> sets the query string of the URL the form posts to (the current page, or <code>to</code>'s page), without touching the body or the named <code>action</code>."
             },
             {
               "type": "Added",
-              "html": "<code>&lt;Form independent&gt;</code> submits alongside a pending submission instead of sharing it: a Cancel next to a long-running Start. Neither aborts the other; a double submit of the same form with the same fields still shares one request, another form posting the same action (a Cancel per row) never does, and unmounting a form cancels only its own submission. Its result, redirect included, is dropped once the user has moved to another page (WR-013)."
+              "html": "<code>&lt;Form independent&gt;</code> submits alongside a pending submission instead of sharing it: a Cancel next to a long-running Start. Neither aborts the other; a double submit of the same form with the same fields still shares one request, another form posting the same action (a Cancel per row) never does, and unmounting a form cancels only its own submission. Its result, redirect included, is dropped once the user has moved to another page."
             },
             {
               "type": "Added",
-              "html": "<code>LinkPropsWithout&lt;K&gt;</code> and <code>DistributiveOmit&lt;T, K&gt;</code>: omit props from <code>LinkProps</code> without collapsing its destination union, so a wrapper keeps the required-params check (WR-021)."
+              "html": "<code>LinkPropsWithout&lt;K&gt;</code> and <code>DistributiveOmit&lt;T, K&gt;</code>: omit props from <code>LinkProps</code> without collapsing its destination union, so a wrapper keeps the required-params check."
             },
             {
               "type": "Added",
-              "html": "<code>isRouteName(name)</code> narrows a data-driven string to a route name after checking the published route table, so it reaches <code>&lt;Link to&gt;</code> or <code>href()</code> without a cast (WR-021)."
+              "html": "<code>isRouteName(name)</code> narrows a data-driven string to a route name after checking the published route table, so it reaches <code>&lt;Link to&gt;</code> or <code>href()</code> without a cast."
             },
             {
               "type": "Added",
-              "html": "<code>metadata.viewport</code> (<code>string | false</code>). <code>&lt;Head /&gt;</code> now emits <code>&lt;meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"&gt;</code> by default, so a new app lays out at device width on phones; a <code>meta</code> entry named <code>viewport</code> is still honoured. Like the charset it is document-level: client navigation never rewrites it, nor a viewport tag <code>root.tsx</code> writes itself (FW-03)."
+              "html": "<code>metadata.viewport</code> (<code>string | false</code>). <code>&lt;Head /&gt;</code> now emits <code>&lt;meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"&gt;</code> by default, so a new app lays out at device width on phones; a <code>meta</code> entry named <code>viewport</code> is still honoured. Like the charset it is document-level: client navigation never rewrites it, nor a viewport tag <code>root.tsx</code> writes itself."
             },
             {
               "type": "Added",
-              "html": "<code>webConnector({ build: { testOnly } })</code>: app-root-relative folders or files the production build's page-graph scan skips (FW-15)."
+              "html": "<code>webConnector({ build: { testOnly } })</code>: app-root-relative folders or files the production build's page-graph scan skips."
             },
             {
               "type": "Changed",
-              "html": "A page action that redirects now ends its submission once the redirected page is on screen: <code>useIsSubmitting()</code> stays <code>true</code> and <code>onSuccess</code> waits until the destination's fresh loader data has committed, so a revision-guarded form cannot resubmit stale data (WR-002)."
+              "html": "A page action that redirects now ends its submission once the redirected page is on screen: <code>useIsSubmitting()</code> stays <code>true</code> and <code>onSuccess</code> waits until the destination's fresh loader data has committed, so a revision-guarded form cannot resubmit stale data."
             },
             {
               "type": "Changed",
@@ -383,31 +383,31 @@
             },
             {
               "type": "Changed",
-              "html": "A production start no longer loads Vite, Rollup or <code>@babel/parser</code>: the web connector imports its Vite dev-server config, page-registry plugin, dev route installer, dev 404 reporter and the sitemap's page-walk fallback only on the development path, so its static graph shrinks from 185 to 67 modules (WR-027)."
+              "html": "A production start no longer loads Vite, Rollup or <code>@babel/parser</code>: the web connector imports its Vite dev-server config, page-registry plugin, dev route installer, dev 404 reporter and the sitemap's page-walk fallback only on the development path, so its static graph shrinks from 185 to 67 modules."
             },
             {
               "type": "Fixed",
-              "html": "<code>&lt;Form&gt;</code> honours the submit button's <code>formAction</code> and its <code>name</code>/<code>value</code>. The enhanced path posted to the form's URL; with no navigation runtime the fallback called <code>form.submit()</code>, which dropped both. Without a runtime the browser now submits natively, and a late fallback re-submits through the same button (WR-011)."
+              "html": "<code>&lt;Form&gt;</code> honours the submit button's <code>formAction</code> and its <code>name</code>/<code>value</code>. The enhanced path posted to the form's URL; with no navigation runtime the fallback called <code>form.submit()</code>, which dropped both. Without a runtime the browser now submits natively, and a late fallback re-submits through the same button."
             },
             {
               "type": "Fixed",
-              "html": "A page request the client abandoned before its loaders finished no longer renders: it stops with <code>ClientDisconnectedError</code> before anything is committed, and the page handler neither reports it nor writes a response. It used to render layouts without their loader data and log a 500. A loader timeout on a connected request still renders its 504 (WR-016)."
+              "html": "A page request the client abandoned before its loaders finished no longer renders: it stops with <code>ClientDisconnectedError</code> before anything is committed, and the page handler neither reports it nor writes a response. It used to render layouts without their loader data and log a 500. A loader timeout on a connected request still renders its 504."
             },
             {
               "type": "Fixed",
-              "html": "A 4xx error page (a thrown <code>ForbiddenError</code>/<code>BadRequestError</code>, a failed page validation) now hydrates. The client payload gate accepted only 500–599 and only <code>name</code>/<code>message</code>/<code>stack</code>, so it refused the 4xx status, the validation <code>errors</code> and the production <code>errorCode</code> the server sends, and logged \"hydration payload … could not be read\" (FW-01)."
+              "html": "A 4xx error page (a thrown <code>ForbiddenError</code>/<code>BadRequestError</code>, a failed page validation) now hydrates. The client payload gate accepted only 500–599 and only <code>name</code>/<code>message</code>/<code>stack</code>, so it refused the 4xx status, the validation <code>errors</code> and the production <code>errorCode</code> the server sends, and logged \"hydration payload … could not be read\"."
             },
             {
               "type": "Fixed",
-              "html": "The production build's <code>import.meta.url</code> / static-asset scan skips <code>*.spec.*</code> and <code>*.test.*</code> files and <code>__tests__</code> / <code>__mocks__</code> folders; a test helper under <code>src/web</code> no longer fails <code>warlock build</code> (FW-15)."
+              "html": "The production build's <code>import.meta.url</code> / static-asset scan skips <code>*.spec.*</code> and <code>*.test.*</code> files and <code>__tests__</code> / <code>__mocks__</code> folders; a test helper under <code>src/web</code> no longer fails <code>warlock build</code>."
             },
             {
               "type": "Fixed",
-              "html": "Web's React contexts (locale, document, session) live in one <code>Symbol.for</code> registry on <code>globalThis</code>, so a second evaluation of their module under <code>warlock dev</code> reuses them instead of making <code>useLocale()</code> throw \"called outside Warlock's LocaleProvider\" until restart (FW-07)."
+              "html": "Web's React contexts (locale, document, session) live in one <code>Symbol.for</code> registry on <code>globalThis</code>, so a second evaluation of their module under <code>warlock dev</code> reuses them instead of making <code>useLocale()</code> throw \"called outside Warlock's LocaleProvider\" until restart."
             },
             {
               "type": "Fixed",
-              "html": "A request abandoned between the layout and page loaders no longer renders the page with <code>data</code> undefined; covered by the abandoned-request fix above, with a regression test for this case (FW-08)."
+              "html": "A request abandoned between the layout and page loaders no longer renders the page with <code>data</code> undefined; covered by the abandoned-request fix above, with a regression test for this case."
             },
             {
               "type": "Fixed",
@@ -419,7 +419,7 @@
             },
             {
               "type": "Fixed",
-              "html": "The FW-15 test-folder skip reads folder names below the web root, so an app located under a <code>__tests__</code> folder is still scanned."
+              "html": "The build's test-folder skip reads folder names below the web root, so an app located under a <code>__tests__</code> folder is still scanned."
             },
             {
               "type": "Security",
@@ -456,7 +456,7 @@
             },
             {
               "type": "Added",
-              "html": "<code>pnpm bench:types</code> measures inference compile cost on a generated composed-schema project (16 entities, 8 services) and fails when instantiations or types grow more than 5% over <code>bench/types-baseline.json</code> (WR-001). It also fails when it cannot read a metric or is given a malformed option, warns when the TypeScript version differs from the baseline's (<code>--strict</code> makes that a failure), and removes its temporary project on Ctrl+C."
+              "html": "<code>pnpm bench:types</code> measures inference compile cost on a generated composed-schema project (16 entities, 8 services) and fails when instantiations or types grow more than 5% over <code>bench/types-baseline.json</code>. It also fails when it cannot read a metric or is given a malformed option, warns when the TypeScript version differs from the baseline's (<code>--strict</code> makes that a failure), and removes its temporary project on Ctrl+C."
             },
             {
               "type": "Changed",
@@ -472,7 +472,7 @@
             },
             {
               "type": "Changed",
-              "html": "<code>.refine()</code> callbacks stay <code>value: any</code> on purpose: custom rules run before an object or array validates its children, so the value is not the schema output (WR-020)."
+              "html": "<code>.refine()</code> callbacks stay <code>value: any</code> on purpose: custom rules run before an object or array validates its children, so the value is not the schema output."
             },
             {
               "type": "Changed",
@@ -484,11 +484,11 @@
             },
             {
               "type": "Fixed",
-              "html": "<code>v.literal(\"\")</code> accepts a present <code>\"\"</code> again (regressed in 5.25): its default (implicit) required state and <code>.present()</code> keep it, <code>.optional()</code> and <code>.nullable()</code> no longer drop it. An explicit <code>.required()</code> or <code>requiredIf(...)</code> still rejects <code>\"\"</code>. A literal set without a blank value still reads <code>\"\"</code> as missing (WR-008)."
+              "html": "<code>v.literal(\"\")</code> accepts a present <code>\"\"</code> again (regressed in 5.25): its default (implicit) required state and <code>.present()</code> keep it, <code>.optional()</code> and <code>.nullable()</code> no longer drop it. An explicit <code>.required()</code> or <code>requiredIf(...)</code> still rejects <code>\"\"</code>. A literal set without a blank value still reads <code>\"\"</code> as missing."
             },
             {
               "type": "Fixed",
-              "html": "A field with an empty default (<code>v.string().max(n).default(\"\")</code>) no longer fails \"is required\" when the input omits it, sends <code>null</code>, or sends a blank string (an untouched HTML input); the output is the default (WR-008)."
+              "html": "A field with an empty default (<code>v.string().max(n).default(\"\")</code>) no longer fails \"is required\" when the input omits it, sends <code>null</code>, or sends a blank string (an untouched HTML input); the output is the default."
             },
             {
               "type": "Fixed",
@@ -496,11 +496,11 @@
             },
             {
               "type": "Fixed",
-              "html": "<code>v.discriminatedUnion(...).optional()</code> accepts an absent, <code>undefined</code> or <code>null</code> field, as every other validator does; <code>.default(...)</code> replaces <code>null</code> too and is validated through its branch. A required union reports a missing or <code>null</code> field with the <code>required</code> error; <code>.nullable()</code> keeps <code>null</code> (WR-007)."
+              "html": "<code>v.discriminatedUnion(...).optional()</code> accepts an absent, <code>undefined</code> or <code>null</code> field, as every other validator does; <code>.default(...)</code> replaces <code>null</code> too and is validated through its branch. A required union reports a missing or <code>null</code> field with the <code>required</code> error; <code>.nullable()</code> keeps <code>null</code>."
             },
             {
               "type": "Fixed",
-              "html": "<code>schema[\"~standard\"].validate(...)</code> on a discriminated union resolves to the branch output union instead of <code>unknown</code> (WR-020)."
+              "html": "<code>schema[\"~standard\"].validate(...)</code> on a discriminated union resolves to the branch output union instead of <code>unknown</code>."
             }
           ]
         },
@@ -529,11 +529,11 @@
             },
             {
               "type": "Added",
-              "html": "<code>maskEmail(address)</code> and <code>maskEmailsInText(text)</code>: mask email addresses (<code>m***@example.com</code>) inside message strings and cache keys, which key-based redaction cannot reach. Core's mail logs and the cache drivers' key logs use them (FW-04)."
+              "html": "<code>maskEmail(address)</code> and <code>maskEmailsInText(text)</code>: mask email addresses (<code>m***@example.com</code>) inside message strings and cache keys, which key-based redaction cannot reach. Core's mail logs and the cache drivers' key logs use them."
             },
             {
               "type": "Changed",
-              "html": "Logging is fire-and-forget: level methods no longer return a promise, so <code>@typescript-eslint/no-floating-promises</code> no longer flags every call site (WR-019)."
+              "html": "Logging is fire-and-forget: level methods no longer return a promise, so <code>@typescript-eslint/no-floating-promises</code> no longer flags every call site."
             },
             {
               "type": "Changed",
@@ -582,15 +582,15 @@
           "items": [
             {
               "type": "Added",
-              "html": "<strong>Provider content blocks</strong>: <code>ProviderContentBlock</code> (<code>{ provider, type, data }</code>) on <code>ModelResponse.blocks</code>, the streaming <code>done</code> chunk, <code>Message.blocks</code>, <code>CapturedMessage.blocks</code>, <code>LLMTrip.blocks</code> and <code>AgentResult.blocks</code>. The agent copies a response's blocks onto the assistant turn so the adapter can replay it verbatim (thinking, compaction) (WR-022)."
+              "html": "<strong>Provider content blocks</strong>: <code>ProviderContentBlock</code> (<code>{ provider, type, data }</code>) on <code>ModelResponse.blocks</code>, the streaming <code>done</code> chunk, <code>Message.blocks</code>, <code>CapturedMessage.blocks</code>, <code>LLMTrip.blocks</code> and <code>AgentResult.blocks</code>. The agent copies a response's blocks onto the assistant turn so the adapter can replay it verbatim (thinking, compaction)."
             },
             {
               "type": "Added",
-              "html": "<code>FinishReason</code> values <code>context_exceeded</code>, <code>pause_turn</code> and <code>refusal</code>. The agent resumes a <code>pause_turn</code> by replaying the paused turn, within <code>maxTrips</code> (WR-023)."
+              "html": "<code>FinishReason</code> values <code>context_exceeded</code>, <code>pause_turn</code> and <code>refusal</code>. The agent resumes a <code>pause_turn</code> by replaying the paused turn, within <code>maxTrips</code>."
             },
             {
               "type": "Added",
-              "html": "<code>toolDispatch: \"concurrent\" | \"sequential\"</code> on <code>AgentConfig</code> and <code>AgentExecuteOptions</code> (<code>ToolDispatchMode</code>), concurrent by default (WR-024)."
+              "html": "<code>toolDispatch: \"concurrent\" | \"sequential\"</code> on <code>AgentConfig</code> and <code>AgentExecuteOptions</code> (<code>ToolDispatchMode</code>), concurrent by default."
             },
             {
               "type": "Added",
@@ -602,7 +602,7 @@
             },
             {
               "type": "Added",
-              "html": "<code>ModelCallOptions.providerOptions</code> (adapter-only options keyed by wire format) and <code>cacheControl.ttl</code> (<code>\"5m\" | \"1h\"</code>) (WR-025)."
+              "html": "<code>ModelCallOptions.providerOptions</code> (adapter-only options keyed by wire format) and <code>cacheControl.ttl</code> (<code>\"5m\" | \"1h\"</code>)."
             },
             {
               "type": "Added",
@@ -614,7 +614,7 @@
             },
             {
               "type": "Fixed",
-              "html": "VCR request hashes include <code>providerOptions</code>, so two calls that differ only in provider options (betas, <code>context_management</code>, …) no longer replay the same recording. It joins the hash only when a provider entry carries a value — <code>{}</code>, <code>{ anthropic: {} }</code> and <code>{ anthropic: { betas: undefined } }</code> hash like no <code>providerOptions</code> — so existing cassettes recorded without it still match. <code>cacheControl</code> (breakpoints, <code>ttl</code>) stays out of the hash: it changes billing, not output (WR-025)."
+              "html": "VCR request hashes include <code>providerOptions</code>, so two calls that differ only in provider options (betas, <code>context_management</code>, …) no longer replay the same recording. It joins the hash only when a provider entry carries a value — <code>{}</code>, <code>{ anthropic: {} }</code> and <code>{ anthropic: { betas: undefined } }</code> hash like no <code>providerOptions</code> — so existing cassettes recorded without it still match. <code>cacheControl</code> (breakpoints, <code>ttl</code>) stays out of the hash: it changes billing, not output."
             }
           ]
         },
@@ -639,15 +639,15 @@
           "items": [
             {
               "type": "Added",
-              "html": "Responses with thinking, redacted-thinking, compaction, server-tool or cited-text blocks return the whole ordered turn as <code>ModelResponse.blocks</code> (and on the streaming <code>done</code> chunk); an assistant message carrying Anthropic <code>blocks</code> is replayed verbatim (WR-022)."
+              "html": "Responses with thinking, redacted-thinking, compaction, server-tool or cited-text blocks return the whole ordered turn as <code>ModelResponse.blocks</code> (and on the streaming <code>done</code> chunk); an assistant message carrying Anthropic <code>blocks</code> is replayed verbatim."
             },
             {
               "type": "Added",
-              "html": "<code>providerOptions.anthropic</code> (<code>AnthropicCallOptions</code>): <code>betas</code> routes the call through <code>client.beta.messages</code>, <code>body</code> merges extra request fields last (<code>context_management</code>, <code>fallbacks</code>, <code>inference_geo</code>, …), <code>thinkingDisplay</code> sets <code>thinking.display</code> (WR-025)."
+              "html": "<code>providerOptions.anthropic</code> (<code>AnthropicCallOptions</code>): <code>betas</code> routes the call through <code>client.beta.messages</code>, <code>body</code> merges extra request fields last (<code>context_management</code>, <code>fallbacks</code>, <code>inference_geo</code>, …), <code>thinkingDisplay</code> sets <code>thinking.display</code>."
             },
             {
               "type": "Added",
-              "html": "<code>AnthropicModel.countTokens(messages, options?)</code> counts input tokens through <code>messages.countTokens</code>; <code>AnthropicModel</code> is exported and <code>AnthropicSDK.model()</code> returns it (WR-025)."
+              "html": "<code>AnthropicModel.countTokens(messages, options?)</code> counts input tokens through <code>messages.countTokens</code>; <code>AnthropicModel</code> is exported and <code>AnthropicSDK.model()</code> returns it."
             },
             {
               "type": "Added",
@@ -655,15 +655,15 @@
             },
             {
               "type": "Changed",
-              "html": "Consecutive tool results are sent as one <code>user</code> message with several <code>tool_result</code> blocks, as Anthropic expects for parallel tool use (WR-024)."
+              "html": "Consecutive tool results are sent as one <code>user</code> message with several <code>tool_result</code> blocks, as Anthropic expects for parallel tool use."
             },
             {
               "type": "Changed",
-              "html": "Claude 5-family thinking rules: Opus 5.5, Sonnet 5.5 and Fable 5 / 5.1 never receive <code>budget_tokens</code> or <code>disabled</code> (WR-026)."
+              "html": "Claude 5-family thinking rules: Opus 5.5, Sonnet 5.5 and Fable 5 / 5.1 never receive <code>budget_tokens</code> or <code>disabled</code>."
             },
             {
               "type": "Changed",
-              "html": "<code>effort: \"none\"</code> on Claude Sonnet 5.5 sends <code>thinking: { type: \"between_tools\" }</code> (its only thinking-off form, sent alone with no <code>output_config.effort</code> or <code>display</code>); it used to omit <code>thinking</code>, so the model still thought at its default effort. Opus 5.5 and Fable 5 / 5.1 have no thinking-off form and keep omitting <code>thinking</code> (WR-026)."
+              "html": "<code>effort: \"none\"</code> on Claude Sonnet 5.5 sends <code>thinking: { type: \"between_tools\" }</code> (its only thinking-off form, sent alone with no <code>output_config.effort</code> or <code>display</code>); it used to omit <code>thinking</code>, so the model still thought at its default effort. Opus 5.5 and Fable 5 / 5.1 have no thinking-off form and keep omitting <code>thinking</code>."
             },
             {
               "type": "Fixed",
@@ -692,7 +692,7 @@
           "items": [
             {
               "type": "Added",
-              "html": "<code>exec()</code> takes a per-call <code>signal</code> (<code>ExecOptions</code>); <code>run_shell</code> and <code>run_tests</code> pass the agent run's <code>ctx.signal</code>. An already-aborted signal never starts the command; an abort mid-run kills the process tree. Both resolve with the new <code>cancelled: true</code> on <code>RunShellResult</code>, never together with <code>timedOut</code> (WR-010)."
+              "html": "<code>exec()</code> takes a per-call <code>signal</code> (<code>ExecOptions</code>); <code>run_shell</code> and <code>run_tests</code> pass the agent run's <code>ctx.signal</code>. An already-aborted signal never starts the command; an abort mid-run kills the process tree. Both resolve with the new <code>cancelled: true</code> on <code>RunShellResult</code>, never together with <code>timedOut</code>."
             },
             {
               "type": "Added",
@@ -704,7 +704,7 @@
             },
             {
               "type": "Fixed",
-              "html": "<code>read.maxBytes</code> is enforced: the returned <code>content</code> (line-number prefixes and newlines included) never exceeds it, so a single long line no longer bypasses the cap. Lines are cut on a character boundary, never mid-character; <code>hash</code> remains the SHA-256 of the whole file (WR-009)."
+              "html": "<code>read.maxBytes</code> is enforced: the returned <code>content</code> (line-number prefixes and newlines included) never exceeds it, so a single long line no longer bypasses the cap. Lines are cut on a character boundary, never mid-character; <code>hash</code> remains the SHA-256 of the whole file."
             },
             {
               "type": "Fixed",
@@ -745,7 +745,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Email addresses inside logged cache keys are masked (<code>user.member@example.com</code> logs as <code>u***@example.com</code>), in the base driver's operation log, in error lines (written even with logging off: SWR refresh failures, lock release, clone failures), in the \"Cannot increment non-numeric value\" error, and in the null driver (FW-04)."
+              "html": "Email addresses inside logged cache keys are masked (<code>user.member@example.com</code> logs as <code>u***@example.com</code>), in the base driver's operation log, in error lines (written even with logging off: SWR refresh failures, lock release, clone failures), in the \"Cannot increment non-numeric value\" error, and in the null driver."
             },
             {
               "type": "Fixed",
@@ -778,11 +778,11 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Selecting notifications scaffolds the smaller, convention-following <code>src/app/notifications</code> module that <code>warlock add notifications</code> now writes (FW-09; see <code>@warlock.js/core</code>)."
+              "html": "Selecting notifications scaffolds the smaller, convention-following <code>src/app/notifications</code> module that <code>warlock add notifications</code> now writes (see <code>@warlock.js/core</code>)."
             },
             {
               "type": "Fixed",
-              "html": "New apps get the viewport tag from <code>&lt;Head /&gt;</code> (<code>@warlock.js/web</code> 5.30.0), so phones lay pages out at device width and responsive CSS applies; the scaffolded <code>src/web/root.tsx</code> says so and does not hand-write a second one (FW-03)."
+              "html": "New apps get the viewport tag from <code>&lt;Head /&gt;</code> (<code>@warlock.js/web</code> 5.30.0), so phones lay pages out at device width and responsive CSS applies; the scaffolded <code>src/web/root.tsx</code> says so and does not hand-write a second one."
             },
             {
               "type": "Fixed",
@@ -807,7 +807,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "<strong>The login throttle keys accounts and IPs by a keyed hash</strong> (<code>auth.throttle.count.email.&lt;hmac&gt;</code>, <code>auth.throttle.count.ip.&lt;hmac&gt;</code>) instead of the raw address or IP, so cache logs never show them. The HMAC key is derived from <code>auth.accessToken.secret</code> (as the OTP code MAC is), so a list of known addresses cannot reverse it; without a configured secret it falls back to SHA-256. The value is trimmed and lower-cased first, so <code>\" Sara@x.io\"</code> and <code>\"sara@x.io\"</code> share one bucket. Applies to <code>loginThrottleMiddleware</code> and every preset built on it (token issue/consume, OTP); a custom <code>identify</code> is used as is. <code>throttleIdentifierHash(kind, value)</code> is exported (FW-04)."
+              "html": "<strong>The login throttle keys accounts and IPs by a keyed hash</strong> (<code>auth.throttle.count.email.&lt;hmac&gt;</code>, <code>auth.throttle.count.ip.&lt;hmac&gt;</code>) instead of the raw address or IP, so cache logs never show them. The HMAC key is derived from <code>auth.accessToken.secret</code> (as the OTP code MAC is), so a list of known addresses cannot reverse it; without a configured secret it falls back to SHA-256. The value is trimmed and lower-cased first, so <code>\" Sara@x.io\"</code> and <code>\"sara@x.io\"</code> share one bucket. Applies to <code>loginThrottleMiddleware</code> and every preset built on it (token issue/consume, OTP); a custom <code>identify</code> is used as is. <code>throttleIdentifierHash(kind, value)</code> is exported."
             },
             {
               "type": "Changed",
@@ -832,7 +832,7 @@
           "items": [
             {
               "type": "Added",
-              "html": "<code>moveDirectoryNoReplaceAsync(from, to, { expectedSource?, syncParents? })</code> (also <code>fs.dirs.moveNoReplace</code>): moves a directory only when nothing holds the destination, refusing atomically instead of replacing an empty directory the way <code>rename()</code> does. It claims the name with an exclusive <code>mkdir</code>, renames over that placeholder, verifies the moved <code>(dev, ino)</code> and never falls back to copy + delete (WR-015)."
+              "html": "<code>moveDirectoryNoReplaceAsync(from, to, { expectedSource?, syncParents? })</code> (also <code>fs.dirs.moveNoReplace</code>): moves a directory only when nothing holds the destination, refusing atomically instead of replacing an empty directory the way <code>rename()</code> does. It claims the name with an exclusive <code>mkdir</code>, renames over that placeholder, verifies the moved <code>(dev, ino)</code> and never falls back to copy + delete."
             },
             {
               "type": "Added",
@@ -1125,7 +1125,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Docs and skills point at the model path <code>warlock add notifications</code> writes since 5.30.0: <code>app/notifications/models/notification/notification.model</code> (FW-09)."
+              "html": "Docs and skills point at the model path <code>warlock add notifications</code> writes since 5.30.0: <code>app/notifications/models/notification/notification.model</code>."
             }
           ]
         },

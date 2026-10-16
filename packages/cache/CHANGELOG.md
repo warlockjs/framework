@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Email addresses inside logged cache keys are masked (`user.member@example.com` logs as `u***@example.com`), in the base driver's operation log, in error lines (written even with logging off: SWR refresh failures, lock release, clone failures), in the "Cannot increment non-numeric value" error, and in the null driver (FW-04).
+- Email addresses inside logged cache keys are masked (`user.member@example.com` logs as `u***@example.com`), in the base driver's operation log, in error lines (written even with logging off: SWR refresh failures, lock release, clone failures), in the "Cannot increment non-numeric value" error, and in the null driver.
 
 ### Fixed
 

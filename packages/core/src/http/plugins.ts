@@ -66,7 +66,7 @@ export async function registerHttpPlugins(server: FastifyInstance) {
   // 👇🏻 serve the public folder. Importing `@fastify/static` is not free (its
   // directory-listing module calls `os.cpus()` at load), so it is only loaded
   // when there is a folder to serve: `storage.publicRoot: false` turns public
-  // serving off, and a missing folder skips it (WR-027).
+  // serving off, and a missing folder skips it.
   const publicRoot = resolvePublicRoot(config.get("storage.publicRoot", rootPath("public")));
 
   if (publicRoot !== undefined) {

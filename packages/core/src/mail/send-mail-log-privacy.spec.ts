@@ -12,7 +12,7 @@ vi.mock("./mailer-pool", () => ({
 const mockedGetMailer = vi.mocked(getMailer);
 
 /**
- * FW-04: recipient addresses are personal data and sit inside the log
+ * recipient addresses are personal data and sit inside the log
  * message, where key-based redaction cannot reach them, so every mail log
  * line carries them masked.
  */
@@ -27,7 +27,7 @@ function loggedText(): string {
     .join("\n");
 }
 
-describe("sendMail log privacy (FW-04)", () => {
+describe("sendMail log privacy", () => {
   afterEach(() => {
     clearTestMailbox();
     resetMailConfig();

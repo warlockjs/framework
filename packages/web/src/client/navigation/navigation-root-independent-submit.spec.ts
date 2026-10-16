@@ -12,7 +12,7 @@ import { resetScrollPositions } from "./scroll-positions";
 import { resetManualScrollRestorationInstalled } from "./scroll-restoration";
 
 /**
- * Review fixes for `<Form independent>` (WR-013) against the REAL navigation
+ * Review fixes for `<Form independent>` against the REAL navigation
  * runtime: a result for the page the user left is never drawn over the page
  * they reached, and an independent write never strands another operation's
  * pending commit (which left `useIsNavigating()` stuck true).

@@ -1,5 +1,5 @@
 /**
- * Workspace resolution shim for `@warlock.js/core/errors` (WR-017).
+ * Workspace resolution shim for `@warlock.js/core/errors`.
  *
  * Core declares no `exports` map, so inside this repository TypeScript and
  * Vite/vitest resolve a deep specifier by path: `@warlock.js/core/errors`

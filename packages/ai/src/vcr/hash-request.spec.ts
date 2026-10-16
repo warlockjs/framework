@@ -94,7 +94,7 @@ describe("hashRequest", () => {
     );
   });
 
-  describe("providerOptions and cacheControl (WR-025)", () => {
+  describe("providerOptions and cacheControl", () => {
     const LEGACY_HASH_OPTIONS = [
       "temperature",
       "maxTokens",

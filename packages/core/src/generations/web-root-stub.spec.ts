@@ -7,7 +7,7 @@ describe("warlock add web root.tsx stub", () => {
     expect(webRootStub).not.toContain('id="root"');
   });
 
-  it("leaves the viewport tag to <Head /> instead of hand-writing a second one (FW-03)", () => {
+  it("leaves the viewport tag to <Head /> instead of hand-writing a second one", () => {
     const code = webRootStub.replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
 
     expect(code).toContain("<Head />");

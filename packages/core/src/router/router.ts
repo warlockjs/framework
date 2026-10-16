@@ -263,7 +263,7 @@ export class Router {
    * Register every `directory()` with `@fastify/static`. The plugin is
    * imported only when at least one directory was declared: loading it is not
    * free (its directory-listing module calls `os.cpus()` at load), and an app
-   * that serves no static folder should not pay for it (WR-027).
+   * that serves no static folder should not pay for it.
    */
   protected registerStaticDirectories(server: FastifyInstance) {
     if (this.staticDirectories.length === 0) return;

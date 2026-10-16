@@ -259,7 +259,7 @@ export class FilesOrchestrator {
    *
    * The JSON dictionaries must be in the boot set: the module loader
    * registers them like any other locale file, but a code-only glob left them
-   * out, so `t()` printed raw keys until the watcher reported an edit (FW-02).
+   * out, so `t()` printed raw keys until the watcher reported an edit.
    */
   public async getAllFilesFromFilesystem(): Promise<string[]> {
     const [codePaths, localePaths] = await Promise.all([

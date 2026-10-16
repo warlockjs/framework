@@ -7,7 +7,7 @@ import { Response } from "../../../src/http/response";
 import type { ResponseSSEController } from "../../../src/http/types";
 
 /**
- * WR-006: a long-lived SSE stream must not retain its whole history, and its
+ * a long-lived SSE stream must not retain its whole history, and its
  * producer needs a way to wait for a slow client instead of buffering
  * without bound.
  */

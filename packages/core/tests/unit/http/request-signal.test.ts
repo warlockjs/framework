@@ -5,7 +5,7 @@ import { Request } from "../../../src/http/request";
 import { Response } from "../../../src/http/response";
 
 /**
- * WR-012: `request.signal` aborts when the client disconnects before the
+ * `request.signal` aborts when the client disconnects before the
  * response finishes — and only then. Real loopback sockets, because the
  * distinction (request body fully read vs. client gone) only exists on a real
  * transport.

@@ -7,7 +7,7 @@ import * as rootHttpErrors from "../../../src/http/errors";
 import * as errorsEntry from "../../../src/errors";
 
 /**
- * WR-017: `@warlock.js/core/errors` is a published subpath (pkgist builds
+ * `@warlock.js/core/errors` is a published subpath (pkgist builds
  * `src/errors/index.ts` as its own entry). Core declares no `exports` map, so
  * inside this repository the specifier resolves by path to the root
  * `errors/index.ts` shim. This test lives under `tests/` on purpose: the

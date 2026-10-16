@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Compiler-cost benchmark for Seal's type inference (WR-001).
+ * Compiler-cost benchmark for Seal's type inference.
  *
  * Generates a large composed-schema project into a temporary directory — many
  * entity schemas with nested objects, arrays, unions, discriminated unions and

@@ -167,7 +167,7 @@ describe("generation stub handlers (src/generations/stubs.ts)", () => {
     for (const stub of stubs) {
       const parameterLists = findArrowFunctionParameterLists(stub);
 
-      // One controller per file (FW-09).
+      // One controller per file.
       expect(parameterLists).toHaveLength(1);
       expect(isV5ContextParam(parameterLists[0], ["request", "response"])).toBe(true);
     }

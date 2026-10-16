@@ -151,7 +151,7 @@ expectTypeOf(listForm.data).toEqualTypeOf<unknown>();
 const explicitForm = useSubmitForm<undefined, { ok: true }>({ path: "/api/x" });
 expectTypeOf(explicitForm.data).toEqualTypeOf<{ ok: true } | null>();
 
-// WR-021: a wrapper's props keep every destination form and its correlations.
+// a wrapper's props keep every destination form and its correlations.
 type WrapperLinkProps = LinkPropsWithout<"className">;
 const wrapperNamed: WrapperLinkProps = { to: "posts.show", params: { slug: "typed" } };
 const wrapperLiteral: WrapperLinkProps = { href: "/pricing" };
@@ -163,7 +163,7 @@ const wrapperClassName: WrapperLinkProps = { href: "/pricing", className: "x" };
 
 void [wrapperNamed, wrapperLiteral, wrapperEmail, wrapperMissingParams, wrapperClassName];
 
-// WR-021: a data-driven name narrows through the runtime guard, no cast.
+// a data-driven name narrows through the runtime guard, no cast.
 declare const shortcutName: string;
 if (isRouteName(shortcutName)) {
   const guardedLink: LinkProps = { to: shortcutName };

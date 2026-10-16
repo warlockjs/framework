@@ -84,7 +84,7 @@ describe("<Form>", () => {
     await act(async () => finish({ type: "success" }));
   });
 
-  // WR-011: with no runtime the browser's own submission must keep the
+  // with no runtime the browser's own submission must keep the
   // submit button's `formaction` and name/value, so the event is left alone.
   it("leaves the submission to the browser when no runtime is connected", async () => {
     const { container } = mount(<Form />);
@@ -175,7 +175,7 @@ describe("<Form>", () => {
     expect((submitter.mock.calls[0] as unknown[])[0]).toBe("?mode=inspect");
   });
 
-  // WR-013
+  // Independent submissions.
   it("submits an independent form with its own cancellation signal", async () => {
     const submitter = vi.fn(async () => ({ type: "success" as const }));
 

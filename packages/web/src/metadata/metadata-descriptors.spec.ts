@@ -54,7 +54,7 @@ function renderedBySsr(metadata: MetadataOutput | undefined): string[] {
 
     if (metaAttrs !== undefined) {
       if (metaAttrs.includes("charSet")) continue; // unconditional, not page metadata
-      // Document-level like the charset: SSR only, never navigation-managed (FW-03).
+      // Document-level like the charset: SSR only, never navigation-managed.
       if (/\bname="viewport"/.test(metaAttrs)) continue;
 
       results.push(
@@ -360,7 +360,7 @@ describe("SSR/client metadata parity", () => {
   });
 });
 
-/** FW-03: every page lays out at device width unless its metadata says otherwise. */
+/** every page lays out at device width unless its metadata says otherwise. */
 describe("viewport", () => {
   const viewportTags = (metadata: MetadataOutput | undefined) =>
     renderToStaticMarkup(

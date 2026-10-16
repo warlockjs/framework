@@ -8,7 +8,7 @@ import { Response } from "../../../src/http/response";
 import type { ResponseStreamController } from "../../../src/http/types";
 
 /**
- * WR-006 for `response.stream()`: the same contract as `response.sse()` —
+ * For `response.stream()`: the same contract as `response.sse()` —
  * no unbounded history on the response body, and a producer that can wait
  * for a slow client and learn when it disconnects.
  */

@@ -5,7 +5,7 @@ import type { UploadedFile } from "../../http";
 import "../init";
 
 /**
- * Type-level coverage for the `v.file()` chain (WR-020). Every rule method
+ * Type-level coverage for the `v.file()` chain. Every rule method
  * returns `this`, so the `UploadedFile` output declared by `v.file()` survives
  * `.maxSize()`, `.image()`, `.accept()` and the rest. The assertions are
  * enforced by `tsc -p tsconfig.typecheck.json`.

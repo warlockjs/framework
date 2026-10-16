@@ -412,7 +412,7 @@ describe("executePageRequest ctx.signal", () => {
     expect(setCookie).not.toHaveBeenCalled();
   });
 
-  // WR-016: an abandoned POST used to reach `finish` (the full render) with
+  // an abandoned POST used to reach `finish` (the full render) with
   // the layout's loader data missing, and the layout's own read of it threw.
   it("never calls finish for a request abandoned while its loaders ran", async () => {
     const { request: abortRequest, response, rawRequest } = abortableHttp();
@@ -458,7 +458,7 @@ describe("executePageRequest ctx.signal", () => {
     expect(finish).not.toHaveBeenCalled();
   });
 
-  // FW-08: a crossed navigation aborted the request after the layout loader
+  // a crossed navigation aborted the request after the layout loader
   // and before the page loader, and the page component rendered with `data`
   // undefined (`Cannot destructure property 'create' of 'data'`).
   it("never renders the page when the request is abandoned between the layout and page loaders", async () => {
@@ -547,7 +547,7 @@ describe("executePageRequest — web.loaderTimeout (card 904a04eb)", () => {
     expect(bundle.error?.statusCode).toBe(504);
   }, 2000);
 
-  // WR-016: the disconnect guard must not swallow OUR OWN timeout abort — the
+  // the disconnect guard must not swallow OUR OWN timeout abort — the
   // client is still connected on a real transport and still gets the 504.
   it("still renders the 504 for a loader timeout on a connected real transport", async () => {
     config.set("web", { loaderTimeout: 50 });

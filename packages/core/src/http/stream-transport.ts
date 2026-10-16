@@ -4,7 +4,7 @@ import { log } from "@warlock.js/logger";
 /**
  * Shared transport bookkeeping for the long-lived responses
  * (`response.sse()` and `response.stream()`): client-disconnect detection,
- * an `AbortSignal` for the work feeding the stream, and backpressure (WR-006).
+ * an `AbortSignal` for the work feeding the stream, and backpressure.
  */
 export type StreamTransport = {
   /** Aborted when the client disconnects (not when the stream is ended). */

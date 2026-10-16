@@ -54,7 +54,7 @@ describe("buildRateLimitOptions", () => {
     expect(buildRateLimitOptions({})?.skipOnError).toBeUndefined();
   });
 
-  it('selects the cache-backed store for store: "cache" (FW-14)', () => {
+  it('selects the cache-backed store for store: "cache"', () => {
     expect(buildRateLimitOptions({ store: "cache" })?.store).toBe(CacheRateLimitStore);
   });
 

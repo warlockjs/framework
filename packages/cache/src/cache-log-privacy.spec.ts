@@ -4,7 +4,7 @@ import { MemoryCacheDriver } from "./drivers/memory-cache-driver";
 import { NullCacheDriver } from "./drivers/null-cache-driver";
 
 /**
- * FW-04: cache drivers log every key they touch, and an app key such as
+ * cache drivers log every key they touch, and an app key such as
  * `user.<email>` would put the address in the log. Logged keys are masked.
  */
 function loggedText(): string {
@@ -17,7 +17,7 @@ function loggedText(): string {
     .join("\n");
 }
 
-describe("cache key log privacy (FW-04)", () => {
+describe("cache key log privacy", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });

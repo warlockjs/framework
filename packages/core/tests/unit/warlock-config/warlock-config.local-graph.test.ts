@@ -15,7 +15,7 @@ import {
 const run = promisify(execFile);
 
 /**
- * WR-004: the config fallback must load a `warlock.config.ts` whose LOCAL graph
+ * the config fallback must load a `warlock.config.ts` whose LOCAL graph
  * uses what only TypeScript resolves — an extensionless import and a tsconfig
  * `paths` alias — while packages stay external (one `BaseConnector` identity),
  * the config runs once, user errors survive and no temp module is left behind.

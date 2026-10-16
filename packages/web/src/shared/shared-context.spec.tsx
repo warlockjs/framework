@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { sharedContext } from "./shared-context";
 
 /**
- * FW-07: after an edit under `warlock dev`, a page answered 500 with
+ * after an edit under `warlock dev`, a page answered 500 with
  * "useLocale() was called outside Warlock's LocaleProvider" until restart —
  * the provider and the hook came from two evaluations of the module that
  * created the context. These tests evaluate the module twice on purpose.

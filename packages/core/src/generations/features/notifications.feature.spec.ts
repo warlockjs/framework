@@ -44,7 +44,7 @@ function writtenModuleFiles(): string[] {
     .sort();
 }
 
-describe("warlock add notifications (FW-09)", () => {
+describe("warlock add notifications", () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {

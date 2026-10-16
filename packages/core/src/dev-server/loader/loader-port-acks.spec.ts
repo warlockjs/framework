@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { trackLoaderPortAcks } from "./loader-port-acks";
 
 /**
- * FW-05: the main-thread end of the loader-hook channel kept the process alive
+ * the main-thread end of the loader-hook channel kept the process alive
  * after the HTTP test server stopped, so Vitest's main process hung until its
  * close timeout. The port must stay unreferenced except while a `sync` waits.
  */

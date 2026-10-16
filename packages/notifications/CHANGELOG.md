@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Docs and skills point at the model path `warlock add notifications` writes since 5.30.0: `app/notifications/models/notification/notification.model` (FW-09).
+- Docs and skills point at the model path `warlock add notifications` writes since 5.30.0: `app/notifications/models/notification/notification.model`.
 
 ## 5.29.0 - 2026-10-01
 

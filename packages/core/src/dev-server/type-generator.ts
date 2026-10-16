@@ -78,7 +78,7 @@ export async function listRouteLocaleKeysForTypeGeneration(
  * written with: `"machine-thumb"`, `'machine-thumb'` and `machine-thumb` in a
  * template all read `machine-thumb`. `getText()` kept the quotes, so a quoted
  * config key was written as `"uploads.images.variants."machine-thumb""` and
- * broke the generated `config.d.ts` (FW-06). Computed names (`[KEY]`) and
+ * broke the generated `config.d.ts`. Computed names (`[KEY]`) and
  * private names have no static key and return `undefined`.
  */
 export function readPropertyName(name: ts.PropertyName): string | undefined {
@@ -106,7 +106,7 @@ export function isRouteLocalesJsonPath(path: string): boolean {
  * the cached data changes meaning, so caches written by an older generator are
  * thrown away instead of reused while their source hashes still match.
  *
- * 2: config and storage-driver keys are stored unquoted (FW-06); 5.29 cached
+ * 2: config and storage-driver keys are stored unquoted; 5.29 cached
  *    keys such as `"machine-thumb"` with their quotes, which kept producing an
  *    invalid `config.d.ts` until a config file changed.
  */

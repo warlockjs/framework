@@ -204,7 +204,7 @@ describe("createPageRouteHandler — universal registration", () => {
     expect(requestContext.response.html).not.toHaveBeenCalled();
   });
 
-  // WR-016: a request the client abandoned is neither reported nor answered.
+  // a request the client abandoned is neither reported nor answered.
   it("stops quietly when the pipeline reports a disconnected client", async () => {
     const requestContext = context();
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);

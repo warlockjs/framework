@@ -135,7 +135,7 @@ describe("createActionSubmitter", () => {
     expect(h.runtime.writeCurrent).not.toHaveBeenCalled();
   });
 
-  // WR-002: the submission is not over until the redirected page is on screen.
+  // the submission is not over until the redirected page is on screen.
   it("stays submitting until the redirect's navigation settles", async () => {
     const h = makeRuntime();
     let settle: () => void = () => undefined;
@@ -178,7 +178,7 @@ describe("createActionSubmitter", () => {
   });
 });
 
-// WR-013: a Cancel must reach the server while a Start is still pending.
+// a Cancel must reach the server while a Start is still pending.
 describe("createActionSubmitter — independent submissions", () => {
   function deferred() {
     let resolve: (value: unknown) => void = () => undefined;

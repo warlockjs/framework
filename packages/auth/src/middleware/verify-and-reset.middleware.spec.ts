@@ -64,7 +64,7 @@ import {
 import { throttleIdentifierHash } from "./login-throttle.middleware";
 import { makeCtx } from "./test-support/make-ctx";
 
-/** The throttle keys an account by a keyed hash of its trimmed, lower-cased credential (FW-04). */
+/** The throttle keys an account by a keyed hash of its trimmed, lower-cased credential. */
 const SARA_KEY = throttleIdentifierHash("email", "sara@x.io");
 const IP_KEY = throttleIdentifierHash("ip", "1.2.3.4");
 
@@ -206,7 +206,7 @@ describe("requireVerifiedEmail", () => {
   });
 });
 
-describe("throttle identifier hashing (FW-04 review)", () => {
+describe("throttle identifier hashing", () => {
   it("keys the hash with auth.accessToken.secret, so it is not a plain SHA-256 of the email", async () => {
     const { createHash } = await import("node:crypto");
     const plain = createHash("sha256").update("email:sara@x.io").digest("hex");

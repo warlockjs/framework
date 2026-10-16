@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { validate, v } from "../../../src";
 
 /**
- * Regression cover for WR-007 and WR-008 (Bureau 0.30 findings).
+ * Regression cover for optional discriminated unions and empty string literals.
  *
- * WR-008: 5.25 made a blank string count as missing for literal/enum sets,
+ * 5.25 made a blank string count as missing for literal/enum sets,
  * which also hit `v.literal("")`, where `""` is the value the author listed.
- * WR-007: an optional discriminated union rejected an absent field because its
+ * an optional discriminated union rejected an absent field because its
  * own `validate()` demanded a plain object before `.optional()` was consulted.
  */
 

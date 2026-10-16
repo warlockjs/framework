@@ -578,7 +578,7 @@ describe.skipIf(!sharpAvailable)("uploadedFileController — variants", () => {
     expect((await sharp!(result.rawPayload).metadata()).format).toBe(sharpFormat);
   });
 
-  it("makes a new derivative when the source changes, and prunes the old one (FW-10)", async () => {
+  it("makes a new derivative when the source changes, and prunes the old one", async () => {
     const save = vi.spyOn(Image.prototype, "save");
     const before = await get("/uploads/hero.jpg?variant=thumb");
 
@@ -602,7 +602,7 @@ describe.skipIf(!sharpAvailable)("uploadedFileController — variants", () => {
     expect(listFiles(cacheDirectory)).toHaveLength(3);
   });
 
-  it("removes a file's derivatives when local storage deletes it (FW-10)", async () => {
+  it("removes a file's derivatives when local storage deletes it", async () => {
     await get("/uploads/hero.jpg?variant=thumb");
     await get("/uploads/hero.jpg?variant=card&format=webp");
     fs.writeFileSync(path.join(storageRoot, "other.jpg"), await makeImage("jpeg", 64, 64));
@@ -619,7 +619,7 @@ describe.skipIf(!sharpAvailable)("uploadedFileController — variants", () => {
     fs.rmSync(path.join(storageRoot, "other.jpg"), { force: true });
   });
 
-  it("removes a file's derivatives when local storage moves it (FW-10)", async () => {
+  it("removes a file's derivatives when local storage moves it", async () => {
     await get("/uploads/hero.jpg?variant=thumb");
 
     const driver = new LocalDriver({ root: storageRoot });
@@ -630,7 +630,7 @@ describe.skipIf(!sharpAvailable)("uploadedFileController — variants", () => {
     fs.rmSync(path.join(storageRoot, "moved"), { recursive: true, force: true });
   });
 
-  it("purgeImageVariants removes one file's derivatives, or the whole cache (FW-10)", async () => {
+  it("purgeImageVariants removes one file's derivatives, or the whole cache", async () => {
     await get("/uploads/hero.jpg?variant=thumb");
     fs.writeFileSync(path.join(storageRoot, "other.jpg"), await makeImage("jpeg", 64, 64));
     await get("/uploads/other.jpg?variant=thumb");
@@ -651,7 +651,7 @@ describe.skipIf(!sharpAvailable)("uploadedFileController — variants", () => {
     expect(listFiles(cacheDirectory)).toHaveLength(1);
   });
 
-  it("serves variants of a second local disk through createUploadedFileController({ disk }) (FW-11)", async () => {
+  it("serves variants of a second local disk through createUploadedFileController({ disk })", async () => {
     const privateRoot = path.join(workspace, "private-disk");
     fs.mkdirSync(privateRoot, { recursive: true });
     fs.writeFileSync(path.join(privateRoot, "invoice.png"), await makeImage("png", 64, 64));
@@ -697,7 +697,7 @@ describe.skipIf(!sharpAvailable)("uploadedFileController — variants", () => {
     }
   });
 
-  it("resolveImageVariant renders a variant of another local disk for an app's own route (FW-11)", async () => {
+  it("resolveImageVariant renders a variant of another local disk for an app's own route", async () => {
     const privateRoot = path.join(workspace, "private-disk-2");
     fs.mkdirSync(privateRoot, { recursive: true });
     fs.writeFileSync(path.join(privateRoot, "photo.jpg"), await makeImage("jpeg", 64, 64));

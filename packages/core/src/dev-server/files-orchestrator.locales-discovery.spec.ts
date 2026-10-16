@@ -6,11 +6,11 @@ import { FilesOrchestrator } from "./files-orchestrator";
 import { isLocaleFile } from "./special-file-patterns";
 
 /**
- * FW-02: the boot file set came from a `.ts`/`.tsx` glob, so a module whose
+ * the boot file set came from a `.ts`/`.tsx` glob, so a module whose
  * only dictionary is `utils/locales.json` was never registered at boot and
  * `t()` printed raw keys until the watcher reported an edit to the file.
  */
-describe("FilesOrchestrator.getAllFilesFromFilesystem — module locales.json (FW-02)", () => {
+describe("FilesOrchestrator.getAllFilesFromFilesystem — module locales.json", () => {
   let root: string;
 
   function write(relativePath: string, contents: string) {

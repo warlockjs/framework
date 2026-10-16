@@ -548,7 +548,7 @@ export function NavigationRoot({
           }
 
           // The navigator claimed its ticket synchronously; the submission
-          // settles once the redirected page has committed (WR-002).
+          // settles once the redirected page has committed.
           return waitForNavigationIdle();
         },
         observeTicket: () => {

@@ -378,9 +378,9 @@ describe("the Vite-switch tripwire", () => {
     ).rejects.toThrowError(WebPageGraphUnsupportedImportError);
   });
 
-  // FW-15: test code under src/web never reaches the server bundle, so it may
+  // test code under src/web never reaches the server bundle, so it may
   // use `import.meta.url` like test code anywhere else.
-  describe("test-only sources (FW-15)", () => {
+  describe("test-only sources", () => {
     const productionDirOf = (appRoot: string) => path.join(appRoot, ".warlock/production");
 
     it.each([

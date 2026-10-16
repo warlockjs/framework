@@ -7,7 +7,7 @@ import { hydrationErrorPageProps } from "./server/error-page";
 import { PageValidationFailedError } from "./server/page-validation-failed-error";
 
 /**
- * FW-01: the server renders 4xx error pages (a thrown `HttpError` below 500,
+ * the server renders 4xx error pages (a thrown `HttpError` below 500,
  * a failed page validation) with their real status, so the client gate must
  * accept every error page the server can produce. Each case builds the
  * payload with the real producer, `hydrationErrorPageProps`, and reads it

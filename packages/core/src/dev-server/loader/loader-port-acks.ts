@@ -15,7 +15,7 @@ export type LoaderPortAcks = {
  * A `message` listener refs a `MessagePort`, and the hook thread lives for the
  * whole process, so a referenced port holds the event loop open after
  * everything else has closed: the HTTP test server's teardown finished, yet
- * Vitest's main process could not exit (FW-05). The port is unreferenced as
+ * Vitest's main process could not exit. The port is unreferenced as
  * soon as the listener is attached and referenced again only while a `sync`
  * waits for its acknowledgement, so a pending flush still completes.
  *

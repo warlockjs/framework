@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { beginHttpDrain, closeServerWithTimeout, startHttpServer } from "../../../src/http/server";
 
 /**
- * WR-014: a request in flight when graceful shutdown begins finishes its
+ * a request in flight when graceful shutdown begins finishes its
  * response, the client keeps the keep-alive connection open, and Node's
  * `server.close()` waits on that now-idle connection until the shutdown
  * budget expires. These run over real loopback sockets with `fetch`, whose

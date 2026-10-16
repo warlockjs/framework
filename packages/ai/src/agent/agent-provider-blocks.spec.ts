@@ -52,7 +52,7 @@ function deferred(): { promise: Promise<void>; resolve: () => void } {
   return { promise, resolve };
 }
 
-describe("agent — provider content blocks (WR-022)", () => {
+describe("agent — provider content blocks", () => {
   it("copies the response blocks onto the assistant tool-call turn and the trip", async () => {
     const mock = MockSDK({
       responses: [
@@ -159,7 +159,7 @@ describe("agent — provider content blocks (WR-022)", () => {
   });
 });
 
-describe("agent — pause_turn (WR-023)", () => {
+describe("agent — pause_turn", () => {
   it("replays a paused turn and continues the loop", async () => {
     const paused: ProviderContentBlock[] = [
       {
@@ -239,7 +239,7 @@ describe("agent — pause_turn (WR-023)", () => {
   });
 });
 
-describe("agent — tool dispatch (WR-024)", () => {
+describe("agent — tool dispatch", () => {
   function makeTrackedTools() {
     const log: string[] = [];
     const gates = { a: deferred(), b: deferred() };

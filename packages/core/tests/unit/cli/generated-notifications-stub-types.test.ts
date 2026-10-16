@@ -20,7 +20,7 @@ import {
  * `tsc --noEmit` — once found a generated controller that did NOT compile:
  * `request.locals.user` is untyped from core's own perspective (see the
  * 5.12.0 CHANGELOG: `RequestUser` moved out of core to `@warlock.js/auth`).
- * Since 5.30.0 (FW-09) the controllers are typed with the module's own
+ * Since 5.30.0 the controllers are typed with the module's own
  * `NotificationsRequestHandler`, whose request guarantees `locals.user.id`.
  * This test compiles the generated request type, schema, resource, service
  * and the four controllers together, and pins that a plain `RequestHandler`

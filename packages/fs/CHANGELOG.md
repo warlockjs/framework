@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- `moveDirectoryNoReplaceAsync(from, to, { expectedSource?, syncParents? })` (also `fs.dirs.moveNoReplace`): moves a directory only when nothing holds the destination, refusing atomically instead of replacing an empty directory the way `rename()` does. It claims the name with an exclusive `mkdir`, renames over that placeholder, verifies the moved `(dev, ino)` and never falls back to copy + delete (WR-015).
+- `moveDirectoryNoReplaceAsync(from, to, { expectedSource?, syncParents? })` (also `fs.dirs.moveNoReplace`): moves a directory only when nothing holds the destination, refusing atomically instead of replacing an empty directory the way `rename()` does. It claims the name with an exclusive `mkdir`, renames over that placeholder, verifies the moved `(dev, ino)` and never falls back to copy + delete.
 - `DirectoryMoveError` with `outcome` (`not-moved`: this call moved and replaced nothing / `moved` / `uncertain`), `reason`, and `placeholderCleanupError` when the empty placeholder it claimed could not be removed; `directoryIdentityAsync()` and the `DirectoryIdentity` type. When the source vanishes just before the rename the claim is released and the error is `not-moved` / `source-identity-mismatch`. The destination parent may be a symlink to a directory (macOS `/tmp`, a deploy `current` link). POSIX only: refuses explicitly on Windows and across filesystems.
 
 ## 5.29.0 - 2026-10-01

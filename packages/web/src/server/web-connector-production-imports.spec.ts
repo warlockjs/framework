@@ -3,7 +3,7 @@ import { build } from "esbuild";
 import { describe, expect, it } from "vitest";
 
 /**
- * WR-027: a production start of a built app constructs the web connector, and
+ * a production start of a built app constructs the web connector, and
  * every STATIC import it reaches is loaded before the first request. Vite (and
  * Rollup behind it, whose loader alone cost ~0.55 s of a measured cold start)
  * is development and build tooling, so it may only be reached through

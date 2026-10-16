@@ -13,16 +13,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Responses with thinking, redacted-thinking, compaction, server-tool or cited-text blocks return the whole ordered turn as `ModelResponse.blocks` (and on the streaming `done` chunk); an assistant message carrying Anthropic `blocks` is replayed verbatim (WR-022).
-- `providerOptions.anthropic` (`AnthropicCallOptions`): `betas` routes the call through `client.beta.messages`, `body` merges extra request fields last (`context_management`, `fallbacks`, `inference_geo`, …), `thinkingDisplay` sets `thinking.display` (WR-025).
-- `AnthropicModel.countTokens(messages, options?)` counts input tokens through `messages.countTokens`; `AnthropicModel` is exported and `AnthropicSDK.model()` returns it (WR-025).
+- Responses with thinking, redacted-thinking, compaction, server-tool or cited-text blocks return the whole ordered turn as `ModelResponse.blocks` (and on the streaming `done` chunk); an assistant message carrying Anthropic `blocks` is replayed verbatim.
+- `providerOptions.anthropic` (`AnthropicCallOptions`): `betas` routes the call through `client.beta.messages`, `body` merges extra request fields last (`context_management`, `fallbacks`, `inference_geo`, …), `thinkingDisplay` sets `thinking.display`.
+- `AnthropicModel.countTokens(messages, options?)` counts input tokens through `messages.countTokens`; `AnthropicModel` is exported and `AnthropicSDK.model()` returns it.
 - Per-call `cacheControl.ttl` overrides the model's `promptCacheTtl`.
 
 ### Changed
 
-- Consecutive tool results are sent as one `user` message with several `tool_result` blocks, as Anthropic expects for parallel tool use (WR-024).
-- Claude 5-family thinking rules: Opus 5.5, Sonnet 5.5 and Fable 5 / 5.1 never receive `budget_tokens` or `disabled` (WR-026).
-- `effort: "none"` on Claude Sonnet 5.5 sends `thinking: { type: "between_tools" }` (its only thinking-off form, sent alone with no `output_config.effort` or `display`); it used to omit `thinking`, so the model still thought at its default effort. Opus 5.5 and Fable 5 / 5.1 have no thinking-off form and keep omitting `thinking` (WR-026).
+- Consecutive tool results are sent as one `user` message with several `tool_result` blocks, as Anthropic expects for parallel tool use.
+- Claude 5-family thinking rules: Opus 5.5, Sonnet 5.5 and Fable 5 / 5.1 never receive `budget_tokens` or `disabled`.
+- `effort: "none"` on Claude Sonnet 5.5 sends `thinking: { type: "between_tools" }` (its only thinking-off form, sent alone with no `output_config.effort` or `display`); it used to omit `thinking`, so the model still thought at its default effort. Opus 5.5 and Fable 5 / 5.1 have no thinking-off form and keep omitting `thinking`.
 
 ### Fixed
 

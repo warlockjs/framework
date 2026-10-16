@@ -6,7 +6,7 @@ import type { Infer } from "../../../src/types/inference-types";
 import type { BaseValidator, ObjectValidator } from "../../../src/validators";
 
 /**
- * WR-020 (Bureau 0.30): `validate()` returned `data: any`, `~standard.validate`
+ * `validate()` returned `data: any`, `~standard.validate`
  * on a discriminated union resolved to `unknown`. The `expectTypeOf` assertions are enforced under
  * `vitest --typecheck`; the runtime assertions keep the file honest under the
  * plain runner.

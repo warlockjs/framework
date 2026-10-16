@@ -8,7 +8,7 @@ import type { Middleware, RequestHandler } from "../../../src/router/types";
 import { bootHarness, type HttpHarness } from "./harness";
 
 /**
- * WR-003: request log entries carry a bounded snapshot with the route's
+ * request log entries carry a bounded snapshot with the route's
  * logging policy applied BEFORE logging, so values a route rejects (schema or
  * middleware) and credential-bearing URLs never reach a log channel.
  *

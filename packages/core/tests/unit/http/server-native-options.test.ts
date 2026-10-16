@@ -3,7 +3,7 @@ import { startHttpServer } from "../../../src/http/server";
 import type { HttpConfigurations } from "../../../src/http/types";
 
 /**
- * WR-005: `http.serverOptions` is forwarded to Fastify, which hands its `http`
+ * `http.serverOptions` is forwarded to Fastify, which hands its `http`
  * key to Node's `http.createServer()`. The config type must be able to say so.
  */
 describe("http.serverOptions", () => {

@@ -87,7 +87,7 @@ async function drain(iterable: AsyncIterable<{ type: string }>) {
 const thinkingBlock = { type: "thinking", thinking: "", signature: "sig_1" };
 const toolUseBlock = { type: "tool_use", id: "tu_1", name: "lookup", input: { q: "x" } };
 
-describe("AnthropicModel provider blocks (WR-022)", () => {
+describe("AnthropicModel provider blocks", () => {
   it("returns the ordered content blocks when the turn has a non-neutral block", async () => {
     const { client } = makeClient({
       message: {
@@ -285,7 +285,7 @@ describe("AnthropicModel provider blocks (WR-022)", () => {
   });
 });
 
-describe("AnthropicModel tool results (WR-024)", () => {
+describe("AnthropicModel tool results", () => {
   it("groups the results of one parallel tool-use turn into a single user message", async () => {
     const { client, calls } = makeClient({});
     const model = new AnthropicModel(client, { name: "claude-opus-5-5" });
@@ -318,7 +318,7 @@ describe("AnthropicModel tool results (WR-024)", () => {
   });
 });
 
-describe("AnthropicModel provider options (WR-025)", () => {
+describe("AnthropicModel provider options", () => {
   it("routes through beta.messages with the beta flags and merges body fields last", async () => {
     const { client, calls } = makeClient({});
     const model = new AnthropicModel(client, { name: "claude-opus-5-5" });
@@ -472,7 +472,7 @@ describe("AnthropicModel provider options (WR-025)", () => {
   });
 });
 
-describe("AnthropicModel Claude 5-family thinking (WR-026)", () => {
+describe("AnthropicModel Claude 5-family thinking", () => {
   const models = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1"] as const;
 
   /** Expected `output_config.effort` for each effort that keeps thinking on. */

@@ -336,7 +336,7 @@ export async function parseImports(
     // where it finds nothing (it does not report `export type { A } from`).
     // It runs over the source without comments: scanning them turned a doc
     // comment such as `(await import("./query-testing"))` in a file with no
-    // imports into a self edge and a false "circular dependency" (FW-13).
+    // imports into a self edge and a false "circular dependency".
     const regexImports = extractImportPathsWithRegex(stripComments(source, filePath));
     const resolvedImports = new Map<string, ResolvedImport>();
 

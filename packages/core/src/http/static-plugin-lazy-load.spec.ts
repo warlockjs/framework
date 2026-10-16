@@ -1,5 +1,5 @@
 /**
- * WR-027: `@fastify/static` is not free to load (its directory-listing module
+ * `@fastify/static` is not free to load (its directory-listing module
  * calls `os.cpus()` at import), so the HTTP stack may only reach it through
  * `import()` and only when there is something to serve.
  */

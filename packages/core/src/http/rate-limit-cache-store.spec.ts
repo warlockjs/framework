@@ -16,7 +16,7 @@ import type { Request } from "./request";
 import type { Response } from "./response";
 
 /**
- * FW-14: rate-limit counts kept in `@warlock.js/cache`. Two store or
+ * rate-limit counts kept in `@warlock.js/cache`. Two store or
  * middleware instances over one cache driver stand in for two processes over
  * one shared driver (Redis, a database).
  */

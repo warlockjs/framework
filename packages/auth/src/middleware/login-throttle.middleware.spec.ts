@@ -28,7 +28,7 @@ import { log } from "@warlock.js/logger";
 import { AuthErrorCodes } from "../utils/auth-error-codes";
 import { makeCtx } from "./test-support/make-ctx";
 
-/** The throttle keys an account by a keyed hash of its trimmed, lower-cased credential (FW-04). */
+/** The throttle keys an account by a keyed hash of its trimmed, lower-cased credential. */
 const SARA_KEY = throttleIdentifierHash("email", "sara@example.com");
 const IP_KEY = throttleIdentifierHash("ip", "1.2.3.4");
 
@@ -144,7 +144,7 @@ describe("loginThrottleMiddleware", () => {
       onConflict: "create",
     });
     expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`);
-    // The lock value is its own deadline (FW-04 review): sliding-expiry
+    // The lock value is its own deadline: sliding-expiry
     // drivers cannot stretch a lockout.
     const lockCall = cacheSet.mock.calls.find((call) => call[0] === `auth.throttle.lock.email.${SARA_KEY}`);
 
@@ -235,7 +235,7 @@ describe("loginThrottleMiddleware", () => {
     expect(response.tooManyRequests).not.toHaveBeenCalled();
   });
 
-  it("never puts the raw credential in a cache key, and ignores its case (FW-04)", async () => {
+  it("never puts the raw credential in a cache key, and ignores its case", async () => {
     cacheGet.mockResolvedValue(null);
     cacheIncrement.mockResolvedValue(1);
 

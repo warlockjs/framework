@@ -148,7 +148,7 @@ describe("web build contribution — zero pages", () => {
     log.mockRestore();
   });
 
-  it("forwards build.testOnly into the barrel generator (FW-15)", async () => {
+  it("forwards build.testOnly into the barrel generator", async () => {
     const appRoot = makeTree({ "src/web/root.tsx": APP, "src/web/home.page.tsx": PAGE });
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     stubGeneratedPages(1);
