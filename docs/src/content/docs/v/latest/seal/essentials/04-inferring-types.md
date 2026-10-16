@@ -131,14 +131,15 @@ You never touch the brands directly — they're attached automatically by chain 
 ```ts
 import type { ObjectValidator } from "@warlock.js/seal";
 
-// ❌ Discards the Standard Schema bridge intersection
-const schema: ObjectValidator<{...}> = v.object({...});
-
-// ✅ Let inference run
-const schema = v.object({...});
+const fields = { email: v.string() };
+const inferred = v.object(fields);
+const typed: ObjectValidator<typeof fields> = inferred; // preserves object input/output
 ```
 
-The bare class annotation strips the `& StandardSchemaV1<...>` intersection that the factory return carries. If you need the value type, use `Infer<typeof schema>` instead of typing the schema itself.
+An `ObjectValidator<typeof fields>` annotation preserves both shapes through the
+class's generic parameters. A bare `ObjectValidator` loses the concrete fields;
+a bare primitive class annotation can discard its factory's Standard Schema
+intersection. Let the factory infer its concrete type when possible.
 
 ### 2. Hand-rolled parallel types drift
 
@@ -164,21 +165,46 @@ Adding a field to the schema and forgetting to update the parallel type used to 
 
 TypeScript can't infer recursion from the validator alone. Declare the type explicitly and annotate the schema variable. See [the recursive schemas recipe](../recipes/recursive-schemas.md) for the full pattern.
 
-### 4. `.refine()` callbacks are not typed from the schema
+### 4. `.refine()` checks successful typed output
 
-The `value` a `.refine()` callback receives is `any`. Custom rules run before an object or array validates its children (and, when `firstErrorOnly` is `false`, even after the type rule failed; the default `true` stops at the first error), so the value is the input, not `Infer.Output`. Check the fields you rely on inside the callback.
+Refinement callbacks read the validator's declared output type and run after
+value rules, container children, defaults, computed fields and transformers.
+They skip failed validation and absent/null values, including when
+`firstErrorOnly: false`. Successful empty defaults such as `.default("")` are
+checked too. Return `undefined` to accept the value or an error string to reject
+it. Use `.addRule()` for checks against input before child validation.
 
-### 5. Very large composed schemas are expensive to compile
+```ts
+v.object({ count: v.int().optional().default(1) }).refine((value) => {
+  // count is already defaulted, and its type is number.
+  return value.count > 10 ? "Too many items" : undefined;
+});
+```
 
-Inference cost grows with every nested object, union and discriminated union in a schema. Seal's `pnpm bench:types` fixture (about 30 fields per entity, three levels of nesting) costs roughly 100k type instantiations and 100 MB of compiler memory per entity, so a project with a few dozen such schemas approaches the default 4 GB `tsc` heap. If yours does, raise the heap for compiler-only commands (`node --max-old-space-size=8192 node_modules/typescript/bin/tsc --noEmit`); runtime memory is unaffected. The benchmark guards Seal against regressions in this cost.
+Output transformers do not yet update every declared type. For example,
+`v.date().toISOString()` produces a string while its declaration remains `Date`.
+A refinement sees the string even when `.refine()` appears first in the chain.
+Use a Date input rule or convert after validation when you need Date methods.
+
+### 5. Very large composed schemas still have a compiler cost
+
+The deterministic 16-entity/8-service fixture currently uses about 655,000 type
+instantiations and 663 MB of compiler memory with TypeScript 5.9.3 (roughly 41,000
+instantiations and 41 MB per entity for this fixture). Returning an object's
+already typed class directly removed a duplicate Standard Schema intersection
+and reduced instantiations by about 63% from the previous baseline. Larger or
+more deeply nested schemas can still need a larger compiler heap; memory varies
+by environment. Run `pnpm bench:types --check` from `packages/seal` after inference
+changes; CI gates deterministic type/instantiation counts within 5% of the
+baseline. Time and memory are diagnostic only.
 
 ## Standard Schema interop
 
-`v.object({...})` also satisfies `StandardSchemaV1<Infer<typeof schema>>`. Any library that types its input as `StandardSchemaV1<T>` — TanStack Form, Conform, LangGraph, OpenAI structured outputs in a wrapper library — accepts a seal schema directly. No `as unknown as` casts.
+`v.object({...})` exposes `StandardSchemaV1<Infer.Input<typeof schema>, Infer.Output<typeof schema>>`. Any library that types its input as `StandardSchemaV1<T>` — TanStack Form, Conform, LangGraph, OpenAI structured outputs in a wrapper library — accepts a seal schema directly. No `as unknown as` casts.
 
-The mechanism is a phantom intersection applied at the factory return type. The [Standard Schema bridge guide](../guides/bridge-standard-schema.md) covers the typing details and what to do when a slot rejects your schema.
+Object validators thread their input/output shapes through class parameters; primitive and other factories add precise Standard Schema intersections when needed. The [Standard Schema bridge guide](../guides/bridge-standard-schema.md) covers the typing details and what to do when a slot rejects your schema.
 
 ## Related
 
 - [Modifiers](./02-modifiers.md) — `.optional`, `.default`, `.catch`, `.nullable` — the chain methods that attach the brands.
-- [Guides → Bridge Standard Schema](../guides/bridge-standard-schema.md) — the phantom intersection, `Result<unknown>` errors, cascade `Model<TSchema>` variance.
+- [Guides → Bridge Standard Schema](../guides/bridge-standard-schema.md) — input/output class parameters, factory intersections and `Result<unknown>` errors, cascade `Model<TSchema>` variance.

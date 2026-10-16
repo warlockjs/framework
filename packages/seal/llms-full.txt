@@ -223,6 +223,16 @@ v.object({ count: v.int().optional().default(1) }).refine((value) => {
 });
 ```
 
+Successful empty defaults such as `.default("")` are refined too. `.merge()`
+appends the other object's refinements; `.extend()` imports only fields. Cloning
+and field-selection methods preserve the receiver's refinements, so callbacks
+must tolerate fields removed by `.pick()` or `.without()`.
+
+Output transformers do not yet change declared output types: a
+`v.date().toISOString()` refinement receives a string at runtime despite the
+`Date` declaration. Use a Date input rule, or convert after validation; moving
+`.refine()` earlier in the chain does not move it before transformers.
+
 ## `.required()` / `.optional()` / `.present()`
 
 ```ts
@@ -1412,7 +1422,7 @@ Read a `ValidationResult` — `isValid`, `errors[]`, `data`. Branch on `error.ty
 `schema.toJsonSchema(target)` — draft-2020-12 / draft-07 / openapi-3.0 / openai-strict. For OpenAI structured outputs, OpenAPI specs, any JSON-Schema consumer.
 
 #### `bridge-standard-schema`
-Standard Schema interop — why a `StandardSchemaV1<T>` slot might reject a schema, the phantom-intersection at the `v` factory return, Cascade `Model<TSchema>` variance. For migrating off `as unknown as` casts.
+Standard Schema interop — why a `StandardSchemaV1<T>` slot might reject a schema, object input/output class parameters and primitive factory intersections, Cascade `Model<TSchema>` variance. For migrating off `as unknown as` casts.
 
 #### `extend-seal-with-plugins`
 Author a plugin to add validator methods (`.slug`, `.postalCode`, …) — the `SealPlugin` shape, `registerPlugin` lifecycle, TS prototype augmentation.
@@ -2313,7 +2323,7 @@ Both flavours widen with `| null` when `.nullable()` is set.
 | Modifiers — `.required` / `.optional` / `.nullable` / `.default` / `.catch` / `.omit`, transformer vs mutator pipelines, membership rules | The `compose-seal-modifiers` topic |
 | Reading `ValidationResult`, branching on `error.type`, error message customization, translation | The `handle-seal-errors` topic |
 | Generating JSON Schema for OpenAI strict / OpenAPI / draft-07 | The `generate-json-schema` topic |
-| Why a `StandardSchemaV1<T>` slot accepts/rejects a schema, the phantom-intersection design, `Result<unknown>` errors | The `bridge-standard-schema` topic |
+| Why a `StandardSchemaV1<T>` slot accepts/rejects a schema, object input/output class parameters and primitive factory intersections, `Result<unknown>` errors | The `bridge-standard-schema` topic |
 | Authoring custom seal plugins to add validator methods | The `extend-seal-with-plugins` topic |
 
 ## Things NOT to do

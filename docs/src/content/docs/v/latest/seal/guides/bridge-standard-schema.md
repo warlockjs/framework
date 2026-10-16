@@ -81,44 +81,34 @@ const jsonSchema = userSchema["~standard"].jsonSchema.input({ target: "openai-st
 
 This is the same data as `userSchema.toJsonSchema("openai-strict")` — just the Standard Schema accessor for cross-library tooling.
 
-## Why no casts? The phantom intersection
+## Why no casts? Input and output types
 
-Under the hood, each factory call widens its return with an intersection at the type level only:
+`ObjectValidator<TSchema>` supplies distinct input and output shapes to
+`BaseValidator<TInput, TOutput>`. Both object factories return that class directly;
+adding another Standard Schema intersection duplicates compiler work on nested
+schemas. Other factories use precise intersections when their class does not
+already carry the output type, for example `StringValidator & StandardSchemaV1<string>`.
 
-```ts
-// Conceptually:
-object: <T extends Schema>(schema: T) =>
-  new ObjectValidator<T>(schema) as ObjectValidator<T> & StandardSchemaV1<Infer<ObjectValidator<T>>>;
-
-string: () =>
-  new StringValidator() as StringValidator & StandardSchemaV1<string>;
-```
-
-The intersection lives **only on the factory return** — not on the `ObjectValidator` or `BaseValidator` class shapes. That distinction matters: putting `Infer<this>` on the class itself breaks cascade's `Model<TSchema>` (the invariant generic explodes when class members vary with `TSchema`). The factory-side intersection avoids that — bare classes still slot into `Model.schema: ObjectValidator<TSchema>` positions.
-
-You don't think about this in app code. Just use `Infer<typeof schema>` for the type and hand the schema to typed slots without casting.
+Use `Infer.Input<typeof schema>` for caller data and `Infer.Output<typeof schema>`
+for successful validation results. Defaults and catches may make fields optional
+in input and required in output. Unions and records preserve this distinction,
+and unions return the matching branch's validated data.
 
 ## When the bridge "fails"
 
-Three failure modes appear in real projects.
-
-### 1. You annotated the schema with the bare class type
+### 1. An annotation discarded schema details
 
 ```ts
-import type { ObjectValidator, StringValidator } from "@warlock.js/seal";
+import type { ObjectValidator } from "@warlock.js/seal";
 
-// ❌ Discards the phantom intersection
-const schema: ObjectValidator<{ email: StringValidator }> = v.object({
-  email: v.string(),
-});
-
-// ✅ Let inference run
-const schema = v.object({
-  email: v.string(),
-});
+const fields = { email: v.string() };
+const schema: ObjectValidator<typeof fields> = v.object(fields);
+// Concrete object class generics preserve the Standard Schema input and output.
 ```
 
-The class-type annotation strips `& StandardSchemaV1<...>` from the type. The schema then stops fitting `StandardSchemaV1<T>` slots. Fix: remove the annotation. If you need the value type elsewhere, use `Infer<typeof schema>`.
+A bare `ObjectValidator` annotation loses the concrete fields. Bare primitive
+class annotations can also discard the factory's precise Standard Schema
+intersection. Let factories infer their concrete types where possible.
 
 ### 2. The schema's inferred shape doesn't match the slot
 
@@ -133,24 +123,17 @@ The supervisor's explicit `<MyOutput>` generic is a constraint the schema must s
 - **Drop the explicit generic.** Let the supervisor infer the output type from the schema. The hand-rolled type was probably documentation-only.
 - **Align them.** If the hand-rolled type is the source of truth (a domain type from elsewhere), reshape the schema to match.
 
-### 3. The error mentions `Result<unknown>` even though `Infer<>` looks right
+### 3. The error mentions `Result<unknown>`
 
-A TypeScript reporting quirk. When a `StandardSchemaV1<T>` slot rejects a schema, TS picks the simplest mismatch chain — sometimes it falls through `BaseValidator['~standard'].validate`'s wider `Result<unknown>` declaration before reaching the narrower factory-side one.
-
-The intersection *is* there structurally. To check the actual inferred type:
-
-```ts
-type _Probe = Infer<typeof schema>;
-const _force: { __nope: 1 } = null as unknown as _Probe;
-// Hover the error in your editor to see the resolved shape.
-// Compare to the slot's expected T.
-```
-
-That's the real mismatch — ignore the `Result<unknown>` mention.
+Check for annotations that erased factory details, then compare the schema's
+`Infer.Input` and `Infer.Output` with the consumer's expected types. Output slots
+should use the post-default output shape. Objects carry it in class generics;
+union/record factory intersections put their precise Standard Schema validation
+signature first so direct `~standard.validate()` calls also return typed output.
 
 ## Cascade `Model<TSchema>` variance
 
-`@warlock.js/cascade` Models declare `static schema: ObjectValidator<TSchema>`. Passing `v.object({...})` works directly — the factory return widens to fit the invariant generic.
+`@warlock.js/cascade` Models declare `static schema: ObjectValidator<TSchema>`. Passing `v.object({...})` works directly — the factory returns the same generic object class.
 
 If you see *"`ObjectValidator<{specific}>` is not assignable to `ObjectValidator<TSchema>`"*, the answer isn't to widen the schema. It's almost always that `Model<TSchema>` was parameterized with a hand-rolled type that drifted from the schema's inferred shape. Fix the type, not the schema.
 

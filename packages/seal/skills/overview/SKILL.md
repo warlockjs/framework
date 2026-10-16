@@ -50,7 +50,7 @@ Read a `ValidationResult` — `isValid`, `errors[]`, `data`. Branch on `error.ty
 `schema.toJsonSchema(target)` — draft-2020-12 / draft-07 / openapi-3.0 / openai-strict. For OpenAI structured outputs, OpenAPI specs, any JSON-Schema consumer.
 
 #### `bridge-standard-schema`
-Standard Schema interop — why a `StandardSchemaV1<T>` slot might reject a schema, the phantom-intersection at the `v` factory return, Cascade `Model<TSchema>` variance. For migrating off `as unknown as` casts.
+Standard Schema interop — why a `StandardSchemaV1<T>` slot might reject a schema, object input/output class parameters and primitive factory intersections, Cascade `Model<TSchema>` variance. For migrating off `as unknown as` casts.
 
 #### `extend-seal-with-plugins`
 Author a plugin to add validator methods (`.slug`, `.postalCode`, …) — the `SealPlugin` shape, `registerPlugin` lifecycle, TS prototype augmentation.

@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Upgrading
 
 - **BREAKING:** `.refine()` now runs against successful output after child validation and transformers, and skips absent/null or invalid values. Callbacks are typed from the validator's output instead of `any`. Move checks that need input before child validation to `.addRule()`.
+- **BREAKING:** `.catch()` is a no-op on container validators, including failures in the container's own rules. Inputs previously accepted by an array/object catch after a length or unknown-key error now fail. Apply catches to child validators or handle a failed container result explicitly.
+- Refinements now also check successful empty defaults such as `.default("")`; callbacks that reject those defaults now reject validation.
 
 ### Changed
 
@@ -16,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Object `.merge()` retains refinements from both schemas, in their original order; cloning, extending and selecting fields preserve the original schema's refinements.
 - Union and record Standard Schema types now distinguish child input from validated output; `Infer.Output` reads the Standard Schema output parameter. Defaults and catches remain guaranteed in output.
 - Unions return the selected branch's validated data, preserving defaults, computed fields, catches and child transformations before applying union transformers/refinements. Successful custom rules may return a `data` property to replace the current validated value, including explicit `undefined`.
 

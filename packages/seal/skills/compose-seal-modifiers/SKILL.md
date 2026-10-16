@@ -53,6 +53,16 @@ v.object({ count: v.int().optional().default(1) }).refine((value) => {
 });
 ```
 
+Successful empty defaults such as `.default("")` are refined too. `.merge()`
+appends the other object's refinements; `.extend()` imports only fields. Cloning
+and field-selection methods preserve the receiver's refinements, so callbacks
+must tolerate fields removed by `.pick()` or `.without()`.
+
+Output transformers do not yet change declared output types: a
+`v.date().toISOString()` refinement receives a string at runtime despite the
+`Date` declaration. Use a Date input rule, or convert after validation; moving
+`.refine()` earlier in the chain does not move it before transformers.
+
 ## `.required()` / `.optional()` / `.present()`
 
 ```ts

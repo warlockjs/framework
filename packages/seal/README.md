@@ -211,6 +211,18 @@ v.string().refine(async value => {
 
 The callback's `value` is typed from the validator's output. Refinements run after value rules, child validation (including defaults and computed fields), and output transformers succeed. They skip absent/null values and failed validation, even with `firstErrorOnly: false`. Multiple refinements run in declaration order and respect `firstErrorOnly`. Use `.addRule()` for checks that need the input before child validation.
 
+Refinements also run on successful empty defaults such as `.default("")`. Object
+`.merge()` appends refinements from the merged schema; `.extend()` imports only
+its fields and retains the receiver's refinements. Other clone/field-selection
+operations keep the receiver's refinements, so callbacks must tolerate any fields
+you remove from the shape.
+
+Output transformer types are not fully tracked yet: for example,
+`v.date().toISOString()` returns a string at runtime while its declared output
+remains `Date`. Use a Date input rule or convert the Date after validation when
+a refinement needs Date methods. Chaining `.refine()` before `.toISOString()`
+does not change execution order.
+
 A successful `.addRule()` callback may return `{ isValid: true, data: replacement }`
 to replace the value for later rules, transformers and refinements. Omitting `data`
 keeps the current value; including `data: undefined` explicitly clears it.

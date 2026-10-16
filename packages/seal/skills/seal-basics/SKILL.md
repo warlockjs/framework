@@ -116,7 +116,7 @@ Both flavours widen with `| null` when `.nullable()` is set.
 | Modifiers — `.required` / `.optional` / `.nullable` / `.default` / `.catch` / `.omit`, transformer vs mutator pipelines, membership rules | The `compose-seal-modifiers` topic |
 | Reading `ValidationResult`, branching on `error.type`, error message customization, translation | The `handle-seal-errors` topic |
 | Generating JSON Schema for OpenAI strict / OpenAPI / draft-07 | The `generate-json-schema` topic |
-| Why a `StandardSchemaV1<T>` slot accepts/rejects a schema, the phantom-intersection design, `Result<unknown>` errors | The `bridge-standard-schema` topic |
+| Why a `StandardSchemaV1<T>` slot accepts/rejects a schema, object input/output class parameters and primitive factory intersections, `Result<unknown>` errors | The `bridge-standard-schema` topic |
 | Authoring custom seal plugins to add validator methods | The `extend-seal-with-plugins` topic |
 
 ## Things NOT to do

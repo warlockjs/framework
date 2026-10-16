@@ -221,8 +221,9 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
     merged.shouldAllowUnknown = validator.shouldAllowUnknown;
     merged.allowedKeys = [...merged.allowedKeys, ...validator.allowedKeys];
 
-    // Append rules, mutators, transformers from other validator
+    // Append rules, refinements, mutators and transformers from the other validator
     merged.rules.push(...validator.rules);
+    merged.refinements.push(...validator.refinements);
     merged.mutators.push(...validator.mutators);
     merged.dataTransformers.push(...validator.dataTransformers);
 
