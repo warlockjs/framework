@@ -1,3 +1,4 @@
+import { redisTestsAvailable } from "./redis-availability";
 import { log } from "@warlock.js/logger";
 import Fastify from "fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,7 +11,9 @@ import {
 } from "../src";
 import { testQueueConfig } from "./test-redis";
 
-describe("mountQueueDashboard", () => {
+const redisAvailable = await redisTestsAvailable();
+
+describe.skipIf(!redisAvailable)("mountQueueDashboard", () => {
   const originalNodeEnv = process.env.NODE_ENV;
 
   beforeEach(() => {

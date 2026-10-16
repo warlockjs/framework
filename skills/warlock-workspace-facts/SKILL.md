@@ -74,3 +74,10 @@ When present, `tools/release/sources/@warlock.js/**` holds copies of package sou
 ## Known events pitfall
 
 `@mongez/events` `trigger` / `triggerAll` / `emit` are **fully synchronous** — they do not await handlers. `await events.triggerAll(...)` silently drops async listeners and lets rejections escape. Use **`triggerAsync` / `triggerAllAsync`** when an `await` is intended. Handlers run in registration order, and **a handler returning `false` silently cancels every handler after it**.
+
+Queue/notification integration tests probe Redis with PING at
+`QUEUE_REDIS_HOST:QUEUE_REDIS_PORT` (default `127.0.0.1:6390`). Local runs skip
+unavailable integration cases with a clear message while unit cases still run.
+CI and `WARLOCK_REDIS_INTEGRATION=1` require a reachable service. Use a disposable
+Redis instance with persistence disabled for local testing; never flush a shared
+database. HTTP socket tests bind port `0` to avoid depending on port 3000.

@@ -413,3 +413,9 @@ CI checks shipped documentation command portability and skill-snippet compile bu
 Package-manager-specific troubleshooting exceptions match exact file and text, so
 inserting lines above them cannot hide a new command or break a valid exception.
 The spec-coverage gate passes under the required Node.js 22.15 runtime.
+
+Queue and notification integration tests probe Redis at localhost:6390 (override
+with QUEUE_REDIS_HOST/QUEUE_REDIS_PORT). Without Redis, local runs skip those cases
+and continue unit tests. CI or WARLOCK_REDIS_INTEGRATION=1 fails when the service is
+missing. A disposable local service can use `redis-server --bind 127.0.0.1 --port
+6390 --save "" --appendonly no`; stop only the instance you started.

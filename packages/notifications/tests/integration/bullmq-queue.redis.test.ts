@@ -1,3 +1,4 @@
+import { redisTestsAvailable } from "../../../queue/tests/redis-availability";
 /**
  * Integration specs against a REAL Redis (no mocking `@warlock.js/queue`).
  * Point them at one with `QUEUE_REDIS_HOST` / `QUEUE_REDIS_PORT` (default
@@ -58,7 +59,9 @@ const recipient = (id: number, email: string): Notifiable =>
 
 type Delivery = { payload: unknown; route: unknown; at: number };
 
-describe("bullmqQueue (notifications → @warlock.js/queue → channel.send)", () => {
+const redisAvailable = await redisTestsAvailable();
+
+describe.skipIf(!redisAvailable)("bullmqQueue (notifications → @warlock.js/queue → channel.send)", () => {
   const deliveries: Delivery[] = [];
 
   beforeEach(() => {

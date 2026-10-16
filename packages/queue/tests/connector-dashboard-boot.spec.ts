@@ -1,3 +1,4 @@
+import { redisTestsAvailable } from "./redis-availability";
 import Fastify, { type FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { closeQueue, defineJob, queueConnector, resetQueueConfig } from "../src";
@@ -10,7 +11,9 @@ import { testQueueConfig } from "./test-redis";
  * is what a real app does, and what the mountQueueDashboard specs (which set
  * it by hand) cannot see.
  */
-describe("queueConnector().boot() with the dashboard enabled", () => {
+const redisAvailable = await redisTestsAvailable();
+
+describe.skipIf(!redisAvailable)("queueConnector().boot() with the dashboard enabled", () => {
   let server: FastifyInstance;
 
   beforeEach(() => {

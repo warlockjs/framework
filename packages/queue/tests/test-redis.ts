@@ -3,8 +3,8 @@ import type { QueueConfig } from "../src";
 
 /**
  * Specs run against a REAL Redis. Point them at one with `QUEUE_REDIS_HOST` /
- * `QUEUE_REDIS_PORT` (default 127.0.0.1:6390). There is no skip path: an
- * unreachable server fails the run.
+ * `QUEUE_REDIS_PORT` (default 127.0.0.1:6390). Local integration cases skip with a message when Redis is unavailable.
+ * CI and explicitly requested integration runs require the service.
  */
 export function testQueueConfig(overrides: Partial<QueueConfig> = {}): QueueConfig {
   return {

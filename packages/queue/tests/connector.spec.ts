@@ -1,7 +1,10 @@
+import { redisTestsAvailable } from "./redis-availability";
 import { setConfig } from "@warlock.js/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { closeQueue, defineJob, queueConnector, runningWorkers } from "../src";
 import { testQueueConfig, waitFor } from "./test-redis";
+
+const redisAvailable = await redisTestsAvailable();
 
 describe("queueConnector", () => {
   afterEach(async () => {
@@ -16,7 +19,7 @@ describe("queueConnector", () => {
     expect(connector.shouldRestart(["src/config/app.ts"])).toBe(false);
   });
 
-  it("reads the `queue` config key, starts workers, and closes them on shutdown", async () => {
+  it.skipIf(!redisAvailable)("reads the `queue` config key, starts workers, and closes them on shutdown", async () => {
     let processed = 0;
     const job = defineJob({
       name: "spec.connector",

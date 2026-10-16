@@ -1,3 +1,4 @@
+import { redisTestsAvailable } from "./redis-availability";
 import { Job } from "bullmq";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -11,7 +12,9 @@ import {
 } from "../src";
 import { sleep, testQueueConfig, waitFor } from "./test-redis";
 
-describe("@warlock.js/queue against a real Redis", () => {
+const redisAvailable = await redisTestsAvailable();
+
+describe.skipIf(!redisAvailable)("@warlock.js/queue against a real Redis", () => {
   beforeEach(() => {
     setQueueConfig(testQueueConfig({ workers: { concurrency: 1 } }));
   });

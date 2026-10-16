@@ -1,3 +1,4 @@
+import { redisTestsAvailable } from "./redis-availability";
 import type { HttpContext, Middleware } from "@warlock.js/core";
 import { t } from "@warlock.js/core";
 // Not a queue dependency — reused from core's install so the test server can
@@ -46,7 +47,9 @@ function buildGuard(): Middleware {
   return guard;
 }
 
-describe("a guard middleware running on the bull-board dashboard over real HTTP", () => {
+const redisAvailable = await redisTestsAvailable();
+
+describe.skipIf(!redisAvailable)("a guard middleware running on the bull-board dashboard over real HTTP", () => {
   let server: FastifyInstance;
   let baseUrl: string;
 

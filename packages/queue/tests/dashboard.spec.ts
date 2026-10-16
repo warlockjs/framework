@@ -1,3 +1,4 @@
+import { redisTestsAvailable } from "./redis-availability";
 import Fastify from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -10,12 +11,14 @@ import {
 } from "../src";
 import { testQueueConfig } from "./test-redis";
 
+const redisAvailable = await redisTestsAvailable();
+
 describe("queueDashboard", () => {
   afterEach(async () => {
     await closeQueue();
   });
 
-  it("mounts bull-board on a Fastify server and lists the queue", async () => {
+  it.skipIf(!redisAvailable)("mounts bull-board on a Fastify server and lists the queue", async () => {
     setQueueConfig(testQueueConfig());
     const job = defineJob({
       name: "spec.dashboard",

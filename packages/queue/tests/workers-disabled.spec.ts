@@ -1,8 +1,11 @@
+import { redisTestsAvailable } from "./redis-availability";
 import { afterEach, describe, expect, it } from "vitest";
 import { closeQueue, defineJob, setQueueConfig, startWorkers } from "../src";
 import { sleep, testQueueConfig } from "./test-redis";
 
-describe("workers.enabled = false", () => {
+const redisAvailable = await redisTestsAvailable();
+
+describe.skipIf(!redisAvailable)("workers.enabled = false", () => {
   afterEach(async () => {
     await closeQueue();
   });
