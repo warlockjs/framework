@@ -1,4 +1,4 @@
-import type { CliFlags } from "../commands/create-new-app/types";
+import type { CliFlags, LintToolchain } from "../commands/create-new-app/types";
 import { getDefaultFeatureKeys } from "../features/features-map";
 import { getPreferredPackageManager } from "../helpers/package-manager";
 
@@ -22,11 +22,13 @@ export type WizardSeeds = {
   aiProviders: string[];
   useGit: boolean;
   useJWT: boolean;
+  lint: LintToolchain;
 };
 
 export function seedFromFlags(cli: CliFlags): WizardSeeds {
   return {
     packageManager: cli.pm ?? getPreferredPackageManager(),
+    lint: cli.lint === "oxc" ? "oxc" : "eslint",
     databaseDriver: cli.db,
     features: cli.features ?? defaultFeatures(cli),
     aiProviders: cli.ai ?? [],

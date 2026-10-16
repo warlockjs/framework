@@ -85,6 +85,7 @@ function makeFakeApp(
     configureDatabaseConfig: vi.fn(function (this: unknown) {
       return this;
     }),
+    configureLintToolchain: vi.fn(() => true),
     configureWebStarter: vi.fn(function (this: unknown) {
       return this;
     }),
@@ -129,6 +130,7 @@ describe("createWarlockApp — template + base install", () => {
     expect(fake.updateDotEnv).toHaveBeenCalledTimes(1);
     expect(fake.configureDatabaseEnv).toHaveBeenCalledWith("mongodb");
     expect(fake.configureWebStarter).toHaveBeenCalledWith(false);
+    expect(fake.configureLintToolchain).toHaveBeenCalledOnce();
   });
 
   it("uses web ownership only when the web feature was selected", async () => {

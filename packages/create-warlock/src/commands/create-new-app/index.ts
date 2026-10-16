@@ -28,6 +28,7 @@ import { hasInteractiveStdin } from "../../helpers/tty";
 import { askAgentTargets } from "../../prompts/ask-agent-targets";
 import { askAiFeatures } from "../../prompts/ask-ai-features";
 import { askFeatures } from "../../prompts/ask-features";
+import { askLintToolchain } from "../../prompts/ask-lint-toolchain";
 import { askProjectName } from "../../prompts/ask-project-name";
 import { askStack } from "../../prompts/ask-stack";
 import { showIntroBanner } from "../../ui/banner";
@@ -155,6 +156,12 @@ async function createFullWizard(
 
   setPackageManager(packageManager as string);
 
+  const lint = await askLintToolchain(seeds.lint);
+  if (isCancel(lint)) {
+    cancel("Toolchain selection cancelled");
+    process.exit(0);
+  }
+
   // Step 3: Database driver selection
   const databaseDriver = await select({
     message: "Choose your database driver",
@@ -231,6 +238,7 @@ async function createFullWizard(
       useGit,
       useJWT,
       agents,
+      lint,
     },
   };
 
@@ -341,6 +349,12 @@ export type SyncAppOptions = Omit<AppOptions, "agents">;
  * before any file is written.
  */
 export function resolveNonInteractiveOptions(cli: CliFlags): SyncAppOptions {
+  const lint = cli.lint ?? "eslint";
+  if (lint !== "eslint" && lint !== "oxc") {
+    throw new Error(
+      `Unknown lint toolchain "${lint}". Use --lint=eslint or --lint=oxc.`,
+    );
+  }
   const databaseDriver = cli.db ?? "mongodb";
   const noDatabase = isNoDatabase(databaseDriver);
   const driver = noDatabase ? undefined : getDatabaseDriver(databaseDriver);
@@ -383,6 +397,7 @@ export function resolveNonInteractiveOptions(cli: CliFlags): SyncAppOptions {
     databasePort: driver?.defaultPort ?? 27017,
     features,
     aiProviders,
+    lint,
     useGit: cli.git ?? false,
     useJWT: cli.jwt ?? false,
   };
@@ -419,7 +434,7 @@ async function createNonInteractive(cli: CliFlags) {
       "A project name is required and no terminal is available to ask for one. " +
         "Pass it as the first argument or --name=<name>. Non-interactive flags: " +
         "--yes, --pm=<npm|yarn|pnpm|bun>, --db=<driver>|--no-db, --features=<list>, " +
-        "--ai=<list>, --git|--no-git, --jwt|--no-jwt.",
+        "--ai=<list>, --lint=<oxc|eslint>, --git|--no-git, --jwt|--no-jwt.",
     );
     process.exit(1);
   }

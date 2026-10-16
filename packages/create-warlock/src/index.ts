@@ -5,7 +5,16 @@ import { NO_DATABASE } from "./features/database-drivers";
 import { buildHelpText } from "./flags/definitions";
 import { packageRoot } from "./helpers/paths";
 
-const valueFlags = ["name", "db", "pm", "features", "ai", "agents", "stack"];
+const valueFlags = [
+  "name",
+  "db",
+  "pm",
+  "features",
+  "ai",
+  "agents",
+  "stack",
+  "lint",
+];
 
 const HELP_TEXT = buildHelpText();
 
@@ -85,6 +94,9 @@ export function parseFlags(argv: string[]): CliFlags {
         // from omitting the flag. The command validator rejects this empty
         // value instead of silently selecting the preferred manager.
         flags.pm = value ?? "";
+        break;
+      case "lint":
+        flags.lint = value ?? "";
         break;
       case "features":
         flags.features = splitList(value);

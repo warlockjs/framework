@@ -195,3 +195,22 @@ counts update when returning to the menu, and **Continue** keeps the selection.
 Flags preselect their existing feature keys. Both menus and checklists retain
 terminal paging. The decisions overview previews up to six feature/AI keys with
 a total count; the success screen shows the complete list.
+
+
+## Choose the linter and formatter
+
+`--lint=eslint` is the default. `--lint=oxc` (also `--lint oxc`) installs exact
+`oxlint@1.88.0` and `oxfmt@0.73.0` versions, emits `.oxlintrc.json` and
+`.oxfmtrc.json`, and removes the template's ESLint/Prettier configs and dependencies.
+The custom wizard prompts for the same choice; a flag preselects it.
+
+```bash
+npm create warlock@latest my-app -- --lint=oxc --yes
+```
+
+Both choices provide `lint`/`format` and non-mutating `lint:check`/`format:check`
+scripts. Oxc config enables `devServer.healthCheckers: { eslint: false, oxlint: true }`
+and leaves TypeScript health checks enabled. Style matches the template's 100-column,
+double-quote, semicolon and trailing-comma settings. Oxfmt does not perform
+`prettier-plugin-organize-imports`' semantic import sorting/removal, so maintain
+import order and remove unused imports based on lint diagnostics.

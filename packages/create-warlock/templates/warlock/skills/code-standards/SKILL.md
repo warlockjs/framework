@@ -1,6 +1,6 @@
 ---
 name: code-standards
-description: 'Project-level TypeScript code standards for apps built on Warlock.js — `interface` vs `type`, access modifiers, no `any`, no inline-duplicated unions, file-naming suffixes (`.contract.ts` / `.type.ts` / `.service.ts` / `.model.ts` / `.resource.ts` / `.spec.ts`), single-responsibility files, FP-factory + internal-class pattern, brace-every-control-block readability with blank lines between consecutive blocks, JSDoc on public surface and non-obvious logic, error classes extending framework errors, async/await + `Promise.all`, `undefined` over `null`, Vitest co-located, ESLint + Prettier. Triggers: writing/editing any `.ts` / `.tsx` file in this project; user asks "what are the code standards / style rules / conventions"; spawning a sub-agent that will write code; reviewing a diff for style issues; deciding `interface` vs `type`, when to use a class, where helpers live, how to name a file, or whether something needs JSDoc. Skip: pure-Markdown / JSON / YAML edits with no code change; runtime / behavior questions about a specific framework primitive — load the relevant `@warlock.js/<pkg>` skill instead; package-publishing or CI workflow questions.'
+description: 'Project-level TypeScript code standards for apps built on Warlock.js — `interface` vs `type`, access modifiers, no `any`, no inline-duplicated unions, file-naming suffixes (`.contract.ts` / `.type.ts` / `.service.ts` / `.model.ts` / `.resource.ts` / `.spec.ts`), single-responsibility files, FP-factory + internal-class pattern, brace-every-control-block readability with blank lines between consecutive blocks, JSDoc on public surface and non-obvious logic, error classes extending framework errors, async/await + `Promise.all`, `undefined` over `null`, Vitest co-located, ESLint/Prettier or Oxlint/Oxfmt. Triggers: writing/editing any `.ts` / `.tsx` file in this project; user asks "what are the code standards / style rules / conventions"; spawning a sub-agent that will write code; reviewing a diff for style issues; deciding `interface` vs `type`, when to use a class, where helpers live, how to name a file, or whether something needs JSDoc. Skip: pure-Markdown / JSON / YAML edits with no code change; runtime / behavior questions about a specific framework primitive — load the relevant `@warlock.js/<pkg>` skill instead; package-publishing or CI workflow questions.'
 ---
 
 # Code Standards
@@ -551,7 +551,12 @@ A secret with no safe default (a payment key, a signing secret) should fail loud
 
 ## 11. Tooling
 
-Ship a `.eslintrc` with at least these rules on:
+Use the project's selected toolchain: `eslint.config.js` + `.prettierrc.json`, or
+`.oxlintrc.json` + `.oxfmtrc.json`. Run `npm run lint:check` and
+`npm run format:check` for non-mutating checks. The Oxc scaffold enables the
+Oxlint development health checker and retains TypeScript checking.
+
+For ESLint, consider enabling these additional rules:
 
 - `@typescript-eslint/explicit-member-accessibility` — enforces § 1.2
 - `@typescript-eslint/no-explicit-any` — enforces § 1.3
@@ -561,7 +566,7 @@ Ship a `.eslintrc` with at least these rules on:
 - `curly` — enforces braces (§ 4.4)
 - `no-console` — enforces § 8
 
-Match the project's `.prettierrc` exactly. If two configs are present and disagree, the one closer to the file wins (Prettier's resolution order). Don't fight the formatter — configure it, then trust it.
+Match the selected formatter config: `.prettierrc.json` or `.oxfmtrc.json`. Both use 100 columns, double quotes, semicolons and trailing commas. Oxfmt does not run `prettier-plugin-organize-imports`; maintain import order and remove unused imports separately, then run the linter.
 
 ---
 
@@ -583,7 +588,7 @@ Before any change ships:
 - [ ] JSDoc on every public export and every multi-method class
 - [ ] No `console.log`, `log.<level>(module, action, message, context)` signature used correctly
 - [ ] Tests co-located, public-surface-driven
-- [ ] `tsc --noEmit` and `eslint` pass clean
+- [ ] `tsc --noEmit`, `npm run lint:check` and `npm run format:check` pass clean
 
 **Non-negotiable defaults**
 - [ ] Every untrusted input has a `@warlock.js/seal` schema at the boundary

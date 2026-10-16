@@ -88,6 +88,7 @@ export async function createWarlockApp(
     }
 
     application.configureWebStarter(features.includes("web"));
+    application.configureLintToolchain();
     application.configureAgentKitTargets(options.agents ?? ["claude"]);
   } catch (error) {
     templateSpinner.stop(spinnerMessages.templateFailed);

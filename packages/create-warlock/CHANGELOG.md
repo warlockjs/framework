@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Opt-in `--lint=oxc` / `--lint oxc` flag and custom-wizard prompt install pinned Oxlint 1.88.0/Oxfmt 0.73.0, matching lint/style configs and the Oxlint development health checker. ESLint/Prettier remain the default. Both choices include non-mutating `lint:check` and `format:check` scripts.
 - Custom-mode optional features now use paged sections with selected counts and a select-all action per section. The decisions overview previews the selected feature/AI count and keys.
 
 ## 5.30.0 - 2026-10-16

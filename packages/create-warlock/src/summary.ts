@@ -22,6 +22,7 @@ export function printDecisionsSummary({
   const headline = [
     `Using ${packageManager}`,
     `database: ${databaseLabel}`,
+    `lint: ${options.lint ?? "eslint"}`,
     `agent-kit targets: ${options.agents.join(", ")}`,
   ].join(" · ");
 
@@ -35,7 +36,7 @@ export function printDecisionsSummary({
   console.log(
     colors.dim(
       "  change these — package manager: --pm, database: --db/--no-db, agents: --agents, " +
-        "features: --features, ai: --ai, git: --git/--no-git, jwt: --jwt/--no-jwt — " +
+        "features: --features, ai: --ai, lint: --lint, git: --git/--no-git, jwt: --jwt/--no-jwt — " +
         "or re-run with --interactive for the full wizard. Package-manager-level choices " +
         "(husky, lint config, etc.) can also be edited directly in the generated project.",
     ),

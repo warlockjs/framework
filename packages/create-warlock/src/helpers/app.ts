@@ -10,7 +10,11 @@ import {
 } from "@warlock.js/fs";
 import { existsSync, rmSync, unlinkSync } from "node:fs";
 import path from "path";
-import { Application, AppOptions } from "../commands/create-new-app/types";
+import {
+  Application,
+  AppOptions,
+  LintToolchain,
+} from "../commands/create-new-app/types";
 import { getDatabaseDriver } from "../features/database-drivers";
 import { executeCommand, runCommand } from "./exec";
 import { insertImportInSortedPosition } from "./insert-import";
@@ -205,6 +209,70 @@ export class App {
 
     pkg.save();
 
+    return this;
+  }
+
+  /** Apply the selected development tools before dependency installation. */
+  public configureLintToolchain(
+    toolchain: LintToolchain = this.options.lint ?? "eslint",
+  ) {
+    if (toolchain === "eslint") return this;
+
+    // Database and web setup may have edited package.json after it was cached.
+    delete this.jsonFiles[path.resolve(this.path, "package.json")];
+    const pkg = this.package;
+    const content = pkg.content as unknown as {
+      devDependencies: Record<string, string>;
+      scripts: Record<string, string>;
+    };
+    const deps = content.devDependencies;
+    for (const dependency of [
+      "@types/prettier",
+      "@typescript-eslint/eslint-plugin",
+      "@typescript-eslint/parser",
+      "eslint",
+      "eslint-config-prettier",
+      "eslint-plugin-prettier",
+      "eslint-plugin-unused-imports",
+      "prettier",
+      "prettier-plugin-organize-imports",
+    ])
+      delete deps[dependency];
+    Object.assign(deps, { oxlint: "1.88.0", oxfmt: "0.73.0" });
+    Object.assign(content.scripts, {
+      lint: "oxlint --fix ./src --max-warnings=0",
+      "lint:check": "oxlint ./src --max-warnings=0",
+      format: "oxfmt --write ./src",
+      "format:check": "oxfmt --check ./src",
+    });
+    pkg.save();
+
+    for (const fileName of [
+      "eslint.config.js",
+      ".prettierrc.json",
+      ".prettierignore",
+    ]) {
+      rmSync(path.join(this.path, fileName), { force: true });
+    }
+    for (const fileName of [".oxlintrc.json", ".oxfmtrc.json"]) {
+      copyFile(
+        packageRoot("templates", "toolchains", "oxc", fileName),
+        path.join(this.path, fileName),
+      );
+    }
+
+    const config = this.file("warlock.config.ts");
+    if (!config.content.includes("healthCheckers:")) {
+      config
+        .replace(
+          "export default defineConfig({",
+          `export default defineConfig({
+  devServer: {
+    healthCheckers: { eslint: false, oxlint: true },
+  },`,
+        )
+        .save();
+    }
     return this;
   }
 

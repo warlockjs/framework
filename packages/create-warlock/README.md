@@ -171,3 +171,29 @@ paged to the terminal height and hints fit the available width.
 The decisions overview shows the total selected feature/AI count and up to six
 keys, followed by `+N more` for longer selections. The final success screen lists
 all selected feature keys.
+
+
+### Optional Oxc tooling
+
+Pass `--lint=oxc` (or `--lint oxc`) to scaffold with Oxlint **1.88.0** and Oxfmt
+**0.73.0**. The full `--customize` wizard offers the same choice and preselects
+any supplied flag. The default is `--lint=eslint`, which keeps ESLint/Prettier.
+Unknown or missing `--lint` values fail before copying the project.
+
+```bash
+npm create warlock@latest my-app -- --lint=oxc --yes
+```
+
+Oxc projects receive `.oxlintrc.json` and `.oxfmtrc.json`, replace the template's
+ESLint/Prettier dependencies and configs, and enable the Oxlint development health
+checker while retaining TypeScript checks. Both choices provide `lint`, `format`,
+`lint:check` and `format:check` scripts. The check variants do not modify files.
+
+The Oxlint config preserves the template's unused-variable/import checks,
+explicit class accessibility and type-import style. Oxfmt uses the same 100-column,
+double-quote, semicolon and trailing-comma settings. It does not run
+`prettier-plugin-organize-imports`' semantic import sorting/removal; maintain
+import order and let the linter report unused imports. See the
+[Oxlint config reference](https://oxc.rs/docs/guide/usage/linter/config-file-reference)
+and [Oxfmt config reference](https://oxc.rs/docs/guide/usage/formatter/config-file-reference)
+when adding project rules.

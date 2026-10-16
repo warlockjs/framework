@@ -440,3 +440,30 @@ describe("the scaffolded root is mobile-ready", () => {
     expect(root).not.toMatch(/<meta\s+name="viewport"/);
   });
 });
+
+
+describe("optional Oxc toolchain templates", () => {
+  it("keeps the default template on ESLint and supplies matching Oxc style", () => {
+    const pkg = JSON.parse(read("package.json"));
+    expect(pkg.devDependencies.eslint).toBeTruthy();
+    expect(pkg.devDependencies.oxlint).toBeUndefined();
+    const lint = JSON.parse(read("../toolchains/oxc/.oxlintrc.json"));
+    const format = JSON.parse(read("../toolchains/oxc/.oxfmtrc.json"));
+    const prettier = JSON.parse(read(".prettierrc.json"));
+    expect(lint.rules["typescript/explicit-member-accessibility"][0]).toBe(
+      "error",
+    );
+    expect(lint.rules["typescript/consistent-type-imports"][0]).toBe("error");
+    for (const key of [
+      "semi",
+      "tabWidth",
+      "printWidth",
+      "singleQuote",
+      "arrowParens",
+      "trailingComma",
+      "endOfLine",
+    ]) {
+      expect(format[key]).toEqual(prettier[key]);
+    }
+  });
+});

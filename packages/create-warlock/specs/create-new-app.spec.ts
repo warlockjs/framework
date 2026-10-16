@@ -20,6 +20,7 @@ const text = vi.fn();
 const select = vi.fn();
 const multiselect = vi.fn();
 const confirm = vi.fn();
+const askLintToolchain = vi.fn(async (value: string) => value);
 const cancel = vi.fn();
 
 vi.mock("@clack/prompts", () => ({
@@ -39,6 +40,10 @@ vi.mock("@clack/prompts", () => ({
 // command-level harness's feature answer in the existing prompt queue.
 vi.mock("../src/prompts/ask-features", () => ({
   askFeatures: (initialValues: string[]) => multiselect({ initialValues }),
+}));
+
+vi.mock("../src/prompts/ask-lint-toolchain", () => ({
+  askLintToolchain: (value: string) => askLintToolchain(value),
 }));
 
 // --- @warlock.js/fs (version read) ------------------------------------------
@@ -149,6 +154,9 @@ beforeEach(() => {
   // somewhere unrelated. Drain the prompt queues explicitly.
   [text, select, multiselect, confirm].forEach(mock => mock.mockReset());
   // Re-seed the defaults the mocks lost on clear.
+  askLintToolchain
+    .mockReset()
+    .mockImplementation(async (value: string) => value);
   getSystemPackageManagers.mockReturnValue(["npm", "yarn", "pnpm"]);
   getPreferredPackageManager.mockReturnValue("yarn");
   getPackageManager.mockReturnValue("yarn");
@@ -1173,5 +1181,14 @@ describe("createNewApp — default TTY path", () => {
     const app = capturedApp();
     expect(app.options.databaseDriver).toBe("postgres");
     expect(app.options.agents).toEqual(["claude"]);
+  });
+});
+
+describe("wizard lint toolchain", () => {
+  it("preselects --lint and carries the chosen toolchain into scaffolding", async () => {
+    primeHappyPath();
+    await createNewApp({ interactive: true, lint: "oxc" });
+    expect(askLintToolchain).toHaveBeenCalledWith("oxc");
+    expect(capturedApp().options.lint).toBe("oxc");
   });
 });

@@ -40,8 +40,10 @@ It restarts on file changes.
 | `npm run seed` | Run the database seeders |
 | `npm run jwt` | Generate a JWT secret into `.env` |
 | `npm run tsc` | Type-check without building |
-| `npm run lint` | ESLint, auto-fixing what it can |
-| `npm run format` | Prettier over `src/` |
+| `npm run lint` | The configured linter, auto-fixing what it can |
+| `npm run format` | The configured formatter over `src/` |
+| `npm run lint:check` | Lint without changing files |
+| `npm run format:check` | Check formatting without changing files |
 | `npm run skills:sync` | Refresh the AI agent skills (see below) |
 
 The `warlock` CLI has more than the scripts expose — run `npx warlock --help`

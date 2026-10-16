@@ -80,8 +80,7 @@ automatically on `postinstall`).
 - `yarn start` — start the production server (`warlock start`)
 - `yarn migrate` / `yarn migrate.fresh` / `yarn migrate.list` — run migrations
 - `yarn seed` — run database seeders
-- `yarn lint` / `yarn format` / `yarn tsc` — lint (eslint --fix), format
-  (prettier), and type-check (`tsc --noEmit`)
+- `yarn lint` / `yarn format` / `yarn tsc` — lint and format with the selected toolchain, and type-check (`tsc --noEmit`)
 - `yarn skills:sync` — re-sync skills from `node_modules` and regenerate the
   derived per-agent files from this `AGENTS.md`
 

@@ -59,6 +59,11 @@ export const FLAG_DEFINITIONS: FlagDefinition[] = [
       "inferred from the invoking agent (npm_config_user_agent) or the system",
   },
   {
+    usage: "--lint=<oxc|eslint>",
+    description: "Linter and formatter: Oxlint/Oxfmt or ESLint/Prettier",
+    defaultValue: "eslint",
+  },
+  {
     usage: "--agents=<list>",
     description: "Comma-separated agent-kit targets to derive docs/skills for",
     defaultValue: "claude",
