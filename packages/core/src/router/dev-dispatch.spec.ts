@@ -2,6 +2,8 @@
  * Dev/prod router parity (finding C1:B21): HEAD-only, OPTIONS, per-route
  * rateLimit and the 404 body behave under `scanDevServer` as they do in `scan`.
  */
+import config from "@mongez/config";
+import { log } from "@warlock.js/logger";
 import fastifyCors from "@fastify/cors";
 import fastifyRateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance } from "fastify";
@@ -41,7 +43,23 @@ describe("dev router parity", () => {
   afterEach(async () => {
     await server?.close();
     vi.restoreAllMocks();
+    config.set("http.logging", undefined);
     (router as any).routes = [];
+  });
+
+  it("withholds private queries from dev-dispatch errors", async () => {
+    config.set("http.logging", { private: [{ path: "/private", query: false }] });
+    const logError = vi.spyOn(log, "error").mockImplementation(() => log);
+    vi.mocked(router["handleRoute"]).mockImplementation(() => async () => {
+      throw new Error("dispatch failure");
+    });
+    router.get("/private", () => undefined);
+    server = await devServer();
+    await server.inject({ method: "GET", url: "/private?note=secret-sentinel" });
+    expect(logError).toHaveBeenCalledWith("router", "dev-dispatch", expect.any(Error), {
+      method: "GET",
+      url: "/private",
+    });
   });
 
   it("serves an explicit HEAD-only route", async () => {
@@ -86,9 +104,13 @@ describe("dev router parity", () => {
   });
 
   it("applies a per-route rateLimit", async () => {
-    router.get("/limited", (() => undefined) as any, {
-      rateLimit: { max: 1, timeWindow: 60_000 },
-    } as any);
+    router.get(
+      "/limited",
+      (() => undefined) as any,
+      {
+        rateLimit: { max: 1, timeWindow: 60_000 },
+      } as any,
+    );
     server = await devServer();
 
     const first = await server.inject({ method: "GET", url: "/limited" });

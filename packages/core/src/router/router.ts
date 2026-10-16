@@ -7,7 +7,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { container } from "../container";
 import { buildCorsOptions } from "../http/build-cors-options";
 import { Request } from "../http/request";
-import { redactUrlCredentials } from "../http/request-log-snapshot";
+import { buildRequestLogSnapshot } from "../http/request-log-snapshot";
 import { Response } from "../http/response";
 import { type FastifyInstance } from "../http/server";
 import { buildTracingContext, dispatchPhase, isTracingEnabled } from "../http/tracing";
@@ -1108,7 +1108,12 @@ export class Router {
       } catch (error) {
         log.error("router", "dev-dispatch", error as Error, {
           method: fastifyRequest.method,
-          url: redactUrlCredentials(fastifyRequest.url),
+          url: buildRequestLogSnapshot({
+            id: fastifyRequest.id,
+            method: fastifyRequest.method,
+            url: fastifyRequest.url,
+            route: match.route,
+          }).url,
         });
 
         throw error;
@@ -1124,7 +1129,10 @@ export class Router {
     const corsOwnsPreflight = buildCorsOptions().preflight !== false;
 
     for (const method of DEV_DISPATCH_METHODS) {
-      if (method === "OPTIONS" && (corsOwnsPreflight || server.hasRoute({ method: "OPTIONS", url: "*" }))) {
+      if (
+        method === "OPTIONS" &&
+        (corsOwnsPreflight || server.hasRoute({ method: "OPTIONS", url: "*" }))
+      ) {
         continue;
       }
 

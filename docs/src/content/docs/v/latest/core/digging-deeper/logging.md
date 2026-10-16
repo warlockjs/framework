@@ -54,20 +54,20 @@ The shape is **module / action / message / context** — four positional argumen
 
 Six levels with conventional severity ordering:
 
-| Level     | When to use                                                             |
-| --------- | ----------------------------------------------------------------------- |
-| `debug`   | Verbose internals — disabled by default in production via min-level     |
-| `info`    | Routine events worth observing — request start, job picked up, etc.     |
+| Level     | When to use                                                            |
+| --------- | ---------------------------------------------------------------------- |
+| `debug`   | Verbose internals — disabled by default in production via min-level    |
+| `info`    | Routine events worth observing — request start, job picked up, etc.    |
 | `success` | An outcome you want to highlight — same severity as info, separate icon |
-| `warn`    | Something unexpected but not actionable — partial failures, fallbacks   |
-| `error`   | Something went wrong and you should know about it                       |
-| `fatal`   | Unrecoverable failure — the app is going down                           |
+| `warn`    | Something unexpected but not actionable — partial failures, fallbacks  |
+| `error`   | Something went wrong and you should know about it                      |
+| `fatal`   | Unrecoverable failure — the app is going down                          |
 
 Set a minimum level to drop noise before any channel runs:
 
 ```ts
-log.setMinLevel("info"); // drop debug entries everywhere
-log.setMinLevel("warn"); // production-quiet — only warn/error
+log.setMinLevel("info");    // drop debug entries everywhere
+log.setMinLevel("warn");    // production-quiet — only warn/error
 log.setMinLevel(undefined); // accept all
 ```
 
@@ -87,11 +87,11 @@ import { type LogConfigurations } from "@warlock.js/core";
 import { ConsoleLog, JSONFileLog } from "@warlock.js/logger";
 
 const consoleLog = new ConsoleLog({
-  showContext: true, // pretty-print context on a second line
+  showContext: true,   // pretty-print context on a second line
 });
 
 const logConfigurations: LogConfigurations = {
-  channels: [consoleLog], // runs in every environment
+  channels: [consoleLog],   // runs in every environment
   production: {
     channels: [
       new JSONFileLog({
@@ -105,11 +105,11 @@ const logConfigurations: LogConfigurations = {
 export default logConfigurations;
 ```
 
-| Field         | Read by the core wrapper? | Behaviour                                                          |
-| ------------- | ------------------------- | ------------------------------------------------------------------ |
-| `channels`    | Yes                       | Channels active in **all** environments (merged with env-specific) |
-| `development` | Yes (its `.channels`)     | Channels added on top when the environment is `development`        |
-| `production`  | Yes (its `.channels`)     | Channels added on top when the environment is `production`         |
+| Field           | Read by the core wrapper? | Behaviour                                                          |
+| --------------- | ------------------------- | ----------------------------------------------------------------- |
+| `channels`      | Yes                       | Channels active in **all** environments (merged with env-specific) |
+| `development`   | Yes (its `.channels`)     | Channels added on top when the environment is `development`        |
+| `production`    | Yes (its `.channels`)     | Channels added on top when the environment is `production`         |
 
 The merge is `[...channels, ...env.channels]` — a channel in `channels` runs everywhere, and `production.channels` adds production-only destinations.
 
@@ -142,10 +142,10 @@ Three channels ship with `@warlock.js/logger`. They share a common base — inst
 
 ```ts
 new ConsoleLog({
-  showContext: false, // default — context is dropped on console
-  contextDepth: 4, // util.inspect depth, when showContext is true
+  showContext: false,      // default — context is dropped on console
+  contextDepth: 4,         // util.inspect depth, when showContext is true
   // BasicLogConfigurations:
-  levels: ["info", "warn", "error"], // per-channel level filter
+  levels: ["info", "warn", "error"],   // per-channel level filter
   filter: (data) => !data.message.includes("noisy"),
   redact: { paths: ["context.token"], censor: "[REDACTED]" },
 });
@@ -239,8 +239,8 @@ Channel-level redaction:
 ```ts
 new ConsoleLog({
   redact: {
-    paths: ["context.email"], // adds to the logger-wide list
-    censor: "[hidden]", // overrides the censor for this channel
+    paths: ["context.email"],   // adds to the logger-wide list
+    censor: "[hidden]",          // overrides the censor for this channel
   },
 });
 ```
@@ -305,11 +305,11 @@ Each channel inherits `BasicLogConfigurations`:
 
 ```ts
 type BasicLogConfigurations = {
-  levels?: LogLevel[]; // accept only these levels
+  levels?: LogLevel[];                              // accept only these levels
   dateFormat?: { date?: string; time?: string };
-  filter?: (data: LoggingData) => boolean; // custom predicate
-  context?: (data: LoggingData) => Promise<Record<string, any>>; // enrich
-  redact?: RedactConfig; // additive on top of logger floor
+  filter?: (data: LoggingData) => boolean;          // custom predicate
+  context?: (data: LoggingData) => Promise<Record<string, any>>;  // enrich
+  redact?: RedactConfig;                            // additive on top of logger floor
 };
 ```
 
@@ -381,11 +381,11 @@ The pattern reads like a transcript — start, success, failure with the same `m
 ```ts title="src/config/log.ts"
 const logConfigurations: LogConfigurations = {
   development: {
-    channels: [new ConsoleLog({ showContext: true })], // debug-friendly
+    channels: [new ConsoleLog({ showContext: true })],   // debug-friendly
   },
   production: {
     channels: [
-      new ConsoleLog({ levels: ["info", "success", "warn", "error"] }), // drop debug
+      new ConsoleLog({ levels: ["info", "success", "warn", "error"] }),  // drop debug
       new JSONFileLog({ storagePath: "/var/log/app", rotate: true }),
     ],
   },
@@ -442,12 +442,6 @@ The timer always logs — even on error — so you get both the happy-path timin
 - **`log.assert(condition, ...)` is free on truthy conditions.** No string formatting runs, no channel is called. Cheap to use liberally.
 - **`enabled` and `test` in `src/config/log.ts` are inert.** The core `setLogConfigurations()` wrapper only reads `channels` plus the `development`/`production` env blocks' `channels`. `enabled: false` does not disable anything, and a `test:` block is never consulted (under test, only top-level `channels` apply). To turn logging off, ship an empty `channels` list or filter per-channel with `levels`.
 
-## See also
-
-- **[Configuration](../architecture-concepts/configuration-deep.md)** — the `src/config/log.ts` shape and how env-specific blocks compose.
-- **[Bootstrap and connectors](../architecture-concepts/bootstrap-and-connectors.md)** — where the logger is wired into the bootstrap sequence and `captureAnyUnhandledRejection` lives.
-- **[`@warlock.js/logger`](/v/latest/logger/)** — the underlying package, for custom channels and redact-config patterns beyond the warlock surface.
-
 ## Hide input for a family of URLs
 
 ```ts
@@ -464,14 +458,24 @@ export default {
 ```
 
 String paths match a prefix at a segment boundary. Regexes match the decoded,
-normalized pathname: repeated slashes, trailing slashes, dot segments and encoded
-slashes are normalized before matching. These rules apply even when no route
+pathname candidates: raw, decoded, and decoded with dot segments resolved, each
+with repeated/trailing slashes collapsed. Any match suppresses input; normalization
+never narrows a raw-path match. The matched route pattern is checked too. These rules apply even when no route
 matches. Matching rules combine and only remove input; a route cannot re-enable
 fields they suppress. `query: false` also removes the logged URL's query string.
 With private policies configured, an undecodable path withholds both body and
-query. The URL's original path spelling is retained in the snapshot.
+query. An undecodable configured prefix suppresses its selected fields for all
+requests. Rules assume case-sensitive routing defaults; with case-insensitive
+routing, use a regex with `i` and include any custom semicolon delimiters in the
+matcher. The URL's original path spelling is retained in the snapshot.
 
 When upgrading from 5.29, update redaction censors that inspect `context.request`:
 it is a `RequestLogSnapshot`, with `url` and `route` (a string), rather than a
 Request instance with `baseRequest.url` or `route.path`. Custom log calls can use
 `request.toLogSnapshot()` to apply these same policies.
+
+## See also
+
+- **[Configuration](../architecture-concepts/configuration-deep.md)** — the `src/config/log.ts` shape and how env-specific blocks compose.
+- **[Bootstrap and connectors](../architecture-concepts/bootstrap-and-connectors.md)** — where the logger is wired into the bootstrap sequence and `captureAnyUnhandledRejection` lives.
+- **[`@warlock.js/logger`](/v/latest/logger/)** — the underlying package, for custom channels and redact-config patterns beyond the warlock surface.

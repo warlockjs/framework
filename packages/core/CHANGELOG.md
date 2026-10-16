@@ -10,7 +10,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Upgrading
 
-- Redaction censors upgrading from 5.29 must read `context.request.url` and the `route` string from the snapshot; `context.request.baseRequest.url` and `context.request.route.path` no longer exist after the 5.30 snapshot change.
 - **BREAKING:** upgrade development and production runtimes to Node.js 22.15 or newer before running the CLI.
 
 ### Added
@@ -18,7 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - SSE supports unnamed events (`send(undefined, data)`) and raw string payloads through a fourth `{ raw: true }` argument, with safe multiline `data:` encoding. SSE and streams preserve pre-set cache headers and accept `headers` before flushing.
 - SSE and stream controllers gain synchronous `enqueue()` with a byte cap (`maxQueuedBytes`, default 1 MiB for enqueue), disconnect/drop overflow policies, ordered draining and flushing accepted queued output on `end()`.
 
-- `http.logging.private` applies path-prefix or regular-expression policies to decoded, normalized request URLs, including unmatched requests. Matching policies remove body/query input before snapshots are built and cannot be overridden by per-route logging.
+- `http.logging.private` applies path-prefix or regular-expression policies to decoded, normalized request URLs, including unmatched requests. Matching policies check raw, decoded and resolved paths plus the matched route pattern, remove input before snapshots are built and cannot be overridden by per-route logging. Dev-dispatch error URLs use the same policy.
 
 ### Fixed
 

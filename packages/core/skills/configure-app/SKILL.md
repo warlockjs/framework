@@ -345,12 +345,16 @@ export default {
 ```
 
 String paths match a prefix at a segment boundary. Regexes match the decoded,
-normalized pathname: repeated slashes, trailing slashes, dot segments and encoded
-slashes are normalized before matching. These rules apply even when no route
+pathname candidates: raw, decoded, and decoded with dot segments resolved, each
+with repeated/trailing slashes collapsed. Any match suppresses input; normalization
+never narrows a raw-path match. The matched route pattern is checked too. These rules apply even when no route
 matches. Matching rules combine and only remove input; a route cannot re-enable
 fields they suppress. `query: false` also removes the logged URL's query string.
 With private policies configured, an undecodable path withholds both body and
-query. The URL's original path spelling is retained in the snapshot.
+query. An undecodable configured prefix suppresses its selected fields for all
+requests. Rules assume case-sensitive routing defaults; with case-insensitive
+routing, use a regex with `i` and include any custom semicolon delimiters in the
+matcher. The URL's original path spelling is retained in the snapshot.
 
 When upgrading from 5.29, update redaction censors that inspect `context.request`:
 it is a `RequestLogSnapshot`, with `url` and `route` (a string), rather than a

@@ -210,6 +210,7 @@ function redactQueryValue(value: unknown, isCredential: (name: string) => boolea
 export function resolveRequestLoggingOptions(
   routeOptions: RequestLoggingOptions | undefined,
   url?: string,
+  routePath?: string,
 ): Required<RequestLoggingOptions> & { redactQueryParams: string[] } {
   const global = (config.get("http.logging") ?? {}) as HttpLoggingConfig;
 
@@ -219,16 +220,35 @@ export function resolveRequestLoggingOptions(
     redactQueryParams: global.redactQueryParams ?? [],
   };
   if (!global.private?.length || url === undefined) return options;
-  const pathname = normalizedLoggingPath(url);
-  if (pathname === undefined) return { ...options, body: false, query: false };
+  const candidates = loggingPathCandidates(url);
+  if (candidates === undefined) return { ...options, body: false, query: false };
+  if (routePath) {
+    const routeCandidates = loggingPathCandidates(routePath);
+    if (!routeCandidates) return { ...options, body: false, query: false };
+    candidates.push(...routeCandidates);
+  }
 
   for (const rule of global.private) {
-    const prefix = typeof rule.path === "string" ? normalizedLoggingPath(rule.path) : undefined;
-    const matches =
-      rule.path instanceof RegExp
-        ? new RegExp(rule.path.source, rule.path.flags).test(pathname)
-        : prefix !== undefined &&
-          (prefix === "/" || pathname === prefix || pathname.startsWith(`${prefix}/`));
+    let matches: boolean;
+    if (rule.path instanceof RegExp) {
+      const regex = rule.path;
+      matches = candidates.some((candidate) =>
+        (regex.global || regex.sticky ? new RegExp(regex.source, regex.flags) : regex).test(
+          candidate,
+        ),
+      );
+    } else {
+      const prefixes = loggingPathCandidates(rule.path);
+      // A malformed configured prefix must never silently disable privacy.
+      matches =
+        prefixes === undefined ||
+        prefixes.some((prefix) =>
+          candidates.some(
+            (candidate) =>
+              prefix === "/" || candidate === prefix || candidate.startsWith(`${prefix}/`),
+          ),
+        );
+    }
     if (!matches) continue;
     if (rule.body === false) options.body = false;
     if (rule.query === false) options.query = false;
@@ -236,18 +256,20 @@ export function resolveRequestLoggingOptions(
   return options;
 }
 
-function normalizedLoggingPath(url: string): string | undefined {
+function loggingPathCandidates(url: string): string[] | undefined {
   try {
-    const pathname = /^[a-z][a-z\d+.-]*:\/\//i.test(url)
-      ? new URL(url).pathname
-      : url.split(/[?#]/u)[0];
-    const decoded = decodeURIComponent(pathname).replace(/\\/g, "/");
+    // Preserve raw dot segments in absolute-form requests; URL() would erase them.
+    const pathname = url.replace(/^[a-z][a-z\d+.-]*:\/\/[^/?#]*/i, "").split(/[?#]/u)[0] || "/";
+    const collapse = (path: string) =>
+      path.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/\/$/, "") || "/";
+    const raw = collapse(pathname);
+    const decoded = collapse(decodeURIComponent(pathname));
     const segments: string[] = [];
     for (const segment of decoded.split("/")) {
       if (segment === "..") segments.pop();
       else if (segment && segment !== ".") segments.push(segment);
     }
-    return `/${segments.join("/")}`;
+    return [...new Set([raw, decoded, `/${segments.join("/")}`])];
   } catch {
     // With a private-path policy, undecodable input is withheld rather than guessed.
     return undefined;
@@ -278,7 +300,11 @@ export type RequestLogSource = {
  * Uploaded files are summarised (`{ file, mimeType }`) rather than walked.
  */
 export function buildRequestLogSnapshot(source: RequestLogSource): RequestLogSnapshot {
-  const options = resolveRequestLoggingOptions(source.route?.logging, source.url);
+  const options = resolveRequestLoggingOptions(
+    source.route?.logging,
+    source.url,
+    source.route?.path,
+  );
   const url = options.query ? source.url : stripQuery(source.url);
 
   const snapshot: RequestLogSnapshot = {

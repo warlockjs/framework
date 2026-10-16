@@ -167,6 +167,36 @@ describe("buildRequestLogSnapshot", () => {
     expect(JSON.stringify(snapshot)).not.toContain("sentinel");
   });
 
+  it.each([
+    "/api/private/a%2F..%2F..%2Fpublic?x=secret",
+    "/api/private/..",
+    "/api/private/%2e%2e",
+    "/api/private/a%5C..%5C..%5Cpub",
+    "http://example.test/api/private/../public?x=secret",
+  ])("only widens private matches when normalizing %s", (url) => {
+    config.set("http.logging", { private: [{ path: "/api/private", body: false, query: false }] });
+    const snapshot = buildRequestLogSnapshot({ ...source, url });
+    expect(snapshot.body).toBeUndefined();
+    expect(snapshot.query).toBeUndefined();
+    expect(snapshot.url).not.toContain("?");
+  });
+
+  it("also checks matched route patterns and wildcard paths", () => {
+    config.set("http.logging", { private: [{ path: "/api/runs", body: false, query: false }] });
+    for (const url of ["/api/runs/../../x", "/rewritten"]) {
+      const snapshot = buildRequestLogSnapshot({ ...source, url, route: { path: "/api/runs/*" } });
+      expect(snapshot.body).toBeUndefined();
+      expect(snapshot.query).toBeUndefined();
+    }
+  });
+
+  it("fails closed for an undecodable configured prefix", () => {
+    config.set("http.logging", { private: [{ path: "/files/100%", body: false, query: false }] });
+    const snapshot = buildRequestLogSnapshot({ ...source, url: "/ordinary" });
+    expect(snapshot.body).toBeUndefined();
+    expect(snapshot.query).toBeUndefined();
+  });
+
   it("combines matching rules and prevents routes from re-enabling private input", () => {
     const path = /^\/api\/private(?:\/|$)/g;
     config.set("http.logging", {
