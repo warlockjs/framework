@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- The release gate regenerates every package llms reference before public-text validation and clean-tree checks, so stale projections must be reviewed and committed before packing.
+
 - Package-manager documentation exceptions match exact content and file instead of drifting line numbers, while replacement commands remain checked. CI now runs shipped-doc and skill-snippet gates; the new devtools skill starts with a measured zero-failure allowance.
 
 - Origin install, scaffold and dependency checks retry within the same propagation deadline as registry views. Final failure preserves the runner's release commit in the uploaded logs as a Git bundle and prints artifact restoration, commit import, ancestry verification, branch/tag push and registry blog-check recovery steps.

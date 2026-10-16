@@ -484,6 +484,15 @@ async function prepareAndGate(
   // and running it after 28 builds would waste the whole build for a defect
   // this could have caught first. OVER allowance or UNMEASURED refuses the
   // gate outright, with no handoff, same as every other refusal below.
+  // Regenerate before validation and clean-tree checks. Stale projections become
+  // visible changes to review and commit before this gate may pack a member.
+  await runtime.runCommand({
+    command: process.execPath,
+    args: [path.join(REPO_ROOT, "scripts/regenerate-llms.mjs")],
+    cwd: REPO_ROOT,
+    env: process.env,
+  });
+
   await runtime.runCommand({
     command: process.execPath,
     args: [path.join(REPO_ROOT, "scripts/check-public-text.mjs")],

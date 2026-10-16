@@ -419,3 +419,8 @@ with QUEUE_REDIS_HOST/QUEUE_REDIS_PORT). Without Redis, local runs skip those ca
 and continue unit tests. CI or WARLOCK_REDIS_INTEGRATION=1 fails when the service is
 missing. A disposable local service can use `redis-server --bind 127.0.0.1 --port
 6390 --save "" --appendonly no`; stop only the instance you started.
+
+The release gate runs every package reference generator before validation and
+clean-tree checks. Run `pnpm docs:references` in the workspace to prepare those
+files; commit any changed projections before gating. Generator failure stops the
+gate, and stale generated changes cannot be silently packed.
