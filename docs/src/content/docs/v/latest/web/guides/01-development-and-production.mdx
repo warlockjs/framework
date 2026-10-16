@@ -125,6 +125,14 @@ export const requestContext = (store[key] ??= new AsyncLocalStorage());
 Both copies of the module now read the same instance. `warlock start` has one
 module graph and is unaffected.
 
+Web's locale, document and session React contexts already use a shared registry.
+Vite can reevaluate a context-owning module after an edit while a retained root
+still holds its previous provider. The refreshed hooks reuse that provider's
+context, keeping locale and translations available without restarting the server.
+The registry shares context identity; each provider still supplies its own data.
+A real dev-server regression checks repeated watched edits and includes a control
+that reproduces the missing-provider HTTP error when context identity is split.
+
 ## Dev SSR shares the app's framework package instances
 
 `warlock dev` runs SSR inside Vite's module graph. Before 5.13, an app

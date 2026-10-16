@@ -4,6 +4,10 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ## 5.31.0
 
+### Fixed
+
+- Locale context reuse after development edits is covered by a real Vite dev-server/HMR regression: a retained provider continues to serve refreshed locale and translation hooks after repeated filesystem edits. An unshared-context control reproduces the missing-provider HTTP failure.
+
 ### Added
 
 - `<Form onSettled={outcome => …}>` observes every enhanced submission outcome, including network failures and dropped submissions, after the existing success/error callbacks. Native browser submissions do not invoke it.

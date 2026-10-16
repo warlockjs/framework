@@ -1627,6 +1627,15 @@ Error pages rebind to their own snapshot. If rendering falls through to the fram
 
 In development, add, edit, and delete `locales.json` normally. HMR rebuilds the manifest and publishes a new snapshot. Its revision participates in page-cache selection, so cached payloads do not retain pre-edit JSON.
 
+The framework's locale, document and session contexts share a realm-wide registry.
+When Vite reevaluates their modules after an edit, existing providers and refreshed
+hooks keep the same context identity. A real listening Vite dev-server regression
+fixture verifies locale and translation rendering after repeated watched edits;
+its unshared-context control reproduces the outside-provider error over HTTP.
+This preserves context identity, not request data: locale and translations still
+come from each rendered provider. Components genuinely outside the page pipeline
+continue to throw the missing-provider error.
+
 ## Change locale from a component
 
 ```tsx title="src/web/components/locale-picker.tsx"
