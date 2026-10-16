@@ -1,3 +1,4 @@
+import { maskEmailsInText } from "@warlock.js/logger";
 import type {
   CacheData,
   CacheDriver,
@@ -640,7 +641,7 @@ export class PgCacheDriver
     );
 
     if (rows.length === 0) {
-      throw new Error(`Cannot increment non-numeric value for key: ${parsedKey}`);
+      throw new Error(`Cannot increment non-numeric value for key: ${maskEmailsInText(parsedKey)}`);
     }
 
     const newValue = Number(this.decodeJson(rows[0].value));

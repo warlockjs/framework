@@ -171,6 +171,8 @@ cache.setCacheConfigurations(config);
 await cache.init();
 ```
 
+`logging` turns the per-operation key log (`<key> fetched`, `<key> not found`, ...) on or off. Email addresses inside logged keys are masked (`user.member@example.com` logs as `u***@example.com`), in operation lines and in error lines (which are written even with logging off); other personal data in a key is logged as is, so keep it out of keys or turn logging off in production.
+
 ## Primary ops
 
 ```ts

@@ -1,5 +1,5 @@
 import type { GenericObject } from "@mongez/reinforcements";
-import { log } from "@warlock.js/logger";
+import { log, maskEmailsInText } from "@warlock.js/logger";
 import type {
   CacheDriver,
   CacheKey,
@@ -77,11 +77,20 @@ export class NullCacheDriver
    * {@inheritdoc}
    */
   public async removeNamespace(namespace: string) {
-    log.info("cache", "clearing namespace", namespace);
+    const loggableNamespace = maskEmailsInText(namespace);
 
-    log.success("cache", "namespace cleared", namespace);
+    log.info("cache", "clearing namespace", loggableNamespace);
+
+    log.success("cache", "namespace cleared", loggableNamespace);
 
     return this;
+  }
+
+  /**
+   * The key as it may appear in a log line: parsed, with email addresses masked
+   */
+  protected loggableKey(key: CacheKey): string {
+    return maskEmailsInText(this.parseKey(key));
   }
 
   /**
@@ -92,9 +101,9 @@ export class NullCacheDriver
     _value: any,
     _ttlOrOptions?: CacheTtl | CacheSetOptions,
   ): Promise<any> {
-    log.info("cache", "setting key", key);
+    log.info("cache", "setting key", this.loggableKey(key));
 
-    log.success("cache", "key set", key);
+    log.success("cache", "key set", this.loggableKey(key));
 
     return this;
   }
@@ -103,9 +112,9 @@ export class NullCacheDriver
    * {@inheritdoc}
    */
   public async get(key: CacheKey) {
-    log.info("cache", "fetching", key);
+    log.info("cache", "fetching", this.loggableKey(key));
 
-    log.success("cache", "fetched", key);
+    log.success("cache", "fetched", this.loggableKey(key));
 
     return null;
   }
@@ -114,9 +123,9 @@ export class NullCacheDriver
    * {@inheritdoc}
    */
   public async remove(key: CacheKey) {
-    log.info("cache", "removing", key);
+    log.info("cache", "removing", this.loggableKey(key));
 
-    log.success("cache", "removed", key);
+    log.success("cache", "removed", this.loggableKey(key));
   }
 
   /**

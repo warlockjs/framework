@@ -8,7 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Lockstep release; package APIs are unchanged.
+- Email addresses inside logged cache keys are masked (`user.member@example.com` logs as `u***@example.com`), in the base driver's operation log, in error lines (written even with logging off: SWR refresh failures, lock release, clone failures), in the "Cannot increment non-numeric value" error, and in the null driver (FW-04).
+
+### Fixed
+
+- **`redis` driver `increment()` works on Redis 6.** With a default `ttl` configured it ran `EXPIRE … NX`, which only Redis 7+ accepts: on Redis 6 the call threw after the count had already gone up, which silently disabled login throttles and the cache-backed rate limiter. The increment and the default TTL are now applied together by one Lua script, and a TTL the counter already has is never shortened.
+- The default `increment()` (file and null drivers) reads a counter's value and deadline in one read. A counter that expired between two separate reads used to be rewritten from its stale value with no expiry at all, and every increment rounded the remaining TTL up, pushing the deadline up to a second later each time.
+- `file` driver: an entry stored without a TTL (its `expiresAt` is written to JSON as `null`) was read back by the internal entry reader as already expired, so `swr()` freshness checks and TTL-preserving writes treated it as missing.
 
 ## 5.29.0 - 2026-10-01
 

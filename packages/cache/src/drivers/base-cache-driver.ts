@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { log } from "@warlock.js/logger";
+import { log, maskEmailsInText } from "@warlock.js/logger";
 import { MemoryCacheList } from "../list/memory-cache-list";
 import { TaggedCache } from "../tagged-cache";
 import type {
@@ -741,28 +741,42 @@ export abstract class BaseCacheDriver<
    * {@inheritdoc}
    *
    * Default implementation: read-add-write serialized per key in THIS process,
-   * keeping the entry's remaining TTL (a missing key starts from 0 with the
-   * driver default TTL). Not atomic across servers: drivers with a native
-   * primitive override it (redis `INCRBY`, pg single-statement upsert).
+   * keeping the entry's deadline (a missing key starts from 0 with the driver
+   * default TTL). Not atomic across servers: drivers with a native primitive
+   * override it (redis `INCRBY`, pg single-statement upsert).
+   *
+   * The value and its deadline come from ONE read. Reading them separately
+   * let a counter that expired in between be rewritten from its stale value
+   * with no expiry at all (a login-throttle counter that then never resets).
+   * The remaining TTL is rounded down, so repeated increments can never push
+   * a window's deadline later.
    */
   public async increment(key: CacheKey, value: number = 1): Promise<number> {
     const parsedKey = this.parseKey(key);
 
     return this.runSerialized(parsedKey, async () => {
-      const current = await this.get(key);
+      const entry = await this.getEntry(key);
+      const now = Date.now();
+      const expiresAt = entry?.expiresAt;
+      const live = entry ? expiresAt == null || expiresAt > now : false;
+      const current = entry && live ? entry.data : null;
       const base = current === null || current === undefined ? 0 : current;
 
       if (typeof base !== "number") {
-        throw new Error(`Cannot increment non-numeric value for key: ${parsedKey}`);
+        throw new Error(`Cannot increment non-numeric value for key: ${maskEmailsInText(parsedKey)}`);
       }
 
       const newValue = base + value;
-      const remainingTtl = current === null ? undefined : await this.getRemainingTtl(key);
 
-      if (remainingTtl !== undefined) {
-        await this.set(key, newValue, { ttl: remainingTtl });
-      } else {
+      if (!live) {
+        // missing, or expired since it was read: a fresh counter
         await this.set(key, newValue);
+      } else if (expiresAt == null || expiresAt === Infinity) {
+        await this.set(key, newValue, { ttl: Infinity });
+      } else {
+        await this.set(key, newValue, {
+          ttl: Math.max(1, Math.floor((expiresAt - now) / 1000)),
+        });
       }
 
       return newValue;
@@ -804,7 +818,9 @@ export abstract class BaseCacheDriver<
     if (typeof key === "string") {
       // this will be likely used with file cache driver as it will convert the dot to slash
       // to make it consistent and not to confuse developers we will output the key by making sure it's a dot
-      key = key.replace(/\//g, ".");
+      // An email inside a key (an app's `user.<email>` key, say) is personal
+      // data in a log line; key-based redaction cannot reach it, so mask it.
+      key = maskEmailsInText(key.replace(/\//g, "."));
     }
 
     if (operation === "connectionFailed") {
@@ -843,10 +859,20 @@ export abstract class BaseCacheDriver<
    * passed to the structured logger.
    */
   protected logError(message: string, error?: any) {
+    // Error lines name the key ("SWR background refresh failed for
+    // user.alice@example.com"), and they are written even with logging off,
+    // so addresses are masked here as in `log()`.
+    const maskedMessage = maskEmailsInText(message);
+
     if (error) {
-      log.error("cache." + this.name, "error", message, safeErrorInfo(error));
+      const info = safeErrorInfo(error);
+
+      log.error("cache." + this.name, "error", maskedMessage, {
+        ...info,
+        message: maskEmailsInText(info.message),
+      });
     } else {
-      log.error("cache." + this.name, "error", message);
+      log.error("cache." + this.name, "error", maskedMessage);
     }
   }
 

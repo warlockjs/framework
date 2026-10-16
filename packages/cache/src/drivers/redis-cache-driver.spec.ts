@@ -241,6 +241,17 @@ class FakeRedisClient {
       return 1;
     }
 
+    if (script.includes("redis.call('INCRBY', KEYS[1], ARGV[1])")) {
+      const next = await this.incrBy(key, Number(args[0]));
+      const ttl = Number(args[1]);
+
+      if (ttl > 0 && (await this.ttl(key)) === -1) {
+        this.expires.set(key, Date.now() + ttl * 1000);
+      }
+
+      return next;
+    }
+
     if (script.includes("local v = redis.call('GET', KEYS[1])")) {
       const value = await this.get(key);
       if (value !== null) await this.del(key);
@@ -1010,6 +1021,31 @@ describe("RedisCacheDriver — cross-server atomic ops (wave 2)", () => {
 
     await expect(driver.update("gone", () => null)).resolves.toBeNull();
     expect(fakeClient.store.has("gone")).toBe(false);
+  });
+
+  it("increment gives a new counter the driver's default TTL without EXPIRE NX (Redis 6)", async () => {
+    const driver = await makeDriver();
+    driver.setOptions({ url: "redis://localhost", ttl: 120 });
+    const expire = vi.spyOn(fakeClient, "expire");
+
+    await expect(driver.increment("fresh-counter")).resolves.toBe(1);
+    await expect(driver.increment("fresh-counter", 2)).resolves.toBe(3);
+
+    // `EXPIRE key ttl NX` is Redis >= 7 only; the Lua script works on Redis 6.
+    expect(expire).not.toHaveBeenCalled();
+    expect(fakeClient.evalLog.some((call) => call.script.includes("'INCRBY'"))).toBe(true);
+    const remaining = await fakeClient.ttl("fresh-counter");
+    expect(remaining).toBeGreaterThan(0);
+    expect(remaining).toBeLessThanOrEqual(120);
+  });
+
+  it("increment never shortens a TTL the counter already has", async () => {
+    const driver = await makeDriver();
+    driver.setOptions({ url: "redis://localhost", ttl: 5 });
+    await driver.set("long-counter", 1, 600);
+
+    await expect(driver.increment("long-counter")).resolves.toBe(2);
+    expect(await fakeClient.ttl("long-counter")).toBeGreaterThan(5);
   });
 
   it("increment keeps an existing TTL (INCRBY never resets it)", async () => {

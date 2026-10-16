@@ -92,6 +92,24 @@ export const REDIS_GET_DEL_SCRIPT = `local v = redis.call('GET', KEYS[1])
 if v then redis.call('DEL', KEYS[1]) end
 return v`;
 
+/**
+ * Increment that gives a counter without an expiry the driver's default TTL,
+ * in one round trip.
+ *
+ * KEYS[1]=key; ARGV[1]=amount; ARGV[2]=ttl seconds ('0' = none).
+ *
+ * Replaces `INCRBY` + `EXPIRE … NX`: the `NX` flag needs Redis >= 7.0, and on
+ * Redis 6 the second command failed after the count had already gone up.
+ * `TTL == -1` means "exists without an expiry", so a TTL set earlier (by
+ * `set(..., { ttl })`) is never shortened or reset.
+ */
+export const REDIS_INCREMENT_SCRIPT = `local v = redis.call('INCRBY', KEYS[1], ARGV[1])
+local ttl = tonumber(ARGV[2])
+if ttl > 0 and redis.call('TTL', KEYS[1]) == -1 then
+  redis.call('EXPIRE', KEYS[1], ttl)
+end
+return v`;
+
 /** Compare-and-set attempts before `update()` gives up under contention. */
 const UPDATE_MAX_ATTEMPTS = 10;
 
@@ -751,12 +769,18 @@ export class RedisCacheDriver
 
     this.log("caching", parsedKey);
 
-    const result = await this.client?.incrBy(parsedKey, value);
-
-    // A fresh counter has no TTL; apply the driver default (only if none set).
-    if (this.ttl !== Infinity && this.ttl > 0) {
-      await this.client?.expire(parsedKey, this.ttl, "NX");
-    }
+    // A fresh counter has no TTL; apply the driver default (only if none set),
+    // atomically with the increment and without Redis 7's `EXPIRE … NX`.
+    const defaultTtl = Number.isFinite(this.ttl) && this.ttl > 0 ? Math.ceil(this.ttl) : 0;
+    const result =
+      defaultTtl > 0
+        ? Number(
+            await (this.client as any)?.eval(REDIS_INCREMENT_SCRIPT, {
+              keys: [parsedKey],
+              arguments: [String(value), String(defaultTtl)],
+            }),
+          )
+        : await this.client?.incrBy(parsedKey, value);
 
     this.log("cached", parsedKey);
 

@@ -258,6 +258,8 @@ const cacheConfigurations: CacheConfigurations<"database"> = {
 export default cacheConfigurations;
 ```
 
+`logging` turns the per-operation key log on or off. Email addresses inside a logged key are masked (`user.member@example.com` logs as `u***@example.com`), in operation lines and in error lines (SWR refresh failures, lock release, clone failures), which are written even with `logging: false`; other personal data in a key is logged as is, so keep it out of keys or set `logging: false` in production.
+
 Two things worth highlighting:
 
 - **`globalPrefix` can be a function.** Every driver resolves it per call, so a

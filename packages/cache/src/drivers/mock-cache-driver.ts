@@ -1,3 +1,4 @@
+import { maskEmailsInText } from "@warlock.js/logger";
 import type {
   CacheCall,
   CacheData,
@@ -259,7 +260,7 @@ export class MockCacheDriver
     const current = entry ? entry.data : 0;
 
     if (typeof current !== "number") {
-      throw new Error(`Cannot increment non-numeric value for key: ${parsedKey}`);
+      throw new Error(`Cannot increment non-numeric value for key: ${maskEmailsInText(parsedKey)}`);
     }
 
     const newValue = current + value;

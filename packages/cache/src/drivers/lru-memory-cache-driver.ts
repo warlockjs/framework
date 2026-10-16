@@ -1,3 +1,4 @@
+import { maskEmailsInText } from "@warlock.js/logger";
 import type {
   CacheData,
   CacheDriver,
@@ -354,7 +355,7 @@ export class LRUMemoryCacheDriver
     const current = node ? node.value : 0;
 
     if (typeof current !== "number") {
-      throw new Error(`Cannot increment non-numeric value for key: ${parsedKey}`);
+      throw new Error(`Cannot increment non-numeric value for key: ${maskEmailsInText(parsedKey)}`);
     }
 
     const newValue = current + value;

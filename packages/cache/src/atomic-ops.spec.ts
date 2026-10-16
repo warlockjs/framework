@@ -212,3 +212,35 @@ describe("remember / swr / update / lock bookkeeping (memory driver)", () => {
     expect(work).not.toHaveBeenCalled();
   });
 });
+
+describe("base increment (file driver) — one read for value and deadline", () => {
+  it("starts a counter over when it expired between the read and the write", async () => {
+    const driver = await file();
+
+    await driver.set("throttle", 5, 60);
+    // the entry read is already past its deadline by the time it is used
+    vi.spyOn(driver as any, "getEntry").mockResolvedValueOnce({
+      data: 5,
+      expiresAt: Date.now() - 1,
+    });
+
+    await expect(driver.increment("throttle")).resolves.toBe(1);
+  });
+
+  it("rounds the remaining TTL down, so increments never push the deadline later", async () => {
+    const driver = await file();
+
+    await driver.set("window", 0, 60);
+    // 59.5 s left: rounding up (the old behaviour) re-wrote it as 60 s,
+    // stretching the window by up to a second on every increment
+    vi.spyOn(driver as any, "getEntry").mockResolvedValueOnce({
+      data: 0,
+      expiresAt: Date.now() + 59_500,
+    });
+    const set = vi.spyOn(driver, "set");
+
+    await driver.increment("window");
+
+    expect(set).toHaveBeenCalledWith("window", 1, { ttl: 59 });
+  });
+});

@@ -348,7 +348,9 @@ export class FileCacheDriver
         return null;
       }
 
-      if (entry.expiresAt !== undefined && entry.expiresAt <= Date.now()) {
+      // `Infinity` (no expiry) is written to JSON as `null`; `null <= now`
+      // is true, so only a real deadline may count as expired.
+      if (typeof entry.expiresAt === "number" && entry.expiresAt <= Date.now()) {
         return null;
       }
 
