@@ -30,7 +30,7 @@ It is NOT a queue, a template engine, a transport library, or an analytics pipel
 
 ```ts title="src/config/notifications.ts"
 import { type NotificationConfig, mailChannel, inApp } from "@warlock.js/notifications";
-import { Notification } from "app/notifications/notification.model";
+import { Notification } from "app/notifications/models/notification/notification.model";
 
 const config: NotificationConfig = {
   channels: {

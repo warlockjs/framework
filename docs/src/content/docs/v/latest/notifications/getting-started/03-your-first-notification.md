@@ -12,7 +12,7 @@ We'll ship `order.shipped` through **mail + in-app**, then read it back.
 
 `warlock add notifications` scaffolds this; here's what it looks like. Extend the shipped base and declare your columns via `columnMap`.
 
-```ts title="src/app/notifications/notification.model.ts"
+```ts title="src/app/notifications/models/notification/notification.model.ts"
 import { RegisterModel } from "@warlock.js/cascade";
 import { DatabaseNotification, type NotificationColumnMap } from "@warlock.js/notifications";
 import { v } from "@warlock.js/seal";
@@ -42,7 +42,7 @@ export class Notification extends DatabaseNotification {
 
 One line — the columns are named from your model's `columnMap`:
 
-```ts title="src/app/notifications/migrations/…notification.migration.ts"
+```ts title="src/app/notifications/models/notification/migrations/…notification.migration.ts"
 import { Migration } from "@warlock.js/cascade";
 import { notificationColumns } from "@warlock.js/notifications";
 import { Notification } from "../notification.model";

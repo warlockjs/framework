@@ -7,7 +7,7 @@
  *
  * @example  src/config/notifications.ts — declarative; the connector registers it
  *   import { type NotificationConfig, mailChannel, inApp } from "@warlock.js/notifications";
- *   import { Notification } from "app/notifications/notification.model";
+ *   import { Notification } from "app/notifications/models/notification/notification.model";
  *
  *   const config: NotificationConfig = {
  *     channels: {

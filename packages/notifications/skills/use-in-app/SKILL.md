@@ -112,7 +112,7 @@ the repo; there is no `isRead` filter key to remember.
 
 ## Your model — declare `table`, `schema`, and `columnMap`
 
-```ts title="src/app/notifications/notification.model.ts"
+```ts title="src/app/notifications/models/notification/notification.model.ts"
 import { RegisterModel } from "@warlock.js/cascade";
 import { v } from "@warlock.js/seal";
 import { DatabaseNotification, type NotificationColumnMap } from "@warlock.js/notifications";
@@ -147,9 +147,9 @@ repo filter, and the accessors all follow. For a different driver's naming
 
 `columnMap` already covers column naming. Subclass only for EXTRA query methods:
 
-```ts title="src/app/notifications/notifications.repository.ts"
+```ts title="src/app/notifications/repositories/notifications.repository.ts"
 import { BaseNotificationsRepository } from "@warlock.js/notifications";
-import { Notification } from "./notification.model";
+import { Notification } from "../models/notification/notification.model";
 
 export class NotificationsRepository extends BaseNotificationsRepository<Notification> {
   public source = Notification; // its columnMap still drives filter + write mapping

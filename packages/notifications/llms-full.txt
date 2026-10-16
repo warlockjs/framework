@@ -21,7 +21,7 @@ description: 'Wire `@warlock.js/notifications` via a declarative `src/config/not
 
 ```ts title="src/config/notifications.ts"
 import { type NotificationConfig, inApp, mailChannel } from "@warlock.js/notifications";
-import { Notification } from "app/notifications/notification.model";
+import { Notification } from "app/notifications/models/notification/notification.model";
 
 const config: NotificationConfig = {
   channels: {
@@ -428,7 +428,7 @@ It is NOT a queue, a template engine, a transport library, or an analytics pipel
 
 ```ts title="src/config/notifications.ts"
 import { type NotificationConfig, mailChannel, inApp } from "@warlock.js/notifications";
-import { Notification } from "app/notifications/notification.model";
+import { Notification } from "app/notifications/models/notification/notification.model";
 
 const config: NotificationConfig = {
   channels: {
@@ -587,7 +587,7 @@ import {
   inApp,
   mailChannel,
 } from "@warlock.js/notifications";
-import { Notification } from "app/notifications/notification.model";
+import { Notification } from "app/notifications/models/notification/notification.model";
 
 const config: NotificationConfig = {
   channels: { mail: mailChannel(), database: inApp.configure({ model: Notification }) },
@@ -895,7 +895,7 @@ the repo; there is no `isRead` filter key to remember.
 
 ## Your model — declare `table`, `schema`, and `columnMap`
 
-```ts title="src/app/notifications/notification.model.ts"
+```ts title="src/app/notifications/models/notification/notification.model.ts"
 import { RegisterModel } from "@warlock.js/cascade";
 import { v } from "@warlock.js/seal";
 import { DatabaseNotification, type NotificationColumnMap } from "@warlock.js/notifications";
@@ -930,9 +930,9 @@ repo filter, and the accessors all follow. For a different driver's naming
 
 `columnMap` already covers column naming. Subclass only for EXTRA query methods:
 
-```ts title="src/app/notifications/notifications.repository.ts"
+```ts title="src/app/notifications/repositories/notifications.repository.ts"
 import { BaseNotificationsRepository } from "@warlock.js/notifications";
-import { Notification } from "./notification.model";
+import { Notification } from "../models/notification/notification.model";
 
 export class NotificationsRepository extends BaseNotificationsRepository<Notification> {
   public source = Notification; // its columnMap still drives filter + write mapping
@@ -970,7 +970,7 @@ The package ships no table or migration (thin eject). You own the migration; the
 
 ## Common case — one line
 
-```ts title="src/app/notifications/migrations/01-01-2026_00-00-00-notifications.migration.ts"
+```ts title="src/app/notifications/models/notification/migrations/01-01-2026_00-00-00-notifications.migration.ts"
 import { Migration } from "@warlock.js/cascade";
 import { notificationColumns } from "@warlock.js/notifications";
 import { Notification } from "../notification.model";

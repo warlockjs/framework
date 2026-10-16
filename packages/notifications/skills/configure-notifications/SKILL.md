@@ -13,7 +13,7 @@ description: 'Wire `@warlock.js/notifications` via a declarative `src/config/not
 
 ```ts title="src/config/notifications.ts"
 import { type NotificationConfig, inApp, mailChannel } from "@warlock.js/notifications";
-import { Notification } from "app/notifications/notification.model";
+import { Notification } from "app/notifications/models/notification/notification.model";
 
 const config: NotificationConfig = {
   channels: {

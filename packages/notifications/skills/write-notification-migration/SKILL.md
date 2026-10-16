@@ -11,7 +11,7 @@ The package ships no table or migration (thin eject). You own the migration; the
 
 ## Common case — one line
 
-```ts title="src/app/notifications/migrations/01-01-2026_00-00-00-notifications.migration.ts"
+```ts title="src/app/notifications/models/notification/migrations/01-01-2026_00-00-00-notifications.migration.ts"
 import { Migration } from "@warlock.js/cascade";
 import { notificationColumns } from "@warlock.js/notifications";
 import { Notification } from "../notification.model";

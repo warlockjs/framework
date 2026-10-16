@@ -17,7 +17,7 @@ import {
   inApp,
   mailChannel,
 } from "@warlock.js/notifications";
-import { Notification } from "app/notifications/notification.model";
+import { Notification } from "app/notifications/models/notification/notification.model";
 
 const config: NotificationConfig = {
   channels: { mail: mailChannel(), database: inApp.configure({ model: Notification }) },

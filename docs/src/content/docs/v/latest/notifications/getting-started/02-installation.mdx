@@ -19,9 +19,13 @@ It also pulls in the `mail` feature (the package's one required dependency), so 
 This ejects into your project — yours to edit:
 
 - `src/config/notifications.ts` — a **declarative** config wired to the scaffolded model (see below).
-- `src/app/notifications/notification.model.ts` — extends `DatabaseNotification`; declares its physical columns via `columnMap`.
-- `src/app/notifications/migrations/…notification.migration.ts` — `Migration.create(Notification, notificationColumns(Notification))`.
-- `src/app/notifications/routes.ts` + `controllers/notifications.controller.ts` — the recipient-scoped read/dismiss endpoints (list / unread-count / mark-read / mark-all-read / clear / delete), gated by `authMiddleware`. Delete them if your app exposes notifications another way (sockets, GraphQL, …).
+- `src/app/notifications/models/notification/notification.model.ts` — extends `DatabaseNotification`; declares its physical columns via `columnMap` and its output through `NotificationResource`.
+- `src/app/notifications/models/notification/migrations/…notification.migration.ts` — `Migration.create(Notification, notificationColumns(Notification))`. Pass `{ idType: "integer" }` (or `"bigint"` / `"string"`) when your user ids are not UUIDs.
+- `src/app/notifications/routes.ts` + one controller per file under `controllers/` — the recipient-scoped list / unread-count / mark-read / mark-all-read endpoints, gated by `authMiddleware`, with a commented `gate()` line for a permission check. Delete them if your app exposes notifications another way (sockets, GraphQL, …).
+- `resources/notification.resource.ts` (the response shape), `schema/list-notifications.schema.ts` (the list query: `page`, `limit` up to 50, `type`, `unread`), `types/notifications-request.type.ts` (the guarded request), `services/mark-notification-read.service.ts` and `utils/locales.json`.
+- A `*.spec.ts` beside each controller when the app has the test feature (`src/test-setup.ts`), checking that the route answers 401 without a signed-in user.
+
+Apps scaffolded by 5.29 or earlier keep their files: the generator skips a module that already has a notification model.
 
 > Prefer to wire it by hand? `yarn add @warlock.js/notifications` (npm / pnpm work too), then create the files yourself. The generator is the recommended path — it keeps them in sync and matches the conventions below.
 
@@ -31,7 +35,7 @@ The file is **declarative**: it exports a config object, and Warlock's notificat
 
 ```ts title="src/config/notifications.ts"
 import { type NotificationConfig, mailChannel, inApp } from "@warlock.js/notifications";
-import { Notification } from "app/notifications/notification.model";
+import { Notification } from "app/notifications/models/notification/notification.model";
 
 const config: NotificationConfig = {
   channels: {
