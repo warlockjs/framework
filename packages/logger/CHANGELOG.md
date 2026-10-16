@@ -13,15 +13,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Logging is fire-and-forget: level methods no longer return a promise, so `@typescript-eslint/no-floating-promises` no longer flags every call site (WR-019).
-- `log.flush()` first waits for every async channel delivery still in flight, then drains each channel's `flush()`.
+- `log.flush()` drains every channel concurrently: each waits for its own in-flight async deliveries (including entries logged while the flush runs), then runs its `flush()`, so a hung network channel no longer holds up the file channel.
+- `log.flush({ timeout })` is bounded: it resolves after `timeout` ms (default 5000, `DEFAULT_FLUSH_TIMEOUT_MS`; `Infinity` waits without a limit) and reports each channel still draining to the channel error handler. Before, one delivery that never settled made `flush()` (and a graceful shutdown awaiting it) wait forever.
+- `maskEmailsInText` cuts text longer than `MASK_EMAILS_MAX_LENGTH` (16,384 characters) and marks the cut, so masking a huge cache key or message has a bounded cost.
 
 ### Added
 
-- `log.onChannelError(handler)` / `configure({ onChannelError })` and the `ChannelErrorHandler` type: receives a channel's sync throw or async rejection from `log()`. Default: one stderr line.
+- `log.onChannelError(handler)` / `configure({ onChannelError })` and the `ChannelErrorHandler` type: receives a channel's sync throw or async rejection from `log()`, a redaction that threw, or a timed-out `flush()`. Default: one stderr line. The handler may be async; a rejection is swallowed.
+- `maskEmail(address)` and `maskEmailsInText(text)`: mask email addresses (`m***@example.com`) inside message strings and cache keys, which key-based redaction cannot reach. Core's mail logs and the cache drivers' key logs use them (FW-04).
 
 ### Fixed
 
 - A channel whose `log()` rejected became an unhandled rejection (looping through `captureAnyUnhandledRejection`), and one that threw synchronously stopped delivery to the channels after it; both are now isolated and reported to the channel error handler.
+- A redaction that threw (a `censor` function that fails on an unexpected value) threw at the call site and skipped the remaining channels. A channel's own redaction failure is now isolated like any channel failure; a logger-wide one drops the entry (it is never delivered unredacted) and is reported to the channel error handler.
+- An async `onChannelError` handler that rejected became an unhandled rejection.
+- **Security:** `maskEmailsInText` backtracked quadratically on long runs of address-like characters with no domain (about 11 s on 75 KB), and it runs on cache keys built from request input. Its pattern is now bounded and linear. It also masks addresses with letters from any script (`jöhn@exämple.de`), and `maskEmail` no longer keeps half of a surrogate pair.
 
 ## 5.29.0 - 2026-10-01
 

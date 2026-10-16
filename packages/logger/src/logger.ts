@@ -68,10 +68,12 @@ export class Logger {
   private redactConfig?: RedactConfig;
 
   /**
-   * Deliveries still in flight on async channels. `log()` never awaits them;
-   * `flush()` does, so a graceful shutdown still waits for every entry.
+   * Deliveries still in flight on async channels, per channel. `log()` never
+   * awaits them; `flush()` does, so a graceful shutdown still waits for every
+   * entry. Kept per channel so one hung channel cannot hold up another's
+   * drain.
    */
-  private pendingDeliveries = new Set<Promise<void>>();
+  private pendingDeliveries = new Map<LogChannel, Set<Promise<void>>>();
 
   /**
    * Receives a channel's delivery failure (a sync throw or a rejected async
@@ -240,41 +242,57 @@ export class Logger {
 
     // Apply the logger-wide redact floor once. Every channel sees the
     // result; no channel can undo a logger-wide redaction (additive-only
-    // semantics).
-    const baseEntry = applyRedact(data, this.redactConfig);
+    // semantics). A redaction that throws (a bad censor function) drops the
+    // entry: delivering it unredacted would leak exactly what the config
+    // exists to hide.
+    let baseEntry: LoggingData;
 
-    for (const channel of this.channels) {
-      const channelRedact = channel.getRedactConfig?.();
-      const effectiveRedact = channelRedact
-        ? mergeRedact(this.redactConfig, channelRedact)
-        : undefined;
-
-      // When the channel adds paths, redact again from `data` rather than
-      // from `baseEntry` so the merged config (which already contains the
-      // logger-wide paths) does the full pass — avoids double-cloning the
-      // already-redacted base.
-      let payload = effectiveRedact ? applyRedact(data, effectiveRedact) : baseEntry;
-
-      if (channel.terminal === false) {
-        payload = { ...payload, message: clearMessage(payload.message) };
+    try {
+      baseEntry = applyRedact(data, this.redactConfig);
+    } catch (error) {
+      for (const channel of this.channels) {
+        this.reportChannelError(error, channel, redactionFailedEntry(data));
       }
 
-      this.deliver(channel, payload);
+      return this;
+    }
+
+    for (const channel of this.channels) {
+      this.deliver(channel, data, baseEntry);
     }
 
     return this;
   }
 
   /**
-   * Hand one entry to one channel, isolating its failure and tracking an
-   * async delivery until it settles.
+   * Prepare and hand one entry to one channel, isolating its failure (a
+   * channel redaction that throws included) and tracking an async delivery
+   * until it settles.
    */
-  private deliver(channel: LogChannel, payload: LoggingData) {
+  private deliver(channel: LogChannel, data: LoggingData, baseEntry: LoggingData) {
+    let payload: LoggingData = baseEntry;
     let result: void | Promise<void>;
 
     try {
+      const channelRedact = channel.getRedactConfig?.();
+
+      // When the channel adds paths, redact again from `data` rather than
+      // from `baseEntry` so the merged config (which already contains the
+      // logger-wide paths) does the full pass — avoids double-cloning the
+      // already-redacted base.
+      if (channelRedact) {
+        payload = applyRedact(data, mergeRedact(this.redactConfig, channelRedact));
+      }
+
+      if (channel.terminal === false) {
+        payload = { ...payload, message: clearMessage(payload.message) };
+      }
+
       result = channel.log(payload);
     } catch (error) {
+      // `payload` is the logger-wide redacted entry until the channel's own
+      // redaction succeeded, so the handler never sees less-redacted data
+      // than some channel would have.
       this.reportChannelError(error, channel, payload);
       return;
     }
@@ -283,18 +301,36 @@ export class Logger {
       return;
     }
 
+    let pending = this.pendingDeliveries.get(channel);
+
+    if (!pending) {
+      pending = new Set();
+      this.pendingDeliveries.set(channel, pending);
+    }
+
+    const tracked = pending;
     const delivery: Promise<void> = Promise.resolve(result)
       .catch((error) => this.reportChannelError(error, channel, payload))
       .finally(() => {
-        this.pendingDeliveries.delete(delivery);
+        tracked.delete(delivery);
+
+        if (tracked.size === 0 && this.pendingDeliveries.get(channel) === tracked) {
+          this.pendingDeliveries.delete(channel);
+        }
       });
 
-    this.pendingDeliveries.add(delivery);
+    tracked.add(delivery);
   }
 
-  private reportChannelError(error: unknown, channel: LogChannel, entry: LoggingData) {
+  private reportChannelError(error: unknown, channel: LogContract, entry: LoggingData) {
     try {
-      this.channelErrorHandler(error, channel, entry);
+      const outcome: unknown = this.channelErrorHandler(error, channel, entry);
+
+      // An async handler that rejects must not become an unhandled rejection
+      // (which an app may route straight back into this logger).
+      if (outcome && typeof (outcome as Promise<unknown>).then === "function") {
+        (outcome as Promise<unknown>).then(undefined, () => {});
+      }
     } catch {
       // An error handler that throws must not turn logging into a crash.
     }
@@ -450,7 +486,8 @@ export class Logger {
 
   /**
    * Wait for every in-flight async delivery, then drain every channel that
-   * implements `flush()`.
+   * implements `flush()` — bounded by `timeout` (default
+   * {@link DEFAULT_FLUSH_TIMEOUT_MS}).
    *
    * Unlike {@link flushSync}, this awaits each channel's async I/O — the
    * correct call for a graceful shutdown that can afford to wait
@@ -458,36 +495,93 @@ export class Logger {
    * `process.exit`). A channel whose delivery is async (a network transport,
    * an async disk write) implements `flush()`, not `flushSync()`.
    *
-   * Channels are isolated: a channel whose flush rejects can neither prevent
-   * the others from draining nor escape as an unhandled rejection. Channels
-   * without `flush()` are skipped.
+   * Channels drain concurrently and independently: each waits for its own
+   * pending deliveries (including ones logged while the flush runs), then
+   * runs its `flush()`. A channel whose delivery hangs therefore cannot hold
+   * up another channel's drain, and a channel whose flush rejects can neither
+   * stop the others nor escape as an unhandled rejection. When `timeout`
+   * elapses, `flush()` resolves anyway and each channel still draining is
+   * reported to {@link onChannelError}. Channels without `flush()` only wait
+   * for their deliveries.
    *
    * @example
    * async function shutdown() {
    *   await httpServer.close();
-   *   await log.flush();
+   *   await log.flush({ timeout: 3000 });
    *   process.exit(0);
    * }
    */
-  public async flush(): Promise<void> {
-    // Deliveries never reject (failures go to the channel error handler);
-    // allSettled is belt and braces.
-    await Promise.allSettled([...this.pendingDeliveries]);
+  public async flush(options: { timeout?: number } = {}): Promise<void> {
+    const timeout = options.timeout ?? DEFAULT_FLUSH_TIMEOUT_MS;
+    const draining = new Set<LogChannel>(this.channels);
 
-    await Promise.allSettled(
-      this.channels.map(async (channel) => {
-        if (!channel.flush) {
-          return;
-        }
+    for (const channel of this.pendingDeliveries.keys()) {
+      draining.add(channel);
+    }
 
-        try {
-          await channel.flush();
-        } catch {
-          // A single channel must never break shutdown for the others —
-          // a graceful drain is best-effort across every channel.
-        }
-      }),
-    );
+    const unfinished = new Set(draining);
+
+    const drains = [...draining].map(async (channel) => {
+      try {
+        await this.drainChannel(channel);
+      } catch {
+        // A single channel must never break shutdown for the others —
+        // a graceful drain is best-effort across every channel.
+      } finally {
+        unfinished.delete(channel);
+      }
+    });
+
+    const settled = Promise.allSettled(drains).then(() => false);
+
+    // `Infinity` (or any non-finite value) waits without a limit; setTimeout
+    // would otherwise overflow it to an immediate timeout.
+    if (!Number.isFinite(timeout)) {
+      await settled;
+      return;
+    }
+
+    let resolveTimeout!: (timedOut: boolean) => void;
+    const timeoutReached = new Promise<boolean>((resolve) => {
+      resolveTimeout = resolve;
+    });
+    const timer = setTimeout(() => resolveTimeout(true), Math.max(0, timeout));
+
+    // Never keep the process alive just to time a flush out.
+    (timer as { unref?: () => void }).unref?.();
+
+    const timedOut = await Promise.race([settled, timeoutReached]);
+
+    clearTimeout(timer);
+
+    if (!timedOut) return;
+
+    for (const channel of unfinished) {
+      this.reportChannelError(
+        new Error(`flush timed out after ${timeout}ms; entries still in flight may be lost`),
+        channel,
+        { type: "warn", module: "logger", action: "flush", message: "flush timed out" },
+      );
+    }
+  }
+
+  /**
+   * Wait until the channel has no delivery in flight, run its `flush()`, and
+   * repeat while that flush let new deliveries in.
+   */
+  private async drainChannel(channel: LogChannel) {
+    do {
+      let pending = this.pendingDeliveries.get(channel);
+
+      while (pending && pending.size > 0) {
+        await Promise.allSettled([...pending]);
+        pending = this.pendingDeliveries.get(channel);
+      }
+
+      if (channel.flush) {
+        await channel.flush();
+      }
+    } while ((this.pendingDeliveries.get(channel)?.size ?? 0) > 0);
   }
 
   /**
@@ -542,6 +636,25 @@ export class Logger {
 
     return this;
   }
+}
+
+/**
+ * Default `timeout` of {@link Logger.flush}: long enough for a healthy network
+ * channel, short enough that a hung one cannot eat a shutdown budget.
+ */
+export const DEFAULT_FLUSH_TIMEOUT_MS = 5000;
+
+/**
+ * What the error handler receives when the logger-wide redaction itself
+ * failed: the entry's identity only, never the unredacted message or context.
+ */
+function redactionFailedEntry(data: LoggingData): LoggingData {
+  return {
+    type: data.type,
+    module: data.module,
+    action: data.action,
+    message: "[entry dropped: redaction failed]",
+  };
 }
 
 /**

@@ -156,6 +156,8 @@ Function censors are called for every match — keep them cheap. The `path` argu
 
 If `message` is a plain object, paths under `message.*` work as expected. If `message` is a string (the most common case), redaction won't scan it — string scrubbing requires regex and is intentionally out of scope. **Wrap secrets in `context`** and they'll be redacted reliably.
 
+Email addresses are the exception worth handling at the call site: they end up inside message strings and cache keys, where no key can reach them. Mask them before logging with `maskEmail` / `maskEmailsInText` (see [Utilities](../reference/05-utilities.md)); Warlock's own mail and cache logs already do.
+
 ## Performance
 
 | Setup | Cost per `log()` call |

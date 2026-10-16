@@ -4,3 +4,4 @@ export {
   normalizeRedactKey,
 } from "./default-keys";
 export { applyRedact, mergeRedact, resolveRedactKeys } from "./redact";
+export { MASK_EMAILS_MAX_LENGTH, maskEmail, maskEmailsInText } from "./mask-email";

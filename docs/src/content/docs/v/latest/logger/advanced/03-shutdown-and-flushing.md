@@ -111,14 +111,16 @@ import { log } from "@warlock.js/logger";
 
 async function gracefulShutdown() {
   await httpServer.close();
-  await log.flush(); // awaits every channel's async flush()
+  await log.flush({ timeout: 3000 }); // bounded: resolves after 3 s at most
   process.exit(0);
 }
 
 process.once("SIGTERM", gracefulShutdown);
 ```
 
-`log.flush()` fans out to every channel that implements `flush()` and awaits them together (`Promise.allSettled`). Each channel is isolated — one channel's flush rejecting neither aborts the others nor escapes as an unhandled rejection. Channels without `flush()` are skipped. `FileLog` and `JSONFileLog` implement both `flush()` (async write) and `flushSync()`.
+`log.flush()` drains every channel concurrently and independently: each channel first waits for its own in-flight deliveries (including entries logged while the flush runs), then runs its `flush()`. So a network channel whose request hangs can't hold up the file channel's write, and one channel's flush rejecting neither aborts the others nor escapes as an unhandled rejection. Channels without `flush()` only wait for their deliveries. `FileLog` and `JSONFileLog` implement both `flush()` (async write) and `flushSync()`.
+
+`flush()` is bounded: it resolves after `timeout` ms (default 5000, exported as `DEFAULT_FLUSH_TIMEOUT_MS`) even if a channel is still draining, and reports each such channel to `onChannelError`. Pick a timeout that fits inside your shutdown budget; pass `Infinity` only when nothing can hang.
 
 | | `flushSync()` | `flush()` |
 | --- | --- | --- |

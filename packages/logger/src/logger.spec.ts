@@ -1202,3 +1202,154 @@ describe("Logger — fire-and-forget delivery", () => {
     }
   });
 });
+
+describe("Logger — failure isolation and bounded flush", () => {
+  class DelayChannel extends LogChannel {
+    public name = "delay";
+    public terminal = false;
+    public delivered: string[] = [];
+
+    public log(data: LoggingData) {
+      const ms = (data.context?.ms as number) ?? 0;
+
+      return new Promise<void>((resolve) => {
+        setTimeout(() => {
+          this.delivered.push(String(data.message));
+          resolve();
+        }, ms);
+      });
+    }
+  }
+
+  class HungChannel extends LogChannel {
+    public name = "hung";
+    public terminal = false;
+    public flushed = 0;
+
+    public log(_data: LoggingData) {
+      return new Promise<void>(() => {});
+    }
+
+    public async flush() {
+      this.flushed += 1;
+    }
+  }
+
+  class CardRedactingChannel extends CapturingChannel {
+    public name = "card-redacting";
+
+    public getRedactConfig() {
+      return { paths: ["context.card"], censor: (value: any) => value.slice(-4) };
+    }
+  }
+
+  class RejectingChannel extends LogChannel {
+    public name = "rejecting";
+    public terminal = false;
+
+    public async log(_data: LoggingData) {
+      throw new Error("async boom");
+    }
+  }
+
+  it("flush() waits for deliveries logged while it is already running", async () => {
+    const channel = new DelayChannel();
+    const instance = new Logger().addChannel(channel);
+
+    instance.info("m", "a", "A", { ms: 10 });
+    const flushing = instance.flush();
+
+    await new Promise((resolve) => setTimeout(resolve, 1));
+    instance.info("m", "a", "B", { ms: 40 });
+
+    await flushing;
+
+    expect(channel.delivered).toEqual(["A", "B"]);
+  });
+
+  it("flush() gives up after its timeout, reports the hung channel and still drains the others", async () => {
+    const hung = new HungChannel();
+    const healthy = new CapturingChannel();
+    const onChannelError = vi.fn();
+    const instance = new Logger()
+      .onChannelError(onChannelError)
+      .addChannel(hung)
+      .addChannel(healthy);
+
+    instance.info("m", "a", "x");
+
+    const startedAt = Date.now();
+    await instance.flush({ timeout: 30 });
+
+    expect(Date.now() - startedAt).toBeLessThan(1000);
+    // The healthy channel's flush is not queued behind the hung delivery.
+    expect(healthy.asyncFlushed).toBe(1);
+    expect(hung.flushed).toBe(0);
+    expect(onChannelError).toHaveBeenCalledTimes(1);
+    expect((onChannelError.mock.calls[0]![0] as Error).message).toContain("timed out after 30ms");
+    expect(onChannelError.mock.calls[0]![1]).toBe(hung);
+  });
+
+  it("flush({ timeout: Infinity }) waits without a limit", async () => {
+    const channel = new DelayChannel();
+    const instance = new Logger().addChannel(channel);
+
+    instance.info("m", "a", "slow", { ms: 20 });
+    await instance.flush({ timeout: Infinity });
+
+    expect(channel.delivered).toEqual(["slow"]);
+  });
+
+  it("a channel redaction that throws is isolated from the caller and the other channels", () => {
+    const after = new CapturingChannel();
+    const onChannelError = vi.fn();
+    const instance = new Logger()
+      .onChannelError(onChannelError)
+      .addChannel(new CardRedactingChannel())
+      .addChannel(after);
+
+    // censor calls `.slice` on a number: the channel's redaction throws
+    expect(() => instance.error("m", "a", "x", { card: 1234 })).not.toThrow();
+    expect(after.received).toHaveLength(1);
+    expect(onChannelError).toHaveBeenCalledTimes(1);
+    expect(onChannelError.mock.calls[0]![1].name).toBe("card-redacting");
+  });
+
+  it("a logger-wide redaction that throws drops the entry instead of delivering it unredacted", () => {
+    const channel = new CapturingChannel();
+    const onChannelError = vi.fn();
+    const instance = new Logger()
+      .onChannelError(onChannelError)
+      .setRedact({ paths: ["context.card"], censor: (value: any) => value.slice(-4) })
+      .addChannel(channel);
+
+    expect(() => instance.error("m", "a", "secret message", { card: 1234 })).not.toThrow();
+    expect(channel.received).toHaveLength(0);
+    expect(onChannelError).toHaveBeenCalledTimes(1);
+
+    const reported = onChannelError.mock.calls[0]![2] as LoggingData;
+    expect(reported.message).toBe("[entry dropped: redaction failed]");
+    expect(reported.context).toBeUndefined();
+  });
+
+  it("an async error handler that rejects does not become an unhandled rejection", async () => {
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+
+    try {
+      const instance = new Logger()
+        .onChannelError(async () => {
+          throw new Error("handler async boom");
+        })
+        .addChannel(new RejectingChannel());
+
+      instance.info("m", "a", "x");
+      await instance.flush();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off("unhandledRejection", unhandled);
+    }
+  });
+});

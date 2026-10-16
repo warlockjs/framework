@@ -59,6 +59,25 @@ function mergeRedact(
 
 Combines two redact configs into one. `paths` are concatenated (duplicates kept); `censor` from `extra` wins, falling back to `base`, then to the default `"[REDACTED]"`. This is how a channel's additive `redact` layers on top of the logger-wide floor.
 
+## `maskEmail(address)` / `maskEmailsInText(text)`
+
+```ts
+function maskEmail(address: string): string;
+function maskEmailsInText(text: string): string;
+```
+
+`maskEmail` keeps the first character and the domain: `member@example.com` → `m***@example.com` (a value without `@` becomes `***`). `maskEmailsInText` masks the addresses it recognises in a string: letters and digits from any script (`jöhn@exämple.de` → `j***@exämple.de`), a local part of up to 64 characters and up to 12 domain labels. Dots are valid in a local part, so in a dotted key the prefix is masked with it: `email.member@example.com` → `e***@example.com`.
+
+It does not recognise quoted local parts (`"john doe"@example.com`), IP-literal domains (`user@[127.0.0.1]`) or percent-encoded addresses (`user%40example.com`); mask those at the call site. Text longer than `MASK_EMAILS_MAX_LENGTH` (16,384 characters) is cut off with a `…[N chars truncated]` marker, so masking a huge cache key or message costs a bounded amount of time.
+
+Use them for addresses inside message strings and cache keys, which key-based redaction cannot reach:
+
+```ts
+import { log, maskEmail } from "@warlock.js/logger";
+
+log.info("billing", "invoice", `Invoice sent to ${maskEmail(customer.email)}`);
+```
+
 ## See also
 
 - [Redaction](../advanced/01-redaction/) — `applyRedact` / `mergeRedact` in context

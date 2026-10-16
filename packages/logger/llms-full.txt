@@ -419,14 +419,14 @@ process.once("SIGTERM", gracefulShutdown);
 ```ts
 async function gracefulShutdown() {
   await httpServer.close();
-  await log.flush();        // awaits every channel's async flush() to completion
+  await log.flush({ timeout: 3000 }); // bounded drain of every channel
   process.exit(0);
 }
 
 process.once("SIGTERM", gracefulShutdown);
 ```
 
-`log.flush()` first waits for every async channel delivery still in flight (level methods are fire-and-forget and never return a promise), then fans out to every channel that implements `flush()` and awaits them together (`Promise.allSettled`). Each channel is isolated — one channel's flush rejecting neither aborts the others nor escapes as an unhandled rejection. Channels without `flush()` are skipped.
+`log.flush()` drains every channel concurrently: each waits for its own async deliveries still in flight (level methods are fire-and-forget and never return a promise; entries logged during the flush are awaited too), then runs its `flush()`. A hung network delivery can't hold up the file channel, and one channel's flush rejecting neither aborts the others nor escapes as an unhandled rejection. It is bounded: `log.flush({ timeout })` resolves after `timeout` ms (default 5000) and reports each channel still draining to `onChannelError`.
 
 | | `flushSync()` | `flush()` |
 |---|---|---|

@@ -191,14 +191,15 @@ export interface LogContract {
 
 /**
  * Receives a channel's delivery failure: a synchronous throw from its `log()`
- * or a rejection of the promise it returned. Set with
- * `Logger.onChannelError()` or `configure({ onChannelError })`.
+ * or a rejection of the promise it returned, a redaction that threw, or a
+ * `flush()` that timed out. Set with `Logger.onChannelError()` or
+ * `configure({ onChannelError })`. It may be async; a rejection is swallowed.
  */
 export type ChannelErrorHandler = (
   error: unknown,
   channel: LogContract,
   entry: LoggingData,
-) => void;
+) => void | Promise<void>;
 
 export type LoggingData = {
   type: LogLevel;

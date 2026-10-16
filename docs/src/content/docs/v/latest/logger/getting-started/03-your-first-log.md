@@ -94,7 +94,7 @@ const entry: LoggingData = {
   },
 };
 
-await log.log(entry);
+log.log(entry);
 ```
 
 File and JSON channels persist `context` alongside the entry. The console channel renders it on a second line only when its `showContext` option is enabled — see [Console Channel](../channels/02-console/).
