@@ -292,7 +292,7 @@ export class PgCacheDriver
       return;
     }
 
-    this.prune().catch(error => this.logError("prune failed", error));
+    this.prune().catch((error) => this.logError("prune failed", error));
   }
 
   /**
@@ -622,7 +622,11 @@ export class PgCacheDriver
    * keeps its `expires_at`; a missing or expired row restarts from `value`
    * with the driver default TTL. A non-numeric live value is rejected.
    */
-  public async increment(key: CacheKey, value: number = 1): Promise<number> {
+  public async increment(
+    key: CacheKey,
+    value: number = 1,
+    options: { ttl?: CacheTtl } = {},
+  ): Promise<number> {
     const parsedKey = this.parseKey(key);
     const t = this.table;
     const expired = `${t}.expires_at IS NOT NULL AND ${t}.expires_at <= now()`;
@@ -637,7 +641,11 @@ export class PgCacheDriver
              stale_at = CASE WHEN ${expired} THEN NULL ELSE ${t}.stale_at END
          WHERE (${expired}) OR jsonb_typeof(${t}.value) = 'number'
        RETURNING value`,
-      [parsedKey, value, this.ttlToSeconds(this.ttl)],
+      [
+        parsedKey,
+        value,
+        this.ttlToSeconds(options.ttl === undefined ? this.ttl : parseTtl(options.ttl)),
+      ],
     );
 
     if (rows.length === 0) {

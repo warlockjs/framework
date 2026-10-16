@@ -240,7 +240,8 @@ export class MemoryCacheDriver
     this.log("caching", parsedKey);
 
     // expired entries count as missing (readLive deletes them)
-    const existing = onConflict === "create" || onConflict === "update" ? this.readLive(parsedKey) : undefined;
+    const existing =
+      onConflict === "create" || onConflict === "update" ? this.readLive(parsedKey) : undefined;
 
     if (onConflict === "create" && existing) {
       const result: CacheSetResult = { wasSet: false, existing: cloneValue(existing.data) };
@@ -314,7 +315,12 @@ export class MemoryCacheDriver
    * concurrent increments in this process never lose an update. An existing
    * entry keeps its expiry; a missing key starts from 0 with the default TTL.
    */
-  public async increment(key: CacheKey, value: number = 1): Promise<number> {
+  public async increment(
+    key: CacheKey,
+    value: number = 1,
+    options: { ttl?: CacheTtl } = {},
+  ): Promise<number> {
+    const ttl = options.ttl === undefined ? this.ttl : parseTtl(options.ttl);
     const parsedKey = this.parseKey(key);
     const entry = this.readLive(parsedKey);
     const current = entry ? entry.data : 0;
@@ -329,7 +335,7 @@ export class MemoryCacheDriver
       entry.data = newValue;
       this.touch(parsedKey, entry);
     } else {
-      const data = this.prepareDataForStorage(newValue, this.ttl);
+      const data = this.prepareDataForStorage(newValue, ttl);
 
       this.entries.set(parsedKey, data);
 
@@ -340,7 +346,7 @@ export class MemoryCacheDriver
       this.enforceMaxSize(parsedKey);
     }
 
-    await this.emit("set", { key: parsedKey, value: newValue, ttl: entry?.ttl ?? this.ttl });
+    await this.emit("set", { key: parsedKey, value: newValue, ttl: entry?.ttl ?? ttl });
 
     return newValue;
   }

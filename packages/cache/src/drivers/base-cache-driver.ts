@@ -23,13 +23,7 @@ import type {
   RememberOptions,
 } from "../types";
 import { CacheConfigurationError, CacheUnsupportedError } from "../types";
-import {
-  normalizeToOptions,
-  parseCacheKey,
-  parseTtl,
-  resolveTtl,
-  safeErrorInfo,
-} from "../utils";
+import { normalizeToOptions, parseCacheKey, parseTtl, resolveTtl, safeErrorInfo } from "../utils";
 
 /**
  * Normalized form of the 3rd `set` argument.
@@ -141,8 +135,7 @@ export abstract class BaseCacheDriver<
   /**
    * Event listeners storage
    */
-  protected eventListeners: Map<CacheEventType, Set<CacheEventHandler>> =
-    new Map();
+  protected eventListeners: Map<CacheEventType, Set<CacheEventHandler>> = new Map();
 
   /**
    * {@inheritdoc}
@@ -195,10 +188,7 @@ export abstract class BaseCacheDriver<
   /**
    * Emit an event to all registered listeners
    */
-  protected async emit(
-    event: CacheEventType,
-    data: Partial<CacheEventData> = {},
-  ): Promise<void> {
+  protected async emit(event: CacheEventType, data: Partial<CacheEventData> = {}): Promise<void> {
     const handlers = this.eventListeners.get(event);
     if (!handlers || handlers.size === 0) return;
 
@@ -248,9 +238,7 @@ export abstract class BaseCacheDriver<
    * @throws {CacheConfigurationError} when `ttl` and `expiresAt` are passed together
    * or an unparseable duration string is supplied.
    */
-  protected resolveSetOptions(
-    ttlOrOptions?: CacheTtl | CacheSetOptions,
-  ): NormalizedSetOptions {
+  protected resolveSetOptions(ttlOrOptions?: CacheTtl | CacheSetOptions): NormalizedSetOptions {
     const options = normalizeToOptions(ttlOrOptions);
 
     return {
@@ -270,9 +258,7 @@ export abstract class BaseCacheDriver<
    * Keys come back parsed (prefixed) — the index stores them un-prefixed, but
    * callers match them against their own parsed storage keys.
    */
-  protected async getKeysForTags(
-    tags: string[] | undefined,
-  ): Promise<Set<string> | null> {
+  protected async getKeysForTags(tags: string[] | undefined): Promise<Set<string> | null> {
     if (!tags || tags.length === 0) {
       return null;
     }
@@ -526,9 +512,7 @@ export abstract class BaseCacheDriver<
    * Resolve the TTL-or-options arg of `remember` into a `CacheSetOptions` object
    * that can be passed straight to `set()`. Keeps the implementation unbranched.
    */
-  protected normalizeRememberOptions(
-    ttlOrOptions: CacheTtl | RememberOptions,
-  ): CacheSetOptions {
+  protected normalizeRememberOptions(ttlOrOptions: CacheTtl | RememberOptions): CacheSetOptions {
     if (typeof ttlOrOptions === "number" || typeof ttlOrOptions === "string") {
       return { ttl: ttlOrOptions };
     }
@@ -585,14 +569,7 @@ export abstract class BaseCacheDriver<
       return entry.data as T;
     }
 
-    this.scheduleSwrRefresh<T>(
-      parsedKey,
-      key,
-      options,
-      callback,
-      freshSeconds,
-      staleSeconds,
-    );
+    this.scheduleSwrRefresh<T>(parsedKey, key, options, callback, freshSeconds, staleSeconds);
 
     return entry.data as T;
   }
@@ -751,7 +728,12 @@ export abstract class BaseCacheDriver<
    * The remaining TTL is rounded down, so repeated increments can never push
    * a window's deadline later.
    */
-  public async increment(key: CacheKey, value: number = 1): Promise<number> {
+  public async increment(
+    key: CacheKey,
+    value: number = 1,
+    options: { ttl?: CacheTtl } = {},
+  ): Promise<number> {
+    const ttl = options.ttl === undefined ? this.ttl : parseTtl(options.ttl);
     const parsedKey = this.parseKey(key);
 
     return this.runSerialized(parsedKey, async () => {
@@ -763,14 +745,16 @@ export abstract class BaseCacheDriver<
       const base = current === null || current === undefined ? 0 : current;
 
       if (typeof base !== "number") {
-        throw new Error(`Cannot increment non-numeric value for key: ${maskEmailsInText(parsedKey)}`);
+        throw new Error(
+          `Cannot increment non-numeric value for key: ${maskEmailsInText(parsedKey)}`,
+        );
       }
 
       const newValue = base + value;
 
       if (!live) {
         // missing, or expired since it was read: a fresh counter
-        await this.set(key, newValue);
+        await this.set(key, newValue, { ttl });
       } else if (expiresAt == null || expiresAt === Infinity) {
         await this.set(key, newValue, { ttl: Infinity });
       } else {
@@ -800,13 +784,8 @@ export abstract class BaseCacheDriver<
   /**
    * {@inheritdoc}
    */
-  public async setMany(
-    items: Record<string, any>,
-    ttl?: number,
-  ): Promise<void> {
-    await Promise.all(
-      Object.entries(items).map(([key, value]) => this.set(key, value, ttl)),
-    );
+  public async setMany(items: Record<string, any>, ttl?: number): Promise<void> {
+    await Promise.all(Object.entries(items).map(([key, value]) => this.set(key, value, ttl)));
   }
 
   /**
@@ -843,11 +822,7 @@ export abstract class BaseCacheDriver<
       );
     }
 
-    log.info(
-      "cache." + this.name,
-      operation,
-      (key ? key + " " : "") + messages[operation],
-    );
+    log.info("cache." + this.name, operation, (key ? key + " " : "") + messages[operation]);
   }
 
   /**
@@ -1107,9 +1082,7 @@ export abstract class BaseCacheDriver<
     // (e.g. the null driver) may return anything else — treat that as
     // "acquired" since there's nothing to collide with.
     const wasSet =
-      typeof setResult === "object" &&
-      setResult !== null &&
-      "wasSet" in setResult
+      typeof setResult === "object" && setResult !== null && "wasSet" in setResult
         ? (setResult as CacheSetResult).wasSet
         : true;
 
@@ -1169,9 +1142,7 @@ export abstract class BaseCacheDriver<
   /**
    * Resolve the TTL-or-options arg of `lock` into a uniform shape.
    */
-  protected normalizeLockOptions(
-    ttlOrOptions: CacheTtl | Omit<LockOptions, "driver">,
-  ): {
+  protected normalizeLockOptions(ttlOrOptions: CacheTtl | Omit<LockOptions, "driver">): {
     ttl: CacheTtl;
     owner?: string;
   } {

@@ -9,6 +9,7 @@ import type {
   CacheTtl,
   MockCacheOptions,
 } from "../types";
+import { parseTtl } from "../utils";
 import { BaseCacheDriver } from "./base-cache-driver";
 import { InMemoryTagIndex } from "./in-memory-tag-index";
 
@@ -142,9 +143,8 @@ export class MockCacheDriver
 
     // Synchronous check + write (no await between) so onConflict is atomic.
     // Expired entries count as missing and are deleted.
-    let existing = onConflict === "create" || onConflict === "update"
-      ? this.storage.get(parsedKey)
-      : undefined;
+    let existing =
+      onConflict === "create" || onConflict === "update" ? this.storage.get(parsedKey) : undefined;
 
     if (existing && existing.expiresAt !== undefined && existing.expiresAt <= Date.now()) {
       this.storage.delete(parsedKey);
@@ -251,7 +251,12 @@ export class MockCacheDriver
    * Synchronous read-add-write (atomic within the process). Keeps an existing
    * entry's expiry; a missing key starts from 0 with the default TTL.
    */
-  public async increment(key: CacheKey, value: number = 1): Promise<number> {
+  public async increment(
+    key: CacheKey,
+    value: number = 1,
+    options: { ttl?: CacheTtl } = {},
+  ): Promise<number> {
+    const ttl = options.ttl === undefined ? this.ttl : parseTtl(options.ttl);
     const parsedKey = this.parseKey(key);
 
     this.recordCall("increment", parsedKey, [value]);
@@ -268,10 +273,10 @@ export class MockCacheDriver
     if (entry) {
       entry.data = newValue;
     } else {
-      this.storage.set(parsedKey, this.prepareDataForStorage(newValue, this.ttl));
+      this.storage.set(parsedKey, this.prepareDataForStorage(newValue, ttl));
     }
 
-    await this.emit("set", { key: parsedKey, value: newValue, ttl: this.ttl });
+    await this.emit("set", { key: parsedKey, value: newValue, ttl });
 
     return newValue;
   }
@@ -399,9 +404,7 @@ export class MockCacheDriver
 
     const parsedKey = this.parseKey(key);
 
-    return this.callLog.some(
-      (call) => call.operation === operation && call.key === parsedKey,
-    );
+    return this.callLog.some((call) => call.operation === operation && call.key === parsedKey);
   }
 
   /**
@@ -436,11 +439,7 @@ export class MockCacheDriver
    * Append a row to {@link callLog}. Internal helper called by every
    * recorded op before the actual work runs.
    */
-  protected recordCall(
-    operation: string,
-    key: string | undefined,
-    args: unknown[] = [],
-  ): void {
+  protected recordCall(operation: string, key: string | undefined, args: unknown[] = []): void {
     this.callLog.push({
       operation,
       key,

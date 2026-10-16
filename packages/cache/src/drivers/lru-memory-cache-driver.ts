@@ -10,7 +10,7 @@ import type {
   CacheTtl,
   LRUMemoryCacheOptions,
 } from "../types";
-import { cosineSimilarity } from "../utils";
+import { cosineSimilarity, parseTtl } from "../utils";
 import { BaseCacheDriver } from "./base-cache-driver";
 import { InMemoryTagIndex } from "./in-memory-tag-index";
 
@@ -349,7 +349,12 @@ export class LRUMemoryCacheDriver
    * concurrent increments in this process never lose an update. An existing
    * node keeps its expiry; a missing key starts from 0 with the default TTL.
    */
-  public async increment(key: CacheKey, value: number = 1): Promise<number> {
+  public async increment(
+    key: CacheKey,
+    value: number = 1,
+    options: { ttl?: CacheTtl } = {},
+  ): Promise<number> {
+    const ttl = options.ttl === undefined ? this.ttl : parseTtl(options.ttl);
     const parsedKey = this.parseKey(key);
     const node = this.liveNode(parsedKey);
     const current = node ? node.value : 0;
@@ -364,7 +369,7 @@ export class LRUMemoryCacheDriver
       node.value = newValue;
       this.moveHead(node);
     } else {
-      const newNode = new CacheNode(parsedKey, newValue, this.ttl);
+      const newNode = new CacheNode(parsedKey, newValue, ttl);
 
       this.cache.set(parsedKey, newNode);
       this.addNode(newNode);
@@ -374,7 +379,7 @@ export class LRUMemoryCacheDriver
       }
     }
 
-    await this.emit("set", { key: parsedKey, value: newValue, ttl: this.ttl });
+    await this.emit("set", { key: parsedKey, value: newValue, ttl });
 
     return newValue;
   }

@@ -22,15 +22,15 @@ For authoring your OWN middleware (custom guards, enrichment, etc.), see the `wr
 
 All seven are factories — call them to get a `Middleware`. All set `errorCode` on the response so clients can branch without parsing error text (see `HttpErrorCodes` from `@warlock.js/core`). Error messages are translation-driven — keys live under the `http` group in `src/app/shared/utils/locales.ts`.
 
-| Factory | What it does | Status on reject |
-|---|---|---|
-| `middleware.rateLimit({ max, duration })` | Per-route/group cap on top of global `@fastify/rate-limit` | 429 + `Retry-After` |
-| `middleware.concurrencyLimit(n)` | Cap in-flight requests; no queue, fast reject | 429 + `Retry-After: 1` |
-| `middleware.maxBodySize("2mb")` | Per-route `Content-Length` cap | 413 |
-| `middleware.idempotency()` | Dedupe writes by `Idempotency-Key` header; cached replay | 422 on conflict |
-| `middleware.maintenance()` | Globally toggle 503 with allowlist bypass | 503 + `Retry-After` |
-| `middleware.ipFilter({ allow, deny })` | Allowlist/denylist by client IP | 403 (fail-closed) |
-| `middleware.cache(opts)` | Cache + replay successful JSON responses | n/a |
+| Factory                                   | What it does                                               | Status on reject       |
+| ----------------------------------------- | ---------------------------------------------------------- | ---------------------- |
+| `middleware.rateLimit({ max, duration })` | Per-route/group cap on top of global `@fastify/rate-limit` | 429 + `Retry-After`    |
+| `middleware.concurrencyLimit(n)`          | Cap in-flight requests; no queue, fast reject              | 429 + `Retry-After: 1` |
+| `middleware.maxBodySize("2mb")`           | Per-route `Content-Length` cap                             | 413                    |
+| `middleware.idempotency()`                | Dedupe writes by `Idempotency-Key` header; cached replay   | 422 on conflict        |
+| `middleware.maintenance()`                | Globally toggle 503 with allowlist bypass                  | 503 + `Retry-After`    |
+| `middleware.ipFilter({ allow, deny })`    | Allowlist/denylist by client IP                            | 403 (fail-closed)      |
+| `middleware.cache(opts)`                  | Cache + replay successful JSON responses                   | n/a                    |
 
 Each is documented inline (JSDoc + `@example`) — read the file under `@warlock.js/core/src/http/middleware/<name>.middleware.ts` for the full option surface.
 
@@ -39,7 +39,7 @@ Each is documented inline (JSDoc + `@example`) — read the file under `@warlock
 - **Rate limit** caps **requests per time window** — 5 logins/minute per IP. Use for abuse prevention, cost-control on cheap-but-spammable endpoints.
 - **Concurrency limit** caps **in-flight requests at any instant** — 3 simultaneous report generations. Use for expensive endpoints where parallel calls would overload the worker (CPU-bound, large memory, slow third-party).
 
-Both counters are **process-local** by default. With N replicas the effective cap is N × value. `rateLimit` can count in `@warlock.js/cache` instead: `store: "cache"` on the limiter, or `http.rateLimit.store: "cache"` for every limiter (give conditionally created limiters a `name`). It needs a counting driver (`redis`, `pg`, or memory for one process): `null` and `file` are refused, and a cache outage fails open with the error logged at most once a minute. The concurrency cap has no shared mode.
+Both counters are **process-local** by default. With N replicas the effective cap is N × value. `rateLimit` can count in `@warlock.js/cache` instead: `store: "cache"` on the limiter, or `http.rateLimit.store: "cache"` for every limiter (give conditionally created limiters a `name`). It needs a counting driver (`redis`, `pg`, or memory for one process): `null` and `file` are refused, and a cache outage fails open with the error logged at most once a minute. The concurrency cap has no shared mode. The cache-backed limiter passes its window TTL into every atomic increment, so counters recreated after a seed expires still expire even with no driver default TTL.
 
 ```ts
 import { middleware } from "@warlock.js/core";
@@ -47,7 +47,7 @@ import { middleware } from "@warlock.js/core";
 router.post("/ai/summarize", summarizeController, {
   middleware: [
     middleware.rateLimit({ max: 60, duration: 60 * 60 * 1000 }), // 60/hr per user
-    middleware.concurrencyLimit(5),                              // ≤5 in-flight at once
+    middleware.concurrencyLimit(5), // ≤5 in-flight at once
   ],
 });
 ```
@@ -70,7 +70,7 @@ Lifecycle:
 1. **Method not eligible** (GET / HEAD) → pass through.
 2. **No `Idempotency-Key` header** → pass through (the primitive is opt-in by the client).
 3. **Key already in flight** (concurrent duplicate) → 409 with `Retry-After`. The key is reserved create-only before the handler runs (`reservationTtl`, default 60s, or `http.idempotency.reservationTtl`). A 5xx frees the reservation; if the cache is down it fails open. Use a shared cache (redis/pg) across servers.
-3b. **Key + same body within TTL** (default 24h) → replays the cached response with `Idempotent-Replay: true`. Handler does NOT re-run.
+   3b. **Key + same body within TTL** (default 24h) → replays the cached response with `Idempotent-Replay: true`. Handler does NOT re-run.
 4. **Key + different body** → 422 `IdempotencyKeyConflict`. Client bug — same key must mean same intent.
 5. **Cache miss** → runs handler; on response sent, caches `{ status, body, bodyHash }` for TTL.
 
@@ -124,12 +124,12 @@ export default {
 
 ⚠ **Opt in with the narrowest shape your topology allows, not with `true`.** `http.trustProxy` takes a trusted-proxy list, and `detectIp()` resolves the chain the same way Fastify's `request.ip` does:
 
-| `http.trustProxy` | Client IP |
-| --- | --- |
-| `false` *(default)* | Socket peer address |
-| `"10.0.0.0/8"` / `"loopback, 10.0.0.0/8"` / `["10.0.0.0/8", "192.168.0.0/16"]` | Walks left while each hop is a listed proxy, stops at the first that isn't |
-| `(address, hop) => boolean` | Your own predicate |
-| `true` | Trusts the whole chain — the leftmost hop, i.e. **whatever the client put there** if your edge appends rather than overwrites |
+| `http.trustProxy`                                                              | Client IP                                                                                                                     |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `false` _(default)_                                                            | Socket peer address                                                                                                           |
+| `"10.0.0.0/8"` / `"loopback, 10.0.0.0/8"` / `["10.0.0.0/8", "192.168.0.0/16"]` | Walks left while each hop is a listed proxy, stops at the first that isn't                                                    |
+| `(address, hop) => boolean`                                                    | Your own predicate                                                                                                            |
+| `true`                                                                         | Trusts the whole chain — the leftmost hop, i.e. **whatever the client put there** if your edge appends rather than overwrites |
 
 ⚠ **Since 5.2 the value is validated at boot, and a hop count is refused.** The accepted shapes are exactly `boolean`, a non-empty string (comma-separated IPs/CIDRs), a non-empty `string[]`, and an `(address, hop) => boolean` predicate. Missing or nullish means `false`. Anything else — a **number**, `""`, `[]`, a mixed array, a plain object — throws a `TypeError` while the HTTP server is being constructed instead of being silently coerced:
 
@@ -212,10 +212,7 @@ import { authMiddleware } from "@warlock.js/auth";
 import { middleware, router } from "@warlock.js/core";
 
 router.post("/auth/login", loginController, {
-  middleware: [
-    middleware.rateLimit({ max: 5, duration: 60_000 }),
-    middleware.maxBodySize("4kb"),
-  ],
+  middleware: [middleware.rateLimit({ max: 5, duration: 60_000 }), middleware.maxBodySize("4kb")],
 });
 
 router.group({ middleware: [authMiddleware("client")] }, () => {
@@ -247,9 +244,9 @@ import { ulid } from "ulid"; // if you prefer ULID over the default random strin
 
 export default {
   requestId: {
-    header: "X-Request-Id",   // outbound + inbound header name
-    generator: () => ulid(),  // optional override
-    enabled: true,            // set false to disable both inherit + echo
+    header: "X-Request-Id", // outbound + inbound header name
+    generator: () => ulid(), // optional override
+    enabled: true, // set false to disable both inherit + echo
   },
 };
 ```

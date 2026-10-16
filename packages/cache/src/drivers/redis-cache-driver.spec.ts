@@ -301,8 +301,9 @@ vi.mock("redis", () => ({
   createClient: vi.fn(() => fakeClient),
 }));
 
-let driverImportPromise: Promise<typeof import("./redis-cache-driver")["RedisCacheDriver"]> | null =
-  null;
+let driverImportPromise: Promise<
+  (typeof import("./redis-cache-driver"))["RedisCacheDriver"]
+> | null = null;
 
 async function importDriver() {
   if (!driverImportPromise) {
@@ -550,9 +551,7 @@ describe("RedisCacheDriver", () => {
 
     await driver.removeNamespace("tenant*evil?");
 
-    expect(scanSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ MATCH: "tenant\\*evil\\?.*" }),
-    );
+    expect(scanSpy).toHaveBeenCalledWith(expect.objectContaining({ MATCH: "tenant\\*evil\\?.*" }));
     await expect(driver.get("tenant.other")).resolves.toBe("x");
   });
 
@@ -608,19 +607,16 @@ describe("RedisCacheDriver", () => {
     await driver.set("legacy.one", 1);
     await driver.set("legacy.two", 2);
     const batches = fakeClient.scanIterator.bind(fakeClient);
-    vi.spyOn(fakeClient, "scanIterator").mockImplementation((async function* (options: {
+    vi.spyOn(fakeClient, "scanIterator").mockImplementation(async function* (options: {
       MATCH?: string;
       COUNT?: number;
     }) {
       for await (const batch of batches(options)) {
         for (const key of batch) yield key;
       }
-    }) as never);
+    } as never);
 
-    await expect(driver.removeNamespace("legacy")).resolves.toEqual([
-      "legacy.one",
-      "legacy.two",
-    ]);
+    await expect(driver.removeNamespace("legacy")).resolves.toEqual(["legacy.one", "legacy.two"]);
   });
 
   it("increment and decrement use native INCRBY/DECRBY", async () => {
@@ -1037,6 +1033,20 @@ describe("RedisCacheDriver — cross-server atomic ops (wave 2)", () => {
     const remaining = await fakeClient.ttl("fresh-counter");
     expect(remaining).toBeGreaterThan(0);
     expect(remaining).toBeLessThanOrEqual(120);
+  });
+
+  it("applies a per-call TTL atomically after the seeded key expires with no driver default", async () => {
+    const driver = await makeDriver();
+    driver.setOptions({ url: "redis://localhost", ttl: 0 });
+    await driver.set("window", 0, 60);
+    fakeClient.expires.set("window", Date.now() - 1);
+    await fakeClient.get("window");
+    await expect(driver.increment("window", 1, { ttl: "2m" })).resolves.toBe(1);
+    expect(await fakeClient.ttl("window")).toBe(120);
+    const deadline = fakeClient.expires.get("window");
+    await driver.increment("window", 1, { ttl: "1d" });
+    expect(fakeClient.expires.get("window")).toBe(deadline);
+    expect(fakeClient.evalLog.at(-1)?.arguments).toEqual(["1", "86400"]);
   });
 
   it("increment never shortens a TTL the counter already has", async () => {

@@ -1863,7 +1863,7 @@ description: 'Brute-force / credential-stuffing protection via `loginThrottleMid
 
 `loginThrottleMiddleware(options?)` returns a Warlock middleware that defends the login (and refresh / password-reset) routes against brute-force and credential-stuffing — without punishing a user who fat-fingers a password then gets it right.
 
-The trick that makes it different from a plain rate limiter: it's **failure-aware**. It hooks the response *after* your controller runs (`response.onSent`), counts only the attempts that actually failed, and **clears the counter the moment a login succeeds**. A generic request limiter can't do that — it runs before the controller and counts every hit, success or not.
+The trick that makes it different from a plain rate limiter: it's **failure-aware**. It hooks the response _after_ your controller runs (`response.onSent`), counts only the attempts that actually failed, and **clears the counter the moment a login succeeds**. A generic request limiter can't do that — it runs before the controller and counts every hit, success or not.
 
 ## The shortest version
 
@@ -1890,10 +1890,10 @@ Per-account tracking stops a password-spray against one user from many IPs; per-
 
 ```ts
 loginThrottleMiddleware({
-  max: 5,                 // failures allowed in the window before lockout
-  window: "15m",          // counting window — ms-format string or seconds (number)
+  max: 5, // failures allowed in the window before lockout
+  window: "15m", // counting window — ms-format string or seconds (number)
   lockoutDuration: "15m", // how long the lock lasts once tripped
-  by: ["email", "ip"],    // identifiers tracked, each independently
+  by: ["email", "ip"], // identifiers tracked, each independently
   identifierKey: "email", // which credential field is the account key
   errorMessage: "Too many attempts. Try again later.",
 });
@@ -1911,16 +1911,16 @@ loginThrottleMiddleware({
 });
 ```
 
-| Option | Default | Purpose |
-| --- | --- | --- |
-| `max` | `5` | Failures within the window before lockout |
-| `window` | `"15m"` | Counting window (`ms`-string or seconds) |
-| `lockoutDuration` | `"15m"` | Lock TTL once tripped |
-| `by` | `["email", "ip"]` | Identifiers tracked independently |
-| `identifierKey` | `"email"` | Credential field used as the account key |
-| `errorMessage` | i18n `auth.errors.tooManyAttempts` | 429 message override |
-| `isFailure` | `(res) => !res.isOk` | What counts as a failed attempt |
-| `identify` | built-in email + ip extraction | Custom identifier list |
+| Option            | Default                            | Purpose                                   |
+| ----------------- | ---------------------------------- | ----------------------------------------- |
+| `max`             | `5`                                | Failures within the window before lockout |
+| `window`          | `"15m"`                            | Counting window (`ms`-string or seconds)  |
+| `lockoutDuration` | `"15m"`                            | Lock TTL once tripped                     |
+| `by`              | `["email", "ip"]`                  | Identifiers tracked independently         |
+| `identifierKey`   | `"email"`                          | Credential field used as the account key  |
+| `errorMessage`    | i18n `auth.errors.tooManyAttempts` | 429 message override                      |
+| `isFailure`       | `(res) => !res.isOk`               | What counts as a failed attempt           |
+| `identify`        | built-in email + ip extraction     | Custom identifier list                    |
 
 ## The 429 response
 
@@ -1948,20 +1948,20 @@ router.post("/auth/forgot-password", forgotController, {
 
 ## When to use this vs core's `rateLimit`
 
-| | `loginThrottleMiddleware` (auth) | `middleware.rateLimit` (core) |
-| --- | --- | --- |
-| Counts | only **failed** logins | **every** request |
-| Resets on a successful login | yes | no |
-| Locks per account / per IP | yes | per key (default IP) |
-| Storage | `@warlock.js/cache` (shared across replicas) | in-process map |
+|                              | `loginThrottleMiddleware` (auth)             | `middleware.rateLimit` (core) |
+| ---------------------------- | -------------------------------------------- | ----------------------------- |
+| Counts                       | only **failed** logins                       | **every** request             |
+| Resets on a successful login | yes                                          | no                            |
+| Locks per account / per IP   | yes                                          | per key (default IP)          |
+| Storage                      | `@warlock.js/cache` (shared across replicas) | in-process map                |
 
-They compose. For a hard ceiling on request volume *and* failure-aware account lockout, stack both: `middleware: [middleware.rateLimit({ max: 30, duration: 60_000 }), loginThrottleMiddleware()]`.
+They compose. For a hard ceiling on request volume _and_ failure-aware account lockout, stack both: `middleware: [middleware.rateLimit({ max: 30, duration: 60_000 }), loginThrottleMiddleware()]`.
 
 ## Gotchas
 
 - **Needs an initialised cache driver.** Storage is `@warlock.js/cache` (a peer dep, transitively present via core). If the driver isn't configured at runtime, the middleware **fails open** — it logs and lets the request through, because a throttle outage must never become an auth outage. That also means: no cache, no protection. Verify your cache config in production.
 - **Account lockout can be weaponised.** An attacker who knows a victim's email can lock them out by spamming failures. The per-IP counter mitigates this (the attacker's IP locks too), but for purely anonymous endpoints prefer `by: ["ip"]`. For high-value accounts, consider a CAPTCHA step instead of a hard lock.
-- **Counts are atomic and exact across servers (redis/pg).** Each failure does a create-only `cache.set(key, 0, { ttl: window })` (only the first failure opens the window and sets the TTL) followed by an atomic `cache.increment(key)`, so concurrent failures on different servers are never lost. The memory cache driver is per-process — counts and locks are then per-process, so use redis/pg when running more than one instance.
+- **Counts are atomic and exact across servers (redis/pg).** Each failure does a create-only `cache.set(key, 0, { ttl: window })` (only the first failure opens the window and sets the TTL) followed by an atomic `cache.increment(key, 1, { ttl: window })`, so concurrent failures on different servers are never lost. Passing the TTL on the increment also expires a counter recreated after its seed expires, without extending an existing window. The memory cache driver is per-process — counts and locks are then per-process, so use redis/pg when running more than one instance.
 - **Account and IP keys are hashed.** The built-in extractor keys both by an HMAC of the trimmed, lower-cased value (`email.<hmac>`, `ip.<hmac>`), keyed from `auth.accessToken.secret`, so cache logs never show the address or IP and a list of known emails cannot reverse the key. Without a configured secret it falls back to SHA-256. A custom `identify` is used as is — hash personal values yourself (`throttleIdentifierHash(kind, value)` is exported).
 - **Fixed window, not sliding.** The window is anchored at the first failure and does not extend on each subsequent one — predictable lockout timing. The lock key is independent and always lasts `lockoutDuration`: the lock stores its own deadline, so even a sliding-expiry driver (`memoryExtended`) cannot extend it.
 - **Needs a real cache driver.** The `null` driver stores nothing, so the throttle never locks; it warns once when that happens. On Redis, any version from 6 works.

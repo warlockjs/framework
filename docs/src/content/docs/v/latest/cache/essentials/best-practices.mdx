@@ -13,15 +13,15 @@ Always use `remember()` for database queries, API calls, or expensive computatio
 
 ```ts
 // ✅ GOOD: Prevents stampedes
-const posts = await cache.remember('posts.popular', 3600, async () => {
-  return await db.query('SELECT * FROM posts ORDER BY views DESC LIMIT 10');
+const posts = await cache.remember("posts.popular", 3600, async () => {
+  return await db.query("SELECT * FROM posts ORDER BY views DESC LIMIT 10");
 });
 
 // ❌ BAD: Vulnerable to stampedes
-let posts = await cache.get('posts.popular');
+let posts = await cache.get("posts.popular");
 if (!posts) {
-  posts = await db.query('SELECT * FROM posts ORDER BY views DESC LIMIT 10');
-  await cache.set('posts.popular', posts, 3600);
+  posts = await db.query("SELECT * FROM posts ORDER BY views DESC LIMIT 10");
+  await cache.set("posts.popular", posts, 3600);
 }
 ```
 
@@ -31,7 +31,7 @@ Group related cache entries with tags for easy invalidation:
 
 ```ts
 // ✅ GOOD: Use tags for related data
-const tagged = cache.tags([`user.${userId}`, 'users']);
+const tagged = cache.tags([`user.${userId}`, "users"]);
 await tagged.set(`user.${userId}.profile`, profileData);
 await tagged.set(`user.${userId}.posts`, postsData);
 
@@ -49,16 +49,16 @@ await cache.set(`user.${userId}.posts`, postsData);
 Choose TTLs based on data freshness requirements:
 
 ```ts
-import { CACHE_FOR } from '@warlock.js/cache';
+import { CACHE_FOR } from "@warlock.js/cache";
 
 // Frequently changing data: Short TTL
-await cache.set('current.stats', stats, CACHE_FOR.HALF_HOUR);
+await cache.set("current.stats", stats, CACHE_FOR.HALF_HOUR);
 
 // Semi-static data: Medium TTL
-await cache.set('user.profile', profile, CACHE_FOR.ONE_DAY);
+await cache.set("user.profile", profile, CACHE_FOR.ONE_DAY);
 
 // Rarely changing data: Long TTL
-await cache.set('app.config', config, CACHE_FOR.ONE_WEEK);
+await cache.set("app.config", config, CACHE_FOR.ONE_WEEK);
 ```
 
 ### Use Atomic Operations for Counters
@@ -67,11 +67,11 @@ Always use `increment()` / `decrement()` for counters instead of manual get/set:
 
 ```ts
 // ✅ GOOD: atomic, race-condition free
-await cache.increment('page.views', 1);
+await cache.increment("page.views", 1);
 
 // ❌ BAD: race condition risk
-const views = await cache.get('page.views') || 0;
-await cache.set('page.views', views + 1);
+const views = (await cache.get("page.views")) || 0;
+await cache.set("page.views", views + 1);
 ```
 
 For structured (non-numeric) values that need atomic mutation, use `update()` or `merge()`:
@@ -106,9 +106,9 @@ Set up event listeners for monitoring and debugging:
 
 ```ts
 // ✅ GOOD: Monitor cache performance
-cache.on('hit', () => metrics.increment('cache.hit'));
-cache.on('miss', () => metrics.increment('cache.miss'));
-cache.on('error', ({ error }) => logger.error('Cache error', error));
+cache.on("hit", () => metrics.increment("cache.hit"));
+cache.on("miss", () => metrics.increment("cache.miss"));
+cache.on("error", ({ error }) => logger.error("Cache error", error));
 ```
 
 ### Use Namespaces for Organization
@@ -117,13 +117,13 @@ Organize cache keys hierarchically with namespaces:
 
 ```ts
 // ✅ GOOD: Organized with namespaces
-await cache.set('users.profile.123', profileData);
-await cache.set('users.settings.123', settingsData);
-await cache.removeNamespace('users'); // Clears all user data
+await cache.set("users.profile.123", profileData);
+await cache.set("users.settings.123", settingsData);
+await cache.removeNamespace("users"); // Clears all user data
 
 // ❌ BAD: Flat keys, hard to manage
-await cache.set('user_123_profile', profileData);
-await cache.set('user_123_settings', settingsData);
+await cache.set("user_123_profile", profileData);
+await cache.set("user_123_settings", settingsData);
 ```
 
 ### Set Memory Limits
@@ -137,9 +137,9 @@ cache.setCacheConfigurations({
   options: {
     memory: {
       maxSize: 1000, // Auto-evicts when full
-      ttl: 3600
-    }
-  }
+      ttl: 3600,
+    },
+  },
 });
 ```
 
@@ -150,14 +150,14 @@ Always use the Redis (or Postgres) driver in production with multiple servers. T
 ```ts
 // ✅ GOOD: Shared cache across servers
 cache.setCacheConfigurations({
-  default: 'redis',
+  default: "redis",
   drivers: { redis: RedisCacheDriver },
   options: {
     redis: {
       host: process.env.REDIS_HOST,
-      port: 6379
-    }
-  }
+      port: 6379,
+    },
+  },
 });
 ```
 
@@ -169,10 +169,10 @@ Only cache data that benefits from caching:
 
 ```ts
 // ❌ BAD: Caching already fast operations
-await cache.set('simple.calculation', 1 + 1, 3600);
+await cache.set("simple.calculation", 1 + 1, 3600);
 
 // ✅ GOOD: Cache expensive operations
-await cache.remember('expensive.query', 3600, async () => {
+await cache.remember("expensive.query", 3600, async () => {
   return await db.complexAggregation();
 });
 ```
@@ -183,13 +183,13 @@ Avoid `forever()` unless data truly never changes:
 
 ```ts
 // ❌ BAD: Infinite cache for changing data
-await cache.forever('user.stats', stats); // Stats change!
+await cache.forever("user.stats", stats); // Stats change!
 
 // ✅ GOOD: Reasonable TTL
-await cache.set('user.stats', stats, CACHE_FOR.ONE_HOUR);
+await cache.set("user.stats", stats, CACHE_FOR.ONE_HOUR);
 
 // ✅ GOOD: Forever for truly static data
-await cache.forever('app.version', '1.0.0');
+await cache.forever("app.version", "1.0.0");
 ```
 
 ### Don't Ignore Memory Limits
@@ -202,17 +202,17 @@ cache.setCacheConfigurations({
   options: {
     memory: {
       // No maxSize - can grow infinitely!
-    }
-  }
+    },
+  },
 });
 
 // ✅ GOOD: Bounded memory
 cache.setCacheConfigurations({
   options: {
     memory: {
-      maxSize: 1000 // Prevents memory leaks
-    }
-  }
+      maxSize: 1000, // Prevents memory leaks
+    },
+  },
 });
 ```
 
@@ -228,7 +228,7 @@ await cache.set(`user.${userId}.session`, sessionData);
 // Configuration:
 options: {
   redis: {
-    globalPrefix: () => `tenant.${getTenantId()}`
+    globalPrefix: () => `tenant.${getTenantId()}`;
   }
 }
 ```
@@ -240,27 +240,26 @@ File driver doesn't work across multiple servers:
 ```ts
 // ❌ BAD: File driver for distributed app
 cache.setCacheConfigurations({
-  default: 'file', // Each server has its own cache!
+  default: "file", // Each server has its own cache!
 });
 
 // ✅ GOOD: Redis for distributed
 cache.setCacheConfigurations({
-  default: 'redis' // Shared across all servers
+  default: "redis", // Shared across all servers
 });
 ```
-
 
 ## Running on multiple servers
 
 When more than one process serves traffic, every process gets its own `memory`, `memoryExtended`, `lru` and `file` cache. Use `redis` or `pg` for anything that must agree across servers.
 
-| Need | Use | Why |
-| --- | --- | --- |
-| Rate-limit or login-throttle counters | `increment()` on `redis` or `pg` | `INCRBY` / a single upsert, TTL kept; on memory each server counts separately, so the limit is N× looser |
-| One-time tokens | `pull()` on `redis` or `pg` | `GETDEL` / `DELETE … RETURNING` hands the value to one caller |
-| Shared read-modify-write | `update()` / `merge()` on `redis` or `pg` | Compare-and-set with retries; keep the callback free of side effects |
-| One server runs a job | `cache.lock()` on `redis` or `pg` | Finite TTL required; release only removes your own lock |
-| Tag invalidation | `redis` or `pg` | The index is shared, so one server's `invalidate()` reaches every server's entries |
+| Need                                  | Use                                       | Why                                                                                                      |
+| ------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Rate-limit or login-throttle counters | `increment()` on `redis` or `pg`          | `INCRBY` / a single upsert, TTL kept; on memory each server counts separately, so the limit is N× looser |
+| One-time tokens                       | `pull()` on `redis` or `pg`               | `GETDEL` / `DELETE … RETURNING` hands the value to one caller                                            |
+| Shared read-modify-write              | `update()` / `merge()` on `redis` or `pg` | Compare-and-set with retries; keep the callback free of side effects                                     |
+| One server runs a job                 | `cache.lock()` on `redis` or `pg`         | Finite TTL required; release only removes your own lock                                                  |
+| Tag invalidation                      | `redis` or `pg`                           | The index is shared, so one server's `invalidate()` reaches every server's entries                       |
 
 Also remember:
 
@@ -276,12 +275,12 @@ When you only need to check existence:
 
 ```ts
 // ✅ GOOD: More efficient
-if (await cache.has('key')) {
-  const value = await cache.get('key');
+if (await cache.has("key")) {
+  const value = await cache.get("key");
 }
 
 // ❌ BAD: Unnecessary value fetch
-const value = await cache.get('key');
+const value = await cache.get("key");
 if (value !== null) {
   // ...
 }
@@ -293,12 +292,12 @@ Use `many()` and `setMany()` for multiple operations:
 
 ```ts
 // ✅ GOOD: Single round-trip
-const values = await cache.many(['key1', 'key2', 'key3']);
+const values = await cache.many(["key1", "key2", "key3"]);
 
 // ❌ BAD: Multiple round-trips
-const value1 = await cache.get('key1');
-const value2 = await cache.get('key2');
-const value3 = await cache.get('key3');
+const value1 = await cache.get("key1");
+const value2 = await cache.get("key2");
+const value3 = await cache.get("key3");
 ```
 
 ### Primitives are Fast
@@ -307,26 +306,26 @@ Primitive values skip cloning overhead:
 
 ```ts
 // ✅ GOOD: Fast (no cloning)
-await cache.set('count', 42);
-await cache.set('flag', true);
-await cache.set('name', 'John');
+await cache.set("count", 42);
+await cache.set("flag", true);
+await cache.set("name", "John");
 
 // Objects/arrays are cloned (security), but still fast
-await cache.set('user', { name: 'John' });
+await cache.set("user", { name: "John" });
 ```
 
 ### Choose the Right Driver
 
-| Use Case | Recommended Driver |
-|----------|-------------------|
-| Development | Memory |
-| Testing | Null |
-| Single server | Memory or File |
-| Distributed apps | Redis |
-| Persistence + you already run Postgres | Pg (KV mode) |
-| Similarity / RAG / semantic caching | Pg (with `vector` config) — production. Memory drivers — dev only. |
-| Memory-constrained | LRU Memory |
-| Sliding expiration | Memory Extended |
+| Use Case                               | Recommended Driver                                                 |
+| -------------------------------------- | ------------------------------------------------------------------ |
+| Development                            | Memory                                                             |
+| Testing                                | Null                                                               |
+| Single server                          | Memory or File                                                     |
+| Distributed apps                       | Redis                                                              |
+| Persistence + you already run Postgres | Pg (KV mode)                                                       |
+| Similarity / RAG / semantic caching    | Pg (with `vector` config) — production. Memory drivers — dev only. |
+| Memory-constrained                     | LRU Memory                                                         |
+| Sliding expiration                     | Memory Extended                                                    |
 
 ## Tag Organization Strategies
 
@@ -334,20 +333,20 @@ await cache.set('user', { name: 'John' });
 
 ```ts
 // User-specific + collection
-cache.tags([`user.${id}`, 'users']);
+cache.tags([`user.${id}`, "users"]);
 
 // Resource-specific + collection
-cache.tags([`post.${id}`, 'posts', `category.${catId}`]);
+cache.tags([`post.${id}`, "posts", `category.${catId}`]);
 ```
 
 ### Strategy 2: Functional Tags
 
 ```ts
 // By feature
-cache.tags(['dashboard', 'homepage']);
+cache.tags(["dashboard", "homepage"]);
 
 // By data type
-cache.tags(['config', 'settings']);
+cache.tags(["config", "settings"]);
 ```
 
 ### Strategy 3: Multi-Dimensional
@@ -357,7 +356,7 @@ cache.tags(['config', 'settings']);
 cache.tags([
   `user.${userId}`,
   `category.${catId}`,
-  'featured' // if applicable
+  "featured", // if applicable
 ]);
 ```
 
@@ -366,15 +365,16 @@ cache.tags([
 ### Pattern 1: Metrics Collection
 
 ```ts
-let hits = 0, misses = 0;
+let hits = 0,
+  misses = 0;
 
-cache.on('hit', () => hits++);
-cache.on('miss', () => misses++);
+cache.on("hit", () => hits++);
+cache.on("miss", () => misses++);
 
 setInterval(() => {
   const total = hits + misses;
   const hitRate = total > 0 ? (hits / total) * 100 : 0;
-  metrics.set('cache.hit_rate', hitRate);
+  metrics.set("cache.hit_rate", hitRate);
   hits = misses = 0; // Reset
 }, 60000);
 ```
@@ -383,11 +383,11 @@ setInterval(() => {
 
 ```ts
 if (process.env.DEBUG_CACHE) {
-  cache.on('set', ({ key, ttl }) => {
+  cache.on("set", ({ key, ttl }) => {
     console.log(`[Cache] SET ${key} (TTL: ${ttl}s)`);
   });
-  
-  cache.on('miss', ({ key }) => {
+
+  cache.on("miss", ({ key }) => {
     console.log(`[Cache] MISS ${key}`);
   });
 }
@@ -396,12 +396,12 @@ if (process.env.DEBUG_CACHE) {
 ### Pattern 3: Error Tracking
 
 ```ts
-cache.on('error', ({ error, driver, key }) => {
+cache.on("error", ({ error, driver, key }) => {
   sentry.captureException(error, {
     tags: {
       cache_driver: driver,
-      cache_key: key
-    }
+      cache_key: key,
+    },
   });
 });
 ```
@@ -421,11 +421,11 @@ options: {
 ### Monitor Cache Size with Events
 
 ```ts
-cache.on('set', () => {
+cache.on("set", () => {
   // Track cache size
 });
 
-cache.on('removed', () => {
+cache.on("removed", () => {
   // Track cache size
 });
 ```
@@ -439,7 +439,7 @@ Prevent key collisions between applications:
 ```ts
 options: {
   redis: {
-    globalPrefix: process.env.APP_NAME || 'myapp'
+    globalPrefix: process.env.APP_NAME || "myapp";
   }
 }
 ```
@@ -460,12 +460,12 @@ Avoid caching sensitive information without encryption:
 
 ```ts
 // ❌ BAD: Caching sensitive data
-await cache.set('user.password', password);
+await cache.set("user.password", password);
 
 // ✅ GOOD: Cache only non-sensitive data
-await cache.set('user.profile', {
+await cache.set("user.profile", {
   name: user.name,
-  email: user.email
+  email: user.email,
   // No password!
 });
 ```
@@ -478,7 +478,7 @@ await cache.set('user.profile', {
 async function getUser(id: number) {
   const cached = await cache.get(`user.${id}`);
   if (cached) return cached;
-  
+
   const user = await db.users.findById(id);
   await cache.set(`user.${id}`, user, 3600);
   return user;
@@ -510,7 +510,7 @@ async function updateUser(id: number, data: any) {
 
 ```ts
 // Cache with tags
-const tagged = cache.tags([`user.${id}`, 'users']);
+const tagged = cache.tags([`user.${id}`, "users"]);
 await tagged.set(`user.${id}`, userData);
 
 // Invalidate on update
@@ -560,6 +560,7 @@ Re-embed when you change embedders. There's no way to "convert" between vector s
 ## Summary
 
 **Key patterns:**
+
 - Use `remember()` to prevent cache stampedes
 - Use tags for related data invalidation
 - Choose TTLs based on data freshness requirements
@@ -568,3 +569,12 @@ Re-embed when you change embedders. There's no way to "convert" between vector s
 - Avoid caching sensitive data without encryption
 - Use Redis for distributed systems
 
+### Expiring counters
+
+Pass the TTL on each atomic increment rather than relying on a separate create-only seed:
+
+```ts
+await cache.increment("login.failures", 1, { ttl: "15m" });
+```
+
+The TTL applies when a key is missing or expired; live keys keep their current deadline. Redis increments and applies expiry together with one Lua script, and Postgres uses one upsert. A key that expires immediately after a seed is therefore recreated with an expiry, even when the cache driver has no default TTL. Tagged and scoped calls accept the same option; namespaces use their configured TTL by default. Use a shared Redis or Postgres driver for counters shared across servers.

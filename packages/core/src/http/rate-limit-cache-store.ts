@@ -98,7 +98,7 @@ export async function incrementSharedRateLimit(
 
   await cache.set(key, 0, { ttl: ttlSeconds, onConflict: "create" });
 
-  const current = await cache.increment(key);
+  const current = await cache.increment(key, 1, { ttl: ttlSeconds });
 
   return { current, resetAt: (windowIndex + 1) * windowMs };
 }

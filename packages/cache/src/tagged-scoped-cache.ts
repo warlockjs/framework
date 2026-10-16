@@ -69,11 +69,7 @@ export class TaggedScopedCache implements TaggedScopedCacheContract {
    * Write the scoped key with the handle's tags appended to whatever the
    * caller passed. Scope-level tags are added on top by the scope itself.
    */
-  public set(
-    key: CacheKey,
-    value: any,
-    ttlOrOptions?: CacheTtl | CacheSetOptions,
-  ): Promise<any> {
+  public set(key: CacheKey, value: any, ttlOrOptions?: CacheTtl | CacheSetOptions): Promise<any> {
     const options = injectTags(normalizeToOptions(ttlOrOptions), this.handleTags);
 
     return this.scope.set(key, value, options);
@@ -182,10 +178,7 @@ export class TaggedScopedCache implements TaggedScopedCacheContract {
     ttlOrOptions: CacheTtl | RememberOptions,
     callback: () => Promise<T>,
   ): Promise<T> {
-    const options = injectTags(
-      normalizeToRememberOptions(ttlOrOptions),
-      this.handleTags,
-    );
+    const options = injectTags(normalizeToRememberOptions(ttlOrOptions), this.handleTags);
 
     return this.scope.remember<T>(key, options, callback);
   }
@@ -194,8 +187,8 @@ export class TaggedScopedCache implements TaggedScopedCacheContract {
    * Atomic counter increment on the scoped key. Tags aren't applied to
    * subsequent increments — they're attached at first-write time.
    */
-  public increment(key: CacheKey, value?: number): Promise<number> {
-    return this.scope.increment(key, value);
+  public increment(key: CacheKey, value?: number, options?: { ttl?: CacheTtl }): Promise<number> {
+    return this.scope.increment(key, value, options);
   }
 
   /**

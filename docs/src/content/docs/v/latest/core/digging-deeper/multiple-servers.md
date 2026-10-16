@@ -8,14 +8,14 @@ sidebar:
 
 By default Warlock keeps state in the process: memory cache, local disk, in-process socket rooms, in-process counters. That is right for one server. With two or more, each piece needs a shared backend. In production Warlock warns once at boot for the ones it can detect.
 
-| Concern | Single-server default | Multi-server setup | Silence the warning |
-| --- | --- | --- | --- |
-| Cache, repository cache, locks | Memory driver | `redis` or `pg` cache driver — see [Cache](./cache.md) | `cache.silenceSingleServerWarning` |
-| Files | Local disk | S3 or R2 — see [Storage](./storage.md) and [Upload to S3](../recipes/upload-to-s3.md) | `storage.silenceSingleServerWarning` |
-| Rate limits (global and `middleware.rateLimit`) | In-process | `http.rateLimit.store: "cache"` over a shared cache driver | n/a |
-| Sockets | In-process rooms | `socket.adapter` + sticky sessions | `socket.silenceSingleServerWarning` |
-| Scheduled jobs | Runs on every server | `onOneServer` — see [Overlap prevention](../../scheduler/guides/overlap-prevention/) | n/a |
-| Idempotency keys | Cache-backed | Shared cache (above) | n/a |
+| Concern                                         | Single-server default | Multi-server setup                                                                    | Silence the warning                  |
+| ----------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------- | ------------------------------------ |
+| Cache, repository cache, locks                  | Memory driver         | `redis` or `pg` cache driver — see [Cache](./cache.md)                                | `cache.silenceSingleServerWarning`   |
+| Files                                           | Local disk            | S3 or R2 — see [Storage](./storage.md) and [Upload to S3](../recipes/upload-to-s3.md) | `storage.silenceSingleServerWarning` |
+| Rate limits (global and `middleware.rateLimit`) | In-process            | `http.rateLimit.store: "cache"` over a shared cache driver                            | n/a                                  |
+| Sockets                                         | In-process rooms      | `socket.adapter` + sticky sessions                                                    | `socket.silenceSingleServerWarning`  |
+| Scheduled jobs                                  | Runs on every server  | `onOneServer` — see [Overlap prevention](../../scheduler/guides/overlap-prevention/)  | n/a                                  |
+| Idempotency keys                                | Cache-backed          | Shared cache (above)                                                                  | n/a                                  |
 
 ## Rate limiting
 
@@ -63,3 +63,5 @@ Enable sticky sessions on the load balancer so long-polling requests from one cl
 ## Repository cache
 
 The repository cache is cleared after the model event and again after the transaction commits. With a memory cache, other servers keep their own copies — use redis or pg.
+
+Cache-backed rate limiting passes its window TTL on every atomic increment. A key recreated after the create-only seed expires still gets an expiry, without extending an existing window. Configure a shared Redis or Postgres driver; no driver default TTL is required for these counters.

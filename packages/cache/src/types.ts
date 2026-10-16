@@ -150,9 +150,7 @@ export type LockOptions = {
  *   console.log("skipped — someone else holds the lock");
  * }
  */
-export type LockOutcome<T> =
-  | { acquired: true; value: T }
-  | { acquired: false };
+export type LockOutcome<T> = { acquired: true; value: T } | { acquired: false };
 
 /**
  * Options for `remember()` when you need more than just a TTL — e.g. attaching
@@ -511,7 +509,7 @@ export interface TaggedCacheDriver {
   /**
    * Increment with tags
    */
-  increment(key: CacheKey, value?: number): Promise<number>;
+  increment(key: CacheKey, value?: number, options?: { ttl?: CacheTtl }): Promise<number>;
   /**
    * Decrement with tags
    */
@@ -787,11 +785,7 @@ export interface CacheDriver<ClientType, Options> {
    * // Rich options
    * await cache.set("user:1", user, { ttl: "1h", tags: ["users"], onConflict: "create" });
    */
-  set(
-    key: CacheKey,
-    value: any,
-    ttlOrOptions?: CacheTtl | CacheSetOptions,
-  ): Promise<any>;
+  set(key: CacheKey, value: any, ttlOrOptions?: CacheTtl | CacheSetOptions): Promise<any>;
   /**
    * Get a value from the cache
    */
@@ -859,11 +853,7 @@ export interface CacheDriver<ClientType, Options> {
    *   () => db.products.find(42),
    * );
    */
-  swr<T = any>(
-    key: CacheKey,
-    options: CacheSwrOptions,
-    callback: () => Promise<T>,
-  ): Promise<T>;
+  swr<T = any>(key: CacheKey, options: CacheSwrOptions, callback: () => Promise<T>): Promise<T>;
   /**
    * Get a value and remove it, handing it out exactly once.
    *
@@ -942,7 +932,9 @@ export interface CacheDriver<ClientType, Options> {
   ): Promise<LockOutcome<T>>;
   /**
    * Increment a numeric value in cache. A missing key starts from 0 with the
-   * driver default TTL; an existing key keeps its remaining TTL.
+   * per-call `options.ttl` (or driver default); an existing expiry is preserved.
+   * Supply the TTL on every call for expiring counters: a separate seed may
+   * expire before the atomic increment recreates the key.
    *
    * Atomicity: across servers on `redis` (`INCRBY`) and `pg` (single
    * upsert statement); within the process on `memory`, `memoryExtended`,
@@ -951,7 +943,7 @@ export interface CacheDriver<ClientType, Options> {
    * @param key The cache key
    * @param value The value to increment by (default 1)
    */
-  increment(key: CacheKey, value?: number): Promise<number>;
+  increment(key: CacheKey, value?: number, options?: { ttl?: CacheTtl }): Promise<number>;
   /**
    * Decrement a numeric value in cache
    *
@@ -1025,10 +1017,7 @@ export interface CacheDriver<ClientType, Options> {
    * @example
    * const hits = await cache.similar(await embed(query), { topK: 5, threshold: 0.7 });
    */
-  similar<T = any>(
-    vector: number[],
-    options: CacheSimilarOptions,
-  ): Promise<CacheSimilarHit<T>[]>;
+  similar<T = any>(vector: number[], options: CacheSimilarOptions): Promise<CacheSimilarHit<T>[]>;
 }
 
 /**
@@ -1097,7 +1086,7 @@ export interface TaggedScopedCacheContract {
     ttlOrOptions: CacheTtl | RememberOptions,
     callback: () => Promise<T>,
   ): Promise<T>;
-  increment(key: CacheKey, value?: number): Promise<number>;
+  increment(key: CacheKey, value?: number, options?: { ttl?: CacheTtl }): Promise<number>;
   decrement(key: CacheKey, value?: number): Promise<number>;
   /**
    * Invalidate every entry tagged with the union of scope tags + handle tags.
@@ -1160,14 +1149,10 @@ export interface ScopedCacheContract {
     ttlOrOptions: CacheTtl | RememberOptions,
     callback: () => Promise<T>,
   ): Promise<T>;
-  swr<T = any>(
-    key: CacheKey,
-    options: CacheSwrOptions,
-    callback: () => Promise<T>,
-  ): Promise<T>;
+  swr<T = any>(key: CacheKey, options: CacheSwrOptions, callback: () => Promise<T>): Promise<T>;
 
   // Mutations
-  increment(key: CacheKey, value?: number): Promise<number>;
+  increment(key: CacheKey, value?: number, options?: { ttl?: CacheTtl }): Promise<number>;
   decrement(key: CacheKey, value?: number): Promise<number>;
   update<T = any>(
     key: CacheKey,
@@ -1191,10 +1176,7 @@ export interface ScopedCacheContract {
   ): Promise<LockOutcome<T>>;
 
   // Similarity (delegated; throws CacheUnsupportedError if the driver lacks it)
-  similar<T = any>(
-    vector: number[],
-    options: CacheSimilarOptions,
-  ): Promise<CacheSimilarHit<T>[]>;
+  similar<T = any>(vector: number[], options: CacheSimilarOptions): Promise<CacheSimilarHit<T>[]>;
 }
 
 export type CacheData = {
@@ -1223,14 +1205,7 @@ export type CacheData = {
 export type DriverClass = new () => CacheDriver<any, any>;
 
 type DefaultDrivers =
-  | "redis"
-  | "file"
-  | "memory"
-  | "memoryExtended"
-  | "null"
-  | "lru"
-  | "pg"
-  | "mock";
+  "redis" | "file" | "memory" | "memoryExtended" | "null" | "lru" | "pg" | "mock";
 
 type MergeWithDefaultDrivers<T> = T extends undefined ? DefaultDrivers : DefaultDrivers | T;
 

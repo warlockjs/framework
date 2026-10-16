@@ -322,9 +322,10 @@ export function loginThrottleMiddleware(options: LoginThrottleOptions = {}): Mid
           // only one of several racing servers sets the TTL, and an existing
           // window keeps its deadline (fixed window). The bump itself is an
           // atomic increment, so concurrent failures across servers are never
-          // lost (redis INCRBY / pg upsert keep the window's TTL).
+          // lost (redis INCRBY / pg upsert keep the window's TTL). Passing
+          // the TTL on the bump also expires a key recreated after the seed.
           await cache.set(key, 0, { ttl: window, onConflict: "create" });
-          const count = await cache.increment(key);
+          const count = await cache.increment(key, 1, { ttl: window });
 
           if (count >= max) {
             const lockSeconds = durationSeconds(lockoutDuration);

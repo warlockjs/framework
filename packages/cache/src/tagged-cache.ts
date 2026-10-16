@@ -1,10 +1,4 @@
-import type {
-  CacheDriver,
-  CacheKey,
-  CacheSetOptions,
-  CacheTtl,
-  TaggedCacheDriver,
-} from "./types";
+import type { CacheDriver, CacheKey, CacheSetOptions, CacheTtl, TaggedCacheDriver } from "./types";
 import { parseCacheKey } from "./utils";
 
 /** Implemented by `BaseCacheDriver`; a custom driver may not have it. */
@@ -287,11 +281,7 @@ export class TaggedCache implements TaggedCacheDriver {
   /**
    * {@inheritdoc}
    */
-  public async remember(
-    key: CacheKey,
-    ttl: number,
-    callback: () => Promise<any>,
-  ): Promise<any> {
+  public async remember(key: CacheKey, ttl: number, callback: () => Promise<any>): Promise<any> {
     const value = await this.get(key);
 
     if (value !== null) {
@@ -329,10 +319,14 @@ export class TaggedCache implements TaggedCacheDriver {
   /**
    * {@inheritdoc}
    */
-  public async increment(key: CacheKey, value: number = 1): Promise<number> {
+  public async increment(
+    key: CacheKey,
+    value: number = 1,
+    options?: { ttl?: CacheTtl },
+  ): Promise<number> {
     // The driver's atomic increment (INCRBY / pg upsert / synchronous
     // in-process), then record the tag relationship.
-    const newValue = await this.driver.increment(key, value);
+    const newValue = await this.driver.increment(key, value, options);
 
     await this.storeTaggedKey(key);
 

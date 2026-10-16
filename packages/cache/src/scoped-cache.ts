@@ -163,11 +163,7 @@ export class ScopedCache implements ScopedCacheContract {
    * `expiresAt` is preserved as-is (absolute deadlines are never overridden
    * by the scope's relative-ttl default).
    */
-  public set(
-    key: CacheKey,
-    value: any,
-    ttlOrOptions?: CacheTtl | CacheSetOptions,
-  ): Promise<any> {
+  public set(key: CacheKey, value: any, ttlOrOptions?: CacheTtl | CacheSetOptions): Promise<any> {
     return this.source.set(this.scopedKey(key), value, this.mergeSetOptions(ttlOrOptions));
   }
 
@@ -192,9 +188,7 @@ export class ScopedCache implements ScopedCacheContract {
    */
   public setNX(key: CacheKey, value: any, ttl?: number): Promise<boolean> {
     if (!this.source.setNX) {
-      throw new Error(
-        `setNX is not supported by the underlying cache source: ${this.source.name}`,
-      );
+      throw new Error(`setNX is not supported by the underlying cache source: ${this.source.name}`);
     }
 
     return this.source.setNX(this.scopedKey(key), value, ttl ?? this.scopeTtlSeconds());
@@ -254,8 +248,10 @@ export class ScopedCache implements ScopedCacheContract {
    * Atomic counter increment on the scoped key. TTL is preserved by the
    * underlying driver — scope ttl is only applied on first write via `set`.
    */
-  public increment(key: CacheKey, value?: number): Promise<number> {
-    return this.source.increment(this.scopedKey(key), value);
+  public increment(key: CacheKey, value?: number, options?: { ttl?: CacheTtl }): Promise<number> {
+    return this.source.increment(this.scopedKey(key), value, {
+      ttl: options?.ttl ?? this.defaults.ttl,
+    });
   }
 
   /**
@@ -360,9 +356,7 @@ export class ScopedCache implements ScopedCacheContract {
     const hits = await this.source.similar<T>(vector, options);
     const parsedPrefix = this.source.parseKey(this.prefix);
 
-    return hits.filter(
-      (hit) => hit.key === parsedPrefix || hit.key.startsWith(parsedPrefix + "."),
-    );
+    return hits.filter((hit) => hit.key === parsedPrefix || hit.key.startsWith(parsedPrefix + "."));
   }
 
   /**
@@ -386,12 +380,9 @@ export class ScopedCache implements ScopedCacheContract {
    * additively. `expiresAt` is preserved without injecting the scope's `ttl`
    * default (absolute deadlines override relative ones).
    */
-  protected mergeSetOptions(
-    input?: CacheTtl | CacheSetOptions,
-  ): CacheSetOptions | undefined {
+  protected mergeSetOptions(input?: CacheTtl | CacheSetOptions): CacheSetOptions | undefined {
     const options = normalizeToOptions(input);
-    const ttl =
-      options.ttl ?? (options.expiresAt === undefined ? this.defaults.ttl : undefined);
+    const ttl = options.ttl ?? (options.expiresAt === undefined ? this.defaults.ttl : undefined);
     const tags = mergeTagSets(this.defaults.tags, options.tags);
 
     const merged: CacheSetOptions = { ...options };
@@ -411,9 +402,7 @@ export class ScopedCache implements ScopedCacheContract {
    * Same merge as {@link mergeSetOptions} but for the `remember()` shape
    * ({@link RememberOptions} — no `expiresAt`).
    */
-  protected mergeRememberOptions(
-    input: CacheTtl | RememberOptions,
-  ): CacheTtl | RememberOptions {
+  protected mergeRememberOptions(input: CacheTtl | RememberOptions): CacheTtl | RememberOptions {
     const options = normalizeToRememberOptions(input);
     const ttl = options.ttl ?? this.defaults.ttl;
     const tags = mergeTagSets(this.defaults.tags, options.tags);

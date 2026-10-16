@@ -91,7 +91,12 @@ class FakePool implements PgClientLike {
 
     // Compare-and-set: UPDATE … WHERE key = $1 AND value = $3::jsonb AND live
     if (sql.startsWith("/* cache:cas-update */")) {
-      const [key, valJson, expectedJson, ttlSecs] = values as [string, string, string, number | null | undefined];
+      const [key, valJson, expectedJson, ttlSecs] = values as [
+        string,
+        string,
+        string,
+        number | null | undefined,
+      ];
       this.beforeCas?.(key);
       const row = this.store.get(key);
       if (!isLive(row) || JSON.stringify(row.value) !== JSON.stringify(JSON.parse(expectedJson))) {
@@ -156,7 +161,9 @@ class FakePool implements PgClientLike {
 
     // pgvector extension probe
     if (sql.startsWith("SELECT 1 FROM pg_extension")) {
-      return this.pgvectorInstalled ? { rows: [{ "?column?": 1 }], rowCount: 1 } : { rows: [], rowCount: 0 };
+      return this.pgvectorInstalled
+        ? { rows: [{ "?column?": 1 }], rowCount: 1 }
+        : { rows: [], rowCount: 0 };
     }
 
     // Similarity SELECT — `SELECT key, value, 1 - (embedding <=> $1::vector) AS score FROM <t> ... ORDER BY embedding <=> $1::vector LIMIT $N`
@@ -577,7 +584,7 @@ describe("PgCacheDriver — TTL handling", () => {
 
   it("computes expires_at on the DB clock via now() + make_interval", async () => {
     await driver.set("k", 1, "1h");
-    const write = pool.queryLog.find(q => q.text.includes("INSERT INTO"))!;
+    const write = pool.queryLog.find((q) => q.text.includes("INSERT INTO"))!;
     expect(write.text).toContain("now() + make_interval");
     expect(write.values![2]).toBe(3600);
   });
@@ -629,12 +636,12 @@ describe("PgCacheDriver — vector unsupported when not configured", () => {
 describe("PgCacheDriver — vector configuration validation", () => {
   it("rejects non-positive dimensions", () => {
     const driver = new PgCacheDriver();
-    expect(() =>
-      driver.setOptions({ client: new FakePool(), vector: { dimensions: 0 } }),
-    ).toThrow(CacheConfigurationError);
-    expect(() =>
-      driver.setOptions({ client: new FakePool(), vector: { dimensions: -1 } }),
-    ).toThrow(CacheConfigurationError);
+    expect(() => driver.setOptions({ client: new FakePool(), vector: { dimensions: 0 } })).toThrow(
+      CacheConfigurationError,
+    );
+    expect(() => driver.setOptions({ client: new FakePool(), vector: { dimensions: -1 } })).toThrow(
+      CacheConfigurationError,
+    );
     expect(() =>
       driver.setOptions({ client: new FakePool(), vector: { dimensions: 1.5 } }),
     ).toThrow(CacheConfigurationError);
@@ -802,15 +809,9 @@ describe("PgCacheDriver — similarity (pgvector)", () => {
   });
 
   it("rejects non-positive topK", async () => {
-    await expect(driver.similar([1, 0, 0], { topK: 0 })).rejects.toThrow(
-      CacheConfigurationError,
-    );
-    await expect(driver.similar([1, 0, 0], { topK: -1 })).rejects.toThrow(
-      CacheConfigurationError,
-    );
-    await expect(driver.similar([1, 0, 0], { topK: 1.5 })).rejects.toThrow(
-      CacheConfigurationError,
-    );
+    await expect(driver.similar([1, 0, 0], { topK: 0 })).rejects.toThrow(CacheConfigurationError);
+    await expect(driver.similar([1, 0, 0], { topK: -1 })).rejects.toThrow(CacheConfigurationError);
+    await expect(driver.similar([1, 0, 0], { topK: 1.5 })).rejects.toThrow(CacheConfigurationError);
   });
 
   it("clones object values returned by similar()", async () => {
@@ -941,7 +942,9 @@ describe("PgCacheDriver — SWR (stale_at column)", () => {
     // Reach into the protected helper via a subclass dance — same pattern the
     // SWR flow uses internally.
     const entry = await (
-      driver as unknown as { getEntry(key: string): Promise<{ data: any; staleAt?: number; expiresAt?: number } | null> }
+      driver as unknown as {
+        getEntry(key: string): Promise<{ data: any; staleAt?: number; expiresAt?: number } | null>;
+      }
     ).getEntry("k");
 
     expect(entry).not.toBeNull();
@@ -1026,6 +1029,16 @@ describe("PgCacheDriver — cross-server atomic ops (wave 2)", () => {
     const statements = pool.queryLog.filter((q) => q.text.includes("cache:increment"));
     expect(statements).toHaveLength(1);
     expect(pool.store.get("hits")!.expires_at).toEqual(before);
+  });
+
+  it("recreates expired counters with the per-call TTL in its atomic upsert", async () => {
+    await driver.set("window", 0, 60);
+    pool.store.get("window")!.expires_at = new Date(Date.now() - 1);
+    await expect(driver.increment("window", 1, { ttl: "2m" })).resolves.toBe(1);
+    const deadline = pool.store.get("window")!.expires_at!;
+    expect(deadline.getTime()).toBeGreaterThan(Date.now() + 119_000);
+    await driver.increment("window", 1, { ttl: "1d" });
+    expect(pool.store.get("window")!.expires_at).toEqual(deadline);
   });
 
   it("increment starts a missing key from the amount", async () => {

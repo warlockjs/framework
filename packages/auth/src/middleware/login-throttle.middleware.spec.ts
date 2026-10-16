@@ -112,7 +112,9 @@ describe("loginThrottleMiddleware", () => {
       ttl: "10m",
       onConflict: "create",
     });
-    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`);
+    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`, 1, {
+      ttl: "10m",
+    });
     // no lock yet — count (1) is below max (5)
     expect(cacheSet).not.toHaveBeenCalledWith(
       `auth.throttle.lock.email.${SARA_KEY}`,
@@ -143,10 +145,14 @@ describe("loginThrottleMiddleware", () => {
       ttl: expect.anything(),
       onConflict: "create",
     });
-    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`);
+    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`, 1, {
+      ttl: "15m",
+    });
     // The lock value is its own deadline: sliding-expiry
     // drivers cannot stretch a lockout.
-    const lockCall = cacheSet.mock.calls.find((call) => call[0] === `auth.throttle.lock.email.${SARA_KEY}`);
+    const lockCall = cacheSet.mock.calls.find(
+      (call) => call[0] === `auth.throttle.lock.email.${SARA_KEY}`,
+    );
 
     expect(lockCall?.[2]).toEqual({ ttl: "20m" });
     expect(lockCall?.[1]).toBeGreaterThan(Date.now() + 19 * 60_000);
@@ -168,7 +174,9 @@ describe("loginThrottleMiddleware", () => {
   });
 
   it("still honours a 5.29 lock stored as `true`", async () => {
-    cacheGet.mockImplementation(async (key: string) => (key.startsWith("auth.throttle.lock.") ? true : null));
+    cacheGet.mockImplementation(async (key: string) =>
+      key.startsWith("auth.throttle.lock.") ? true : null,
+    );
 
     const middleware = loginThrottleMiddleware({ by: ["email"] });
     const response = buildResponse(true);
@@ -219,8 +227,12 @@ describe("loginThrottleMiddleware", () => {
     await response.fireSent();
 
     // both the per-account AND the per-source counter must be bumped
-    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`);
-    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.ip.${IP_KEY}`);
+    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`, 1, {
+      ttl: "15m",
+    });
+    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.ip.${IP_KEY}`, 1, {
+      ttl: "15m",
+    });
   });
 
   it("fails open when the cache rejects (driver outage must not escalate to an auth outage)", async () => {
@@ -252,7 +264,9 @@ describe("loginThrottleMiddleware", () => {
 
     expect(keys.length).toBeGreaterThan(0);
     expect(keys.some((key) => key.toLowerCase().includes("sara@example.com"))).toBe(false);
-    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`);
+    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`, 1, {
+      ttl: "15m",
+    });
   });
 
   it("trims the credential, so padded input shares the account's bucket", async () => {
@@ -262,10 +276,14 @@ describe("loginThrottleMiddleware", () => {
     const middleware = loginThrottleMiddleware({ by: ["email"] });
     const response = buildResponse(false);
 
-    await middleware(makeCtx({ request: buildRequest({ email: "  sara@example.com " }), response }));
+    await middleware(
+      makeCtx({ request: buildRequest({ email: "  sara@example.com " }), response }),
+    );
     await response.fireSent();
 
-    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`);
+    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`, 1, {
+      ttl: "15m",
+    });
   });
 
   it("never puts the raw IP in a cache key", async () => {
@@ -310,7 +328,9 @@ describe("throttleIdentifierHash", () => {
     expect(throttleIdentifierHash("email", " Sara@Example.com ")).toBe(
       throttleIdentifierHash("email", "sara@example.com"),
     );
-    expect(throttleIdentifierHash("email", "1.2.3.4")).not.toBe(throttleIdentifierHash("ip", "1.2.3.4"));
+    expect(throttleIdentifierHash("email", "1.2.3.4")).not.toBe(
+      throttleIdentifierHash("ip", "1.2.3.4"),
+    );
     expect(throttleIdentifierHash("email", "sara@example.com")).toMatch(/^[0-9a-f]{64}$/);
   });
 });

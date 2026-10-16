@@ -6,6 +6,7 @@ import { FileCacheDriver } from "./drivers/file-cache-driver";
 import { LRUMemoryCacheDriver } from "./drivers/lru-memory-cache-driver";
 import { MemoryCacheDriver } from "./drivers/memory-cache-driver";
 import { MockCacheDriver } from "./drivers/mock-cache-driver";
+import { ScopedCache } from "./scoped-cache";
 import type { CacheDriver } from "./types";
 import { CacheConfigurationError } from "./types";
 
@@ -81,6 +82,32 @@ describe.each([
     // Every caller saw a distinct running total.
     expect(new Set(results).size).toBe(callers);
   }, 20000);
+
+  it("applies a per-call TTL when a seeded counter expired before increment", async () => {
+    const driver = await make();
+    await driver.set("window", 20, 1);
+    // An expired seed and a missing key have the same atomic-increment path.
+    await driver.remove("window");
+    const started = Date.now();
+    await expect(driver.increment("window", 1, { ttl: "2m" })).resolves.toBe(1);
+    const expiry = await expiresAtOf(driver, "window");
+    expect(expiry).toBeGreaterThanOrEqual(started + 119_000);
+    expect(expiry).toBeLessThanOrEqual(Date.now() + 120_000);
+    await driver.increment("window", 1, { ttl: "1d" });
+    expect(Math.abs((await expiresAtOf(driver, "window"))! - expiry!)).toBeLessThanOrEqual(1000);
+  });
+
+  it("forwards per-call TTL through scoped and tagged counters", async () => {
+    const driver = await make();
+    const scope = new ScopedCache(driver, "namespace", { ttl: "5m" });
+    await scope.increment("default");
+    expect(await expiresAtOf(driver, "namespace.default")).toBeGreaterThan(Date.now() + 299_000);
+    await scope.tags(["counters"]).increment("explicit", 2, { ttl: "1m" });
+    expect(await driver.get("namespace.explicit")).toBe(2);
+    const expiry = await expiresAtOf(driver, "namespace.explicit");
+    expect(expiry).toBeGreaterThan(Date.now() + 59_000);
+    expect(expiry).toBeLessThanOrEqual(Date.now() + 60_000);
+  });
 
   it("increment keeps the existing entry's expiry", async () => {
     const driver = await make();

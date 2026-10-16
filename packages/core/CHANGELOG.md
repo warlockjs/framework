@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The cache-backed rate limiter supplies its per-window TTL on every atomic increment, so a key that expires after the create-only seed cannot be recreated without an expiry.
 - The CLI rejects unsupported Node versions with one clear message and a non-zero exit before loading the published entry or registering the source loader.
 
 ### Changed

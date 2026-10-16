@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/cache` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.31.0
+
+### Fixed
+
+- `cache.increment(key, amount, { ttl })` supplies a TTL when an atomic increment creates or recreates a counter, through direct, tagged and scoped calls. Existing expiry deadlines are preserved. Redis applies the count and TTL together, so an expired seed cannot leave a permanent counter even when the driver has no default TTL.
+
 ## 5.30.0 - 2026-10-16
 
 ### Changed
@@ -87,6 +93,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Lockstep release maintenance and dependency refresh.
+
 ## 5.20.0 - 2026-09-24
 
 ### Breaking
@@ -130,14 +137,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Atomic `increment`/`decrement`, `pull` and `update`**, with a per-driver guarantee:
 
-  | Driver | `increment` / `decrement` | `pull` | `update` |
-  | --- | --- | --- | --- |
-  | `redis` | cross-server (`INCRBY`, keeps TTL) | cross-server (`GETDEL`, Lua fallback) | cross-server (Lua compare-and-set, bounded retries, `KEEPTTL`) |
-  | `pg` | cross-server (one upsert, keeps `expires_at`) | cross-server (`DELETE … RETURNING`) | cross-server (compare-and-set, bounded retries) |
-  | `memory` / `memoryExtended` / `lru` / `mock` | in-process, synchronous | in-process, synchronous | serialized per key, in-process only |
-  | `file` | serialized per key, in-process only | serialized per key, in-process only | not supported (throws) |
+  | Driver                                       | `increment` / `decrement`                     | `pull`                                | `update`                                                       |
+  | -------------------------------------------- | --------------------------------------------- | ------------------------------------- | -------------------------------------------------------------- |
+  | `redis`                                      | cross-server (`INCRBY`, keeps TTL)            | cross-server (`GETDEL`, Lua fallback) | cross-server (Lua compare-and-set, bounded retries, `KEEPTTL`) |
+  | `pg`                                         | cross-server (one upsert, keeps `expires_at`) | cross-server (`DELETE … RETURNING`)   | cross-server (compare-and-set, bounded retries)                |
+  | `memory` / `memoryExtended` / `lru` / `mock` | in-process, synchronous                       | in-process, synchronous               | serialized per key, in-process only                            |
+  | `file`                                       | serialized per key, in-process only           | serialized per key, in-process only   | not supported (throws)                                         |
 
   `update()` callbacks on Redis and Postgres may run more than once under contention, so keep them side-effect free. To coordinate more than one server, use `redis` or `pg`; `memory` is per-process.
+
 - **Tag index primitives** on the driver contract: `tagAdd`, `tagMembers`, `tagRemove`. Redis uses a native SET inside the prefix (a legacy JSON index is upgraded on first touch), Postgres a one-statement JSON-array merge on the index row, and the in-memory drivers a separate store that eviction and expiry never touch. `file` and `null` keep the serialized fallback. `invalidate()` deletes exactly the members it read, writes prune up to 20 dead members, `remove()`/`pull()` detach the key, and tagged `increment`/`pull` use the atomic ops.
 - **`PgCacheDriver.prune(limit = 1000)`** deletes expired rows in batches and returns the count. `set()` also runs it in the background on about 1 in 200 writes, so unique-key workloads no longer grow the table forever.
 - **`lock()` successor-safe release** (see Fixed). There is no renewal, so the TTL must exceed the worst-case duration of the locked work.
@@ -242,7 +250,7 @@ changelogs.
 - Removed the raw `console.log(value)` dump of the full cached payload when `structuredClone` fails in `parseCachedData` — cached values (potentially PII/tokens) no longer leak to stdout; the structured error log with the value's type is kept.
 - **Credential leak via error logging (Medium):** `logError()` and the Redis driver's `connect()` failure path printed the raw `Error` object straight to stdout (`console.log`) or to `log.fatal`, which could include the connection URL — and password — that some Redis/Node client errors echo back in `error.message`/`cause` on connection failure. Both call sites now go through a new `safeErrorInfo()` helper that logs only a redacted `{ message, code }` shape (never the raw error object), with any `scheme://user:pass@` credentials in the message masked to `scheme://[REDACTED]@`. The bare `console.log(error)`/`console.log("Err", error)` calls are gone entirely.
 - **Redis `removeNamespace` blocking `KEYS` scan (Medium):** replaced the blocking `KEYS` command with a non-blocking `SCAN` cursor loop (`client.scanIterator`), so clearing a namespace on a large keyspace no longer stalls the single-threaded Redis event loop for every other tenant/consumer. The existing glob-escaping fix (above) is unchanged.
-- **File driver `removeNamespace` dotted-key gap (Medium):** dotted keys (`ns.a`) are stored as *sibling* directories under the cache root (see the path-traversal fix above), so removing namespace `ns` — which only ever deleted a directory literally named `ns` — silently left every `ns.*` key on disk. `removeNamespace` now lists the cache root's immediate children, decodes each back to its logical key, and removes every directory whose logical key equals the namespace or starts with `<namespace>.`, matching the boundary semantics the `pg` driver already used for the same contract. Honors `globalPrefix` (previously ignored, so a global flush could wipe the whole cache root instead of scoping to the tenant) and preserves the existing path-containment guard.
+- **File driver `removeNamespace` dotted-key gap (Medium):** dotted keys (`ns.a`) are stored as _sibling_ directories under the cache root (see the path-traversal fix above), so removing namespace `ns` — which only ever deleted a directory literally named `ns` — silently left every `ns.*` key on disk. `removeNamespace` now lists the cache root's immediate children, decodes each back to its logical key, and removes every directory whose logical key equals the namespace or starts with `<namespace>.`, matching the boundary semantics the `pg` driver already used for the same contract. Honors `globalPrefix` (previously ignored, so a global flush could wipe the whole cache root instead of scoping to the tenant) and preserves the existing path-containment guard.
 
 ### Dependencies
 

@@ -93,7 +93,7 @@ if v then redis.call('DEL', KEYS[1]) end
 return v`;
 
 /**
- * Increment that gives a counter without an expiry the driver's default TTL,
+ * Increment that gives a counter without an expiry its per-call or default TTL,
  * in one round trip.
  *
  * KEYS[1]=key; ARGV[1]=amount; ARGV[2]=ttl seconds ('0' = none).
@@ -764,14 +764,19 @@ export class RedisCacheDriver
    * Atomic increment using Redis native INCRBY command
    * {@inheritdoc}
    */
-  public async increment(key: CacheKey, value: number = 1): Promise<number> {
+  public async increment(
+    key: CacheKey,
+    value: number = 1,
+    options: { ttl?: CacheTtl } = {},
+  ): Promise<number> {
     const parsedKey = this.parseKey(key);
 
     this.log("caching", parsedKey);
 
-    // A fresh counter has no TTL; apply the driver default (only if none set),
+    // Apply the per-call TTL (or driver default) when INCRBY creates a key,
     // atomically with the increment and without Redis 7's `EXPIRE … NX`.
-    const defaultTtl = Number.isFinite(this.ttl) && this.ttl > 0 ? Math.ceil(this.ttl) : 0;
+    const ttl = options.ttl === undefined ? this.ttl : parseTtl(options.ttl);
+    const defaultTtl = Number.isFinite(ttl) && ttl > 0 ? Math.ceil(ttl) : 0;
     const result =
       defaultTtl > 0
         ? Number(

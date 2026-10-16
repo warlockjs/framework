@@ -18,16 +18,16 @@ router.post("/auth/login", loginController, {
 
 ## Options
 
-| Option | Default | Purpose |
-| --- | --- | --- |
-| `max` | `5` | Failures within the window before lockout |
-| `window` | `"15m"` | Counting window (`ms`-string or seconds) |
-| `lockoutDuration` | `"15m"` | How long the lock lasts once tripped |
-| `by` | `["email", "ip"]` | Identifiers tracked, each independently |
-| `identifierKey` | `"email"` | Credential field used as the account key |
-| `errorMessage` | i18n `auth.errors.tooManyAttempts` | 429 message override |
-| `isFailure` | `(res) => !res.isOk` | What counts as a failed attempt |
-| `identify` | built-in email + ip extraction | Custom identifier list |
+| Option            | Default                            | Purpose                                   |
+| ----------------- | ---------------------------------- | ----------------------------------------- |
+| `max`             | `5`                                | Failures within the window before lockout |
+| `window`          | `"15m"`                            | Counting window (`ms`-string or seconds)  |
+| `lockoutDuration` | `"15m"`                            | How long the lock lasts once tripped      |
+| `by`              | `["email", "ip"]`                  | Identifiers tracked, each independently   |
+| `identifierKey`   | `"email"`                          | Credential field used as the account key  |
+| `errorMessage`    | i18n `auth.errors.tooManyAttempts` | 429 message override                      |
+| `isFailure`       | `(res) => !res.isOk`               | What counts as a failed attempt           |
+| `identify`        | built-in email + ip extraction     | Custom identifier list                    |
 
 ## How failures are counted
 
@@ -60,3 +60,5 @@ Storage is `@warlock.js/cache`. If the cache driver is unavailable the middlewar
 - [Handle login and logout](./handle-login-and-logout.md) — the flow whose failures this counts.
 - [Protect routes](./protect-routes.md) — stack the throttle in front of `authMiddleware` where needed.
 - [Verify email and reset password](./verify-email-and-reset-password.md) — presets that wrap `loginThrottleMiddleware`.
+
+The failure counter passes the configured `window` TTL to every atomic increment. If a key expires after its create-only seed and before the increment, the replacement counter still expires. Existing windows keep their deadlines; this works even when the Redis driver has no default TTL.

@@ -48,6 +48,23 @@ function incr(store: CacheRateLimitStore, key: string, timeWindow = 60_000) {
 }
 
 describe("incrementSharedRateLimit", () => {
+  it("passes the TTL to the atomic bump when a seed disappears before increment", async () => {
+    const increment = vi.spyOn(driver, "increment");
+    const set = driver.set.bind(driver);
+    vi.spyOn(driver, "set").mockImplementation(async (key, value, options) => {
+      const result = await set(key, value, options);
+      await driver.remove(key);
+      return result;
+    });
+    const now = Date.now();
+    expect((await incrementSharedRateLimit("race", "source", 60_000, now)).current).toBe(1);
+    expect(increment).toHaveBeenCalledWith(expect.any(String), 1, { ttl: 120 });
+    const key = increment.mock.calls[0]![0];
+    const entry = await (
+      driver as unknown as { getEntry(key: unknown): Promise<{ expiresAt?: number } | null> }
+    ).getEntry(key);
+    expect(entry?.expiresAt).toBeGreaterThan(now + 119_000);
+  });
   it("counts within a window and starts over in the next one", async () => {
     const start = 1_000 * 60_000;
 

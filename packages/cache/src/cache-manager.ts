@@ -108,10 +108,7 @@ export class CacheManager implements CacheDriver<any, any> {
    * const pool = new Pool({ connectionString });
    * await cache.use("pg", { client: pool });
    */
-  public async use(
-    driver: string | CacheDriver<any, any>,
-    runtimeOptions?: Record<string, any>,
-  ) {
+  public async use(driver: string | CacheDriver<any, any>, runtimeOptions?: Record<string, any>) {
     if (typeof driver === "string") {
       const driverInstance = await this.load(driver, runtimeOptions);
 
@@ -196,10 +193,7 @@ export class CacheManager implements CacheDriver<any, any> {
    * Pass-through if the collector hasn't been instantiated yet — apps that
    * don't read metrics never pay for sample collection.
    */
-  protected async timed<T>(
-    body: () => Promise<T>,
-    driverName?: string,
-  ): Promise<T> {
+  protected async timed<T>(body: () => Promise<T>, driverName?: string): Promise<T> {
     if (!this.metricsCollector) {
       return body();
     }
@@ -438,7 +432,7 @@ export class CacheManager implements CacheDriver<any, any> {
       drivers.add(this.currentDriver);
     }
 
-    await Promise.allSettled([...drivers].map(driver => driver.disconnect()));
+    await Promise.allSettled([...drivers].map((driver) => driver.disconnect()));
 
     for (const name of Object.keys(this.loadedDrivers)) {
       delete this.loadedDrivers[name];
@@ -528,9 +522,13 @@ export class CacheManager implements CacheDriver<any, any> {
   /**
    * {@inheritdoc}
    */
-  public async increment(key: CacheKey, value?: number): Promise<number> {
+  public async increment(
+    key: CacheKey,
+    value?: number,
+    options?: { ttl?: CacheTtl },
+  ): Promise<number> {
     this.ensureDriverInitialized();
-    return this.currentDriver!.increment(key, value);
+    return this.currentDriver!.increment(key, value, options);
   }
 
   /**
@@ -709,9 +707,7 @@ export class CacheManager implements CacheDriver<any, any> {
         ? ttlOrOptions.driver
         : undefined;
 
-    const driver = driverOverride
-      ? await this.load(driverOverride)
-      : this.currentDriver!;
+    const driver = driverOverride ? await this.load(driverOverride) : this.currentDriver!;
 
     return driver.lock<T>(key, ttlOrOptions as CacheTtl | Omit<LockOptions, "driver">, fn);
   }
