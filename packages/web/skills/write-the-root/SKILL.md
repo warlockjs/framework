@@ -189,6 +189,10 @@ middleware:
 import type { RootConfig } from "@warlock.js/web";
 import type { Middleware } from "@warlock.js/core";
 
+declare module "@warlock.js/core" {
+  interface RequestLocals { startedAt?: number }
+}
+
 const attachRequestContext: Middleware = ({ request }) => {
   request.locals.startedAt = Date.now();
 };

@@ -680,6 +680,16 @@ Creating a page, deleting one, or editing `config.route` is route-table churn ra
 - `render-client-only` topic: `ClientOnly` and `useIsClient` for browser-only UI.
 - `serve-styles` topic: CSS imports in page and root modules.
 
+## Example support files
+
+The sample data below makes the example runnable. Replace it with the app's persistence or domain service when integrating.
+
+```ts title="src/app/products/services/find-product.service.ts"
+export async function findProduct(id: string | number) {
+  return id === "missing" ? undefined : { id, name: "Anvil" };
+}
+```
+
 ## generate-sitemap  `@warlock.js/web/generate-sitemap/SKILL.md`
 
 ---
@@ -730,8 +740,8 @@ appears with a zero count in generation diagnostics.
 
 ```ts
 import type { PageConfig } from "@warlock.js/web";
-import { Product } from "./product.server";
-import { listPublishedProductSitemapRows } from "./product-sitemap-data.server";
+import { Product } from "web/product.server";
+import { listPublishedProductSitemapRows } from "web/product-sitemap-data.server";
 
 async function productSitemap() {
   const products = await listPublishedProductSitemapRows();
@@ -854,6 +864,24 @@ with `sitemap.cacheControl`. Versioned generation URLs use immutable caching.
 `extra` lines. `referenceSitemap` defaults true and adds the configured
 sitemap URL when enabled and an origin exists. A hand-written
 `public/robots.txt` wins; maintain its Sitemap line yourself.
+
+## Example support files
+
+The sample data below makes the example runnable. Replace it with the app's persistence or domain service when integrating.
+
+```ts title="src/web/product.server.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Product extends Model {
+  public static table = "products";
+}
+```
+
+```ts title="src/web/product-sitemap-data.server.ts"
+export async function listPublishedProductSitemapRows() {
+  return [{ slug: "anvil", updatedAt: new Date("2026-01-01"), imageUrl: "https://example.com/anvil.jpg" }];
+}
+```
 
 ## handle-a-form-action  `@warlock.js/web/handle-a-form-action/SKILL.md`
 
@@ -1028,7 +1056,7 @@ export const contactSchema = v.object({
 import { Form as ReactForm } from "@mongez/react-form";
 import { useSubmitAction } from "@warlock.js/web/form";
 import type { PageActionContext, PageConfig } from "@warlock.js/web";
-import { contactSchema } from "./contact.schema";
+import { contactSchema } from "web/contact/contact.schema";
 
 export const config = {
   route: { path: "/contact", name: "contact" },
@@ -1078,6 +1106,23 @@ It runs for enhanced submissions, including cancellation and unmount; native
 browser submissions do not call it. A submit button with `data-independent`
 opts only that submission into independent mode. Unmarked buttons follow the
 form's `independent` prop.
+
+## Example support files
+
+The sample data below makes the example runnable. Replace it with the app's persistence or domain service when integrating.
+
+```ts title="src/web/contact/contact.schema.ts"
+import { v } from "@warlock.js/seal";
+
+export const contactSchema = v.object({ email: v.string().email(), message: v.string() });
+```
+
+```ts title="src/app/accounts/services/sign-in.service.ts"
+export async function signIn(email: string, password: string) {
+  // Replace with your app's credential check; this sample denies every login.
+  return null as { id: string | number; name: string } | null;
+}
+```
 
 ## load-page-data  `@warlock.js/web/load-page-data/SKILL.md`
 
@@ -1291,7 +1336,7 @@ import type { PageProps } from "@warlock.js/web";
 import { getProduct } from "app/products/services/get-product.service";
 
 export async function loader() {
-  const product = await getProduct(); // a Product model
+  const product = await getProduct(); // a browser-safe projection
 
   return { product, publishedAt: new Date() };
 }
@@ -1576,6 +1621,16 @@ Only put browser-safe data in `shared`: scalars, arrays, plain objects, or value
 - `navigate-on-the-client` topic: re-fetch loaders with `refresh()`.
 - `stream-deferred-data` topic: stream a slow page-loader key after the shell with `defer()` and `use()`.
 - `handle-a-form-action` topic: set cookies and redirect from a form POST.
+
+## Example support files
+
+The sample data below makes the example runnable. Replace it with the app's persistence or domain service when integrating.
+
+```ts title="src/app/products/services/get-product.service.ts"
+export async function getProduct() {
+  return { id: "42", title: "Anvil" };
+}
+```
 
 ## localize-pages  `@warlock.js/web/localize-pages/SKILL.md`
 
@@ -2128,6 +2183,7 @@ The folder name is the site key, and neither `$sites` nor the site folder appear
 ## 2. Declare fixed and dynamic sites
 
 ```ts title="src/config/web.ts"
+import { findTenantDomain } from "app/tenants/services/tenant.service";
 import type { WebConfigurations } from "@warlock.js/web";
 
 const web: WebConfigurations = {
@@ -2144,7 +2200,7 @@ const web: WebConfigurations = {
     const domain = await findTenantDomain(host);
     if (!domain) return null;
     return {
-      site: domain.kind === "dashboard" ? "tenantAdmin" : "tenant",
+      site: domain.type === "dashboard" ? "tenantAdmin" : "tenant",
       key: String(domain.tenantId),
       indexable: domain.tenant.isPublic,
       shared: { theme: domain.tenant.theme },
@@ -2173,6 +2229,7 @@ Upgrade: move each `src/web/(group)` site folder to `src/web/$sites/<key>` and d
 ## 4. Read the result in a page handler
 
 ```ts
+import { loadTenant } from "app/tenants/services/tenant.service";
 import type { PageLoaderContext } from "@warlock.js/web";
 
 export async function loader({ site }: PageLoaderContext<undefined, undefined>) {
@@ -2207,6 +2264,22 @@ With sitemap and robots enabled, `/sitemap.xml` and `/robots.txt` are selected p
 Boot fails for an unassigned page, a `$sites` folder without a matching `web.sites` entry, a configured site whose `$sites/<name>` folder is missing, a missing site root, overlapping fixed host plus base path, a page shadowing an `src/app` route, or inconsistent dynamic/resolver configuration. Page cache entries are partitioned by site and tenant key. Fix the declared ownership rather than depending on route order.
 
 Out of scope: path- or session-selected tenants, sharing a root between sites, cross-site prefetch, API host scoping, and automatic Cascade query scoping.
+
+## Example support files
+
+The sample data below makes the example runnable. Replace it with the app's persistence or domain service when integrating.
+
+```ts title="src/app/tenants/services/tenant.service.ts"
+const tenant = { id: "demo", isPublic: true, theme: "light" };
+
+export async function findTenantDomain(host: string) {
+  return host === "demo.example.com" ? { type: "site", tenantId: tenant.id, tenant } : null;
+}
+
+export async function loadTenant(id: string) {
+  return id === tenant.id ? tenant : null;
+}
+```
 
 ## multi-theme  `@warlock.js/web/multi-theme/SKILL.md`
 
@@ -2844,9 +2917,10 @@ Wire the resolver once; web never imports auth.
 
 ```ts
 // src/config/web.ts
+import type { Auth } from "@warlock.js/auth";
 import { pageSession } from "@warlock.js/auth";
 
-export default { session: pageSession({ project: (user: User) => userSessionResource(user) }) };
+export default { session: pageSession({ project: (user: Auth) => ({ id: user.id, name: user.get<string>("name") }) }) };
 ```
 
 `project` is required; only its result reaches the browser as the payload's optional `session` key. Type it by augmenting `SessionRegistry { user; model }` in module `"@warlock.js/web"`.
@@ -2856,10 +2930,10 @@ import { useUser } from "@warlock.js/web";
 import { requireGuest, requireUser } from "@warlock.js/web/session";
 
 // account page
-export const config = { route: "/account", middleware: [requireUser({ loginPath: "/login" })] };
+export const accountConfig = { route: "/account", middleware: [requireUser({ loginPath: "/login" })] };
 
 // login page
-export const config = { route: "/login", middleware: [requireGuest({ to: "/account" })] };
+export const loginConfig = { route: "/login", middleware: [requireGuest({ to: "/account" })] };
 ```
 
 - `useUser()` returns the projection or `null`.
@@ -2923,6 +2997,28 @@ These do **not** count (the page stays unguarded in the types and `guard` is not
 
 The not-found page is never guarded. A guard the generator cannot prove still works at runtime; only the types stay loose (`useUser()` returns `null`-able).
 In dev, a file the generator cannot parse reads as unguarded rather than breaking boot.
+
+## Generated typing prerequisites
+
+The guarded example assumes your generated route declaration and session
+projection declaration are included in the TypeScript project. The relevant
+shape is below; let Warlock generate the route entry, and maintain the session
+projection type alongside your app's resolver.
+
+```ts title="src/types/page-session.d.ts"
+import type { Auth } from "@warlock.js/auth";
+import "@warlock.js/web";
+
+declare module "@warlock.js/web" {
+  interface SessionRegistry {
+    user: { id: string | number; name: string };
+    model: Auth;
+  }
+  interface PageRouteRegistry {
+    "account.show": { path: "/account"; params: {}; guard: "user" };
+  }
+}
+```
 
 ## render-client-only  `@warlock.js/web/render-client-only/SKILL.md`
 
@@ -3387,10 +3483,14 @@ The `?variant=` URLs inside that descriptor are served by the `/uploads/*` route
 
 ## A CDN or object storage
 
-Do not proxy remote files through `uploadedFileController`. Either store descriptors whose variants carry their own `url` / `urls` (the loader is then not called for them), or give `<Image>` a custom loader:
+For a configured object-storage disk, serve variants through
+`createUploadedFileController({ disk: "assets" })` and generate descriptors with
+`generateImageVariants(path, { disk: "assets", urlPrefix: "/media" })`. Originals
+retain their remote URL; generated variants are cached locally. Alternatively,
+store descriptors with pre-generated `url` / `urls`, or supply a CDN loader:
 
 ```tsx
-import { Image, type ImageLoader } from "@warlock.js/web";
+import { Image, type ImageLoader, type ImageDescriptor } from "@warlock.js/web";
 
 const cdnLoader: ImageLoader = ({ src, variant, format }) =>
   `https://cdn.example.com${src}/${variant}${format ? `.${format}` : ""}`;
@@ -3416,6 +3516,22 @@ A loader receives `{ src, variant, width, format? }` and returns a string. It mu
 - The `measure-web-vitals` topic: why `width`/`height` and `priority` matter for CLS and LCP.
 - The `serve-styles` topic: styling the `<img>` with imported CSS.
 - The `warlock-js-core` skill: `uploads` configuration, storage and the uploads route.
+
+## Example support files
+
+The sample data below makes the example runnable. Replace it with the app's persistence or domain service when integrating.
+
+```ts title="src/app/posts/models/post.ts"
+import { Model } from "@warlock.js/cascade";
+import { v, type Infer } from "@warlock.js/seal";
+
+const postSchema = v.object({ title: v.string(), cover: v.any() });
+
+export class Post extends Model<Infer<typeof postSchema>> {
+  public static table = "posts";
+  public static schema = postSchema;
+}
+```
 
 ## serve-styles  `@warlock.js/web/serve-styles/SKILL.md`
 
@@ -3865,6 +3981,10 @@ The generated hreflang set swaps only the locale prefix. If the slug also differ
 ```tsx
 import type { PageConfig } from "@warlock.js/web";
 
+export async function loader() {
+  return { listing: { slug: { en: "anvil", ar: "سندان" } } };
+}
+
 export const config = {
   route: { path: "/listings/:id", name: "listings.show" },
   metadata: ({ data }) => ({
@@ -4273,10 +4393,10 @@ browser-safe Seal schema can be shared with the API route's server validation:
 ```tsx
 import { Form } from "@mongez/react-form";
 import { useSubmitForm } from "@warlock.js/web/form";
-import { contactSchema } from "./contact.schema";
+import { contactSchema } from "web/contact/contact.schema";
 
 export default function ContactForm() {
-  const submit = useSubmitForm({ path: "/api/contact" });
+  const submit = useSubmitForm<typeof contactSchema>({ path: "/api/contact" });
 
   return (
     <Form schema={contactSchema} onSubmit={submit.submit}>
@@ -4357,6 +4477,33 @@ after successful registration/reload. Include `.warlock/typings/*.d.ts` in
 your TypeScript project; a generated file is replaced atomically and is cleared
 only when its Warlock ownership header proves it is framework-owned.
 
+## Supporting schema and generated response types
+
+```ts title="src/web/contact/contact.schema.ts"
+import { v } from "@warlock.js/seal";
+
+export const contactSchema = v.object({ email: v.string().email(), message: v.string() });
+```
+
+The named login example assumes Core generated this route entry from the
+handler's `responseSchema`. Include `.warlock/typings/*.d.ts` in the app project;
+do not replace that generated file with a hand-written fallback.
+
+```ts title=".warlock/typings/api-routes.d.ts"
+import "@warlock.js/web";
+
+declare module "@warlock.js/web" {
+  interface ApiRouteRegistry {
+    "auth.login": {
+      path: "/auth/login";
+      params: {};
+      method: "POST";
+      response: { 200: { user: { id: string | number; name: string }; token: string }; 400: { error: string } };
+    };
+  }
+}
+```
+
 ## test-a-page  `@warlock.js/web/test-a-page/SKILL.md`
 
 ---
@@ -4386,7 +4533,7 @@ test: {
   setupFiles: ["./src/test-setup.ts"],
   environment: "node",
   globals: false,
-  include: ["src/app/**/*.test.ts"],
+  include: ["src/app/**/*.{test,spec}.ts"],
 },
 ```
 
@@ -4555,7 +4702,12 @@ What this does and does not prove:
 
 `renderToString` the default export with the props the page receives: `data` (what the loader returned), `shared` and `params`. Wrap it in `LocaleProvider`, because `useTrans()` and `useLocale()` throw outside it (`... was called outside Warlock's LocaleProvider`).
 
-```tsx title="src/web/products/product.spec.tsx"
+```tsx title="src/web/products/product-render.spec.tsx"
+import { LocaleProvider } from "@warlock.js/web";
+import { renderToString } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import ProductPage from "./product.page";
+
 describe("product page render", () => {
   it("renders the component to HTML with loader data and translations", () => {
     const html = renderToString(
@@ -4615,7 +4767,7 @@ describe("Test Infrastructure", () => {
 });
 ```
 
-`testGet(path)` returns a standard `fetch` `Response`, so `await response.text()` is the rendered HTML. `testPost`, `testPut`, `testPatch`, `testDelete`, `testRequest` and `getTestServerUrl` come from the same module. A page action POST needs a same-origin `Origin` (or `Referer`) header or it answers 403, so pass `headers: { origin: getTestServerUrl() }`. These specs need the `warlock add test` harness above (the connectors, and the database if the page reads it) and must match its `include` (`src/app/**/*.test.ts`), so keep them few and let the unit-level specs carry the branches.
+`testGet(path)` returns a standard `fetch` `Response`, so `await response.text()` is the rendered HTML. `testPost`, `testPut`, `testPatch`, `testDelete`, `testRequest` and `getTestServerUrl` come from the same module. A page action POST needs a same-origin `Origin` (or `Referer`) header or it answers 403, so pass `headers: { origin: getTestServerUrl() }`. These specs need the `warlock add test` harness above (the connectors, and the database if the page reads it) and must match its `include` (`src/app/**/*.{test,spec}.ts`), so keep them few and let the unit-level specs carry the branches.
 
 ## Gotchas
 
@@ -4631,6 +4783,20 @@ describe("Test Infrastructure", () => {
 - The `stream-deferred-data` topic: for `defer()` data, hand the component a promise you created.
 - The `render-client-only` topic: what `<ClientOnly>` does in a server render.
 - The `create-a-page` topic: the page module shape.
+
+## Example support files
+
+The sample data below makes the example runnable. Replace it with the app's persistence or domain service when integrating.
+
+```ts title="src/web/products/products.service.ts"
+export async function findProduct(id: string) {
+  return id === "42" ? { id, name: "Anvil" } : undefined;
+}
+
+export async function subscribe(email: string) {
+  console.info("Subscribed", email);
+}
+```
 
 ## use-layouts  `@warlock.js/web/use-layouts/SKILL.md`
 
@@ -5036,6 +5202,10 @@ middleware:
 ```tsx
 import type { RootConfig } from "@warlock.js/web";
 import type { Middleware } from "@warlock.js/core";
+
+declare module "@warlock.js/core" {
+  interface RequestLocals { startedAt?: number }
+}
 
 const attachRequestContext: Middleware = ({ request }) => {
   request.locals.startedAt = Date.now();
