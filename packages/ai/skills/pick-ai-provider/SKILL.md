@@ -196,3 +196,29 @@ If you switch providers mid-project (e.g. OpenAI → Anthropic):
 - The `run-ai-agent` topic — model passed into `ai.agent({...})`
 - The `embed-text` topic — embedder primitive on the SDK
 - The `handle-ai-errors` topic — adapter error categorization
+
+## Native input-token preflight
+
+`ModelContract.countTokens?(messages, options)` is an optional network preflight.
+Check that the method exists before calling it. Anthropic, Bedrock and OpenAI
+Responses models support native counts; Google supports contents counting and
+Vertex system/tools counting, while unsupported Developer API system/tools
+requests fail explicitly. Chat Completions and Ollama omit the method.
+`sdk.count(text)` remains a separate offline estimate. Provider-only request
+fields use `providerOptions.<format>.body`; the Google body maps to generation
+config. See each provider skill for protected fields and count limitations.
+
+
+| Model transport | Native `countTokens` | Provider option key |
+| --- | --- | --- |
+| Anthropic Messages | Yes | `anthropic` |
+| OpenAI Responses | Yes | `openai` |
+| OpenAI Chat Completions | Absent | `openai` |
+| Bedrock Converse | Yes, where supported by the model/region | `bedrock` |
+| Google Vertex | Yes, including system instructions and tools | `google` |
+| Google Developer API | Contents only; system/tools requests explicitly fail | `google` |
+| Ollama chat | Absent | `ollama` |
+
+All adapters ignore unrelated provider keys. Native counts make network calls;
+check `model.countTokens` before using them. Offline `sdk.count(text)` estimates
+remain separate. Google counts also reject cached-content references.

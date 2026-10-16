@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `ModelContract.countTokens?()` represents optional native input-token preflight, separate from offline SDK estimates.
+
 - `SpawnSubAgentSpec` accepts `toolDispatch` and `maxConcurrentTools`, forwarded to the fresh agent. Defaults match `ai.agent()` (concurrent, up to four calls).
 
 ## 5.30.0 - 2026-10-16

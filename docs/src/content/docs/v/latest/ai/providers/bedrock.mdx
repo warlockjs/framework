@@ -187,3 +187,32 @@ per-model tokenizers differ, so this is for budgeting, not billing.
 For the agent/workflow surface these models plug into, see
 [`@warlock.js/ai`](/v/latest/ai/). For provider-specific notes and the
 latest model ids, see the `setup-bedrock` skill.
+
+## Provider body options and input-token counts
+
+`providerOptions.bedrock.body` adds native Converse request fields after the
+neutral options, for completion and streaming:
+
+```ts
+const options = {
+  providerOptions: { bedrock: { body: { additionalModelRequestFields: { top_k: 4 } } } },
+};
+await model.complete(messages, options);
+```
+
+The key stays `bedrock` for custom provider labels. Other provider keys are
+ignored. `BedrockCallOptions` is exported. `modelId`, `messages`, `system` and
+`toolConfig` are protected; attempting to replace them throws
+`InvalidRequestError`. Provider fields are otherwise forwarded without validation.
+
+`model.countTokens(messages, options?)` calls Bedrock `CountTokens` using the same
+Converse messages, system blocks, tool configuration and
+`additionalModelRequestFields` used for generation. Cancellation is forwarded.
+Availability depends on the model and region; provider failures use the adapter's
+normal typed errors. `sdk.count(text)` remains a separate offline estimate.
+
+```ts
+if (model.countTokens) {
+  const inputTokens = await model.countTokens(messages, options);
+}
+```

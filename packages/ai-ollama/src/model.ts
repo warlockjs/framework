@@ -18,6 +18,7 @@ import type {
   Ollama,
   Options,
 } from "ollama";
+import { resolveProviderBody } from "./provider-options";
 import type { OllamaModelConfig } from "./config.type";
 import { inferReasoningCapability } from "./known-reasoning-models";
 import { inferVisionCapability } from "./known-vision-models";
@@ -249,6 +250,7 @@ export class OllamaModel implements ModelContract {
       ...this.buildTools(options?.tools),
       ...this.buildFormat(options?.responseSchema),
       ...this.buildThink(options?.reasoning),
+      ...resolveProviderBody(options),
     };
   }
 

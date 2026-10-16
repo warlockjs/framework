@@ -288,3 +288,33 @@ round-trip, so this stays offline for budgeting, not billing.
 For the agent/workflow surface these models plug into, see
 [`@warlock.js/ai`](/v/latest/ai/). For provider-specific notes and the
 latest model ids, see the `setup-google` skill.
+
+## Provider config options and input-token counts
+
+`providerOptions.google.body` adds native `GenerateContentConfig` fields,
+merged after neutral generation options for both completion and streaming:
+
+```ts
+const options = { providerOptions: { google: { body: { topP: 0.8, topK: 4 } } } };
+await model.complete(messages, options);
+```
+
+The key stays `google` for custom provider labels. Other provider keys are
+ignored. `GoogleCallOptions` is exported. `systemInstruction`, `tools`,
+`abortSignal` and `httpOptions` are protected and throw `InvalidRequestError`;
+use neutral messages/tools/signal and SDK transport configuration for them.
+
+`model.countTokens(messages, options?)` calls the native counting endpoint with
+the same converted contents. In Vertex mode it also counts the same system
+instruction and tools as generation and forwards cancellation. In Developer API
+mode, the installed Google SDK cannot count system instructions or tools through
+its typed count endpoint: requests containing them fail explicitly before a
+network call. Cached-content references also fail explicitly, since this SDK
+count endpoint cannot reproduce them. The adapter never silently counts only a
+subset of a prompt. `sdk.count(text)` remains a separate offline estimate.
+
+```ts
+if (model.countTokens) {
+  const inputTokens = await model.countTokens(messages, options);
+}
+```

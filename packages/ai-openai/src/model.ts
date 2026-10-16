@@ -14,6 +14,7 @@ import {
 } from "@warlock.js/ai";
 import { log, type Logger } from "@warlock.js/logger";
 import type OpenAI from "openai";
+import { resolveProviderBody } from "./provider-options";
 import type { OpenAIModelConfig } from "./config.type";
 import { inferReasoningCapability } from "./known-reasoning-models";
 import { inferVisionCapability } from "./known-vision-models";
@@ -145,6 +146,7 @@ export class OpenAIModel implements ModelContract {
           tools: toOpenAITools(options?.tools),
           ...this.buildResponseFormat(options?.responseSchema),
           ...this.buildReasoningParams(options?.reasoning, Boolean(options?.tools?.length)),
+          ...resolveProviderBody(options),
         },
         options?.signal ? { signal: options.signal } : undefined,
       );
@@ -222,6 +224,7 @@ export class OpenAIModel implements ModelContract {
           stream_options: { include_usage: true },
           ...this.buildResponseFormat(options?.responseSchema),
           ...this.buildReasoningParams(options?.reasoning, Boolean(options?.tools?.length)),
+          ...resolveProviderBody(options),
         },
         options?.signal ? { signal: options.signal } : undefined,
       );

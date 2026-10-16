@@ -174,3 +174,23 @@ character-heuristic approximation — handy for context-window guards.
 For the agent/workflow surface these models plug into, see
 [`@warlock.js/ai`](/v/latest/ai/). For provider-specific notes and the
 latest model tags, see the `setup-ollama` skill.
+
+## Provider body options
+
+`providerOptions.ollama.body` adds native chat request fields after neutral
+options, for completion and streaming:
+
+```ts
+await model.complete(messages, {
+  providerOptions: { ollama: { body: { keep_alive: "10m", options: { top_k: 4 } } } },
+});
+```
+
+The key stays `ollama` for custom provider labels. Other provider keys are
+ignored. `OllamaCallOptions` is exported. `model`, `messages`, `tools` and `stream`
+are protected; replacing them throws `InvalidRequestError`. Fields merge
+shallowly: a provider `options` object replaces the generated inference options,
+so include any neutral sampling settings you want to retain in that object.
+
+Ollama's chat transport has no native preflight token-count endpoint, so its
+model has no `countTokens` method. `sdk.count(text)` remains an offline estimate.

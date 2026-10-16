@@ -8,7 +8,7 @@
 
 ---
 name: setup-bedrock
-description: 'Wire @warlock.js/ai-bedrock — new BedrockSDK({region, credentials?, provider?}) for AWS Bedrock Converse API + Titan embeddings. AWS credential chain (no apiKey). .model({name, vision?, reasoning?, promptCaching?, pdf?, audio?}) with cost-truth capabilities inferred per family, extended thinking via options.reasoning → Converse thinking budget_tokens, prompt caching via options.cacheControl → cachePoint, usage cachedTokens/cacheWriteTokens. Triggers: `BedrockSDK`, `bedrock.model`, `bedrock.embedder`, `bedrock.count`, `BedrockRuntimeClient`, `reasoning`, `thinking`, `budget_tokens`, `cachePoint`, `cacheControl`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`; "how do I use AWS Bedrock", "wire Claude/Nova/Llama on Bedrock", "Titan embeddings", "Bedrock Converse API", "Claude 3.7/4 extended thinking on Bedrock", "Bedrock prompt caching cost"; typical import `import { BedrockSDK } from "@warlock.js/ai-bedrock"`. Skip: agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; provider choice — the `pick-ai-provider` topic of the `warlock-js-ai` skill; embeddings concepts — the `embed-text` topic of the `warlock-js-ai` skill; competing libs `@aws-sdk/client-bedrock-runtime`, `@ai-sdk/amazon-bedrock`; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`.'
+description: 'Wire @warlock.js/ai-bedrock — new BedrockSDK({region, credentials?, provider?}) for AWS Bedrock Converse API + Titan embeddings. AWS credential chain (no apiKey). .model({name, vision?, reasoning?, promptCaching?, pdf?, audio?}) with cost-truth capabilities inferred per family, extended thinking via options.reasoning → Converse thinking budget_tokens, prompt caching via options.cacheControl → cachePoint, usage cachedTokens/cacheWriteTokens. Triggers: `providerOptions`, `BedrockCallOptions`, `countTokens`, `BedrockSDK`, `bedrock.model`, `bedrock.embedder`, `bedrock.count`, `BedrockRuntimeClient`, `reasoning`, `thinking`, `budget_tokens`, `cachePoint`, `cacheControl`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`; "how do I use AWS Bedrock", "wire Claude/Nova/Llama on Bedrock", "Titan embeddings", "Bedrock Converse API", "Claude 3.7/4 extended thinking on Bedrock", "Bedrock prompt caching cost"; typical import `import { BedrockSDK } from "@warlock.js/ai-bedrock"`. Skip: agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; provider choice — the `pick-ai-provider` topic of the `warlock-js-ai` skill; embeddings concepts — the `embed-text` topic of the `warlock-js-ai` skill; competing libs `@aws-sdk/client-bedrock-runtime`, `@ai-sdk/amazon-bedrock`; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`.'
 ---
 
 # `@warlock.js/ai-bedrock`
@@ -182,6 +182,36 @@ Both `complete()` and `stream()` normalize Converse's `TokenUsage` into the neut
 | — | `usage.reasoningTokens` | **Never set** — Converse exposes no reasoning-token count. |
 
 Set `cachedInput` / `cachedOutput` in `ModelPricing` to have cache reads/writes billed at their distinct rates. Read-side accounting (`cachedTokens` / `cacheWriteTokens`) is populated whenever Bedrock reports it, independent of whether you sent a `cacheControl` breakpoint.
+
+## Provider body options and input-token counts
+
+`providerOptions.bedrock.body` adds native Converse request fields after the
+neutral options, for completion and streaming:
+
+```ts
+const options = {
+  providerOptions: { bedrock: { body: { additionalModelRequestFields: { top_k: 4 } } } },
+};
+await model.complete(messages, options);
+```
+
+The key stays `bedrock` for custom provider labels. Other provider keys are
+ignored. `BedrockCallOptions` is exported. `modelId`, `messages`, `system` and
+`toolConfig` are protected; attempting to replace them throws
+`InvalidRequestError`. Provider fields are otherwise forwarded without validation.
+
+`model.countTokens(messages, options?)` calls Bedrock `CountTokens` using the same
+Converse messages, system blocks, tool configuration and
+`additionalModelRequestFields` used for generation. Cancellation is forwarded.
+Availability depends on the model and region; provider failures use the adapter's
+normal typed errors. `sdk.count(text)` remains a separate offline estimate.
+
+```ts
+if (model.countTokens) {
+  const inputTokens = await model.countTokens(messages, options);
+}
+```
+
 
 ## When NOT to use this skill
 

@@ -100,3 +100,32 @@ Reports label per-agent provider correctly. Pricing applies per SDK instance. Co
 
 - [Your first agent](/v/latest/ai/getting-started/04-your-first-agent/) — runnable walkthrough using the OpenAI adapter.
 - [OpenAI adapter](/v/latest/ai/providers/openai/) — full setup docs for the default adapter.
+
+## Native input-token preflight
+
+
+| Model transport | Native `countTokens` | Provider option key |
+| --- | --- | --- |
+| Anthropic Messages | Yes | `anthropic` |
+| OpenAI Responses | Yes | `openai` |
+| OpenAI Chat Completions | Absent | `openai` |
+| Bedrock Converse | Yes, where supported by the model/region | `bedrock` |
+| Google Vertex | Yes, including system instructions and tools | `google` |
+| Google Developer API | Contents only; system/tools requests explicitly fail | `google` |
+| Ollama chat | Absent | `ollama` |
+
+All adapters ignore unrelated provider keys. Native counts make network calls;
+check `model.countTokens` before using them. Offline `sdk.count(text)` estimates
+remain separate. Google counts also reject cached-content references.
+
+```ts
+if (model.countTokens) {
+  const inputTokens = await model.countTokens(messages, options);
+}
+```
+
+Use the same messages and options for counting and generation. The adapter builds
+one request shape and selects the fields accepted by its native counting endpoint.
+Provider-only fields use `providerOptions.<format>.body`; Google's body contains
+`GenerateContentConfig` fields. See each provider page for protected request fields
+and endpoint limitations.

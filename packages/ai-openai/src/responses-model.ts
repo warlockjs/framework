@@ -14,6 +14,7 @@ import {
 } from "@warlock.js/ai";
 import { log, type Logger } from "@warlock.js/logger";
 import type OpenAI from "openai";
+import { resolveProviderBody } from "./provider-options";
 import type { OpenAIModelConfig } from "./config.type";
 import { inferReasoningCapability } from "./known-reasoning-models";
 import { inferVisionCapability } from "./known-vision-models";
@@ -149,6 +150,31 @@ export class OpenAIResponsesModel implements ModelContract {
     return { content, finishReason, usage, ...(toolCalls ? { toolCalls } : {}) };
   }
 
+  /** Count native Responses input tokens using the same converted input and tools. */
+  public async countTokens(messages: Message[], options?: ModelCallOptions): Promise<number> {
+    const request = this.buildRequest(messages, options);
+    const body: OpenAI.Responses.InputTokenCountParams = {
+      model: request.model,
+      input: request.input,
+      instructions: request.instructions,
+      tools: request.tools,
+      tool_choice: request.tool_choice,
+      reasoning: request.reasoning,
+      text: request.text,
+      parallel_tool_calls: request.parallel_tool_calls,
+      truncation: request.truncation ?? undefined,
+    };
+    try {
+      const response = await this.client.responses.inputTokens.count(
+        body,
+        options?.signal ? { signal: options.signal } : undefined,
+      );
+      return response.input_tokens;
+    } catch (thrown) {
+      throw this.logAndWrap(thrown);
+    }
+  }
+
   /**
    * Incremental streaming completion via `responses.create({ stream: true })`
    * (the SDK's `Stream<ResponseStreamEvent>`, `responses.d.ts:55`). Yields the
@@ -194,7 +220,10 @@ export class OpenAIResponsesModel implements ModelContract {
 
     try {
       for await (const event of events) {
-        if (event.type === "response.output_text.delta" || event.type === "response.refusal.delta") {
+        if (
+          event.type === "response.output_text.delta" ||
+          event.type === "response.refusal.delta"
+        ) {
           if (event.delta) {
             yield { type: "delta", content: event.delta };
           }
@@ -300,6 +329,7 @@ export class OpenAIResponsesModel implements ModelContract {
       ...this.buildTextFormat(options?.responseSchema),
       ...this.buildReasoningParams(options?.reasoning),
       ...buildPromptCacheParams(this.provider, this.config),
+      ...resolveProviderBody(options),
     };
   }
 
@@ -316,7 +346,9 @@ export class OpenAIResponsesModel implements ModelContract {
 
     if (plan.mode === "json_schema") {
       return {
-        text: { format: { type: "json_schema", name: "response", schema: plan.schema, strict: true } },
+        text: {
+          format: { type: "json_schema", name: "response", schema: plan.schema, strict: true },
+        },
       };
     }
 

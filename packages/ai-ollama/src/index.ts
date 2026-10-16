@@ -4,3 +4,5 @@ export type {
   OllamaModelConfig,
   OllamaEmbedderConfig,
 } from "./config.type";
+
+export type { OllamaCallOptions } from "./provider-options";

@@ -7,3 +7,5 @@ export type {
   GoogleEmbedderConfig,
   GoogleImageConfig,
 } from "./config.type";
+
+export type { GoogleCallOptions } from "./provider-options";

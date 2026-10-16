@@ -1,6 +1,6 @@
 ---
 name: setup-ollama
-description: 'Wire @warlock.js/ai-ollama — new OllamaSDK({host?, headers?}) for local / self-hosted Ollama via the official ollama client (not OpenAI-compat). chat + embed, daemon-down error handling. .model({name, vision?, reasoning?}) with cost-truth capabilities — reasoning inferred from thinking-model tags (deepseek-r1/qwq/qwen3/gpt-oss…), promptCaching/audio/pdf honestly false; options.reasoning → Ollama native `think` flag; usage reasoningTokens/cachedTokens stay undefined (none reported). Triggers: `OllamaSDK`, `ollama.model`, `ollama.embedder`, `embedder.embedMany`, `ollama.count`, `host`, `headers`, `reasoning`, `think`, thinking models, `deepseek-r1`, `qwq`, `qwen3`, `gpt-oss`; "use ollama with warlock", "run llama3 locally", "self-hosted llama", "ollama reasoning / thinking models", "deepseek-r1 with warlock"; typical import `import { OllamaSDK } from "@warlock.js/ai-ollama"`. Skip: agent loop — the `run-ai-agent` topic of the `warlock-js-ai` skill; provider choice — the `pick-ai-provider` topic of the `warlock-js-ai` skill; embeddings core — the `embed-text` topic of the `warlock-js-ai` skill; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`; raw `ollama` npm, Vercel `@ai-sdk/ollama`; OpenAI-compat gateway via `@warlock.js/ai-openai` `baseURL`.'
+description: 'Wire @warlock.js/ai-ollama — new OllamaSDK({host?, headers?}) for local / self-hosted Ollama via the official ollama client (not OpenAI-compat). chat + embed, daemon-down error handling. .model({name, vision?, reasoning?}) with cost-truth capabilities — reasoning inferred from thinking-model tags (deepseek-r1/qwq/qwen3/gpt-oss…), promptCaching/audio/pdf honestly false; options.reasoning → Ollama native `think` flag; usage reasoningTokens/cachedTokens stay undefined (none reported). Triggers: `providerOptions`, `OllamaCallOptions`, `countTokens`, `OllamaSDK`, `ollama.model`, `ollama.embedder`, `embedder.embedMany`, `ollama.count`, `host`, `headers`, `reasoning`, `think`, thinking models, `deepseek-r1`, `qwq`, `qwen3`, `gpt-oss`; "use ollama with warlock", "run llama3 locally", "self-hosted llama", "ollama reasoning / thinking models", "deepseek-r1 with warlock"; typical import `import { OllamaSDK } from "@warlock.js/ai-ollama"`. Skip: agent loop — the `run-ai-agent` topic of the `warlock-js-ai` skill; provider choice — the `pick-ai-provider` topic of the `warlock-js-ai` skill; embeddings core — the `embed-text` topic of the `warlock-js-ai` skill; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`; raw `ollama` npm, Vercel `@ai-sdk/ollama`; OpenAI-compat gateway via `@warlock.js/ai-openai` `baseURL`.'
 ---
 
 # `@warlock.js/ai-ollama`
@@ -124,6 +124,27 @@ Per-call `Usage` comes from the chat response's `prompt_eval_count` (→ `input`
 - `cachedTokens` / `cacheWriteTokens` — **always undefined**. Ollama has no provider prompt cache, so there is no cache-hit or cache-write accounting (honest absence, not a false `0`).
 - `reasoningTokens` — **always undefined**. Reasoning models emit their thinking as the `message.thinking` *string*, but the wire format carries **no separate reasoning-token count** — those tokens are already folded into `eval_count`. The adapter does not estimate a count from the thinking text.
 - `cost` — populated only when a `ModelPricing` is configured (local Ollama is free, so usually undefined).
+
+## Provider body options
+
+`providerOptions.ollama.body` adds native chat request fields after neutral
+options, for completion and streaming:
+
+```ts
+await model.complete(messages, {
+  providerOptions: { ollama: { body: { keep_alive: "10m", options: { top_k: 4 } } } },
+});
+```
+
+The key stays `ollama` for custom provider labels. Other provider keys are
+ignored. `OllamaCallOptions` is exported. `model`, `messages`, `tools` and `stream`
+are protected; replacing them throws `InvalidRequestError`. Fields merge
+shallowly: a provider `options` object replaces the generated inference options,
+so include any neutral sampling settings you want to retain in that object.
+
+Ollama's chat transport has no native preflight token-count endpoint, so its
+model has no `countTokens` method. `sdk.count(text)` remains an offline estimate.
+
 
 ## When NOT to use this skill
 

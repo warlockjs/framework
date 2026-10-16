@@ -1,4 +1,5 @@
 import {
+  InvalidRequestError,
   type Message,
   type ModelCallOptions,
   type ModelCapabilities,
@@ -16,7 +17,9 @@ import type {
   GenerateContentResponse,
   GoogleGenAI,
   Part,
+  Tool,
 } from "@google/genai";
+import { resolveProviderBody } from "./provider-options";
 import type { GoogleModelConfig } from "./config.type";
 import { inferVisionCapability } from "./known-vision-models";
 import {
@@ -163,6 +166,44 @@ export class GoogleModel implements ModelContract {
     };
   }
 
+  /** Count native input tokens with the same converted content, system and tools. */
+  public async countTokens(messages: Message[], options?: ModelCallOptions): Promise<number> {
+    const { systemInstruction, contents } = toGoogleContents(messages);
+    const config = this.buildConfig(systemInstruction, options);
+    if (
+      !this.ai.vertexai &&
+      (config.systemInstruction !== undefined || config.tools !== undefined)
+    ) {
+      throw new InvalidRequestError(
+        "The Google SDK countTokens endpoint in Developer API mode cannot count system instructions or tools. Use Vertex mode for this preflight, or SDK.count() for an offline estimate.",
+      );
+    }
+    if (config.cachedContent !== undefined) {
+      throw new InvalidRequestError(
+        "The Google SDK countTokens endpoint cannot count a cachedContent reference.",
+      );
+    }
+    try {
+      const response = await this.ai.models.countTokens({
+        model: this.name,
+        contents,
+        config: {
+          ...(config.systemInstruction !== undefined
+            ? { systemInstruction: config.systemInstruction }
+            : {}),
+          ...(config.tools !== undefined ? { tools: config.tools as Tool[] } : {}),
+          ...(config.abortSignal ? { abortSignal: config.abortSignal } : {}),
+          ...(config.httpOptions ? { httpOptions: config.httpOptions } : {}),
+        },
+      });
+      if (response.totalTokens === undefined)
+        throw new InvalidRequestError("Google countTokens returned no totalTokens.");
+      return response.totalTokens;
+    } catch (thrown) {
+      throw this.logAndWrap(thrown);
+    }
+  }
+
   /**
    * Incremental streaming completion via `generateContentStream`.
    * Yields neutral `ModelStreamChunk`s — `delta` for text, `tool-call`
@@ -271,6 +312,7 @@ export class GoogleModel implements ModelContract {
       ...this.buildTools(options?.tools),
       ...this.buildStructuredOutput(options?.responseSchema),
       ...this.buildThinking(options?.reasoning),
+      ...resolveProviderBody(options),
     };
   }
 
@@ -359,9 +401,7 @@ export class GoogleModel implements ModelContract {
    * the follow-up turn if that signature is not echoed back. See
    * `partToToolCall`.
    */
-  private extractToolCalls(
-    response: GenerateContentResponse,
-  ): ModelToolCallRequest[] | undefined {
+  private extractToolCalls(response: GenerateContentResponse): ModelToolCallRequest[] | undefined {
     const parts = response.candidates?.[0]?.content?.parts ?? [];
     const toolCalls = parts
       .map((part) => this.partToToolCall(part))

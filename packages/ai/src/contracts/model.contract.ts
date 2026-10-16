@@ -294,4 +294,10 @@ export interface ModelContract {
    * Send messages and stream the response chunk by chunk.
    */
   stream(messages: Message[], options?: ModelCallOptions): AsyncIterable<ModelStreamChunk>;
+
+  /**
+   * Native input-token preflight (network call). Absent when this model's
+   * transport has no counting endpoint. SDK.count() is a separate offline estimate.
+   */
+  countTokens?(messages: Message[], options?: ModelCallOptions): Promise<number>;
 }

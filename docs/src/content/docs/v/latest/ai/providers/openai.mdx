@@ -277,3 +277,32 @@ over inference.
 - [Google provider](/v/latest/ai/providers/google/) — Gemini and Imagen image
   generation, and Gemini `inlineData` multimodal input.
 - [API reference](/v/latest/ai/reference/api/) — every public export.
+
+## Provider body options and input-token counts
+
+`providerOptions.openai.body` adds native request fields to Chat Completions or
+Responses, merged after the neutral options. For example:
+
+```ts
+const options = { providerOptions: { openai: { body: { service_tier: "default" } } } };
+await model.complete(messages, options);
+```
+
+The key stays `openai` for compatible gateways with a custom provider label.
+Other provider keys are ignored. `OpenAICallOptions` is exported. The body cannot
+replace `model`, `messages`, `input`, `instructions`, `tools`, `stream`,
+`stream_options`, `previous_response_id`, `conversation`, `store` or `include`;
+those fields protect the adapter's conversation, tools and stateless replay.
+
+Models using `api: "responses"` expose native `countTokens(messages, options?)`
+through `responses.inputTokens.count`: the same input, system instructions,
+tools, reasoning, text format, tool choice, parallel-tool setting and truncation
+used for generation are counted. The endpoint supports only input-shaping fields;
+output caps and generation-only options are omitted. The Chat Completions model
+has no `countTokens` method. `sdk.count(text)` remains a separate offline estimate.
+
+```ts
+if (model.countTokens) {
+  const inputTokens = await model.countTokens(messages, options);
+}
+```

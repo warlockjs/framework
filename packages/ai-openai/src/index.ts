@@ -10,3 +10,5 @@ export type {
   OpenAISpeechConfig,
   OpenAITranscriptionConfig,
 } from "./config.type";
+
+export type { OpenAICallOptions } from "./provider-options";

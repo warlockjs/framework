@@ -1,6 +1,6 @@
 ---
 name: setup-openai
-description: 'Wire @warlock.js/ai-openai — new OpenAISDK({apiKey, baseURL?, provider?, pricing?}) for OpenAI / Azure / OpenRouter, .model({name, vision?, reasoning?, structuredOutput?, responseFormat?, pdf?, audio?}) for ModelContract, .embedder({name, dimensions?}) for embeddings, .image({name, pricing?}) for gpt-image-*/dall-e-* image generation (via ai.image). PDF input maps to OpenAI file parts (opt-in pdf:true), audio input to input_audio (opt-in audio:true). Triggers: `OpenAISDK`, `.model`, `.embedder`, `.image`, `.embed`, `.embedMany`, `baseURL`, `pricing`, `responseSchema`, `responseFormat`, `reasoning_effort`, `reasoningTokens`, `cachedTokens`, `gpt-image`, `dall-e`, `ai.image`, `pdf input`, `input_audio`, o-series / gpt-5 reasoning, `api: "responses"`, Responses API, reasoning with tools, prompt caching; "wire openai into a warlock agent", "configure gpt-4o", "use o3 / gpt-5 reasoning effort", "route through openrouter or azure openai", "openai embeddings with warlock", "generate images with gpt-image / dall-e", "send a pdf / audio to gpt-4o"; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: the ai.image verb surface — the `generate-images` topic of the `warlock-js-ai` skill; agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; competing adapters `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `openai` SDK, Vercel `@ai-sdk/openai`.'
+description: 'Wire @warlock.js/ai-openai — new OpenAISDK({apiKey, baseURL?, provider?, pricing?}) for OpenAI / Azure / OpenRouter, .model({name, vision?, reasoning?, structuredOutput?, responseFormat?, pdf?, audio?}) for ModelContract, .embedder({name, dimensions?}) for embeddings, .image({name, pricing?}) for gpt-image-*/dall-e-* image generation (via ai.image). PDF input maps to OpenAI file parts (opt-in pdf:true), audio input to input_audio (opt-in audio:true). Triggers: `providerOptions`, `OpenAICallOptions`, `countTokens`, `OpenAISDK`, `.model`, `.embedder`, `.image`, `.embed`, `.embedMany`, `baseURL`, `pricing`, `responseSchema`, `responseFormat`, `reasoning_effort`, `reasoningTokens`, `cachedTokens`, `gpt-image`, `dall-e`, `ai.image`, `pdf input`, `input_audio`, o-series / gpt-5 reasoning, `api: "responses"`, Responses API, reasoning with tools, prompt caching; "wire openai into a warlock agent", "configure gpt-4o", "use o3 / gpt-5 reasoning effort", "route through openrouter or azure openai", "openai embeddings with warlock", "generate images with gpt-image / dall-e", "send a pdf / audio to gpt-4o"; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: the ai.image verb surface — the `generate-images` topic of the `warlock-js-ai` skill; agent wiring — the `run-ai-agent` topic of the `warlock-js-ai` skill; adapter comparison — the `pick-ai-provider` topic of the `warlock-js-ai` skill; competing adapters `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `openai` SDK, Vercel `@ai-sdk/openai`.'
 ---
 
 # `@warlock.js/ai-openai`
@@ -235,6 +235,36 @@ The registry is per-model; `usage.cost` is the per-channel breakdown the framewo
 ## Errors
 
 Raw OpenAI SDK errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy via the adapter's error wrapper. Dispatch keys on `APIError.status + code` combined — see the `handle-ai-errors` topic of the `warlock-js-ai` skill.
+
+## Provider body options and input-token counts
+
+`providerOptions.openai.body` adds native request fields to Chat Completions or
+Responses, merged after the neutral options. For example:
+
+```ts
+const options = { providerOptions: { openai: { body: { service_tier: "default" } } } };
+await model.complete(messages, options);
+```
+
+The key stays `openai` for compatible gateways with a custom provider label.
+Other provider keys are ignored. `OpenAICallOptions` is exported. The body cannot
+replace `model`, `messages`, `input`, `instructions`, `tools`, `stream`,
+`stream_options`, `previous_response_id`, `conversation`, `store` or `include`;
+those fields protect the adapter's conversation, tools and stateless replay.
+
+Models using `api: "responses"` expose native `countTokens(messages, options?)`
+through `responses.inputTokens.count`: the same input, system instructions,
+tools, reasoning, text format, tool choice, parallel-tool setting and truncation
+used for generation are counted. The endpoint supports only input-shaping fields;
+output caps and generation-only options are omitted. The Chat Completions model
+has no `countTokens` method. `sdk.count(text)` remains a separate offline estimate.
+
+```ts
+if (model.countTokens) {
+  const inputTokens = await model.countTokens(messages, options);
+}
+```
+
 
 ## When NOT to use this skill
 

@@ -1,4 +1,5 @@
 import {
+  InvalidRequestError,
   safeJsonParse,
   type Message,
   type ModelCallOptions,
@@ -12,6 +13,7 @@ import {
 } from "@warlock.js/ai";
 import { log, type Logger } from "@warlock.js/logger";
 import {
+  CountTokensCommand,
   ConverseCommand,
   ConverseStreamCommand,
   type BedrockRuntimeClient,
@@ -19,6 +21,7 @@ import {
   type ConverseRequest,
   type TokenUsage,
 } from "@aws-sdk/client-bedrock-runtime";
+import { resolveProviderBody } from "./provider-options";
 import type { BedrockModelConfig } from "./config.type";
 import {
   inferPdfCapability,
@@ -154,6 +157,32 @@ export class BedrockModel implements ModelContract {
       usage,
       toolCalls,
     };
+  }
+
+  /** Count native input tokens from the same Converse conversation and tool configuration. */
+  public async countTokens(messages: Message[], options?: ModelCallOptions): Promise<number> {
+    const request = this.buildRequest(messages, options);
+    try {
+      const response = await this.client.send(
+        new CountTokensCommand({
+          modelId: request.modelId,
+          input: {
+            converse: {
+              messages: request.messages,
+              system: request.system,
+              toolConfig: request.toolConfig,
+              additionalModelRequestFields: request.additionalModelRequestFields,
+            },
+          },
+        }),
+        options?.signal ? { abortSignal: options.signal } : undefined,
+      );
+      if (response.inputTokens === undefined)
+        throw new InvalidRequestError("Bedrock countTokens returned no inputTokens.");
+      return response.inputTokens;
+    } catch (thrown) {
+      throw this.logAndWrap(thrown);
+    }
   }
 
   /**
@@ -331,6 +360,7 @@ export class BedrockModel implements ModelContract {
       ...this.buildToolConfig(options?.tools),
       ...this.buildOutputConfig(options?.responseSchema),
       ...this.buildReasoningConfig(thinkingBudget),
+      ...resolveProviderBody(options),
     };
   }
 
@@ -401,7 +431,10 @@ export class BedrockModel implements ModelContract {
   }
 
   /** Resolve Bedrock's output ceiling while reserving room for extended thinking. */
-  private resolveMaxTokens(maxTokens: number | undefined, thinkingBudget: number | undefined): number | undefined {
+  private resolveMaxTokens(
+    maxTokens: number | undefined,
+    thinkingBudget: number | undefined,
+  ): number | undefined {
     if (thinkingBudget === undefined) {
       return maxTokens;
     }
@@ -411,7 +444,9 @@ export class BedrockModel implements ModelContract {
     }
 
     if (maxTokens <= thinkingBudget) {
-      throw new Error(`maxTokens (${maxTokens}) must be greater than thinking budget (${thinkingBudget})`);
+      throw new Error(
+        `maxTokens (${maxTokens}) must be greater than thinking budget (${thinkingBudget})`,
+      );
     }
 
     return maxTokens;
@@ -491,9 +526,9 @@ export class BedrockModel implements ModelContract {
    */
   private extractToolCalls(blocks: ContentBlock[]): ModelToolCallRequest[] | undefined {
     const toolCalls: ModelToolCallRequest[] = [];
-    const reasoningBlocks = blocks.map(toReasoningMetadata).filter(
-      (block): block is BedrockReasoningBlock => block !== undefined,
-    );
+    const reasoningBlocks = blocks
+      .map(toReasoningMetadata)
+      .filter((block): block is BedrockReasoningBlock => block !== undefined);
 
     for (const block of blocks) {
       if ("toolUse" in block && block.toolUse) {
@@ -523,7 +558,10 @@ export class BedrockModel implements ModelContract {
 
     return toReasoningMetadata({
       reasoningContent: {
-        reasoningText: { text: block.text ?? "", ...(block.signature ? { signature: block.signature } : {}) },
+        reasoningText: {
+          text: block.text ?? "",
+          ...(block.signature ? { signature: block.signature } : {}),
+        },
       },
     });
   }

@@ -1,6 +1,6 @@
 ---
 name: setup-google
-description: 'Wire @warlock.js/ai-google — new GoogleSDK({apiKey} | {vertexai, project, location}) for Gemini API + Vertex AI. generateContent / embedContent + thoughtSignature round-trip for thinking models, batched embeddings. .model({name, vision?, reasoning?, audio?, pdf?}) with cost-truth capabilities (PDF + audio input map to Gemini inlineData), .image({name, pricing?}) for image generation via ai.image — the id picks the transport: gemini-* → generateContent + responseModalities IMAGE (usage passed through; generateImages is deprecated by Google), everything else → generateImages (Imagen, per-image, zero usage) — extended thinking via options.reasoning → thinkingConfig.thinkingBudget, usage reasoningTokens (thoughtsTokenCount) / cachedTokens (cachedContentTokenCount). Triggers: `GoogleSDK`, `google.model`, `google.embedder`, `google.image`, `imagen`, `generateImages`, `gemini image`, `nano banana`, `responseModalities`, `imageConfig`, `ai.image`, `inlineData`, `pdf input`, `audio input`, `thoughtSignature`, `responseJsonSchema`, `vertexai`, `reasoning`, `thinkingConfig`, `thinkingBudget`, `thoughtsTokenCount`, `reasoningTokens`, `cachedTokens`, `promptCaching`, `cacheControl`; "use gemini", "wire Vertex AI", "gemini embeddings", "gemini thinking tool calls", "gemini 2.5 thinking budget", "gemini cached content cost", "generate images with imagen", "generate an image with gemini", "gemini image model 404 not supported for predict", "send a pdf / audio to gemini"; import `import { GoogleSDK } from "@warlock.js/ai-google"`. Skip: the ai.image verb surface — the `generate-images` topic of the `warlock-js-ai` skill; agent loop the `run-ai-agent` topic of the `warlock-js-ai` skill; provider picking the `pick-ai-provider` topic of the `warlock-js-ai` skill; embedder usage the `embed-text` topic of the `warlock-js-ai` skill; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@google/genai`, `@google-cloud/vertexai`, Vercel `@ai-sdk/google`.'
+description: 'Wire @warlock.js/ai-google — new GoogleSDK({apiKey} | {vertexai, project, location}) for Gemini API + Vertex AI. generateContent / embedContent + thoughtSignature round-trip for thinking models, batched embeddings. .model({name, vision?, reasoning?, audio?, pdf?}) with cost-truth capabilities (PDF + audio input map to Gemini inlineData), .image({name, pricing?}) for image generation via ai.image — the id picks the transport: gemini-* → generateContent + responseModalities IMAGE (usage passed through; generateImages is deprecated by Google), everything else → generateImages (Imagen, per-image, zero usage) — extended thinking via options.reasoning → thinkingConfig.thinkingBudget, usage reasoningTokens (thoughtsTokenCount) / cachedTokens (cachedContentTokenCount). Triggers: `providerOptions`, `GoogleCallOptions`, `countTokens`, `GoogleSDK`, `google.model`, `google.embedder`, `google.image`, `imagen`, `generateImages`, `gemini image`, `nano banana`, `responseModalities`, `imageConfig`, `ai.image`, `inlineData`, `pdf input`, `audio input`, `thoughtSignature`, `responseJsonSchema`, `vertexai`, `reasoning`, `thinkingConfig`, `thinkingBudget`, `thoughtsTokenCount`, `reasoningTokens`, `cachedTokens`, `promptCaching`, `cacheControl`; "use gemini", "wire Vertex AI", "gemini embeddings", "gemini thinking tool calls", "gemini 2.5 thinking budget", "gemini cached content cost", "generate images with imagen", "generate an image with gemini", "gemini image model 404 not supported for predict", "send a pdf / audio to gemini"; import `import { GoogleSDK } from "@warlock.js/ai-google"`. Skip: the ai.image verb surface — the `generate-images` topic of the `warlock-js-ai` skill; agent loop the `run-ai-agent` topic of the `warlock-js-ai` skill; provider picking the `pick-ai-provider` topic of the `warlock-js-ai` skill; embedder usage the `embed-text` topic of the `warlock-js-ai` skill; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@google/genai`, `@google-cloud/vertexai`, Vercel `@ai-sdk/google`.'
 ---
 
 # `@warlock.js/ai-google`
@@ -219,6 +219,37 @@ google.model({ name: "gemini-2.5-pro" });                  // → no entry → p
 ```
 
 Resolution order: per-model `pricing` > SDK-level registry entry > `undefined`. The resolved `ModelPricing` is attached to the produced model so the agent runtime can compute cost from usage.
+
+## Provider config options and input-token counts
+
+`providerOptions.google.body` adds native `GenerateContentConfig` fields,
+merged after neutral generation options for both completion and streaming:
+
+```ts
+const options = { providerOptions: { google: { body: { topP: 0.8, topK: 4 } } } };
+await model.complete(messages, options);
+```
+
+The key stays `google` for custom provider labels. Other provider keys are
+ignored. `GoogleCallOptions` is exported. `systemInstruction`, `tools`,
+`abortSignal` and `httpOptions` are protected and throw `InvalidRequestError`;
+use neutral messages/tools/signal and SDK transport configuration for them.
+
+`model.countTokens(messages, options?)` calls the native counting endpoint with
+the same converted contents. In Vertex mode it also counts the same system
+instruction and tools as generation and forwards cancellation. In Developer API
+mode, the installed Google SDK cannot count system instructions or tools through
+its typed count endpoint: requests containing them fail explicitly before a
+network call. Cached-content references also fail explicitly, since this SDK
+count endpoint cannot reproduce them. The adapter never silently counts only a
+subset of a prompt. `sdk.count(text)` remains a separate offline estimate.
+
+```ts
+if (model.countTokens) {
+  const inputTokens = await model.countTokens(messages, options);
+}
+```
+
 
 ## When NOT to use this skill
 
