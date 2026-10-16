@@ -23,4 +23,4 @@
 
 - Restored a damaged historical locale-folder changelog entry and removed private application attribution from published package history and documentation. The public-text gate now rejects the additional configured name.
 
-- Added exactly pinned Oxlint and Oxfmt workspace tools. Shared Oxlint correctness/suspicious checks run in CI in report-only mode during adoption; existing ESLint commands remain available.
+- Added exactly pinned Oxlint and Oxfmt workspace tools. Shared Oxlint correctness errors block CI while suspicious/style warnings remain advisory; existing ESLint commands remain available.
