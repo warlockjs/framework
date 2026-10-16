@@ -86,6 +86,46 @@ describe("response.sse()", () => {
     app = undefined;
   });
 
+  it("supports unnamed raw data without allowing SSE field injection", async () => {
+    app = Fastify();
+    app.get("/sse", async (_request, reply) => {
+      const sse = bind(reply).sse();
+      sse.send(undefined, "already serialized\nevent: injected", "id\nvalue", { raw: true });
+      sse.end();
+      return reply;
+    });
+    const result = await app.inject({ method: "GET", url: "/sse" });
+    expect(result.body).toBe("id: idvalue\ndata: already serialized\ndata: event: injected\n\n");
+  });
+
+  it("preserves a caller's cache policy and applies headers before flushing", async () => {
+    app = Fastify();
+    app.get("/sse", async (_request, reply) => {
+      const response = bind(reply);
+      response.header("Cache-Control", "private, no-store");
+      const sse = response.sse({ headers: { "X-Stream": "ready" } });
+      expect(sse.enqueue(undefined, { ok: true })).toBe(true);
+      sse.end();
+      return reply;
+    });
+    const result = await app.inject({ method: "GET", url: "/sse" });
+    expect(result.headers["cache-control"]).toBe("private, no-store");
+    expect(result.headers["x-stream"]).toBe("ready");
+    expect(result.body).toBe('data: {"ok":true}\n\n');
+  });
+
+  it("drops overflow without disconnecting when requested", async () => {
+    app = Fastify();
+    app.get("/sse", async (_request, reply) => {
+      const sse = bind(reply).sse({ maxQueuedBytes: 0, onOverflow: "drop" });
+      expect(sse.enqueue("tick", { large: true })).toBe(false);
+      expect(sse.signal.aborted).toBe(false);
+      sse.end();
+      return reply;
+    });
+    expect((await app.inject({ method: "GET", url: "/sse" })).body).toBe("");
+  });
+
   it("keeps no events on the response body by default", async () => {
     app = Fastify();
     let sent: Response | undefined;

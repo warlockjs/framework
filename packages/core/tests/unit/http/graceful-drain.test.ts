@@ -116,6 +116,28 @@ describe("graceful HTTP drain with keep-alive clients", () => {
     expect(Date.now() - startedAt).toBeLessThan(2000);
   });
 
+  it("retires a hijacked response that has not flushed headers yet", async () => {
+    server = startHttpServer();
+    const started = gate();
+    const release = gate();
+    server.get("/hijacked", async (_request: unknown, reply: FastifyReply) => {
+      reply.hijack();
+      started.release();
+      await release.promise;
+      reply.raw.writeHead(200, { "content-type": "text/plain" });
+      reply.raw.end("done");
+    });
+    const baseUrl = await listen(server);
+    const pending = fetch(`${baseUrl}/hijacked`);
+    await started.promise;
+    const drained = closeServerWithTimeout(server, 3000);
+    release.release();
+    const response = await pending;
+    expect(response.headers.get("connection")).toBe("close");
+    expect(await response.text()).toBe("done");
+    await expect(drained).resolves.toBe(true);
+  });
+
   it("does not track connections when forceCloseConnections is false", () => {
     config.set("http.gracefulShutdown.forceCloseConnections", false);
     server = startHttpServer();

@@ -15,6 +15,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- SSE supports unnamed events (`send(undefined, data)`) and raw string payloads through a fourth `{ raw: true }` argument, with safe multiline `data:` encoding. SSE and streams preserve pre-set cache headers and accept `headers` before flushing.
+- SSE and stream controllers gain synchronous `enqueue()` with a byte cap (`maxQueuedBytes`, default 1 MiB for enqueue), disconnect/drop overflow policies, ordered draining and flushing accepted queued output on `end()`.
+
 - `http.logging.private` applies path-prefix or regular-expression policies to decoded, normalized request URLs, including unmatched requests. Matching policies remove body/query input before snapshots are built and cannot be overridden by per-route logging.
 
 ### Fixed

@@ -5228,6 +5228,43 @@ return response.header("X-Cache", "HIT").replay({
 - The `register-route` topic — wiring the controller to a URL.
 - The `warlock-conventions` topic — when to use HTTP error helpers vs `throw`.
 
+## Stream wire format, headers and synchronous producers
+
+```ts
+const sse = response.sse({
+  headers: { "Cache-Control": "private, no-store" },
+  maxQueuedBytes: 1024 * 1024,
+  onOverflow: "disconnect",
+});
+sse.send(undefined, { status: "ready" }); // no event field: EventSource.onmessage
+sse.enqueue(undefined, "already serialized\nsecond line", undefined, { raw: true });
+```
+
+The positional `send(event, data, id?, options?)` and `write(...)` calls still work.
+An undefined event omits `event:`. Data is JSON by default; `{ raw: true }` requires
+string data and emits one safe `data:` line per input line. Event/id line breaks
+and NUL are removed, so raw data cannot inject event fields.
+
+Both `sse({ headers })` and `stream(contentType, { headers })` apply caller headers
+before flushing; a Cache-Control set on the response is respected unless the
+options explicitly override it. Existing defaults apply when neither supplies it.
+
+Use synchronous `enqueue()` for event-bus producers. It returns false when closed
+or overflowing. The byte cap includes queued UTF-8 data and Node's unsent buffer.
+It defaults to 1 MiB for enqueue; `onOverflow: "disconnect"` aborts the signal and
+runs disconnect cleanup, while `"drop"` rejects the newest chunk so the producer
+can schedule a resync. Choosing maxQueuedBytes also bounds send/write/render and
+SSE comments; using enqueue switches subsequent writes on that controller into
+bounded mode. `drain()` waits for both queues. `end()` stops accepting new output
+and flushes already accepted queued output before ending. Without a byte cap or
+enqueue, send/write retain their existing behavior.
+
+Graceful HTTP/1 drain tracks raw responses, including hijacked replies. Before
+headers flush it adds Connection: close; already-streaming replies finish and
+then have their idle connections reaped. A hand-written hijacked writer that sets
+its own Connection header must preserve close during drain rather than overwrite
+it with keep-alive. Headers already on the wire cannot be changed.
+
 
 ## store-file  `@warlock.js/core/store-file/SKILL.md`
 

@@ -5,6 +5,7 @@ import type { Server as NodeHttpServer } from "node:http";
 import type React from "react";
 import type { Middleware } from "../router";
 import type { HttpRateLimitConfig } from "./build-rate-limit-options";
+import type { StreamQueueOptions } from "./bounded-stream-queue";
 import type { CspConfig } from "./csp";
 import type { HttpErrorMapper } from "./error-mapper";
 import type { HttpLoggingConfig } from "./request-log-snapshot";
@@ -493,7 +494,9 @@ export interface HttpConfigurations {
 /**
  * Options for `response.stream()`.
  */
-export type ResponseStreamOptions = {
+export type ResponseStreamOptions = StreamQueueOptions & {
+  /** Caller headers applied before headers are flushed, overriding stream defaults. */
+  headers?: Record<string, string>;
   /**
    * How many of the most recent chunks (from `send()`, `write()` and
    * `render()`) to keep on `response.body` after `end()`, for logging and
@@ -513,6 +516,8 @@ export type ResponseStreamController = {
    * client disconnected; throws after `end()`.
    */
   send: (data: string | Uint8Array) => void;
+  /** Bounded synchronous write; false when closed or overflow rejects this chunk. */
+  enqueue: (data: string | Uint8Array) => boolean;
   /**
    * Send data and wait until the transport can take more. Resolves `true`
    * when it can, `false` when the stream ended or the client disconnected —
@@ -555,7 +560,9 @@ export type ResponseStreamController = {
 /**
  * Options for `response.sse()`.
  */
-export type ResponseSSEOptions = {
+export type ResponseSSEOptions = StreamQueueOptions & {
+  /** Caller headers applied before headers are flushed, overriding SSE defaults. */
+  headers?: Record<string, string>;
   /**
    * How many of the most recent events to keep on `response.body` after
    * `end()`, for logging and debugging. Sent events are otherwise not kept,
@@ -566,6 +573,9 @@ export type ResponseSSEOptions = {
   retainEvents?: number;
 };
 
+/** Wire serialization for one SSE event. Raw strings are split into safe data lines. */
+export type ResponseSSEMessageOptions = { raw?: boolean };
+
 export type ResponseSSEController = {
   /**
    * Send an SSE event to the client. Does not wait for the client; for
@@ -575,13 +585,30 @@ export type ResponseSSEController = {
    * @param data - Event data (will be JSON stringified)
    * @param id - Optional event ID for client-side Last-Event-ID tracking
    */
-  send: (event: string, data: any, id?: string) => ResponseSSEController;
+  send: (
+    event: string | undefined,
+    data: any,
+    id?: string,
+    options?: ResponseSSEMessageOptions,
+  ) => ResponseSSEController;
+  /** Bounded synchronous event; undefined event omits the event field. */
+  enqueue: (
+    event: string | undefined,
+    data: unknown,
+    id?: string,
+    options?: ResponseSSEMessageOptions,
+  ) => boolean;
   /**
    * Send an SSE event and wait until the transport can take more.
    * Resolves `true` when it can, `false` when the stream ended or the client
    * disconnected — stop producing then.
    */
-  write: (event: string, data: any, id?: string) => Promise<boolean>;
+  write: (
+    event: string | undefined,
+    data: any,
+    id?: string,
+    options?: ResponseSSEMessageOptions,
+  ) => Promise<boolean>;
   /**
    * Wait until output buffered for the client has been flushed. Resolves
    * `true` immediately when nothing is backed up, `false` when the stream

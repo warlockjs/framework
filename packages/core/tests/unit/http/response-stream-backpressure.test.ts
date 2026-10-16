@@ -87,6 +87,36 @@ describe("response.stream()", () => {
     app = undefined;
   });
 
+  it("applies caller stream headers and queues synchronous chunks", async () => {
+    app = Fastify();
+    app.get("/stream", async (_request, reply) => {
+      const response = bind(reply);
+      response.header("Cache-Control", "private, no-store");
+      const stream = response.stream("text/plain", {
+        headers: { "Cache-Control": "private, max-age=0", "X-Stream": "ready" },
+      });
+      expect(stream.enqueue("hello")).toBe(true);
+      stream.end();
+      return reply;
+    });
+    const result = await app.inject({ method: "GET", url: "/stream" });
+    expect(result.headers["cache-control"]).toBe("private, max-age=0");
+    expect(result.headers["x-stream"]).toBe("ready");
+    expect(result.body).toBe("hello");
+  });
+
+  it("drops overflow without disconnecting when requested", async () => {
+    app = Fastify();
+    app.get("/stream", async (_request, reply) => {
+      const stream = bind(reply).stream("text/plain", { maxQueuedBytes: 0, onOverflow: "drop" });
+      expect(stream.enqueue("too much")).toBe(false);
+      expect(stream.signal.aborted).toBe(false);
+      stream.end();
+      return reply;
+    });
+    expect((await app.inject({ method: "GET", url: "/stream" })).body).toBe("");
+  });
+
   it("keeps no chunks on the response body by default", async () => {
     app = Fastify();
     let sent: Response | undefined;

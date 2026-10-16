@@ -17,6 +17,8 @@ export type StreamTransport = {
   readonly backpressured: boolean;
   /** Mark the stream as ended by the server. */
   finish(): void;
+  /** Abort the producer and notify disconnect handlers when a slow client is disconnected. */
+  disconnect(): void;
   /** Call `handler` when the client disconnects. */
   onDisconnect(handler: () => void): void;
   /**
@@ -38,7 +40,7 @@ export function createStreamTransport(
   // Without this, background jobs keep writing to a dead socket after the
   // client drops. `close` also fires after a normal `end()`; `closed` is
   // already set by then.
-  raw.on("close", () => {
+  const disconnect = () => {
     if (closed) return;
 
     closed = true;
@@ -56,7 +58,8 @@ export function createStreamTransport(
         log.error("http", "stream", error as Error, { source: "onDisconnect handler" });
       }
     }
-  });
+  };
+  raw.on("close", disconnect);
 
   return {
     signal: disconnectController.signal,
@@ -76,6 +79,8 @@ export function createStreamTransport(
     finish() {
       closed = true;
     },
+
+    disconnect,
 
     onDisconnect(handler) {
       disconnectHandlers.push(handler);
