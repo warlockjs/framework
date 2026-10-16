@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.31.0
 
+### Changed
+
+- The provider matrix documents inherited `providerOptions.openai.body` on xAI, Groq, DeepSeek and Mistral, and warns against sharing provider-specific fields across incompatible fallback models.
+
 ### Upgrading
 
 - When optional agent compaction applies, persist `captureMessages` history plus the final trip's output/blocks for replay. `result.blocks` stays absent because the original caller history no longer matches the generated thinking signature.

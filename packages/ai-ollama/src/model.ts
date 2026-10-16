@@ -11,14 +11,8 @@ import {
   type Usage,
 } from "@warlock.js/ai";
 import { log, type Logger } from "@warlock.js/logger";
-import type {
-  AbortableAsyncIterator,
-  ChatRequest,
-  ChatResponse,
-  Ollama,
-  Options,
-} from "ollama";
-import { resolveProviderBody } from "./provider-options";
+import type { AbortableAsyncIterator, ChatRequest, ChatResponse, Ollama, Options } from "ollama";
+import { mergeProviderBody } from "./provider-options";
 import type { OllamaModelConfig } from "./config.type";
 import { inferReasoningCapability } from "./known-reasoning-models";
 import { inferVisionCapability } from "./known-vision-models";
@@ -27,10 +21,7 @@ import { mapDoneReason, toOllamaMessages, toOllamaTools, wrapOllamaError } from 
 const LOG_MODULE = "ai.ollama";
 
 /** Ollama supports only low, medium, and high named thinking levels. */
-const EFFORT_TO_THINK_LEVEL: Record<
-  Exclude<ReasoningEffort, "none">,
-  "low" | "medium" | "high"
-> = {
+const EFFORT_TO_THINK_LEVEL: Record<Exclude<ReasoningEffort, "none">, "low" | "medium" | "high"> = {
   minimal: "low",
   low: "low",
   medium: "medium",
@@ -243,15 +234,17 @@ export class OllamaModel implements ModelContract {
       ...(maxTokens !== undefined ? { num_predict: maxTokens } : {}),
     };
 
-    return {
-      model: this.name,
-      messages: toOllamaMessages(messages),
-      ...(Object.keys(ollamaOptions).length > 0 ? { options: ollamaOptions } : {}),
-      ...this.buildTools(options?.tools),
-      ...this.buildFormat(options?.responseSchema),
-      ...this.buildThink(options?.reasoning),
-      ...resolveProviderBody(options),
-    };
+    return mergeProviderBody<Omit<ChatRequest, "stream">>(
+      {
+        model: this.name,
+        messages: toOllamaMessages(messages),
+        ...(Object.keys(ollamaOptions).length > 0 ? { options: ollamaOptions } : {}),
+        ...this.buildTools(options?.tools),
+        ...this.buildFormat(options?.responseSchema),
+        ...this.buildThink(options?.reasoning),
+      },
+      options,
+    );
   }
 
   /**
@@ -273,9 +266,7 @@ export class OllamaModel implements ModelContract {
    * `ModelCallOptions.cacheControl` is likewise a no-op: Ollama has no
    * provider prompt cache, so there is no cache breakpoint to place.
    */
-  private buildThink(
-    reasoning: ModelCallOptions["reasoning"],
-  ): Pick<ChatRequest, "think"> {
+  private buildThink(reasoning: ModelCallOptions["reasoning"]): Pick<ChatRequest, "think"> {
     if (!reasoning || !this.capabilities.reasoning) {
       return {};
     }

@@ -135,6 +135,12 @@ Per-call `Usage` comes from the chat response's `prompt_eval_count` (→ `input`
 
 ## Provider body options
 
+Native body fields merge after neutral options. When both values are plain
+objects, their immediate keys merge and caller-provided keys win; untouched
+neutral fields remain. Arrays, scalars and `null` replace the field. This merge
+is one level deep: a nested object explicitly supplied by the caller replaces
+that nested value.
+
 `providerOptions.ollama.body` adds native chat request fields after neutral
 options, for completion and streaming:
 

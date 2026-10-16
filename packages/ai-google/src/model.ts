@@ -19,7 +19,7 @@ import type {
   Part,
   Tool,
 } from "@google/genai";
-import { resolveProviderBody } from "./provider-options";
+import { mergeProviderBody } from "./provider-options";
 import type { GoogleModelConfig } from "./config.type";
 import { inferVisionCapability } from "./known-vision-models";
 import {
@@ -261,9 +261,7 @@ export class GoogleModel implements ModelContract {
             id: toolCall.id,
             name: toolCall.name,
             input: toolCall.input,
-            ...(toolCall.providerMetadata
-              ? { providerMetadata: toolCall.providerMetadata }
-              : {}),
+            ...(toolCall.providerMetadata ? { providerMetadata: toolCall.providerMetadata } : {}),
           };
         }
 
@@ -304,16 +302,18 @@ export class GoogleModel implements ModelContract {
     const temperature = options?.temperature ?? this.config.temperature;
     const maxOutputTokens = options?.maxTokens ?? this.config.maxTokens;
 
-    return {
-      ...(systemInstruction ? { systemInstruction } : {}),
-      ...(temperature !== undefined ? { temperature } : {}),
-      ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
-      ...(options?.signal ? { abortSignal: options.signal } : {}),
-      ...this.buildTools(options?.tools),
-      ...this.buildStructuredOutput(options?.responseSchema),
-      ...this.buildThinking(options?.reasoning),
-      ...resolveProviderBody(options),
-    };
+    return mergeProviderBody<GenerateContentConfig>(
+      {
+        ...(systemInstruction ? { systemInstruction } : {}),
+        ...(temperature !== undefined ? { temperature } : {}),
+        ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
+        ...(options?.signal ? { abortSignal: options.signal } : {}),
+        ...this.buildTools(options?.tools),
+        ...this.buildStructuredOutput(options?.responseSchema),
+        ...this.buildThinking(options?.reasoning),
+      },
+      options,
+    );
   }
 
   /**
@@ -346,7 +346,8 @@ export class GoogleModel implements ModelContract {
     }
 
     const thinkingBudget =
-      reasoning.maxTokens ?? (reasoning.effort ? EFFORT_THINKING_BUDGET[reasoning.effort] : undefined);
+      reasoning.maxTokens ??
+      (reasoning.effort ? EFFORT_THINKING_BUDGET[reasoning.effort] : undefined);
 
     if (thinkingBudget === undefined) {
       return {};

@@ -21,7 +21,7 @@ import {
   type ConverseRequest,
   type TokenUsage,
 } from "@aws-sdk/client-bedrock-runtime";
-import { resolveProviderBody } from "./provider-options";
+import { mergeProviderBody } from "./provider-options";
 import type { BedrockModelConfig } from "./config.type";
 import {
   inferPdfCapability,
@@ -216,7 +216,10 @@ export class BedrockModel implements ModelContract {
     let rawStopReason: string | undefined;
     const usage: Usage = { input: 0, output: 0, total: 0 };
     const toolBlocks = new Map<number, { id: string; name: string; json: string }>();
-    const reasoningBlocks = new Map<number, { text?: string; signature?: string; redactedContent?: Uint8Array }>();
+    const reasoningBlocks = new Map<
+      number,
+      { text?: string; signature?: string; redactedContent?: Uint8Array }
+    >();
     const completedReasoningBlocks: BedrockReasoningBlock[] = [];
 
     try {
@@ -349,19 +352,21 @@ export class BedrockModel implements ModelContract {
     const temperature = options?.temperature ?? this.config.temperature;
     const cachedMessages = this.applyCacheBreakpoints(bedrockMessages, options?.cacheControl);
 
-    return {
-      modelId: this.name,
-      messages: cachedMessages,
-      ...(system ? { system } : {}),
-      inferenceConfig: {
-        ...(maxTokens !== undefined ? { maxTokens } : {}),
-        ...(temperature !== undefined ? { temperature } : {}),
+    return mergeProviderBody<ConverseRequest>(
+      {
+        modelId: this.name,
+        messages: cachedMessages,
+        ...(system ? { system } : {}),
+        inferenceConfig: {
+          ...(maxTokens !== undefined ? { maxTokens } : {}),
+          ...(temperature !== undefined ? { temperature } : {}),
+        },
+        ...this.buildToolConfig(options?.tools),
+        ...this.buildOutputConfig(options?.responseSchema),
+        ...this.buildReasoningConfig(thinkingBudget),
       },
-      ...this.buildToolConfig(options?.tools),
-      ...this.buildOutputConfig(options?.responseSchema),
-      ...this.buildReasoningConfig(thinkingBudget),
-      ...resolveProviderBody(options),
-    };
+      options,
+    );
   }
 
   /**
@@ -385,7 +390,12 @@ export class BedrockModel implements ModelContract {
   ): ConverseRequest["messages"] {
     const breakpoints = cacheControl?.breakpoints ?? 0;
 
-    if (!this.capabilities.promptCaching || breakpoints <= 0 || !messages || messages.length === 0) {
+    if (
+      !this.capabilities.promptCaching ||
+      breakpoints <= 0 ||
+      !messages ||
+      messages.length === 0
+    ) {
       return messages;
     }
 

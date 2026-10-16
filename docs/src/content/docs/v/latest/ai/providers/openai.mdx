@@ -280,6 +280,12 @@ over inference.
 
 ## Provider body options and input-token counts
 
+Native body fields merge after neutral options. When both values are plain
+objects, their immediate keys merge and caller-provided keys win; untouched
+neutral fields remain. Arrays, scalars and `null` replace the field. This merge
+is one level deep: a nested object explicitly supplied by the caller replaces
+that nested value.
+
 `providerOptions.openai.body` adds native request fields to Chat Completions or
 Responses, merged after the neutral options. For example:
 
@@ -291,7 +297,7 @@ await model.complete(messages, options);
 The key stays `openai` for compatible gateways with a custom provider label.
 Other provider keys are ignored. `OpenAICallOptions` is exported. The body cannot
 replace `model`, `messages`, `input`, `instructions`, `tools`, `stream`,
-`stream_options`, `previous_response_id`, `conversation`, `store` or `include`;
+`stream_options`, `previous_response_id`, `conversation`, `store`, `include`, `functions`, `function_call`, `prompt` or `background`;
 those fields protect the adapter's conversation, tools and stateless replay.
 
 Models using `api: "responses"` expose native `countTokens(messages, options?)`

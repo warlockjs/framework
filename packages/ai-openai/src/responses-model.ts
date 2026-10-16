@@ -14,7 +14,7 @@ import {
 } from "@warlock.js/ai";
 import { log, type Logger } from "@warlock.js/logger";
 import type OpenAI from "openai";
-import { resolveProviderBody } from "./provider-options";
+import { mergeProviderBody } from "./provider-options";
 import type { OpenAIModelConfig } from "./config.type";
 import { inferReasoningCapability } from "./known-reasoning-models";
 import { inferVisionCapability } from "./known-vision-models";
@@ -314,23 +314,25 @@ export class OpenAIResponsesModel implements ModelContract {
     const maxTokens = options?.maxTokens ?? this.config.maxTokens;
     const temperature = options?.temperature ?? this.config.temperature;
 
-    return {
-      model: this.name,
-      ...(instructions !== undefined ? { instructions } : {}),
-      input,
-      store: false,
-      // Stateless replay: ask for the encrypted reasoning blobs so they can be
-      // sent back on the next tool turn (decision 3).
-      include: ["reasoning.encrypted_content"],
-      ...(maxTokens !== undefined ? { max_output_tokens: maxTokens } : {}),
-      ...(!this.capabilities.reasoning && temperature !== undefined ? { temperature } : {}),
-      ...(tools ? { tools } : {}),
-      ...(toolChoice !== undefined ? { tool_choice: toolChoice } : {}),
-      ...this.buildTextFormat(options?.responseSchema),
-      ...this.buildReasoningParams(options?.reasoning),
-      ...buildPromptCacheParams(this.provider, this.config),
-      ...resolveProviderBody(options),
-    };
+    return mergeProviderBody<OpenAI.Responses.ResponseCreateParamsNonStreaming>(
+      {
+        model: this.name,
+        ...(instructions !== undefined ? { instructions } : {}),
+        input,
+        store: false,
+        // Stateless replay: ask for the encrypted reasoning blobs so they can be
+        // sent back on the next tool turn (decision 3).
+        include: ["reasoning.encrypted_content"],
+        ...(maxTokens !== undefined ? { max_output_tokens: maxTokens } : {}),
+        ...(!this.capabilities.reasoning && temperature !== undefined ? { temperature } : {}),
+        ...(tools ? { tools } : {}),
+        ...(toolChoice !== undefined ? { tool_choice: toolChoice } : {}),
+        ...this.buildTextFormat(options?.responseSchema),
+        ...this.buildReasoningParams(options?.reasoning),
+        ...buildPromptCacheParams(this.provider, this.config),
+      },
+      options,
+    );
   }
 
   /**

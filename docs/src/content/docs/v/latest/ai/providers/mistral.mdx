@@ -167,3 +167,17 @@ skill.
 - [OpenAI provider](/v/latest/ai/providers/openai/) — the wrapped adapter; identical wire behavior.
 - [Groq provider](/v/latest/ai/providers/groq/) — another OpenAI-compatible wrapper, for Groq-hosted open models.
 - [`@warlock.js/ai`](/v/latest/ai/) — passing the model into `ai.agent({ ... })`.
+
+## Provider body options and token estimates
+
+This adapter delegates Chat Completions to the OpenAI adapter, so
+`providerOptions.openai.body` adds native Chat request fields. Other provider
+keys are ignored. Plain-object fields merge one level deep with neutral options;
+caller-provided keys win, while arrays, scalars and `null` replace the field.
+The OpenAI adapter's protected conversation, tool and transport fields remain
+protected here too. Send only fields supported by this provider; do not reuse
+OpenAI-only bodies across a mixed-provider fallback chain.
+
+Models from this adapter have no native `countTokens` method. Check
+`model.countTokens` before using an optional native counting capability;
+`sdk.count(text)` is a separate offline estimate.

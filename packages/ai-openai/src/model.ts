@@ -14,7 +14,7 @@ import {
 } from "@warlock.js/ai";
 import { log, type Logger } from "@warlock.js/logger";
 import type OpenAI from "openai";
-import { resolveProviderBody } from "./provider-options";
+import { mergeProviderBody } from "./provider-options";
 import type { OpenAIModelConfig } from "./config.type";
 import { inferReasoningCapability } from "./known-reasoning-models";
 import { inferVisionCapability } from "./known-vision-models";
@@ -138,16 +138,18 @@ export class OpenAIModel implements ModelContract {
 
     try {
       response = await this.client.chat.completions.create(
-        {
-          model: this.name,
-          messages: toOpenAIMessages(messages, this.promptCacheBreakpoints(options)),
-          ...this.buildSamplingParams(options),
-          ...buildPromptCacheParams(this.provider, this.config),
-          tools: toOpenAITools(options?.tools),
-          ...this.buildResponseFormat(options?.responseSchema),
-          ...this.buildReasoningParams(options?.reasoning, Boolean(options?.tools?.length)),
-          ...resolveProviderBody(options),
-        },
+        mergeProviderBody<OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming>(
+          {
+            model: this.name,
+            messages: toOpenAIMessages(messages, this.promptCacheBreakpoints(options)),
+            ...this.buildSamplingParams(options),
+            ...buildPromptCacheParams(this.provider, this.config),
+            tools: toOpenAITools(options?.tools),
+            ...this.buildResponseFormat(options?.responseSchema),
+            ...this.buildReasoningParams(options?.reasoning, Boolean(options?.tools?.length)),
+          },
+          options,
+        ),
         options?.signal ? { signal: options.signal } : undefined,
       );
     } catch (thrown) {
@@ -214,18 +216,20 @@ export class OpenAIModel implements ModelContract {
 
     try {
       stream = await this.client.chat.completions.create(
-        {
-          model: this.name,
-          messages: toOpenAIMessages(messages, this.promptCacheBreakpoints(options)),
-          ...this.buildSamplingParams(options),
-          ...buildPromptCacheParams(this.provider, this.config),
-          tools: toOpenAITools(options?.tools),
-          stream: true,
-          stream_options: { include_usage: true },
-          ...this.buildResponseFormat(options?.responseSchema),
-          ...this.buildReasoningParams(options?.reasoning, Boolean(options?.tools?.length)),
-          ...resolveProviderBody(options),
-        },
+        mergeProviderBody<OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming>(
+          {
+            model: this.name,
+            messages: toOpenAIMessages(messages, this.promptCacheBreakpoints(options)),
+            ...this.buildSamplingParams(options),
+            ...buildPromptCacheParams(this.provider, this.config),
+            tools: toOpenAITools(options?.tools),
+            stream: true,
+            stream_options: { include_usage: true },
+            ...this.buildResponseFormat(options?.responseSchema),
+            ...this.buildReasoningParams(options?.reasoning, Boolean(options?.tools?.length)),
+          },
+          options,
+        ),
         options?.signal ? { signal: options.signal } : undefined,
       );
     } catch (thrown) {

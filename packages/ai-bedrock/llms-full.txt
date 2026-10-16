@@ -185,11 +185,18 @@ Set `cachedInput` / `cachedOutput` in `ModelPricing` to have cache reads/writes 
 
 ## Provider body options and input-token counts
 
+Native body fields merge after neutral options. When both values are plain
+objects, their immediate keys merge and caller-provided keys win; untouched
+neutral fields remain. Arrays, scalars and `null` replace the field. This merge
+is one level deep: a nested object explicitly supplied by the caller replaces
+that nested value.
+
 `providerOptions.bedrock.body` adds native Converse request fields after the
 neutral options, for completion and streaming:
 
 ```ts
 const options = {
+  reasoning: { effort: "high" as const }, // preserved alongside top_k
   providerOptions: { bedrock: { body: { additionalModelRequestFields: { top_k: 4 } } } },
 };
 await model.complete(messages, options);

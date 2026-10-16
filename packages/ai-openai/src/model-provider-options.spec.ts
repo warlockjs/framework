@@ -3,6 +3,7 @@ import { InvalidRequestError, type Message } from "@warlock.js/ai";
 import { describe, expect, it, vi } from "vitest";
 import { OpenAIModel } from "./model";
 import { OpenAIResponsesModel } from "./responses-model";
+import { mergeProviderBody } from "./provider-options";
 
 const messages: Message[] = [
   { role: "system", content: "rules" },
@@ -59,7 +60,13 @@ describe("OpenAI provider options and native Responses counts", () => {
       },
       providerOptions: {
         openai: {
-          body: { parallel_tool_calls: false, truncation: "auto", service_tier: "default" },
+          body: {
+            parallel_tool_calls: false,
+            truncation: "auto",
+            service_tier: "default",
+            reasoning: { summary: "auto" },
+            text: { verbosity: "low" },
+          },
         },
       },
     };
@@ -81,6 +88,16 @@ describe("OpenAI provider options and native Responses counts", () => {
       { signal },
     );
     expect(request?.service_tier).toBe("default");
+    expect(request?.reasoning).toEqual({ effort: "high", summary: "auto" });
+    expect(request?.text).toEqual({
+      verbosity: "low",
+      format: {
+        type: "json_schema",
+        name: "response",
+        schema: options.responseSchema,
+        strict: true,
+      },
+    });
     for await (const chunk of model.stream(messages, options)) void chunk;
     expect(create.mock.calls[1]?.[0]).toMatchObject({
       parallel_tool_calls: false,
@@ -102,6 +119,56 @@ describe("OpenAI provider options and native Responses counts", () => {
     expect("countTokens" in model).toBe(false);
   });
 
+  it("preserves Chat structured output when overriding a sibling format key", async () => {
+    const { client, create } = setup();
+    const model = new OpenAIModel(client, { name: "gpt-4o-mini" });
+    const options = {
+      responseSchema: {
+        type: "object",
+        properties: { answer: { type: "string" } },
+        required: ["answer"],
+        additionalProperties: false,
+      },
+      providerOptions: { openai: { body: { response_format: { type: "json_schema" } } } },
+    };
+    await model.complete(messages, options);
+    for await (const chunk of model.stream(messages, options)) void chunk;
+    for (const [request] of create.mock.calls) {
+      expect(request.response_format).toMatchObject({
+        type: "json_schema",
+        json_schema: { schema: options.responseSchema },
+      });
+    }
+  });
+
+  it("limits object merging to immediate keys and replaces arrays, null and scalars", () => {
+    const built = {
+      config: { neutral: true, nested: { old: true } },
+      list: [1],
+      cleared: { old: true },
+      scalar: 1,
+    };
+    const merged = mergeProviderBody(built, {
+      providerOptions: {
+        openai: {
+          body: {
+            config: { nested: { current: true } },
+            list: [2],
+            cleared: null,
+            scalar: 2,
+          },
+        },
+      },
+    });
+    expect(merged).toEqual({
+      config: { neutral: true, nested: { current: true } },
+      list: [2],
+      cleared: null,
+      scalar: 2,
+    });
+    expect(built.config.nested).toEqual({ old: true });
+  });
+
   it("refuses protected request fields in Chat and Responses", async () => {
     const { client, create, count } = setup();
     for (const model of [
@@ -120,6 +187,10 @@ describe("OpenAI provider options and native Responses counts", () => {
         "conversation",
         "store",
         "include",
+        "functions",
+        "function_call",
+        "prompt",
+        "background",
       ]) {
         await expect(
           model.complete(messages, { providerOptions: { openai: { body: { [field]: [] } } } }),

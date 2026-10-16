@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.31.0
 
+### Fixed
+
+- Provider body options merge plain-object fields one level deep, preserving neutral reasoning, generation and structured-output settings unless the caller overrides their keys.
+
 ### Added
 
 - `providerOptions.google.body` forwards native per-call request options for completions and streams while protecting the model, conversation and tool definitions.

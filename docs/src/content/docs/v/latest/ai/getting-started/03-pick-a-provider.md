@@ -113,6 +113,10 @@ Reports label per-agent provider correctly. Pricing applies per SDK instance. Co
 | Google Vertex | Yes, including system instructions and tools | `google` |
 | Google Developer API | Contents only; system/tools requests explicitly fail | `google` |
 | Ollama chat | Absent | `ollama` |
+| xAI Chat | Absent | `openai` |
+| Groq Chat | Absent | `openai` |
+| DeepSeek Chat | Absent | `openai` |
+| Mistral Chat | Absent | `openai` |
 
 All adapters ignore unrelated provider keys. Native counts make network calls;
 check `model.countTokens` before using them. Offline `sdk.count(text)` estimates
@@ -129,3 +133,9 @@ one request shape and selects the fields accepted by its native counting endpoin
 Provider-only fields use `providerOptions.<format>.body`; Google's body contains
 `GenerateContentConfig` fields. See each provider page for protected request fields
 and endpoint limitations.
+
+Avoid sharing provider-specific bodies across fallback models unless every
+transport accepts those fields. In particular, `providerOptions.openai.body`
+also reaches the xAI, Groq, DeepSeek and Mistral Chat adapters; they ignore other
+provider keys. OpenAI-only fields can make a compatible provider reject a call.
+Use model-specific options or the common neutral options for mixed providers.

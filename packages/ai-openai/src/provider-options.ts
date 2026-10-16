@@ -15,11 +15,16 @@ const RESERVED_FIELDS = new Set([
   "conversation",
   "store",
   "include",
+  "functions",
+  "function_call",
+  "prompt",
+  "background",
 ]);
 
-export function resolveProviderBody(
+export function mergeProviderBody<T extends object>(
+  built: T,
   options: ModelCallOptions | undefined,
-): Record<string, unknown> {
+): T {
   const provider = options?.providerOptions?.openai as OpenAICallOptions | undefined;
   const body = provider?.body ?? {};
   const reserved = Object.keys(body).filter((key) => RESERVED_FIELDS.has(key));
@@ -29,5 +34,22 @@ export function resolveProviderBody(
       { context: { fields: reserved } },
     );
   }
-  return body;
+  const defaults = built as Record<string, unknown>;
+  const overrides = Object.fromEntries(
+    Object.entries(body).map(([key, value]) => {
+      const previous = defaults[key];
+      return [
+        key,
+        isPlainObject(previous) && isPlainObject(value) ? { ...previous, ...value } : value,
+      ];
+    }),
+  );
+  return { ...built, ...overrides };
+}
+
+/** Merge only plain objects; arrays, null and provider scalar values replace the field. */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== "object") return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
 }

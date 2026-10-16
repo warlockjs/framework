@@ -27,12 +27,16 @@ function setup(vertexai = false) {
 
 describe("Google provider options and native counts", () => {
   it("counts the same Vertex content, system and tools sent on completion, with cancellation", async () => {
-    const { model, generateContent, countTokens } = setup(true);
+    const { model, generateContent, countTokens, generateContentStream } = setup(true);
     const signal = new AbortController().signal;
     const options: ModelCallOptions = {
       tools,
       signal,
-      providerOptions: { google: { body: { topP: 0.8 } }, openai: { body: { messages: [] } } },
+      reasoning: { maxTokens: 2048 },
+      providerOptions: {
+        google: { body: { topP: 0.8, thinkingConfig: { includeThoughts: true } } },
+        openai: { body: { messages: [] } },
+      },
     };
     await model.complete(messages, options);
     expect(await model.countTokens(messages, options)).toBe(123);
@@ -50,6 +54,18 @@ describe("Google provider options and native counts", () => {
       },
     });
     expect(generated.config.topP).toBe(0.8);
+    expect(generated.config.thinkingConfig).toEqual({
+      thinkingBudget: 2048,
+      includeThoughts: true,
+    });
+    for await (const chunk of model.stream(messages, options)) void chunk;
+    expect(generateContentStream).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          thinkingConfig: { thinkingBudget: 2048, includeThoughts: true },
+        }),
+      }),
+    );
   });
 
   it("supports Developer API contents counting and explicitly rejects system/tools or cached references", async () => {
@@ -68,7 +84,7 @@ describe("Google provider options and native counts", () => {
   });
 
   it("checks the installed SDK Developer API restriction before any network request", async () => {
-    const sdk = new GoogleGenAI({ apiKey: "test" });
+    const sdk = new GoogleGenAI({ apiKey: "test", vertexai: false });
     const count = vi.spyOn(sdk.models, "countTokens");
     const model = new GoogleModel(sdk, { name: "gemini-2.5-flash" });
     await expect(model.countTokens(messages, { tools })).rejects.toThrow(InvalidRequestError);

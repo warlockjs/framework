@@ -116,3 +116,17 @@ Raw xAI / OpenAI-SDK errors are wrapped into the typed `@warlock.js/ai` `AIError
 - The `run-ai-agent` topic of the `warlock-js-ai` skill — passing the model into `ai.agent({...})`
 - The `pick-ai-provider` topic of the `warlock-js-ai` skill — adapter comparison
 ```
+
+## Provider body options and token estimates
+
+This adapter delegates Chat Completions to the OpenAI adapter, so
+`providerOptions.openai.body` adds native Chat request fields. Other provider
+keys are ignored. Plain-object fields merge one level deep with neutral options;
+caller-provided keys win, while arrays, scalars and `null` replace the field.
+The OpenAI adapter's protected conversation, tool and transport fields remain
+protected here too. Send only fields supported by this provider; do not reuse
+OpenAI-only bodies across a mixed-provider fallback chain.
+
+Models from this adapter have no native `countTokens` method. Check
+`model.countTokens` before using an optional native counting capability;
+`sdk.count(text)` is a separate offline estimate.

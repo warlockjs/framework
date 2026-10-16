@@ -36,29 +36,43 @@ describe("Bedrock provider options and native counts", () => {
     const signal = new AbortController().signal;
     const options = {
       signal,
+      reasoning: { maxTokens: 2048 },
+      temperature: 0.4,
+      maxTokens: 4096,
       tools: [{ name: "lookup", description: "Look up data", execute: async () => "ok" }],
-      providerOptions: { bedrock: { body: { additionalModelRequestFields: { top_k: 4 } } } },
+      providerOptions: {
+        bedrock: {
+          body: {
+            additionalModelRequestFields: { top_k: 4 },
+            inferenceConfig: { topP: 0.7, temperature: 0.8 },
+          },
+        },
+      },
     };
     await model.complete(messages, options);
     expect(await model.countTokens(messages, options)).toBe(321);
-    const request = (send.mock.calls[0]?.[0] as { input: Record<string, unknown> }).input;
-    expect(send.mock.calls[1]?.[0]).toBeInstanceOf(CountTokensCommand);
-    expect((send.mock.calls[1]?.[0] as CountTokensCommand).input).toEqual({
+    const request = (send.mock.calls[0]![0] as { input: Record<string, unknown> }).input;
+    expect(send.mock.calls[1]![0]).toBeInstanceOf(CountTokensCommand);
+    expect((send.mock.calls[1]![0] as CountTokensCommand).input).toEqual({
       modelId: model.name,
       input: {
         converse: {
           messages: request.messages,
           system: request.system,
           toolConfig: request.toolConfig,
-          additionalModelRequestFields: { top_k: 4 },
+          additionalModelRequestFields: {
+            top_k: 4,
+            thinking: { type: "enabled", budget_tokens: 2048 },
+          },
         },
       },
     });
     expect(send.mock.calls[1]?.[1]).toEqual({ abortSignal: signal });
+    expect(request.inferenceConfig).toEqual({ maxTokens: 4096, temperature: 0.8, topP: 0.7 });
     for await (const chunk of model.stream(messages, options)) void chunk;
     expect(
-      (send.mock.calls[2]?.[0] as ConverseStreamCommand).input.additionalModelRequestFields,
-    ).toEqual({ top_k: 4 });
+      (send.mock.calls[2]![0] as ConverseStreamCommand).input.additionalModelRequestFields,
+    ).toEqual({ top_k: 4, thinking: { type: "enabled", budget_tokens: 2048 } });
   });
 
   it("ignores other providers and refuses protected conversation fields", async () => {
