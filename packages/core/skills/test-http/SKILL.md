@@ -64,6 +64,19 @@ remain separate. Extra headers/signals use the normal helper options; a supplied
 Authorization header is replaced by the bound user's token. `client.dispose()`
 revokes only that token. Fixture owners clean up their own users and rows.
 
+## Generated notification specs
+
+Install test support before notifications (`warlock add test`, then
+`warlock add notifications`) to emit a shared fixture and signed-in `.spec.ts`
+cases for list/unread-count/mark-read/mark-all. They use the configured
+`auth.userType.user` model with `actingAs()` and a second recipient to check
+isolation. Run against a migrated test database; customize required user fields
+in `notifications/tests/notifications.fixture.ts`. Cleanup revokes the fixture's
+tokens and deletes only its rows/users.
+
+Existing Vitest configurations must include both test extensions:
+`include: ["src/app/**/*.{test,spec}.ts"]`.
+
 ## The bootstrap — `startHttpTestServer` / `stopHttpTestServer`
 
 ```ts
@@ -163,7 +176,7 @@ export default defineConfig({
     setupFiles: ["./src/test-setup.ts"], // ← setupTest + afterAll(teardownTest), per test file
     environment: "node",
     globals: false,
-    include: ["src/app/**/*.test.ts"],
+    include: ["src/app/**/*.{test,spec}.ts"],
   },
 });
 ```

@@ -683,27 +683,152 @@ export const notificationLocalesStub = `{
 }
 `;
 
-/**
- * A controller spec for the notifications module, written only when the app
- * has the test feature. It checks the one thing true in every app — the route
- * refuses a request with no signed-in user — and leaves the signed-in cases to
- * the app, which owns its login helper.
- */
+/** Shared fixtures for the generated signed-in notification controller specs. */
+export const notificationTestFixtureStub = `import type { Auth } from "@warlock.js/auth";
+import type { ChildModel } from "@warlock.js/cascade";
+import { config } from "@warlock.js/core";
+import { actingAs } from "@warlock.js/core/tests";
+import { randomUUID } from "node:crypto";
+import { Notification } from "../models/notification/notification.model";
+
+/** Isolated recipients and rows; adjust user fields if your auth model requires more. */
+export async function createNotificationTestFixture() {
+  const User = config.key<ChildModel<Auth>>("auth.userType.user");
+  if (!User) throw new Error("Notification specs need the configured auth.userType.user model.");
+
+  const createUser = () =>
+    User.create({
+      name: "Notification test user",
+      email: "notifications-" + randomUUID() + "@example.test",
+      password: "test-password",
+    });
+  const [user, otherUser] = await Promise.all([createUser(), createUser()]);
+  const [client, otherClient] = await Promise.all([actingAs(user), actingAs(otherUser)]);
+  const createNotification = (recipientId: string | number, title: string, readAt?: Date) =>
+    Notification.create({ user_id: recipientId, type: "test", title, read_at: readAt });
+  const [own, alreadyRead, foreign, otherUnread] = await Promise.all([
+    createNotification(user.id, "Own unread notification"),
+    createNotification(user.id, "Own read notification", new Date()),
+    createNotification(otherUser.id, "Other user's notification"),
+    createNotification(otherUser.id, "Other user's second notification"),
+  ]);
+
+  return {
+    user,
+    otherUser,
+    client,
+    otherClient,
+    own,
+    alreadyRead,
+    foreign,
+    async cleanup() {
+      await Promise.all([client.dispose(), otherClient.dispose()]);
+      await Promise.all(
+        [own, alreadyRead, foreign, otherUnread].map((row) =>
+          row.destroy({ strategy: "permanent" }),
+        ),
+      );
+      await Promise.all([user, otherUser].map((row) => row.destroy({ strategy: "permanent" })));
+    },
+  };
+}
+`;
+
+/** A spec for each generated controller, including authenticated recipient isolation. */
 export function notificationControllerSpecStub(method: "GET" | "PATCH", path: string): string {
   const helper = method === "GET" ? "testGet" : "testPatch";
+  let signedInCases: string;
+  if (path === "/notifications") {
+    signedInCases = `    it("lists only the signed-in recipient's rows, ignoring a forged recipient query", async () => {
+      const response = await fixture.client.get(
+        "/notifications?recipientId=" + fixture.otherUser.id,
+      );
+      const body = await expectJson<{ notifications: { id: string | number }[] }>(response);
+      expect(body.notifications.map((row) => row.id)).toEqual(
+        expect.arrayContaining([fixture.own.id, fixture.alreadyRead.id]),
+      );
+      expect(body.notifications).toHaveLength(2);
+    });
 
-  return `import { ${helper} } from "@warlock.js/core/tests";
-import { describe, expect, it } from "vitest";
+    it("applies unread and paging query filters", async () => {
+      const response = await fixture.client.get("/notifications?unread=true&limit=1");
+      const body = await expectJson<{ notifications: { id: string | number }[] }>(response);
+      expect(body.notifications.map((row) => row.id)).toEqual([fixture.own.id]);
+    });
+
+    it("rejects a list limit above the schema's cap", async () => {
+      expect((await fixture.client.get("/notifications?limit=999")).status).toBe(422);
+    });`;
+  } else if (path === "/notifications/unread-count") {
+    signedInCases = `    it("counts only this recipient's unread notifications", async () => {
+      const own = await expectJson<{ count: number }>(
+        await fixture.client.get("/notifications/unread-count"),
+      );
+      const other = await expectJson<{ count: number }>(
+        await fixture.otherClient.get("/notifications/unread-count"),
+      );
+      expect(own.count).toBe(1);
+      expect(other.count).toBe(2);
+    });`;
+  } else if (path === "/notifications/read-all") {
+    signedInCases = `    it("marks only this recipient's unread rows and leaves another recipient unchanged", async () => {
+      const body = await expectJson<{ count: number }>(
+        await fixture.client.patch("/notifications/read-all"),
+      );
+      expect(body.count).toBe(1);
+      expect((await Notification.find(fixture.own.id))?.isRead).toBe(true);
+      expect((await Notification.find(fixture.foreign.id))?.isRead).toBe(false);
+      const other = await expectJson<{ count: number }>(
+        await fixture.otherClient.get("/notifications/unread-count"),
+      );
+      expect(other.count).toBe(2);
+      const again = await expectJson<{ count: number }>(
+        await fixture.client.patch("/notifications/read-all"),
+      );
+      expect(again.count).toBe(0);
+    });`;
+  } else {
+    signedInCases = `    it("marks its own notification read and returns it", async () => {
+      const response = await fixture.client.patch("/notifications/" + fixture.own.id + "/read");
+      const body = await expectJson<{
+        notification: { id: string | number; readAt?: string | null };
+      }>(response);
+      expect(body.notification.id).toBe(fixture.own.id);
+      expect(body.notification.readAt).toBeTruthy();
+      expect((await Notification.find(fixture.own.id))?.isRead).toBe(true);
+    });
+
+    it("answers 404 for another recipient's notification without changing it", async () => {
+      const response = await fixture.client.patch("/notifications/" + fixture.foreign.id + "/read");
+      expect(response.status).toBe(404);
+      expect((await Notification.find(fixture.foreign.id))?.isRead).toBe(false);
+    });`;
+  }
+  const modelImport =
+    method === "PATCH"
+      ? 'import { Notification } from "../models/notification/notification.model";\n'
+      : "";
+  return `import { expectJson, ${helper} } from "@warlock.js/core/tests";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+${modelImport}import { createNotificationTestFixture } from "../tests/notifications.fixture";
 
 describe("${method} ${path}", () => {
   it("answers 401 without a signed-in user", async () => {
     const response = await ${helper}("${path}");
-
     expect(response.status).toBe(401);
   });
 
-  // Add the signed-in cases with your app's login helper, including that
-  // another user's notifications are never returned or changed.
+  describe("signed in", () => {
+    let fixture: Awaited<ReturnType<typeof createNotificationTestFixture>>;
+    beforeEach(async () => {
+      fixture = await createNotificationTestFixture();
+    });
+    afterEach(async () => {
+      await fixture?.cleanup();
+    });
+
+${signedInCases}
+  });
 });
 `;
 }

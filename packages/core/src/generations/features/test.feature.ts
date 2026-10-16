@@ -91,7 +91,7 @@ export default defineConfig({
     setupFiles: ["./src/test-setup.ts"],       // DB/cache - runs per test file
     environment: "node",
     globals: false,
-    include: ["src/app/**/*.test.ts"],
+    include: ["src/app/**/*.{test,spec}.ts"],
   },
 });
 `,

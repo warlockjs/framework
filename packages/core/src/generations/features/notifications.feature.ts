@@ -16,6 +16,7 @@ import {
   markNotificationReadControllerStub,
   markNotificationReadServiceStub,
   notificationControllerSpecStub,
+  notificationTestFixtureStub,
   notificationLocalesStub,
   notificationMigrationStub,
   notificationModelStub,
@@ -220,6 +221,9 @@ async function completeNotificationsInstallation(_options: CommandActionData) {
   // 3. HTTP surface — list, unread count, mark read, mark all read, one
   //    controller per file, gated by authMiddleware in routes.ts.
   const withSpecs = await fileExistsAsync(srcPath("test-setup.ts"));
+  if (withSpecs) {
+    await writeModuleFile("tests/notifications.fixture.ts", notificationTestFixtureStub, skipped);
+  }
 
   for (const controller of notificationControllers) {
     await writeModuleFile(`controllers/${controller.file}.ts`, controller.stub, skipped);

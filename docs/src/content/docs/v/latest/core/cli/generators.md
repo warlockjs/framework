@@ -258,6 +258,24 @@ The setup typically installs the npm package, registers commands in `warlock.con
 
 Use this for major feature packages from the `@warlock.js/*` ecosystem. For project-local code, the `generate.*` family is what you want.
 
+## Notification controller specs
+
+Run `warlock add test` before `warlock add notifications` to generate controller
+specs and a shared `notifications/tests/notifications.fixture.ts`. The specs keep
+anonymous 401 checks and exercise signed-in listing, unread counts, marking one
+row and marking all unread rows. A second recipient verifies that requests cannot
+read or modify another user's notifications, including a forged recipient query.
+
+The fixture uses the configured `auth.userType.user` model and `actingAs(user)`
+from `@warlock.js/core/tests`, which issues real credentials and leaves auth
+middleware active. Run against a migrated test database, and adjust the fixture's
+name/email/password fields if your user model needs more. Each test revokes its
+own tokens and permanently deletes only the rows and users it created.
+
+Generated specs use `.spec.ts`. New test setup includes both `.test.ts` and
+`.spec.ts`; existing apps should set Vitest's `include` to
+`["src/app/**/*.{test,spec}.ts"]` before running these specs.
+
 ## Where the generators differ from the rest
 
 Two conventions worth pulling out:

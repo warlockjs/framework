@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Notification scaffolds with test support emit real signed-in controller specs and isolated two-recipient fixtures for listing, unread counts, marking one/all read, query validation and ownership checks. Fixtures use the configured auth model and revoke/delete only their own credentials and rows.
+
 - `actingAs(user)` at `@warlock.js/core/tests` issues a real persisted access token and returns isolated authenticated HTTP helpers. Middleware remains active; `client.dispose()` revokes only its token.
 
 - Optional Oxlint background file checks during development. Install Oxlint in the app and add `.oxlintrc.json`, `.oxlintrc.jsonc`, `oxlint.config.ts` or `oxlint.config.mts`; changed files are linted in sequential batches in a worker and JSON diagnostics appear with rule, location and severity. Large boot scans stay within platform command-line limits, tool/config failures include actionable CLI output, and results omit source contents. Both configured ESLint and Oxlint run by default; ESLint still needs only its app configuration and uses core's own dependency. `devServer.healthCheckers` also accepts `{ typescript?, eslint?, oxlint? }` switches while preserving custom arrays and `false`.
@@ -32,6 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Framework HTTP/2 servers start with default shutdown options and track sessions even without HTTP/1 idle-connection support. Graceful HTTP/2 drains close sessions after active streams finish without setting forbidden connection headers. SSE and stream helpers omit HTTP/1 framing headers on HTTP/2.
 
 - Both sse() and stream() ignore caller Content-Length, Transfer-Encoding, Content-Type, Connection, Keep-Alive, Proxy-Connection and Upgrade option headers. HTTP/1.1 retains chunked framing and reusable connections; HTTP/1.0 remains close-delimited without Transfer-Encoding.
+- Generated Vitest configuration discovers both `.test.ts` and `.spec.ts`, including notification controller specs. Existing apps should use `include: ["src/app/**/*.{test,spec}.ts"]`.
 
 - Source health-check workers start on Node.js 22.15 through a JavaScript bootstrap and tsx's import API; passing a `.ts` entry directly to a worker could fail before its loader hook ran. Published `.mjs` workers keep their direct startup path.
 

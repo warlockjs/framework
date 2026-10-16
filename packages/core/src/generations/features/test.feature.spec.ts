@@ -29,3 +29,11 @@ describe("add test — generated src/test-setup.ts", () => {
     expect(setupFile?.[1]).toContain("await setupTest({ importModule: (file) => import(file) });");
   });
 });
+
+describe("add test — spec discovery", () => {
+  it("includes generated spec files alongside test files", async () => {
+    await testFeature.onExecuting?.({} as never);
+    const viteConfig = [...written.entries()].find(([path]) => /vite\.config\.ts$/.test(path));
+    expect(viteConfig?.[1]).toContain('include: ["src/app/**/*.{test,spec}.ts"]');
+  });
+});

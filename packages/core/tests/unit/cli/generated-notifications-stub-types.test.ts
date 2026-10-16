@@ -9,6 +9,9 @@ import {
   markNotificationReadControllerStub,
   markNotificationReadServiceStub,
   notificationResourceStub,
+  notificationModelStub,
+  notificationTestFixtureStub,
+  notificationControllerSpecStub,
   notificationsRequestTypeStub,
   unreadNotificationsCountControllerStub,
 } from "../../../src/generations/stubs";
@@ -56,6 +59,16 @@ const TSCONFIG_TYPECHECK_PATH = path.join(CORE_DIR, "tsconfig.typecheck.json");
 const MODULE_DIR = `${CORE_DIR}/__generated-notifications-stub-types-test__/notifications`;
 
 const GENERATED_FILES: Record<string, string> = {
+  [`${MODULE_DIR}/models/notification/notification.model.ts`]: notificationModelStub,
+  [`${MODULE_DIR}/tests/notifications.fixture.ts`]: notificationTestFixtureStub,
+  [`${MODULE_DIR}/controllers/list-notifications.controller.spec.ts`]:
+    notificationControllerSpecStub("GET", "/notifications"),
+  [`${MODULE_DIR}/controllers/unread-notifications-count.controller.spec.ts`]:
+    notificationControllerSpecStub("GET", "/notifications/unread-count"),
+  [`${MODULE_DIR}/controllers/mark-notification-read.controller.spec.ts`]:
+    notificationControllerSpecStub("PATCH", "/notifications/1/read"),
+  [`${MODULE_DIR}/controllers/mark-all-notifications-read.controller.spec.ts`]:
+    notificationControllerSpecStub("PATCH", "/notifications/read-all"),
   [`${MODULE_DIR}/types/notifications-request.type.ts`]: notificationsRequestTypeStub,
   [`${MODULE_DIR}/schema/list-notifications.schema.ts`]: listNotificationsSchemaStub,
   [`${MODULE_DIR}/resources/notification.resource.ts`]: notificationResourceStub,
@@ -97,7 +110,10 @@ function loadTypecheckCompilerOptions(): ts.CompilerOptions {
 
   const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, CORE_DIR);
 
-  return parsed.options;
+  return {
+    ...parsed.options,
+    paths: { ...parsed.options.paths, "@warlock.js/core/tests": ["./src/tests/index.ts"] },
+  };
 }
 
 /**
@@ -144,7 +160,12 @@ function compileVirtualFiles(files: Record<string, string>): Record<string, stri
       );
     }
 
-    return originalGetSourceFile(fileName, languageVersionOrOptions, onError, shouldCreateNewSourceFile);
+    return originalGetSourceFile(
+      fileName,
+      languageVersionOrOptions,
+      onError,
+      shouldCreateNewSourceFile,
+    );
   };
 
   const program = ts.createProgram({ rootNames: [...virtualPaths], options, host });
@@ -164,34 +185,17 @@ function compileVirtualFiles(files: Record<string, string>): Record<string, stri
 }
 
 describe("the generated notifications module type-checks against the real @warlock.js/core + @warlock.js/notifications declarations", () => {
-  it(
-    "compiles clean, and RED-CONTROL fails a plain RequestHandler reading locals.user.id",
-    () => {
-      const results = compileVirtualFiles({
-        ...GENERATED_FILES,
-        [BROKEN_STUB_FILE]: BROKEN_SNIPPET,
-      });
+  // The transitive source graph is deliberately compiled once, including a
+  // negative control. Leave enough time for a busy CI worker.
+  it("compiles the module and authenticated specs, while rejecting unguarded user access", () => {
+    const results = compileVirtualFiles({
+      ...GENERATED_FILES,
+      [BROKEN_STUB_FILE]: BROKEN_SNIPPET,
+    });
 
-      // Every generated file, as it actually ships, has zero compile errors
-      // against the real declarations.
-      for (const file of Object.keys(GENERATED_FILES)) {
-        expect({ file, errors: results[file] }).toEqual({ file, errors: [] });
-      }
-
-      // RED CONTROL: without the guarded request type, `locals.user` is not
-      // known to carry an id, so the compiler refuses the read.
-      expect(results[BROKEN_STUB_FILE]?.length).toBeGreaterThan(0);
-    },
-    // Building the ~3000-file @warlock.js/* transitive graph from source is
-    // genuinely slow (see the file-level doc comment) — this is the one
-    // spec in the suite allowed a timeout this large, and it exists exactly
-    // so that allowance is justified. Re-measured 2026-09-16 running core's
-    // full `test` script back-to-back (competing with ~2300 other tests for
-    // CPU): this case timed out at the previous 120_000ms bound, having
-    // taken ~142s wall under that load versus ~75-80s when the suite is
-    // otherwise idle. Raised well clear of the measured worst case rather
-    // than nudged just above it, for the same reason
-    // `add-command-process-exit.test.ts` documents for its own bound.
-    240_000,
-  );
+    for (const file of Object.keys(GENERATED_FILES)) {
+      expect({ file, errors: results[file] }).toEqual({ file, errors: [] });
+    }
+    expect(results[BROKEN_STUB_FILE]?.length).toBeGreaterThan(0);
+  }, 240_000);
 });

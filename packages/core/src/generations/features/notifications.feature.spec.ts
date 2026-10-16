@@ -98,6 +98,10 @@ describe("warlock add notifications", () => {
 
     expect(listSpec).toContain('await testGet("/notifications")');
     expect(listSpec).toContain("expect(response.status).toBe(401)");
+    expect(listSpec).toContain("lists only the signed-in recipient");
+    expect(
+      written.get(normalize(srcPath("app/notifications/tests/notifications.fixture.ts"))),
+    ).toContain("actingAs(user)");
   });
 
   it("skips an app scaffolded by 5.29 or earlier, whose model sits at the module root", async () => {
