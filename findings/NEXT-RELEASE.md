@@ -12,7 +12,12 @@ comments and test names: describe the change itself.
   skills that state the minimum, and the comment in `.github/workflows/create-warlock.yml` about
   Node 22.13. Then check whether the published CLI reaches `registerHooks` on any path, and make it fail
   with a clear "requires Node 22.15" message instead of `registerHooks is not a function`.
-  (If this file is read after the bump already landed, verify and tick it off.)
+  **Done on `main` (unreleased, `## 5.31.0` in the core and create-warlock CHANGELOGs):** `engines` in the
+  root, core and create-warlock; create-warlock's startup check (it accepted Node 20); the template
+  README. **Still open:** the `warlock` CLI's own clear error on older Node, and docs pages that state a
+  minimum. Node 22.15.0 is installed on the dev server through nvm (globals and corepack shims
+  included); nvm's default is still 22.13.0 so pm2-run apps are unaffected; switch it with
+  `nvm alias default 22.15.0` when ready.
 - **create-warlock "project is ready" box breaks with many features.** With custom mode and every
   feature selected, the `Features:` line is wider than the box, wraps, and the double border renders
   as two misaligned frames. Wrap the feature list inside the box at the terminal width (`process.stdout.columns`),

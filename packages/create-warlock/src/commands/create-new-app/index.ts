@@ -58,10 +58,12 @@ export default async function createNewApp(cli: CliFlags = {}) {
 
   console.log(colors.cyan("Let's create something magical! \n"));
 
-  // Validate Node.js version (minimum v20)
-  const [major] = process.versions.node.split(".").map(Number);
-  if (major < 20) {
-    cancel("Node.js version must be at least 20.0.0");
+  // Validate Node.js version (minimum 22.15: the warlock CLI uses module.registerHooks)
+  const [major = 0, minor = 0] = process.versions.node.split(".").map(Number);
+  if (major < 22 || (major === 22 && minor < 15)) {
+    cancel(
+      `Node.js 22.15.0 or newer is required (found ${process.versions.node}).`,
+    );
     process.exit(0);
   }
 

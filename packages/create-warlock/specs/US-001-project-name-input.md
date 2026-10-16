@@ -25,7 +25,7 @@
 ```
 - Trim whitespace from input
 - Reject empty input with error: "Application name is required to create a new app"
-- Node.js version < 20: "Node.js version must be at least 20.0.0"
+- Node.js version < 22.15: "Node.js 22.15.0 or newer is required (found <version>)."
 ```
 
 ### Files Modified

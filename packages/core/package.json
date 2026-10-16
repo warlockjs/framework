@@ -135,6 +135,9 @@
   ],
   "author": "hassanzohdy",
   "license": "MIT",
+  "engines": {
+    "node": ">=22.15"
+  },
   "module": "./src/index.ts",
   "typings": "./src/index.ts",
   "type": "module",

@@ -7,7 +7,7 @@ Full documentation: [warlock.js.org](https://warlock.js.org).
 
 ## Requirements
 
-- Node.js **22.13** or newer
+- Node.js **22.15** or newer
 - The database you picked when scaffolding (MongoDB or PostgreSQL), running and
   reachable with the settings in `.env` — skip this if you scaffolded with no
   database

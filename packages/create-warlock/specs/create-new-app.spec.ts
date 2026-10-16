@@ -201,13 +201,13 @@ describe("createNewApp — preamble guards", () => {
     expect(showIntroBanner).toHaveBeenCalledWith("9.9.9");
   });
 
-  it("refuses to run on Node older than 20 and exits 0", async () => {
+  it("refuses to run on Node older than 22.15 and exits 0", async () => {
     const descriptor = Object.getOwnPropertyDescriptor(
       process.versions,
       "node",
     );
     Object.defineProperty(process.versions, "node", {
-      value: "18.20.0",
+      value: "22.14.0",
       configurable: true,
     });
 
@@ -216,7 +216,7 @@ describe("createNewApp — preamble guards", () => {
         ProcessExit,
       );
       expect(cancel).toHaveBeenCalledWith(
-        "Node.js version must be at least 20.0.0",
+        "Node.js 22.15.0 or newer is required (found 22.14.0).",
       );
       // The guard precedes the non-interactive branch, so nothing is built.
       expect(createWarlockApp).not.toHaveBeenCalled();
