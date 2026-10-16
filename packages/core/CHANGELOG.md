@@ -27,7 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Graceful HTTP/2 drains close sessions after active streams finish without setting forbidden connection headers. SSE and stream helpers omit HTTP/1 framing headers on HTTP/2.
 
-- SSE retains chunked HTTP/1 framing and reusable connections after filtering caller protocol headers.
+- Both sse() and stream() ignore caller Content-Length, Transfer-Encoding, Content-Type, Connection, Keep-Alive, Proxy-Connection and Upgrade option headers. HTTP/1.1 retains chunked framing and reusable connections; HTTP/1.0 remains close-delimited without Transfer-Encoding.
 
 - Source health-check workers start on Node.js 22.15 through a JavaScript bootstrap and tsx's import API; passing a `.ts` entry directly to a worker could fail before its loader hook ran. Published `.mjs` workers keep their direct startup path.
 

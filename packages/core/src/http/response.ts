@@ -690,7 +690,7 @@ export class Response {
     this.applyStreamHeaders(options.headers);
     this.removeHeader("Content-Length");
     this.setContentType(contentType);
-    if (this.baseResponse.raw.req.httpVersionMajor !== 2) {
+    if (this.isHttp11()) {
       this.header("Transfer-Encoding", "chunked");
     }
     this.header("X-Content-Type-Options", "nosniff");
@@ -941,7 +941,7 @@ export class Response {
     this.header("Cache-Control", "no-cache, no-store, must-revalidate");
     this.applyStreamHeaders(options.headers);
     this.removeHeader("Content-Length");
-    if (this.baseResponse.raw.req.httpVersionMajor !== 2) {
+    if (this.isHttp11()) {
       this.header("Transfer-Encoding", "chunked");
     }
     this.setContentType("text/event-stream");
@@ -1185,6 +1185,11 @@ export class Response {
     return this.baseResponse.elapsedTime;
   }
 
+  protected isHttp11(): boolean {
+    const request = this.baseResponse.raw.req;
+    return request.httpVersionMajor === 1 && request.httpVersionMinor >= 1;
+  }
+
   /** Apply cache/application overrides without letting callers change framing. */
   protected applyStreamHeaders(headers: Record<string, string> = {}) {
     const protectedHeaders = new Set([
@@ -1210,7 +1215,7 @@ export class Response {
    * and hold the server's `close()` until the shutdown budget runs out.
    */
   protected keepLongLivedConnectionAlive() {
-    if (this.baseResponse.raw.req.httpVersionMajor === 2) {
+    if (!this.isHttp11()) {
       for (const name of ["connection", "keep-alive", "proxy-connection", "upgrade", "transfer-encoding"]) {
         this.removeHeader(name);
       }

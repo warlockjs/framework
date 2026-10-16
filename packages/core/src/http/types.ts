@@ -495,7 +495,7 @@ export interface HttpConfigurations {
  * Options for `response.stream()`.
  */
 export type ResponseStreamOptions = StreamQueueOptions & {
-  /** Caller headers applied before headers are flushed, overriding stream defaults. */
+  /** Application/cache headers override defaults before flushing; framing and connection headers are ignored. */
   headers?: Record<string, string>;
   /**
    * How many of the most recent chunks (from `send()`, `write()` and
@@ -564,7 +564,7 @@ export type ResponseStreamController = {
  * Options for `response.sse()`.
  */
 export type ResponseSSEOptions = StreamQueueOptions & {
-  /** Caller headers applied before headers are flushed, overriding SSE defaults. */
+  /** Application/cache headers override defaults before flushing; framing and connection headers are ignored. */
   headers?: Record<string, string>;
   /**
    * How many of the most recent events to keep on `response.body` after

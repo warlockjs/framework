@@ -338,7 +338,7 @@ Both `sse({ headers })` and `stream(contentType, { headers })` apply caller head
 before flushing. Cache-Control keeps the safe stream default unless explicitly
 set in options.headers; a pre-existing global cache header does not override it.
 Caller protocol headers are filtered case-insensitively before applying overrides.
-Both helpers use chunked HTTP/1 framing, set their own content type, and preserve
+Both helpers use chunked HTTP/1.1 framing, set their own content type, and preserve
 Connection: close during graceful drain. Content-Length cannot override framing.
 
 Use synchronous `enqueue()` for event-bus producers. It returns false when closed
@@ -361,9 +361,8 @@ then have their idle connections reaped. A hand-written hijacked writer that set
 its own Connection header must preserve close during drain rather than overwrite
 it with keep-alive. Headers already on the wire cannot be changed.
 
-Caller framing and connection headers are filtered before applying overrides; SSE and streams retain chunked HTTP/1 framing and drain Connection: close.
 
 On HTTP/2, SSE and stream helpers omit connection-specific and Transfer-Encoding
 headers. Graceful drain sends GOAWAY and closes sessions once active streams finish;
-HTTP/1 keeps its existing Connection: close behavior. The shutdown timeout still
+HTTP/1.1 keeps its existing Connection: close behavior. HTTP/1.0 uses close-delimited responses without Transfer-Encoding. The shutdown timeout still
 bounds a stream that never finishes.
