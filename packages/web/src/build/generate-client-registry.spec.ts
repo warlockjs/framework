@@ -273,7 +273,7 @@ describe("generateClientRegistry", () => {
 
     expect(contents.startsWith("//")).toBe(true);
     expect(contents.toLowerCase()).toMatch(/do not edit/);
-    expect(contents.toLowerCase()).not.toMatch(/bureau|worker|room|@[a-z]+ said/);
+    expect(contents.toLowerCase()).not.toMatch(/private-fixture|worker|room|@[a-z]+ said/);
     await expect(evaluate(contents)).resolves.toHaveLength(1);
   });
 

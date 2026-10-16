@@ -17,6 +17,7 @@
     "test": "pnpm --recursive --filter \"./packages/**\" --workspace-concurrency=1 --no-bail run test",
     "docs:dev": "pnpm --filter @warlock.js/docs dev",
     "docs:build": "pnpm --filter @warlock.js/docs build",
+    "check:public-text": "node scripts/check-public-text.mjs",
     "check:spec-coverage": "node scripts/check-spec-coverage.mjs",
     "ci:affected": "node scripts/ci/affected-packages.mjs",
     "release:version": "node scripts/release/set-version.mjs",

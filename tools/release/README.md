@@ -14,7 +14,7 @@ pnpm workspace.
 Releases run in GitHub Actions on this repository
 (`.github/workflows/release.yml`, dispatched with a version and `publish`):
 
-1. **gate** — strictness ratchet, every member's typecheck and tests, a clean
+1. **gate** — public-text check, strictness ratchet, every member's typecheck and tests, a clean
    tree per member directory, pkgist build, ONE release commit for the family,
    pack, local-registry install, generator matrix at the stated scope.
 2. **publish** — every tarball to npm, re-hashed immediately before each publish.

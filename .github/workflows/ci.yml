@@ -82,6 +82,9 @@ jobs:
       - name: Every spec file is reachable by its package's vitest config
         run: node scripts/check-spec-coverage.mjs
 
+      - name: Public text contains no private references
+        run: pnpm run check:public-text
+
       - name: Workspace script tests
         run: pnpm run test:scripts
 

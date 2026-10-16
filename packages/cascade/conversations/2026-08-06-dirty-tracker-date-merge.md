@@ -8,7 +8,7 @@ status: fixed, staged as 4.9.1, working-tree only
 # Dirty-tracker Date-merge bug
 
 Source report: `@warlock.js/plans/2026-08-06-cascade-dirty-tracker-date-merge-bug.md`
-(TeamsUp; @Girder runtime, @Quill source, @Indigo build confirmation).
+(consumer app; @Girder runtime, @Quill source, @Indigo build confirmation).
 
 ## Verification — report is correct
 

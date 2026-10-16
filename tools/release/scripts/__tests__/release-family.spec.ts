@@ -2783,3 +2783,21 @@ describe("physical Core proof", () => {
     );
   });
 });
+
+describe("public text release gate", () => {
+  it("refuses private references before building any artifacts", async () => {
+    const control = fixture();
+    const original = control.dependencies.runCommand!;
+    control.dependencies.runCommand = async (request) => {
+      if (request.args.some((arg) => arg.endsWith("scripts/check-public-text.mjs"))) {
+        throw new Error("Private references in public text");
+      }
+      return original(request);
+    };
+    await assert.rejects(
+      runReleaseFamily({ mode: "gate", version: VERSION, ...FULL_MATRIX }, control.dependencies),
+      /Private references in public text/,
+    );
+    assert.ok(!control.commands.some((request) => request.args.includes("build")));
+  });
+});

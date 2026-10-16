@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DatabaseDirtyTracker } from "../../src/database-dirty-tracker";
 
 /**
- * Regression cover for the merge bug reported from TeamsUp on 2026-08-06
+ * Regression cover for the merge bug reported from consumer app on 2026-08-06
  * (`plans/2026-08-06-cascade-dirty-tracker-date-merge-bug.md`).
  *
  * `mergeIntoRaw` treated anything with `typeof value === "object"` as a

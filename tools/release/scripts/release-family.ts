@@ -484,6 +484,13 @@ async function prepareAndGate(
   // and running it after 28 builds would waste the whole build for a defect
   // this could have caught first. OVER allowance or UNMEASURED refuses the
   // gate outright, with no handoff, same as every other refusal below.
+  await runtime.runCommand({
+    command: process.execPath,
+    args: [path.join(REPO_ROOT, "scripts/check-public-text.mjs")],
+    cwd: REPO_ROOT,
+    env: process.env,
+  });
+
   const strictness = await runStrictnessRatchet(options.skipStrictness, runtime);
 
   // Typecheck the whole family before deciding whether to reuse artifacts or

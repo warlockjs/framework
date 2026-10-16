@@ -4,7 +4,7 @@ import { SQLGrammar } from "../../../src/migration/sql-grammar";
 import type { TaggedSQL } from "../../../src/migration/types";
 
 /**
- * Regression cover for the migration ordering bug reported from TeamsUp on
+ * Regression cover for the migration ordering bug reported from consumer app on
  * 2026-08-05 (`plans/2026-08-05-cascade-migration-sort-order-bug.md`).
  *
  * `SQLGrammar.sort` parsed `createdAt` with `new Date()`, which cannot read
@@ -113,7 +113,7 @@ describe("SQLGrammar.sort", () => {
     expect(order(statements)).toEqual(["a-newer-create", "z-older-alter"]);
   });
 
-  it("orders the TeamsUp otps collision correctly", () => {
+  it("orders the consumer app otps collision correctly", () => {
     // The create migration adds the FK constraint; the cascade migration drops
     // and re-adds it. Running the cascade first made the create fail with
     // "already exists".

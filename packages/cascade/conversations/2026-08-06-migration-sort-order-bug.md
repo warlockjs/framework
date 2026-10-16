@@ -7,7 +7,7 @@ status: fixed, awaiting review
 
 # Cascade migration sort-order bug
 
-Source report: `@warlock.js/plans/2026-08-05-cascade-migration-sort-order-bug.md` (from TeamsUp,
+Source report: `@warlock.js/plans/2026-08-05-cascade-migration-sort-order-bug.md` (from consumer app,
 found by @Vault, verified by @Indigo against the installed `esm/` build).
 
 ## Verification — the report is correct
