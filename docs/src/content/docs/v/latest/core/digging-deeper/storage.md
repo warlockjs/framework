@@ -661,9 +661,87 @@ Then anywhere you have an `Upload`, you can `upload.storageFile().contents()`, `
 - **[Image processing](./image-processing.md)** — the `Image` class for transforms before saving.
 - **[Recipe: Upload to S3](../recipes/upload-to-s3.md)** — end-to-end cloud upload flow.
 
-### Object-storage variants on a non-default disk
+## End-to-end: variants on a non-default disk
 
 S3, R2 and Spaces sources can use the same variants through their storage driver. Derivatives remain on the application's writable local filesystem: the default cache is `<app>/storage/.cache/image-variants`, or set `uploads.images.cacheDirectory` explicitly outside `public/`.
+
+Configure an explicit public image disk while keeping ordinary uploads local:
+
+```ts title="src/config/storage.ts"
+import { env, storageConfigurations, storagePath, type StorageConfigurations } from "@warlock.js/core";
+
+export default {
+  default: "local",
+  drivers: {
+    local: storageConfigurations.local({ root: storagePath("uploads"), urlPrefix: "/uploads" }),
+    media: storageConfigurations.r2({
+      accountId: env("R2_ACCOUNT_ID"),
+      accessKeyId: env("R2_ACCESS_KEY_ID"),
+      secretAccessKey: env("R2_SECRET_ACCESS_KEY"),
+      bucket: env("R2_BUCKET"),
+      publicDomain: env("R2_PUBLIC_DOMAIN"),
+      prefix: "catalog",
+    }),
+  },
+} satisfies StorageConfigurations;
+```
+
+Set those environment values and make the `catalog` prefix publicly readable
+through your CDN. For private images, use an authenticated route and signed
+original URLs instead. Configure the variant and a writable cache outside every
+upload root:
+
+```ts title="src/config/uploads.ts"
+import type { UploadsConfigurations } from "@warlock.js/core";
+
+export default {
+  images: {
+    variants: { thumb: { width: 320, height: 240, fit: "cover" } },
+    formats: ["webp"],
+    cacheDirectory: "/var/cache/shop/image-variants",
+    maxCacheBytes: 512 * 1024 * 1024,
+    maxCacheAge: 7 * 24 * 60 * 60,
+  },
+} satisfies UploadsConfigurations;
+```
+
+Mount the route in a discovered app routes file. This route serves only the
+explicit `media` disk, regardless of the default disk:
+
+```ts title="src/app/catalog/routes.ts"
+import { createUploadedFileController, router } from "@warlock.js/core";
+
+router.get("/catalog-images/*", createUploadedFileController({ disk: "media" }));
+```
+
+After app boot, store a known JPEG and generate its descriptor in your ingest
+service or command. The key is relative to the configured `catalog` prefix:
+
+```ts title="src/app/catalog/services/import-image.ts"
+import { readFile } from "node:fs/promises";
+import { generateImageVariants, storage } from "@warlock.js/core";
+
+export async function importImage() {
+  await storage.use("media").put(await readFile("photo.jpg"), "products/photo.jpg");
+  return generateImageVariants("products/photo.jpg", {
+    disk: "media",
+    variants: ["thumb"],
+    urlPrefix: "/catalog-images",
+  });
+}
+```
+
+The original URL comes from R2/CDN; the derivative is served by the app at
+`/catalog-images/products/photo.jpg?variant=thumb&format=webp`. Fetch it with
+`curl -I 'http://localhost:3000/catalog-images/products/photo.jpg?variant=thumb&format=webp'`;
+expect an image content type. Each app instance has its own bounded derivative
+cache. A hit checks remote metadata without downloading an ETag-versioned source;
+cache housekeeping is eventual and runs off the response path. Reusing a storage
+key invalidates its generation when the metadata changes. Purge the old local
+cache explicitly after remote deletion or moves when immediate cleanup matters.
+
+The shorter API example below uses a disk named `r2`; use `media` with the complete
+configuration above:
 
 ```ts
 import { createUploadedFileController, generateImageVariants } from "@warlock.js/core";

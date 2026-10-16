@@ -44,6 +44,64 @@ Use `redis` (any version from 6) or `pg` across servers, or a memory driver for 
 
 `http.rateLimit` also passes [`@fastify/rate-limit`](https://github.com/fastify/fastify-rate-limit) options through. Its own `redis` option still works but needs an **ioredis** client; the `redis` driver of `@warlock.js/cache` uses node-redis, so share that connection through `store: "cache"`. A `@fastify/rate-limit` store class can be passed as `store` too. `enabled: false` turns the global limiter off.
 
+### End-to-end: one Redis window across two servers
+
+Install the app's Redis driver dependency with `npm install redis`. Use the same
+Redis database and application prefix on every instance; different apps should
+have different prefixes. Declare the driver in `src/config/cache.ts`:
+
+```ts title="src/config/cache.ts"
+import { RedisCacheDriver, type CacheConfigurations } from "@warlock.js/cache";
+import { env } from "@warlock.js/core";
+
+export default {
+  default: "redis",
+  drivers: { redis: RedisCacheDriver },
+  options: {
+    redis: {
+      url: env("REDIS_URL"),
+      globalPrefix: "shop.production",
+      ttl: 0,
+    },
+  },
+} satisfies CacheConfigurations;
+```
+
+Keep `REDIS_URL` identical on both servers and enable the shared store:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+export default {
+  rateLimit: { max: 2, duration: 60_000, store: "cache", skipOnError: false },
+} satisfies HttpConfigurations;
+```
+
+Add an app route:
+
+```ts title="src/app/catalog/routes.ts"
+import { router } from "@warlock.js/core";
+
+router.get("/catalog/ping", ({ response }) => response.success({ ok: true }));
+```
+
+Run the same app on ports 3000 and 3001 with the same Redis configuration. From
+one client, within one clock-aligned window, request server A once, server B once,
+then server A again. The first two return 200 and the third returns 429 with
+`Retry-After` and rate-limit headers. Counters reset on the next minute boundary;
+repeat away from that boundary for a deterministic manual check. Behind a proxy,
+configure `http.trustProxy` for your actual proxy addresses so both instances see
+the same client IP. Avoid unrelated requests from that IP during the check because
+the global bucket is shared across routes.
+
+Atomic increments pass TTL on every call, even though this driver has no default
+TTL. An existing counter's deadline stays fixed; recreating an expired counter
+restores its expiry. This example explicitly chooses `skipOnError: false`: an
+unavailable cache yields an error instead of allowing uncounted traffic. Omit it
+for the documented fail-open default. Memory and file drivers do not provide
+cross-server counting. Cache integration CI tests exercise two independent Redis
+clients and real expiry recreation.
+
 ## Sockets
 
 ```ts

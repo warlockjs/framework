@@ -458,3 +458,6 @@ Don't try to do everything in one layer. The global IP limit catches scrapers; p
 - **Writing middleware in general:** [Middleware guide](../the-basics/middleware.md)
 - **Response helpers and headers:** [HTTP response guide](../the-basics/http-response.md)
 - **Localizing error messages and translations:** [Localized responses recipe](./localized-responses.md)
+
+For a complete Redis driver, HTTP configuration and two-server verification, see
+[the shared window example](../digging-deeper/multiple-servers.md#end-to-end-one-redis-window-across-two-servers).
