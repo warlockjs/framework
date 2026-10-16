@@ -1,6 +1,9 @@
+import { createHash, createHmac } from "node:crypto";
 import { cache } from "@warlock.js/cache";
 import { t, type Middleware, type Request, type Response } from "@warlock.js/core";
 import { log } from "@warlock.js/logger";
+import ms from "ms";
+import { authConfig } from "../services/auth-config";
 import { AuthErrorCodes } from "../utils/auth-error-codes";
 
 /**
@@ -92,6 +95,107 @@ const counterKey = (identifier: string): string => `${COUNTER_PREFIX}${identifie
 const lockKey = (identifier: string): string => `${LOCK_PREFIX}${identifier}`;
 
 /**
+ * The key a throttle identifier is hashed with: an HMAC key derived from
+ * `auth.accessToken.secret` (the same root the OTP code MAC uses), or
+ * `undefined` when no secret is configured.
+ */
+function throttleHashKey(): Buffer | undefined {
+  let secret: string | undefined;
+
+  try {
+    secret = authConfig.accessToken.secret();
+  } catch {
+    return undefined;
+  }
+
+  return createHmac("sha256", secret).update("@warlock.js/auth:throttle").digest();
+}
+
+/**
+ * Hash of a throttle identifier (`kind` is `"email"`, `"ip"`, ...). The value
+ * is trimmed and lower-cased first, so `" Sara@x.io"` and `"sara@x.io"` share
+ * one bucket.
+ *
+ * Identifiers become part of cache keys, and cache drivers log their keys: a
+ * raw email or IP there is personal data in a log line. A plain SHA-256 of an
+ * email is reversible by anyone with a list of addresses, so the hash is
+ * keyed (HMAC) with a key derived from `auth.accessToken.secret`. Without a
+ * configured secret it falls back to SHA-256, which still keeps the address
+ * out of the key.
+ *
+ * Exported for tests and for apps that inspect throttle keys.
+ */
+export function throttleIdentifierHash(kind: string, value: string): string {
+  const normalized = `${kind}:${value.trim().toLowerCase()}`;
+  const key = throttleHashKey();
+
+  return key
+    ? createHmac("sha256", key).update(normalized).digest("hex")
+    : createHash("sha256").update(normalized).digest("hex");
+}
+
+let warnedNullDriver = false;
+
+/**
+ * The `null` cache driver stores nothing: every count reads back as 1 and no
+ * lock is ever found, so the throttle silently never trips. Say so once.
+ */
+function warnIfNullDriver(): void {
+  if (warnedNullDriver) return;
+
+  const driverName = (cache as { currentDriver?: { name?: string } }).currentDriver?.name;
+
+  if (driverName !== "null") return;
+
+  warnedNullDriver = true;
+  log.warn(
+    "auth",
+    "login-throttle",
+    "The cache driver is `null`, so login, token and OTP throttles never lock. Use a real cache driver (redis, pg, or memory for one process).",
+  );
+}
+
+/**
+ * A lock value is the lockout deadline (epoch ms). `true`, written by 5.29
+ * and earlier, still counts as locked until the key expires.
+ */
+function isLocked(value: unknown): boolean {
+  if (typeof value === "number") {
+    return value > Date.now();
+  }
+
+  return Boolean(value);
+}
+
+/**
+ * `ms`'s honest runtime signature (see `services/auth-config.ts`): it returns
+ * `undefined` for text it cannot parse and throws for `""`.
+ */
+const parseMs = ms as unknown as (value: unknown) => number | string | undefined;
+
+/**
+ * `"15m"` / `"1h"` / seconds as a number → seconds, or `undefined` when the
+ * value cannot be parsed (the cache rejects such a TTL anyway).
+ */
+function durationSeconds(duration: string | number): number | undefined {
+  if (typeof duration === "number") {
+    return Number.isFinite(duration) && duration > 0 ? duration : undefined;
+  }
+
+  let milliseconds: number | string | undefined;
+
+  try {
+    milliseconds = parseMs(duration);
+  } catch {
+    milliseconds = undefined;
+  }
+
+  return typeof milliseconds === "number" && Number.isFinite(milliseconds) && milliseconds > 0
+    ? milliseconds / 1000
+    : undefined;
+}
+
+/**
  * Built-in identifier extractor — reads the configured credential field from
  * the request body for the per-account key, and `request.detectIp()` for the
  * per-source key. Untruthy values are dropped; a request that yields zero
@@ -107,8 +211,8 @@ function buildDefaultIdentifiers(
   if (tracked.includes("email")) {
     const value = request.input(credentialField);
 
-    if (typeof value === "string" && value.length > 0) {
-      identifiers.push(`email.${value.toLowerCase()}`);
+    if (typeof value === "string" && value.trim().length > 0) {
+      identifiers.push(`email.${throttleIdentifierHash("email", value)}`);
     }
   }
 
@@ -116,7 +220,7 @@ function buildDefaultIdentifiers(
     const ip = request.detectIp();
 
     if (ip) {
-      identifiers.push(`ip.${ip}`);
+      identifiers.push(`ip.${throttleIdentifierHash("ip", ip)}`);
     }
   }
 
@@ -173,9 +277,11 @@ export function loginThrottleMiddleware(options: LoginThrottleOptions = {}): Mid
 
     if (identifiers.length === 0) return;
 
+    warnIfNullDriver();
+
     try {
       for (const identifier of identifiers) {
-        const locked = await cache.get(lockKey(identifier));
+        const locked = isLocked(await cache.get(lockKey(identifier)));
 
         if (locked) {
           return response.tooManyRequests({
@@ -221,7 +327,18 @@ export function loginThrottleMiddleware(options: LoginThrottleOptions = {}): Mid
           const count = await cache.increment(key);
 
           if (count >= max) {
-            await cache.set(lockKey(identifier), true, { ttl: lockoutDuration });
+            const lockSeconds = durationSeconds(lockoutDuration);
+
+            // The lock stores its own deadline: a driver with sliding
+            // expiration (`memoryExtended`) pushes the key's TTL forward on
+            // every read, but the deadline in the value does not move, so a
+            // client that keeps retrying is still released after
+            // `lockoutDuration`.
+            await cache.set(
+              lockKey(identifier),
+              lockSeconds === undefined ? true : Date.now() + lockSeconds * 1000,
+              { ttl: lockoutDuration },
+            );
           }
         }
       } catch (error) {

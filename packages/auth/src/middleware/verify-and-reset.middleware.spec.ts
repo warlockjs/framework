@@ -61,7 +61,12 @@ import {
   tokenConsumeThrottleMiddleware,
   tokenIssueThrottleMiddleware,
 } from "./one-time-token-throttle.middleware";
+import { throttleIdentifierHash } from "./login-throttle.middleware";
 import { makeCtx } from "./test-support/make-ctx";
+
+/** The throttle keys an account by a keyed hash of its trimmed, lower-cased credential (FW-04). */
+const SARA_KEY = throttleIdentifierHash("email", "sara@x.io");
+const IP_KEY = throttleIdentifierHash("ip", "1.2.3.4");
 
 type SentCallback = (response: FakeResponse) => void | Promise<void>;
 
@@ -107,16 +112,16 @@ describe("tokenIssueThrottleMiddleware", () => {
     await tokenIssueThrottleMiddleware()(makeCtx({ request, response }));
     await response.fireSent();
 
-    expect(cacheSet).toHaveBeenCalledWith("auth.throttle.count.email.sara@x.io", 0, {
+    expect(cacheSet).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`, 0, {
       ttl: "1h",
       onConflict: "create",
     });
-    expect(cacheSet).toHaveBeenCalledWith("auth.throttle.count.ip.1.2.3.4", 0, {
+    expect(cacheSet).toHaveBeenCalledWith(`auth.throttle.count.ip.${IP_KEY}`, 0, {
       ttl: "1h",
       onConflict: "create",
     });
-    expect(cacheIncrement).toHaveBeenCalledWith("auth.throttle.count.email.sara@x.io");
-    expect(cacheIncrement).toHaveBeenCalledWith("auth.throttle.count.ip.1.2.3.4");
+    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`);
+    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.ip.${IP_KEY}`);
     expect(cacheRemove).not.toHaveBeenCalled();
   });
 
@@ -127,9 +132,13 @@ describe("tokenIssueThrottleMiddleware", () => {
     await tokenIssueThrottleMiddleware()(makeCtx({ request, response }));
     await response.fireSent();
 
-    expect(cacheSet).toHaveBeenCalledWith("auth.throttle.lock.email.sara@x.io", true, {
-      ttl: "1h",
-    });
+    expect(cacheSet).toHaveBeenCalledWith(
+      `auth.throttle.lock.email.${SARA_KEY}`,
+      expect.any(Number),
+      {
+        ttl: "1h",
+      },
+    );
 
     cacheGet.mockImplementation(
       async (key: string) => key.startsWith("auth.throttle.lock.") || null,
@@ -149,17 +158,17 @@ describe("tokenConsumeThrottleMiddleware", () => {
     await tokenConsumeThrottleMiddleware()(makeCtx({ request, response: failed }));
     await failed.fireSent();
 
-    expect(cacheSet).toHaveBeenCalledWith("auth.throttle.count.ip.1.2.3.4", 0, {
+    expect(cacheSet).toHaveBeenCalledWith(`auth.throttle.count.ip.${IP_KEY}`, 0, {
       ttl: "15m",
       onConflict: "create",
     });
-    expect(cacheIncrement).toHaveBeenCalledWith("auth.throttle.count.ip.1.2.3.4");
+    expect(cacheIncrement).toHaveBeenCalledWith(`auth.throttle.count.ip.${IP_KEY}`);
 
     const ok = buildResponse(true);
     await tokenConsumeThrottleMiddleware()(makeCtx({ request, response: ok }));
     await ok.fireSent();
 
-    expect(cacheRemove).toHaveBeenCalledWith("auth.throttle.count.ip.1.2.3.4");
+    expect(cacheRemove).toHaveBeenCalledWith(`auth.throttle.count.ip.${IP_KEY}`);
   });
 });
 
@@ -194,5 +203,29 @@ describe("requireVerifiedEmail", () => {
         requireVerifiedEmail()(makeCtx({ request: { locals: { user } }, response: {} })),
       ),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("throttle identifier hashing (FW-04 review)", () => {
+  it("keys the hash with auth.accessToken.secret, so it is not a plain SHA-256 of the email", async () => {
+    const { createHash } = await import("node:crypto");
+    const plain = createHash("sha256").update("email:sara@x.io").digest("hex");
+
+    configValues["auth.accessToken.secret"] = "first-secret";
+    const first = throttleIdentifierHash("email", "sara@x.io");
+
+    configValues["auth.accessToken.secret"] = "second-secret";
+    const second = throttleIdentifierHash("email", "sara@x.io");
+
+    expect(first).not.toBe(plain);
+    expect(first).not.toBe(second);
+  });
+
+  it("falls back to SHA-256 when no secret is configured", async () => {
+    const { createHash } = await import("node:crypto");
+
+    expect(throttleIdentifierHash("email", "Sara@X.io ")).toBe(
+      createHash("sha256").update("email:sara@x.io").digest("hex"),
+    );
   });
 });

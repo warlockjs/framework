@@ -6,9 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.30.0 - 2026-10-16
 
+### Upgrading
+
+- **Throttle counters and locks reset once on upgrade.** The per-account and per-IP keys changed shape (see below), so failures counted and accounts or IPs locked under 5.29 are forgotten when 5.30 starts. Old keys expire on their own TTL. Changing `auth.accessToken.secret` resets them the same way.
+
 ### Changed
 
-- Lockstep release; package APIs are unchanged.
+- **The login throttle keys accounts and IPs by a keyed hash** (`auth.throttle.count.email.<hmac>`, `auth.throttle.count.ip.<hmac>`) instead of the raw address or IP, so cache logs never show them. The HMAC key is derived from `auth.accessToken.secret` (as the OTP code MAC is), so a list of known addresses cannot reverse it; without a configured secret it falls back to SHA-256. The value is trimmed and lower-cased first, so `" Sara@x.io"` and `"sara@x.io"` share one bucket. Applies to `loginThrottleMiddleware` and every preset built on it (token issue/consume, OTP); a custom `identify` is used as is. `throttleIdentifierHash(kind, value)` is exported (FW-04).
+- A throttle lock stores its own deadline, so a cache driver with sliding expiration (`memoryExtended`) can no longer keep a retrying client locked past `lockoutDuration`. Locks written by 5.29 (`true`) are still honoured until they expire.
+- The throttle warns once when the cache driver is `null`, which stores nothing, so the throttle can never lock.
 
 ## 5.29.0 - 2026-10-01
 

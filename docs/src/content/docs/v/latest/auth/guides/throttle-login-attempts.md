@@ -43,6 +43,14 @@ Because the bump is atomic, concurrent failures on different servers are never l
 The **memory** cache driver is per-process. With it, counts and locks are per instance, so an attacker spreading attempts across servers gets `max` tries on each. Use redis or pg when you run more than one instance.
 :::
 
+## Keys never carry the credential
+
+The account and IP keys are keyed hashes (`auth.throttle.count.email.<hmac>`, `auth.throttle.count.ip.<hmac>`), not the address or IP itself: cache drivers log the keys they touch, and an email or IP in a key would land in the log. The HMAC key is derived from `auth.accessToken.secret`, so someone holding a list of addresses cannot reverse a key (without a configured secret the throttle falls back to a plain SHA-256). The value is trimmed and lower-cased first, so `" Sara@x.io"` and `"sara@x.io"` share one bucket. Changing the secret resets every counter and lock once.
+
+The lock stores its own deadline, so it always lasts `lockoutDuration`, even on a cache driver with sliding expiration (`memoryExtended`). The `null` cache driver stores nothing, so the throttle can never lock on it; Warlock warns once when that happens.
+
+A custom `identify` returns its keys as they are; hash anything personal yourself.
+
 ## Fails open
 
 Storage is `@warlock.js/cache`. If the cache driver is unavailable the middleware logs the error and lets the request through — a throttle outage must never become an auth outage. That also means no cache, no protection.
