@@ -8,3 +8,18 @@ excluded. Missing scan roots fail the check. Diagnostics name each file and line
 CI and the release gate both run this check before artifacts are built.
 
 Run its regression tests with `node --test scripts/check-public-text.test.mjs`.
+
+## Oxlint adoption
+
+`pnpm lint:oxlint` runs the exact pinned Oxlint version with the root
+`.oxlintrc.json`: correctness and suspicious rules plus TypeScript, import, React
+and Unicorn plugins. Existing package ESLint commands remain available.
+CI reports this step without blocking while existing diagnostics are addressed;
+remove `continue-on-error` when the repository has no errors. The normal root
+script exits nonzero for errors, so it can become blocking without changing rules.
+Type-aware linting is not enabled in this initial configuration; it requires a
+separate matching native type-checker dependency and configuration.
+
+See the [official Oxlint configuration reference](https://oxc.rs/docs/guide/usage/linter/config-file-reference)
+for supported rules and categories. The configuration regression test runs the
+real pinned binary against failing and clean TypeScript fixtures.

@@ -85,6 +85,10 @@ jobs:
       - name: Public text contains no private references
         run: pnpm run check:public-text
 
+      - name: Oxlint diagnostics (report only during adoption)
+        continue-on-error: true
+        run: pnpm run lint:oxlint
+
       - name: Workspace script tests
         run: pnpm run test:scripts
 
