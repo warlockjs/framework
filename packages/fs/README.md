@@ -82,3 +82,7 @@ yarn test
 ## License
 
 MIT
+
+## Directory moves with concurrent writers
+
+`moveDirectoryNoReplaceAsync` (`fs.dirs.moveNoReplace`) exclusively claims an unused destination before renaming and refuses an already occupied name. It requires cooperating writers: Node has no atomic no-replace directory rename, so a process replacing the empty claim before its first identity read or after its last check can have its empty directory silently replaced. Source and parent-path changes can race too. Use it where all writers honor the claim, or hold an exclusive lock controlling mutations to both parent directories throughout the call. `expectedSource` and `syncParents` add sequential identity checks and durability, respectively; neither closes these windows.

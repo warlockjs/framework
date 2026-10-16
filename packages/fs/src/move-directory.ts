@@ -112,9 +112,15 @@ export async function directoryIdentityAsync(directoryPath: string): Promise<Dir
 }
 
 /**
- * Move a directory to a destination that must not exist, refusing atomically
- * when it does — never replacing anything there, and never falling back to
- * copy + delete.
+ * Move a directory by exclusively claiming an unused destination name.
+ * Refuses an occupied name at the claim, and never falls back to copy + delete.
+ *
+ * COOPERATING WRITERS ONLY: this is not a kernel-level atomic no-replace
+ * rename. Another process can replace the empty claim before its first lstat,
+ * or after its final identity check, and its empty directory can be replaced
+ * silently. Use only where all writers honor the claim, or hold an exclusive
+ * lock controlling source/destination parent mutations for the entire move.
+ * `expectedSource` and `syncParents` do not close these race windows.
  *
  * An ordinary `rename()` silently replaces an empty directory at the
  * destination, and a check-then-rename leaves a window for one to appear.

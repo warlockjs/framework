@@ -168,9 +168,9 @@ Three variants:
 ```ts
 import { listAsync, listFilesAsync, listDirectoriesAsync } from "@warlock.js/fs";
 
-await listAsync("./src");              // [files + subdirs] full paths
-await listFilesAsync("./src");          // only regular files
-await listDirectoriesAsync("./src");    // only directories
+await listAsync("./src"); // [files + subdirs] full paths
+await listFilesAsync("./src"); // only regular files
+await listDirectoriesAsync("./src"); // only directories
 ```
 
 Returns **full paths** (joined to the directory you passed in), not bare entry names. Pass them straight to other fs calls.
@@ -209,10 +209,16 @@ await renameFileAsync("./tmp/foo.txt", "./final/foo.txt");
 
 Works on files and directories. Cross-device renames (e.g. `/tmp` → `/var`) may fail with `EXDEV` — the OS won't move across mounts. For cross-device, copy then delete.
 
-An ordinary rename **replaces an empty destination directory**, and a check-then-rename is racy. When a directory move must never replace anything, use `moveDirectoryNoReplaceAsync` (POSIX only; also `fs.dirs.moveNoReplace`):
+An ordinary rename **replaces an empty destination directory**, and a check-then-rename is racy. For directory moves among cooperating writers, use `moveDirectoryNoReplaceAsync` (POSIX only; also `fs.dirs.moveNoReplace`):
+
+**Cooperating writers only.** This helper claims an unused destination, but Node exposes no atomic `renameat2(RENAME_NOREPLACE)`. Another process can replace its empty placeholder in either of two windows: after `mkdir` and before the first `lstat`, or after the final identity check and before `rename`. Its empty directory can then be silently replaced. The source can also be swapped after its last check, and parent paths are not pinned. Use a directory whose writers all honor the claim, or hold an exclusive lock that controls source/destination parent mutations throughout the move. `expectedSource` and `syncParents` do not eliminate these windows.
 
 ```ts
-import { directoryIdentityAsync, moveDirectoryNoReplaceAsync, DirectoryMoveError } from "@warlock.js/fs";
+import {
+  directoryIdentityAsync,
+  moveDirectoryNoReplaceAsync,
+  DirectoryMoveError,
+} from "@warlock.js/fs";
 
 const identity = await directoryIdentityAsync("./features/billing");
 await moveDirectoryNoReplaceAsync("./features/billing", "./archive/billing", {
@@ -228,18 +234,18 @@ It claims the destination with an exclusive `mkdir`, then renames over that empt
 ```ts
 import { unlinkAsync, removeDirectoryAsync } from "@warlock.js/fs";
 
-await unlinkAsync("./obsolete.txt");          // single file — ENOENT-safe
-await removeDirectoryAsync("./dist");          // recursive + force — ENOENT-safe
+await unlinkAsync("./obsolete.txt"); // single file — ENOENT-safe
+await removeDirectoryAsync("./dist"); // recursive + force — ENOENT-safe
 ```
 
 Both are **idempotent for missing targets** — calling on a path that doesn't exist is a no-op, not an error. Other errors (`EACCES`, `EBUSY`) still throw.
 
 ## Picking a delete shape
 
-| Task | Reach for |
-| --- | --- |
-| Drop one file | `unlinkAsync(path)` |
-| Drop a whole tree | `removeDirectoryAsync(path)` |
+| Task                                            | Reach for                                                                                          |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Drop one file                                   | `unlinkAsync(path)`                                                                                |
+| Drop a whole tree                               | `removeDirectoryAsync(path)`                                                                       |
 | Drop everything in a folder but keep the folder | `for (const f of await listAsync(dir)) await removeDirectoryAsync(f)` (file? unlink; dir? recurse) |
 
 ## Common shapes

@@ -125,6 +125,8 @@ stats(path: string): Promise<FileStats>
 hash(path: string, algorithm?: HashAlgorithm): Promise<string>        // stable tree fingerprint
 ```
 
+`moveNoReplace` claims a destination among cooperating writers. It is not an atomic no-replace rename against arbitrary processes: an empty placeholder swapped before its first identity read or after its final check can be silently replaced. See [directory move limits](../guides/manage-directories#claim-an-unused-destination-for-a-directory-move) before using it with concurrent filesystem writers.
+
 Listing / walking:
 
 ```ts
@@ -142,7 +144,7 @@ mutating methods (`copy` / `copyTo` / `move` / `moveTo` / `rename`) return a
 
 ```ts
 const file = fs.file("cache/report.json");
-const renamed = await file.rename("report.v2.json");   // `file` still points at report.json
+const renamed = await file.rename("report.v2.json"); // `file` still points at report.json
 ```
 
 Properties:
@@ -177,7 +179,7 @@ A lazy, immutable handle to a directory path. `file(...segments)` and
 
 ```ts
 const uploads = fs.dir("storage/uploads");
-const avatar = uploads.dir("users").file("42", "avatar.png");   // storage/uploads/users/42/avatar.png
+const avatar = uploads.dir("users").file("42", "avatar.png"); // storage/uploads/users/42/avatar.png
 ```
 
 Properties:
@@ -219,30 +221,30 @@ All hashing defaults to `sha256`.
 Every option bag is a plain object, exported from the package root.
 
 ```ts
-type ReadOptions = { encoding?: BufferEncoding | null };   // encoding: null → Buffer
+type ReadOptions = { encoding?: BufferEncoding | null }; // encoding: null → Buffer
 
 type ReadJsonOptions<T = unknown> = {
-  schema?: StandardSchemaV1<T>;   // validate the parsed value
-  default?: T;                    // returned on ENOENT instead of throwing
+  schema?: StandardSchemaV1<T>; // validate the parsed value
+  default?: T; // returned on ENOENT instead of throwing
 };
 
 type WriteOptions = {
-  encoding?: BufferEncoding;      // string writes; default "utf-8"
-  atomic?: boolean;               // temp file + rename
-  ensureDir?: boolean;            // create parents; default true
-  overwrite?: boolean;            // false → throw if target exists; default true
+  encoding?: BufferEncoding; // string writes; default "utf-8"
+  atomic?: boolean; // temp file + rename
+  ensureDir?: boolean; // create parents; default true
+  overwrite?: boolean; // false → throw if target exists; default true
 };
 
-type WriteJsonOptions = WriteOptions & { indent?: number };        // default 2
-type MergeJsonOptions = WriteJsonOptions & { deep?: boolean };     // shallow by default
+type WriteJsonOptions = WriteOptions & { indent?: number }; // default 2
+type MergeJsonOptions = WriteJsonOptions & { deep?: boolean }; // shallow by default
 
 type CopyOptions = {
-  overwrite?: boolean;            // default true
-  errorOnExist?: boolean;         // default false
-  dereference?: boolean;          // follow symlinks; default false
+  overwrite?: boolean; // default true
+  errorOnExist?: boolean; // default false
+  dereference?: boolean; // follow symlinks; default false
 };
 
-type MoveOptions = { overwrite?: boolean; ensureDir?: boolean };   // ensureDir default true
+type MoveOptions = { overwrite?: boolean; ensureDir?: boolean }; // ensureDir default true
 
 type ListOptions = { recursive?: boolean };
 type WalkOptions = { recursive?: boolean; followSymlinks?: boolean };
@@ -252,7 +254,7 @@ type WalkOptions = { recursive?: boolean; followSymlinks?: boolean };
 type WalkEntry = {
   path: string;
   name: string;
-  type: "file" | "directory";     // discriminated by `type`, never `kind`
+  type: "file" | "directory"; // discriminated by `type`, never `kind`
 };
 
 type FileStats = {
@@ -261,7 +263,7 @@ type FileStats = {
   size: number;
   type: "file" | "directory";
   lastModified: Date;
-  raw: import("node:fs").Stats;   // escape hatch to the raw stats
+  raw: import("node:fs").Stats; // escape hatch to the raw stats
 };
 ```
 
@@ -271,7 +273,9 @@ with **zero dependencies**, so it speaks the neutral
 validator.
 
 ```ts
-interface StandardSchemaV1<Output = unknown> { readonly "~standard": { /* version, vendor, validate */ } }
+interface StandardSchemaV1<Output = unknown> {
+  readonly "~standard": {/* version, vendor, validate */};
+}
 
 class JsonSchemaValidationError extends Error {
   readonly path: string;

@@ -33,9 +33,9 @@ sanctioned sync layer the facade delegates to. `fs.dirs` never carries an
 Three verbs cover the whole lifecycle, and they read exactly as they behave.
 
 ```ts
-await fs.dirs.ensure("dist/cache/v2");   // create (+ parents), no-op if present
-await fs.dirs.empty("cache");            // clear contents, keep the folder
-await fs.dirs.remove("tmp");             // delete the whole tree
+await fs.dirs.ensure("dist/cache/v2"); // create (+ parents), no-op if present
+await fs.dirs.empty("cache"); // clear contents, keep the folder
+await fs.dirs.remove("tmp"); // delete the whole tree
 ```
 
 `ensure` is recursive `mkdir` — you rarely need it before writing a file,
@@ -61,9 +61,9 @@ await fs.dirs.ensure("build");
 Ask questions before you act on them.
 
 ```ts
-await fs.dirs.exists("logs");    // boolean
-await fs.dirs.isEmpty("logs");   // boolean — no children
-await fs.dirs.count("logs");     // number of immediate children
+await fs.dirs.exists("logs"); // boolean
+await fs.dirs.isEmpty("logs"); // boolean — no children
+await fs.dirs.count("logs"); // number of immediate children
 ```
 
 `isEmpty` is the honest gate for "should I skip this?" and `count` gives you a
@@ -76,9 +76,9 @@ type. All three yield **full paths joined to the directory you passed**, so
 results feed straight into the next call.
 
 ```ts
-const everything = await fs.dirs.list("src");        // files + subdirs
-const onlyFiles = await fs.dirs.listFiles("src");    // regular files
-const onlyDirs = await fs.dirs.listDirs("src");      // subdirectories
+const everything = await fs.dirs.list("src"); // files + subdirs
+const onlyFiles = await fs.dirs.listFiles("src"); // regular files
+const onlyDirs = await fs.dirs.listDirs("src"); // subdirectories
 ```
 
 Single-level by default. Pass `{ recursive: true }` to flatten the whole tree
@@ -121,7 +121,7 @@ pattern strings.
 Both mirror the whole tree and auto-create the destination's parent.
 
 ```ts
-await fs.dirs.copy("public", "dist/public");   // recursive copy
+await fs.dirs.copy("public", "dist/public"); // recursive copy
 await fs.dirs.move("staging/build", "releases/current");
 ```
 
@@ -130,23 +130,36 @@ await fs.dirs.move("staging/build", "releases/current");
 across filesystems, so `fs.dirs.move` transparently falls back to copy-then-
 delete. You don't handle `EXDEV` yourself.
 
-### Move without ever replacing the destination
+### Claim an unused destination for a directory move
 
 `fs.dirs.move` with `overwrite: false` checks the destination and then
 renames — a window in which another directory can appear, and an ordinary
-rename silently replaces an **empty** directory. When the destination must
-never be replaced (archiving a feature, publishing a release folder), use
+rename silently replaces an **empty** directory. For cooperating writers
+(archiving a feature, publishing a release folder), use
 `moveDirectoryNoReplaceAsync` (also `fs.dirs.moveNoReplace`):
 
+:::caution[Cooperating writers only]
+`moveDirectoryNoReplaceAsync` is not a kernel-level atomic no-replace rename. Node exposes no `renameat2(RENAME_NOREPLACE)`. A process that ignores the destination claim can swap the empty placeholder in two windows:
+
+1. Between the exclusive `mkdir` and its first identity read (`lstat`).
+2. Between the final placeholder identity check and `rename`.
+
+In either case, that process's empty directory can be silently replaced. A source swap after its final check and changes to parent path components can also race the move. Use this helper where every writer honors the claim, or hold an exclusive lock controlling mutations to both parent directories throughout the call. `expectedSource` and `syncParents` do not close these windows; they check identity sequentially and add durability, respectively.
+:::
+
 ```ts
-import { directoryIdentityAsync, moveDirectoryNoReplaceAsync, DirectoryMoveError } from "@warlock.js/fs";
+import {
+  directoryIdentityAsync,
+  moveDirectoryNoReplaceAsync,
+  DirectoryMoveError,
+} from "@warlock.js/fs";
 
 const identity = await directoryIdentityAsync("features/billing");
 
 try {
   await moveDirectoryNoReplaceAsync("features/billing", "archive/billing-2026", {
     expectedSource: identity, // refuse if the source was swapped
-    syncParents: true,        // fsync both parent directories after the rename
+    syncParents: true, // fsync both parent directories after the rename
   });
 } catch (error) {
   if (error instanceof DirectoryMoveError && error.outcome === "not-moved") {
@@ -192,8 +205,8 @@ checked. Existing `move` behavior is unchanged.
 ## Measure and fingerprint
 
 ```ts
-await fs.dirs.size("dist");   // total bytes, recursive
-await fs.dirs.hash("dist");   // stable fingerprint of the whole tree
+await fs.dirs.size("dist"); // total bytes, recursive
+await fs.dirs.hash("dist"); // stable fingerprint of the whole tree
 ```
 
 `size` sums every file underneath — the number you'd report as "build output
@@ -214,11 +227,11 @@ const src = fs.dir("src");
 
 for (const file of await src.listFiles({ recursive: true })) {
   if (file.extension === ".ts") {
-    console.log(await file.size());  // File handle, per entry
+    console.log(await file.size()); // File handle, per entry
   }
 }
 
-const nested = src.dir("components", "ui");  // child Directory handle
+const nested = src.dir("components", "ui"); // child Directory handle
 ```
 
 `listFiles` / `listDirs` on a handle return `File[]` / `Directory[]`, so you keep

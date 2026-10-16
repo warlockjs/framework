@@ -103,6 +103,44 @@ posixOnly("moveDirectoryNoReplaceAsync — interleavings", () => {
     expect(await readFile(path.join(source, "receipt.json"), "utf8")).toBe("kept");
   });
 
+  it.each(["before the first identity read", "after the final identity check"])(
+    "documents an uncooperative empty-directory swap %s",
+    async (window) => {
+      const foreign = path.join(dir, "foreign");
+      await original.mkdir(foreign);
+      const sourceIdentity = await directoryIdentityAsync(source);
+      const foreignIdentity = await directoryIdentityAsync(foreign);
+      const swap = async () => {
+        await original.rmdir(destination);
+        await original.rename(foreign, destination);
+      };
+      if (window === "before the first identity read") {
+        let swapped = false;
+        const swapThenLstat = async (target: PathLike) => {
+          if (!swapped && String(target) === destination) {
+            swapped = true;
+            await swap();
+          }
+          return original.lstat(target);
+        };
+        vi.mocked(lstat).mockImplementation(swapThenLstat as typeof lstat);
+      } else {
+        vi.mocked(rename).mockImplementationOnce(async (from, to) => {
+          await swap();
+          return original.rename(from, to);
+        });
+      }
+      // Both swaps evade the sequential checks: the documented limit is a
+      // successful move that silently replaces the other empty directory.
+      const result = await moveDirectoryNoReplaceAsync(source, destination);
+      expect(result.type).toBe("moved");
+      expect(await directoryIdentityAsync(destination)).toEqual(sourceIdentity);
+      expect(await directoryIdentityAsync(destination)).not.toEqual(foreignIdentity);
+      expect(await readFile(path.join(destination, "receipt.json"), "utf8")).toBe("kept");
+      await expect(lstat(source)).rejects.toMatchObject({ code: "ENOENT" });
+    },
+  );
+
   it("reports a cross-device rename as not moved and releases the claim", async () => {
     vi.mocked(rename).mockImplementationOnce(async () => {
       throw Object.assign(new Error("cross-device link"), { code: "EXDEV" });
