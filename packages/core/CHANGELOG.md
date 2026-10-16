@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - End-to-end configuration recipes cover a non-default R2 image disk, variant ingestion and serving, and shared Redis rate-limit windows across two servers with outage behavior.
 
+- Skills include complete examples for request cancellation, stream/SSE backpressure and retention, HTTP error mapping, shared rate limits and signed-in test clients.
+
 - Notification scaffolds with test support emit real signed-in controller specs and isolated two-recipient fixtures for listing, unread counts, marking one/all read, query validation and ownership checks. Fixtures use the configured auth model and revoke/delete only their own credentials and rows.
 
 - `actingAs(user)` at `@warlock.js/core/tests` issues a real persisted access token and returns isolated authenticated HTTP helpers. Middleware remains active; `client.dispose()` revokes only its token.

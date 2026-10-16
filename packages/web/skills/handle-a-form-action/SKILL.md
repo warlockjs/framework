@@ -236,3 +236,34 @@ export async function signIn(email: string, password: string) {
   return null as { id: string | number; name: string } | null;
 }
 ```
+
+## Independent submission with query parameters
+
+```tsx title="src/web/cancel.page.tsx"
+import { useState } from "react";
+import { Form, type PageConfig } from "@warlock.js/web";
+
+export const config = { route: "/cancel" } satisfies PageConfig;
+
+export async function action() {
+  return { cancelled: true };
+}
+
+export default function CancelPage() {
+  const [message, setMessage] = useState("");
+  return (
+    <>
+      <Form independent query={{ source: "controls" }} onSettled={(outcome) => {
+        setMessage(outcome.type === "failed" ? outcome.reason : "Completed");
+      }}>
+        <button>Cancel</button>
+      </Form>
+      <p>{message}</p>
+    </>
+  );
+}
+```
+
+`query` changes the target URL while form fields remain in the request body.
+An independent form can run beside another pending form; duplicate submissions
+of the same form still share their active request.

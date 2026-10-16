@@ -13,6 +13,8 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ### Added
 
+- Skills include complete examples for viewport metadata, typed Link wrappers, runtime route-name checks and independent form submissions with query parameters.
+
 - Development checks compile the optional Web Vitals example against its actual types; Web Vitals remains an app-installed optional dependency.
 
 - `<Form onSettled={outcome => …}>` observes every enhanced submission outcome, including network failures and dropped submissions, after the existing success/error callbacks. Native browser submissions do not invoke it.

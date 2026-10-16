@@ -1,6 +1,6 @@
 ---
 name: send-response
-description: 'Send HTTP responses via @warlock.js/core''s Response helpers — success/error variants, status helpers, redirects, files, streams, and SSE. Picking the right helper carries the HTTP semantic without manual status codes. Triggers: `response.success`, `response.successCreate`, `response.notFound`, `response.forbidden`, `response.badRequest`, `response.sendFile`, `response.stream`, `response.sse`, `response.replay`, `ResourceNotFoundError`, `ForbiddenError`, `request.cookie`, `request.hasCookie`, `CookieJarUnavailableError`; "return a 201 from a controller", "send a file", "stream Server-Sent Events", "throw HTTP-shaped errors from services"; typical import `import type { RequestHandler, Response } from "@warlock.js/core"`. Skip: controller shape — the `create-controller` topic; route registration — the `register-route` topic; competing patterns: hand-rolled status codes via `reply.code(404).send(...)`, raw Fastify reply.'
+description: 'Send HTTP responses via @warlock.js/core''s Response helpers — success/error variants, status helpers, redirects, files, streams, and SSE. Picking the right helper carries the HTTP semantic without manual status codes. Triggers: `response.success`, `response.successCreate`, `response.notFound`, `response.forbidden`, `response.badRequest`, `response.sendFile`, `response.stream`, `response.sse`, `response.replay`, `retainEvents`, `retainChunks`, `backpressure`, `@warlock.js/core/errors`, `ResourceNotFoundError`, `ForbiddenError`, `request.cookie`, `request.hasCookie`, `CookieJarUnavailableError`; "return a 201 from a controller", "send a file", "stream Server-Sent Events", "throw HTTP-shaped errors from services"; typical import `import type { RequestHandler, Response } from "@warlock.js/core"`. Skip: controller shape — the `create-controller` topic; route registration — the `register-route` topic; competing patterns: hand-rolled status codes via `reply.code(404).send(...)`, raw Fastify reply.'
 ---
 
 # Warlock — send a response
@@ -370,3 +370,46 @@ bounds a stream that never finishes.
 `http.serverOptions: { http2: true }` uses session draining by default. The
 framework maps idle-connection shutdown to session tracking on HTTP/2, so Fastify
 never receives its unsupported `forceCloseConnections: "idle"` setting.
+
+## Complete backpressure examples
+
+```ts title="src/app/events/controllers/events.controller.ts"
+import type { RequestHandler } from "@warlock.js/core";
+
+export const eventsController: RequestHandler = async ({ response }) => {
+  const sse = response.sse({ retainEvents: 2 });
+  try {
+    for (const count of [1, 2, 3]) {
+      if (sse.signal.aborted || !(await sse.write("tick", { count }))) break;
+    }
+    await sse.drain();
+  } finally {
+    sse.end();
+  }
+};
+
+export const exportController: RequestHandler = async ({ response }) => {
+  const stream = response.stream("text/plain", { retainChunks: 1 });
+  try {
+    for (const line of ["id,name\n", "1,Anvil\n"]) {
+      if (stream.signal.aborted || !(await stream.write(line))) break;
+    }
+    await stream.drain();
+  } finally {
+    stream.end();
+  }
+};
+```
+
+Retention keeps only the requested tail in `response.body` for inspection; it
+is not a buffer to replay the whole stream. Neither controller's `signal`
+aborts on its normal `end()`.
+
+```ts title="src/app/catalog/services/require-product.service.ts"
+import { ResourceNotFoundError } from "@warlock.js/core/errors";
+
+export function requireProduct<T>(product: T | null | undefined): T {
+  if (product == null) throw new ResourceNotFoundError("Product not found");
+  return product;
+}
+```

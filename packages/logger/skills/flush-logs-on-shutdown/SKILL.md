@@ -1,6 +1,6 @@
 ---
 name: flush-logs-on-shutdown
-description: 'Drain buffered channels before exit — log.flushSync() or log.configure({autoFlushOn: [''SIGINT'', ''SIGTERM'', ''beforeExit'']}) installs handlers that re-raise the signal. Triggers: `log.flush`, `log.flushSync`, `autoFlushOn`, `enableAutoFlush`, `disableAutoFlush`, `SIGINT`, `SIGTERM`, `beforeExit`; "drain logs before exit", "await log.flush() before process.exit", "drain async or network channels on shutdown", "wire SIGTERM for container shutdown", "my logs never showed after a crash", "graceful shutdown logging"; typical import `import { log, FileLog } from "@warlock.js/logger"`. Skip: error capture — the `capture-unhandled-errors` topic; custom sinks — the `write-custom-log-channel` topic; competing `pino.final`, `winston.end`; native `process.on(''exit'')`.'
+description: 'Drain buffered channels before exit — log.flushSync() or log.configure({autoFlushOn: [''SIGINT'', ''SIGTERM'', ''beforeExit'']}) installs handlers that re-raise the signal. Triggers: `log.flush`, `log.flushSync`, `onChannelError`, `log.flush({ timeout })`, `autoFlushOn`, `enableAutoFlush`, `disableAutoFlush`, `SIGINT`, `SIGTERM`, `beforeExit`; "drain logs before exit", "await log.flush() before process.exit", "drain async or network channels on shutdown", "wire SIGTERM for container shutdown", "my logs never showed after a crash", "graceful shutdown logging"; typical import `import { log, FileLog } from "@warlock.js/logger"`. Skip: error capture — the `capture-unhandled-errors` topic; custom sinks — the `write-custom-log-channel` topic; competing `pino.final`, `winston.end`; native `process.on(''exit'')`.'
 ---
 
 # Lifecycle — flushing buffered channels before exit
@@ -115,3 +115,21 @@ captureAnyUnhandledRejection();
 - **Don't `await` inside a signal handler you wrote yourself and then call `flushSync`** — if an async step rejects, you skip the flush. Wrap in `try { await x } finally { log.flushSync(); process.exit(1); }`.
 - **Don't call `process.exit()` inside `autoFlushOn` handlers** — signal handlers here already re-raise the signal. Forcing an exit breaks exit codes.
 - **Don't rely on the 5-second flush interval for shutdown safety.** It's a throughput optimization, not a durability guarantee.
+
+## Observe channel failures and drain explicitly
+
+```ts
+import { log } from "@warlock.js/logger";
+
+log.onChannelError((error, channel) => {
+  // Do not call this logger from its own failure handler.
+  console.error("Log delivery failed", channel.name, error);
+});
+log.info("app", "shutdown", "Draining logs");
+await log.flush({ timeout: 3_000 });
+```
+
+Level methods return the logger synchronously. `flush()` waits for async
+channel work within its timeout, reports failures through `onChannelError`, and
+resolves so shutdown can continue. Timeout does not cancel a channel's network
+operation; its driver owns cancellation.

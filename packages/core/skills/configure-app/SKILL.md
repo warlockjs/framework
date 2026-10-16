@@ -360,3 +360,25 @@ When upgrading from 5.29, update redaction censors that inspect `context.request
 it is a `RequestLogSnapshot`, with `url` and `route` (a string), rather than a
 Request instance with `baseRequest.url` or `route.path`. Custom log calls can use
 `request.toLogSnapshot()` to apply these same policies.
+
+## Map domain errors at the HTTP edge
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+class InventoryConflict extends Error {}
+
+export default {
+  errorMapper(error) {
+    if (error instanceof InventoryConflict) {
+      return { status: 409, message: error.message };
+    }
+    return undefined;
+  },
+  logging: { body: true, query: true, redactQueryParams: ["token"] },
+} satisfies HttpConfigurations;
+```
+
+Keep the domain error class in an app module imported by both the service and
+this config. Return `undefined` for errors you do not recognize; a mapped 5xx
+is opaque unless the mapper explicitly chooses a public message.

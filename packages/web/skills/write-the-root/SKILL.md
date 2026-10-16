@@ -1,6 +1,6 @@
 ---
 name: write-the-root
-description: 'Author `src/web/root.tsx`, the full-document application root that owns `<html>`, `<head>`, and `<body>`, places page metadata with `<Head />`, renders the hydrated subtree inside `#vessel`, and emits the payload with `<Scripts />`. Triggers: `root.tsx`, `AppProps`, `AppLoader`, `Head`, `Scripts`, `id="vessel"`; "customize the root document", "add html lang", "add an app provider", "where do Head and Scripts go"; typical import `import { Head, Scripts, type AppProps } from "@warlock.js/web"`. Skip: page component contract — the `create-a-page` topic; layout wrappers — the `use-layouts` topic; CSS delivery — the `serve-styles` topic; competing roots `next/layout`, Remix `root`, React `createRoot`.'
+description: 'Author `src/web/root.tsx`, the full-document application root that owns `<html>`, `<head>`, and `<body>`, places page metadata with `<Head />`, renders the hydrated subtree inside `#vessel`, and emits the payload with `<Scripts />`. Triggers: `root.tsx`, `AppProps`, `AppLoader`, `Head`, `metadata.viewport`, `Scripts`, `id="vessel"`; "customize the root document", "add html lang", "add an app provider", "where do Head and Scripts go"; typical import `import { Head, Scripts, type AppProps } from "@warlock.js/web"`. Skip: page component contract — the `create-a-page` topic; layout wrappers — the `use-layouts` topic; CSS delivery — the `serve-styles` topic; competing roots `next/layout`, Remix `root`, React `createRoot`.'
 ---
 
 # Warlock — write the root
@@ -248,3 +248,22 @@ in production.
 - The `use-layouts` topic: the persistent wrapper inside `#vessel`.
 - The `load-page-data` topic: `AppLoader` and typed `shared`.
 - The `serve-styles` topic: global CSS from `root.tsx`.
+
+## Override the default viewport
+
+```tsx title="src/web/viewport.page.tsx"
+import type { PageConfig } from "@warlock.js/web";
+
+export const config = {
+  route: "/viewport",
+  metadata: { viewport: "width=device-width, initial-scale=1, viewport-fit=cover" },
+} satisfies PageConfig;
+
+export default function ViewportPage() {
+  return <main>Viewport settings come from metadata.</main>;
+}
+```
+
+`<Head />` emits a default viewport even without this override. Remove a manual
+duplicate tag from `root.tsx`; use `viewport: false` only when intentionally
+suppressing it.

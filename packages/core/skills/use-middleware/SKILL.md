@@ -269,3 +269,26 @@ export default {
 - The `register-route` topic — where middleware attaches: `router.group` and route-options.
 - The `send-response` topic — the response helpers used to short-circuit (`tooManyRequests`, `contentTooLarge`, `serviceUnavailable`, etc.).
 - The `cache-basics` topic of the `warlock-js-cache` skill — the cache singleton (`@warlock.js/cache`) that backs `middleware.idempotency` and `middleware.cache`.
+
+## Shared counters with a complete config
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+export default {
+  rateLimit: { store: "cache", max: 100, timeWindow: "1m" },
+} satisfies HttpConfigurations;
+```
+
+Configure the same Redis or Postgres cache on each server before enabling this;
+a process-local memory driver shares no counters across replicas. Route-specific
+limits get independent counters. After upgrading from 5.29, the new key hashing
+starts fresh windows; old keys can expire naturally.
+
+```ts title="src/app/private/routes.ts"
+import { router } from "@warlock.js/core";
+
+router.post("/private/preview", ({ response }) => response.success({ ready: true }), {
+  logging: { body: false, query: false },
+});
+```

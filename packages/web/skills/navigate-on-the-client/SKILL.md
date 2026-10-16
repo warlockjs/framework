@@ -1,6 +1,6 @@
 ---
 name: navigate-on-the-client
-description: 'Navigate hydrated pages with `<Link>`, resolve named URLs with `href()`, use `navigateTo` / `navigateBack`, prefetch on interaction, style the active link in a navbar, render `<Link>` as your own component (`component`) or without locale prefixing (`locale`), inspect the server match with `currentRoute()`, re-fetch loaders after a mutation with `refresh()`, and read one query-string key live with `useQueryString`. Triggers: `Link`, `href`, `navigateTo`, `navigateBack`, `refresh`, `currentRoute`, `previousRoute`, `useQueryString`, `component`, `locale`; "active link", "highlight current nav item", "NavLink", "aria-current", "navigate without a reload", "link to a named route", "refresh page data", "revalidate loaders", "client-side back", "read query string in a component", "query string stale after Link navigation"; typical import `import { Link, refresh, useQueryString } from "@warlock.js/web"`. Skip: define a page route — the `create-a-page` topic; loader mechanics — the `load-page-data` topic; root hydration boundary — the `write-the-root` topic; competing routers `@mongez/react-router`, `react-router-dom`, Next navigation.'
+description: 'Navigate hydrated pages with `<Link>`, resolve named URLs with `href()`, use `navigateTo` / `navigateBack`, prefetch on interaction, style the active link in a navbar, render `<Link>` as your own component (`component`) or without locale prefixing (`locale`), inspect the server match with `currentRoute()`, re-fetch loaders after a mutation with `refresh()`, and read one query-string key live with `useQueryString`. Triggers: `Link`, `LinkPropsWithout`, `isRouteName`, `href`, `navigateTo`, `navigateBack`, `refresh`, `currentRoute`, `previousRoute`, `useQueryString`, `component`, `locale`; "active link", "highlight current nav item", "NavLink", "aria-current", "navigate without a reload", "link to a named route", "refresh page data", "revalidate loaders", "client-side back", "read query string in a component", "query string stale after Link navigation"; typical import `import { Link, refresh, useQueryString } from "@warlock.js/web"`. Skip: define a page route — the `create-a-page` topic; loader mechanics — the `load-page-data` topic; root hydration boundary — the `write-the-root` topic; competing routers `@mongez/react-router`, `react-router-dom`, Next navigation.'
 ---
 
 # Warlock — navigate on the client
@@ -452,3 +452,21 @@ The switch re-fetches the current page and commits after its tree is ready. In t
 - The `use-layouts` topic: why layout state persists.
 - The `write-the-root` topic: the `#vessel` swap boundary.
 - The `localize-pages` topic: locale URL strategies and the locale switcher.
+
+## Keep wrapper destinations typed and check runtime names
+
+```tsx
+import { href, isRouteName, Link, type LinkPropsWithout } from "@warlock.js/web";
+
+export function QuietLink(props: LinkPropsWithout<"className">) {
+  return <Link {...props} className="quiet" />;
+}
+
+export function knownDestination(name: string): string | undefined {
+  return isRouteName(name) ? href(name) : undefined;
+}
+```
+
+`isRouteName()` checks the published runtime page table. It is false before the
+table exists and narrows a dynamic name for `href()`; it does not generate a
+route or validate that all required parameters were supplied.

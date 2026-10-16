@@ -1,6 +1,6 @@
 ---
 name: run-ai-agent
-description: 'Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, agent.eval scoring, the judge-safe preset for resilient LLM-as-judge / verdict classifiers (ai.agent.judge / judge: true — lenient JSON parse + repair + never-throw, for Nova-class models), and auto-adapting raw executables in tools:[]. Triggers: `compaction`, `AgentCompactionConfig`, `AgentCompactionRecord`, `afterTokens`, `countTokens`, `ai.agent`, `ai.agent.judge`, `agent.execute`, `agent.stream`, `agent.eval`, `AgentResult`, `AgentReport`, `AgentToolEntry`, `JudgeConfig`, `JudgeAgentConfig`, `judge`, `repairAttempts`, `streamingToolGuard`, `attachments`, `repair`, `maxTrips`, `sessionId`, `spawnSubAgent`, `SpawnSubAgentSpec`, `toolDispatch`, `finishReason`, `pause_turn`, `refusal`, `context_exceeded`, `blocks`, `ProviderContentBlock`, `providerOptions`; ''run an agent'', ''stream an agent response'', ''structured output schema'', ''pass image to agent'', ''evaluate an agent'', ''LLM-as-judge that survives malformed JSON'', ''grade with a Nova model without crashing'', ''put a supervisor in tools'', ''cancel an agent run'', ''spawn a one-shot sub-agent with a per-task budget''; typical import `import { ai } from "@warlock.js/ai"`. Skip: tool definition — the `define-ai-tool` topic; workflows — the `run-ai-workflow` topic; eval matchers / batch / fallback detail — the `ai-dx-helpers` topic; competing libs `langchain`, `ai` (Vercel), raw `openai`.'
+description: 'Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, agent.eval scoring, the judge-safe preset for resilient LLM-as-judge / verdict classifiers (ai.agent.judge / judge: true — lenient JSON parse + repair + never-throw, for Nova-class models), and auto-adapting raw executables in tools:[]. Triggers: `compaction`, `AgentCompactionConfig`, `AgentCompactionRecord`, `afterTokens`, `countTokens`, `ai.agent`, `maxConcurrentTools`, `toolDispatch`, `ai.agent.judge`, `agent.execute`, `agent.stream`, `agent.eval`, `AgentResult`, `AgentReport`, `AgentToolEntry`, `JudgeConfig`, `JudgeAgentConfig`, `judge`, `repairAttempts`, `streamingToolGuard`, `attachments`, `repair`, `maxTrips`, `sessionId`, `spawnSubAgent`, `SpawnSubAgentSpec`, `toolDispatch`, `finishReason`, `pause_turn`, `refusal`, `context_exceeded`, `blocks`, `ProviderContentBlock`, `providerOptions`; ''run an agent'', ''stream an agent response'', ''structured output schema'', ''pass image to agent'', ''evaluate an agent'', ''LLM-as-judge that survives malformed JSON'', ''grade with a Nova model without crashing'', ''put a supervisor in tools'', ''cancel an agent run'', ''spawn a one-shot sub-agent with a per-task budget''; typical import `import { ai } from "@warlock.js/ai"`. Skip: tool definition — the `define-ai-tool` topic; workflows — the `run-ai-workflow` topic; eval matchers / batch / fallback detail — the `ai-dx-helpers` topic; competing libs `langchain`, `ai` (Vercel), raw `openai`.'
 ---
 
 # `ai.agent()` — single-turn primitive
@@ -461,3 +461,23 @@ the threshold or `keep` triggers durable drift detection; bump the agent's
 - The `write-system-prompt` topic — persona / instruction builders
 - The `handle-ai-errors` topic — `AIError` hierarchy
 - The `secure-outbound-requests` topic — the `guardedFetch` / `OutboundPolicy` guard behind a remote text attachment fetch
+
+## Complete concurrency configuration
+
+```ts
+import { ai, type ModelContract, type ToolContract } from "@warlock.js/ai";
+
+export function createCatalogAgent(model: ModelContract, tools: ToolContract[]) {
+  return ai.agent({
+    name: "catalog",
+    model,
+    tools,
+    toolDispatch: "concurrent",
+    maxConcurrentTools: 2,
+  });
+}
+```
+
+Use `toolDispatch: "sequential"` for tools whose side effects must run in order.
+A concurrency cap limits calls within one model trip; it is not a process-wide
+limit across many agent runs. Results still reach the model in request order.

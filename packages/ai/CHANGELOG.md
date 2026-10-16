@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Regression fixtures assert required model and identifier segments before reading them under stricter indexed-access checks; the compiler error budget falls by ten.
 
+- Skills include complete examples for per-trip tool concurrency and native token preflight with provider-specific request options.
+
 - Agents can opt into automatic history compaction with an explicit token threshold, a summary callback and an optional native/custom counter. System prompts, current input and tool groups are preserved; retained provider replay data is conservatively skipped. Applied/skipped decisions are recorded on reports and durable snapshots.
 
 - `ModelContract.countTokens?()` represents optional native input-token preflight, separate from offline SDK estimates.

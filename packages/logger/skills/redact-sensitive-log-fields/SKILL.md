@@ -1,6 +1,6 @@
 ---
 name: redact-sensitive-log-fields
-description: 'Strip secrets from log output — a built-in secret-key denylist on by default (DEFAULT_REDACT_KEYS), plus two-layer additive redaction via log.configure({redact: {paths, keys}}) (logger floor) + per-channel redact (more on top). Dotted glob paths (*, **). Triggers: `redact`, `paths`, `keys`, `defaultKeys`, `censor`, `log.setRedact`, `applyRedact`; "redact passwords in logs", "strip tokens from log output", "hide authorization headers", "scrub PII before logging", "turn off default redaction"; typical import `import { log } from "@warlock.js/logger"`. Skip: filtering — the `filter-log-entries` topic; custom sinks — the `write-custom-log-channel` topic; competing libs `pino.redact`, `fast-redact`.'
+description: 'Strip secrets from log output — a built-in secret-key denylist on by default (DEFAULT_REDACT_KEYS), plus two-layer additive redaction via log.configure({redact: {paths, keys}}) (logger floor) + per-channel redact (more on top). Dotted glob paths (*, **). Triggers: `redact`, `paths`, `keys`, `defaultKeys`, `censor`, `log.setRedact`, `applyRedact`, `maskEmail`, `maskEmailsInText`; "redact passwords in logs", "strip tokens from log output", "hide authorization headers", "scrub PII before logging", "turn off default redaction"; typical import `import { log } from "@warlock.js/logger"`. Skip: filtering — the `filter-log-entries` topic; custom sinks — the `write-custom-log-channel` topic; competing libs `pino.redact`, `fast-redact`.'
 ---
 
 # Redaction — keeping secrets out of logs
@@ -154,3 +154,17 @@ If `message` is a plain object, paths under `message.*` work as expected. If `me
 - Each path is matched independently; cost grows linearly with `paths.length`.
 
 For most apps with `<10` redact paths and shallow context, the cost is below 100µs per entry. If you're logging millions of entries per second through paths like `**.something`, profile before scaling up — `**` is the only pattern that recurses through every key.
+
+## Email addresses inside strings
+
+```ts
+import { log, maskEmail, maskEmailsInText } from "@warlock.js/logger";
+
+log.info("mail", "send", `Sending to ${maskEmail("member@example.com")}`);
+log.debug("cache", "key", maskEmailsInText("profile:member@example.com"));
+```
+
+Key-based redaction cannot mask a substring inside a message or cache key.
+`maskEmail()` keeps the first code point and domain (`m***@example.com`);
+`maskEmailsInText()` handles text and bounds its scan at 16,384 characters,
+replacing the remaining suffix with a truncation marker.

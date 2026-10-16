@@ -1,6 +1,6 @@
 ---
 name: pick-ai-provider
-description: 'Choose an AI provider adapter — @warlock.js/ai-openai (shipped, also handles OpenRouter / Azure via baseURL), @warlock.js/ai-anthropic, @warlock.js/ai-bedrock, @warlock.js/ai-google, @warlock.js/ai-ollama — plus cost truth: ModelPricing (per-1M tokens), Usage cost breakdown, the cachedTokens / cacheWriteTokens / reasoningTokens channels, and capability flags. Triggers: `OpenAISDK`, `SDKAdapterContract`, `ModelContract`, `ModelPricing`, `ModelCapabilities`, `sdk.model`, `sdk.embedder`, `capabilities.vision`, `capabilities.structuredOutput`, `capabilities.reasoning`, `capabilities.promptCaching`, `pricing`, `Usage.cost`, `cachedTokens`, `cacheWriteTokens`, `reasoningTokens`, `reasoning.effort`, `cacheControl`, `baseURL`, `provider: "openrouter"`; ''pick a provider'', ''openai vs openrouter'', ''does this model support vision/reasoning'', ''configure pricing'', ''how much did reasoning cost'', ''prompt cache tokens''; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: agent factory — the `run-ai-agent` topic; competing libs raw `openai`, `@anthropic-ai/sdk`, `@aws-sdk/client-bedrock-runtime`.'
+description: 'Choose an AI provider adapter — @warlock.js/ai-openai (shipped, also handles OpenRouter / Azure via baseURL), @warlock.js/ai-anthropic, @warlock.js/ai-bedrock, @warlock.js/ai-google, @warlock.js/ai-ollama — plus cost truth: ModelPricing (per-1M tokens), Usage cost breakdown, the cachedTokens / cacheWriteTokens / reasoningTokens channels, and capability flags. Triggers: `OpenAISDK`, `SDKAdapterContract`, `ModelContract`, `ModelPricing`, `ModelCapabilities`, `sdk.model`, `countTokens`, `providerOptions`, `sdk.embedder`, `capabilities.vision`, `capabilities.structuredOutput`, `capabilities.reasoning`, `capabilities.promptCaching`, `pricing`, `Usage.cost`, `cachedTokens`, `cacheWriteTokens`, `reasoningTokens`, `reasoning.effort`, `cacheControl`, `baseURL`, `provider: "openrouter"`; ''pick a provider'', ''openai vs openrouter'', ''does this model support vision/reasoning'', ''configure pricing'', ''how much did reasoning cost'', ''prompt cache tokens''; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: agent factory — the `run-ai-agent` topic; competing libs raw `openai`, `@anthropic-ai/sdk`, `@aws-sdk/client-bedrock-runtime`.'
 ---
 
 # Pick an AI provider adapter
@@ -232,3 +232,26 @@ transport accepts those fields. In particular, `providerOptions.openai.body`
 also reaches the xAI, Groq, DeepSeek and Mistral Chat adapters; they ignore other
 provider keys. OpenAI-only fields can make a compatible provider reject a call.
 Use model-specific options or the common neutral options for mixed providers.
+
+## Count the exact request when supported
+
+```ts
+import type { Message, ModelCallOptions, ModelContract } from "@warlock.js/ai";
+
+export async function completeWithPreflight(model: ModelContract, messages: Message[]) {
+  const options: ModelCallOptions = {
+    maxTokens: 1_024,
+    providerOptions: { anthropic: { body: { metadata: { user_id: "example-user" } } } },
+  };
+  if (model.countTokens) {
+    const inputTokens = await model.countTokens(messages, options);
+    console.info("Native input tokens", inputTokens);
+  }
+  return model.complete(messages, options);
+}
+```
+
+Counting and completion use the same messages/options. Native counting is a
+network request; handle provider errors normally, and omit the preflight when
+the transport lacks it. Pass only options appropriate to your selected adapter;
+provider-only fields do not replace framework-owned messages, tools or model.

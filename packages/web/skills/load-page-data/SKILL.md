@@ -214,7 +214,7 @@ export async function loader() {
 }
 
 export default function ProductPage({ data }: PageProps<typeof loader>) {
-  // data.product      -> the output of the model's resource (see below)
+  // data.product      -> the browser-safe projection returned by the service
   // data.publishedAt  -> Date (devalue keeps it native)
   return <h1>{data.product.title}</h1>;
 }

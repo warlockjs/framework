@@ -1,6 +1,6 @@
 ---
 name: create-controller
-description: 'Author HTTP controllers in @warlock.js/core — RequestHandler signature, validated input via seal schemas, response helpers, attaching metadata. Controllers are thin functions; business logic moves to services or use-cases. Triggers: `RequestHandler`, `Request<TSchema>`, `GuardedRequestHandler`, `request.validated`, `request.input`, `controller.validation`, `controller.responseSchema`, `response.success`, `response.successCreate`; "write a controller", "attach a schema to a handler", "thin controller pattern", "guarded request type", "type the API response"; typical import `import { type RequestHandler } from "@warlock.js/core"`. Skip: response helper menu — the `send-response` topic; schema authoring — the `validate-input` topic; URL wiring — the `register-route` topic; competing patterns: `express` middleware functions, `@nestjs/common` `@Controller`/`@Get` decorators.'
+description: 'Author HTTP controllers in @warlock.js/core — RequestHandler signature, validated input via seal schemas, response helpers, attaching metadata. Controllers are thin functions; business logic moves to services or use-cases. Triggers: `RequestHandler`, `Request<TSchema>`, `GuardedRequestHandler`, `request.validated`, `request.signal`, `request.input`, `controller.validation`, `controller.responseSchema`, `response.success`, `response.successCreate`; "write a controller", "attach a schema to a handler", "thin controller pattern", "guarded request type", "type the API response"; typical import `import { type RequestHandler } from "@warlock.js/core"`. Skip: response helper menu — the `send-response` topic; schema authoring — the `validate-input` topic; URL wiring — the `register-route` topic; competing patterns: `express` middleware functions, `@nestjs/common` `@Controller`/`@Get` decorators.'
 ---
 
 # Warlock — create a controller
@@ -280,3 +280,16 @@ No `if (!product)` branch in the controller. The error class carries the HTTP se
 - The `register-route` topic — wiring a controller to a URL.
 - The `send-response` topic — full Response helper surface.
 - The `warlock-conventions` topic — controller-service-repository layering.
+
+## Complete cancellation example
+
+```ts title="src/app/catalog/controllers/remote-catalog.controller.ts"
+import type { RequestHandler } from "@warlock.js/core";
+
+export const remoteCatalogController: RequestHandler = async ({ request, response }) => {
+  const signal = AbortSignal.any([request.signal, AbortSignal.timeout(30_000)]);
+  const upstream = await fetch("https://example.com/catalog.json", { signal });
+  if (!upstream.ok) return response.badRequest({ error: "Catalog unavailable" });
+  return response.success({ catalog: await upstream.json() });
+};
+```

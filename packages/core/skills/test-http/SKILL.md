@@ -41,16 +41,18 @@ No `beforeAll`, no manual server start — the project's `src/test-global-setup.
 ## Signed-in requests — `actingAs(user)`
 
 ```ts
+import type { Auth } from "@warlock.js/auth";
 import { actingAs, expectJson } from "@warlock.js/core/tests";
+import { expect } from "vitest";
 
-const user = await User.create({ name: "Ada", email: "ada@example.com", password: "test-password" });
-const client = await actingAs(user);
-try {
-  const body = await expectJson<{ count: number }>(await client.get("/notifications/unread-count"));
-  expect(body.count).toBe(0);
-} finally {
-  await client.dispose();
-  await user.destroy({ strategy: "permanent" });
+export async function expectNoUnreadNotifications(user: Auth) {
+  const client = await actingAs(user);
+  try {
+    const body = await expectJson<{ count: number }>(await client.get("/notifications/unread-count"));
+    expect(body.count).toBe(0);
+  } finally {
+    await client.dispose();
+  }
 }
 ```
 
