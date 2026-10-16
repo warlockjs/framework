@@ -164,6 +164,8 @@ Terminals narrower than 50 columns get a plain list; piped output uses 80 column
 In `--customize` mode, optional features are organized into sections such as
 Auth & Access, Rendering & Mail, and Jobs & Messaging. Open a section to edit its
 checklist or choose **Select all** for that section, then return to the menu.
+The picker remembers the last group; selecting all remaining features preserves
+items you explicitly unticked.
 Each section shows its selected count; **Continue** keeps the current choices.
 Existing `--features` and `--stack=web` selections stay preselected. Lists remain
 paged to the terminal height and hints fit the available width.

@@ -40,6 +40,15 @@ describe("grouped feature selection", () => {
     );
   });
 
+  it("honors explicit unticks while selecting the remaining group members", async () => {
+    select.mockResolvedValueOnce("Auth & Access").mockResolvedValueOnce("@continue");
+    multiselect.mockResolvedValueOnce(["@all"]);
+    expect(await askFeatures(["access", "test"])).toEqual([
+      "test", "auth-google", "auth-passkeys",
+    ]);
+    expect(select.mock.calls[1][0].initialValue).toBe("Auth & Access");
+  });
+
   it("keeps seeds, supports revisiting a group, and permits clearing it", async () => {
     select
       .mockResolvedValueOnce("Storage & Cache")

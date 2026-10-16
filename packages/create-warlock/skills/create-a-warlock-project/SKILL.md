@@ -190,7 +190,9 @@ Terminals narrower than 50 columns get a plain list; piped output uses 80 column
 ## Custom feature groups
 
 `--customize` opens a section menu for optional features. Open a section to edit
-its checklist; **Select all** includes every feature in that section. Section
+its checklist; **Select all** includes the remaining features while preserving
+items you explicitly unticked. The category cursor stays on the last edited
+section. Section
 counts update when returning to the menu, and **Continue** keeps the selection.
 Flags preselect their existing feature keys. Both menus and checklists retain
 terminal paging. The decisions overview previews up to six feature/AI keys with

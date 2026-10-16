@@ -11,6 +11,7 @@ export async function askFeatures(
 ): Promise<string[] | symbol> {
   const groups = getFeatureGroups();
   const selected = new Set(initialValues);
+  let lastGroup: string | undefined;
 
   while (true) {
     const options = [
@@ -23,6 +24,7 @@ export async function askFeatures(
     ];
     const groupName = await select({
       message: "Optional features by group",
+      initialValue: lastGroup,
       options: fitOptionsToWidth(options),
       maxItems: multiselectMaxItems(options.length),
     });
@@ -30,7 +32,11 @@ export async function askFeatures(
     if (isCancel(groupName)) return groupName;
     if (groupName === CONTINUE) return [...selected];
 
+    lastGroup = groupName;
     const group = groups.find(candidate => candidate.label === groupName)!;
+    const previouslySelected = new Set(
+      group.options.filter(option => selected.has(option.value)).map(option => option.value),
+    );
     const groupOptions = [
       {
         value: SELECT_ALL,
@@ -51,7 +57,10 @@ export async function askFeatures(
     if (isCancel(answer)) return answer;
 
     for (const option of group.options) {
-      if (answer.includes(SELECT_ALL) || answer.includes(option.value))
+      if (
+        answer.includes(option.value) ||
+        (answer.includes(SELECT_ALL) && !previouslySelected.has(option.value))
+      )
         selected.add(option.value);
       else selected.delete(option.value);
     }

@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Group feature selection preserves explicit unticks when selecting the remaining group, and returns the category cursor to the group last edited.
+
 - The project-ready summary wraps feature lists and next steps to the terminal width, measures visible emoji width, and uses a plain list on narrow terminals. Piped output uses an 80-column fallback. Wrapped values align under their labels, and the summary retains its label, command and link styling.
 
 ### Changed
