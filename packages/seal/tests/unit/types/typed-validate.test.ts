@@ -1,6 +1,8 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { validate } from "../../../src/factory/validate";
 import { v } from "../../../src/factory/validators";
+import type { StandardSchemaV1 } from "../../../src/standard-schema/types";
+import { object } from "../../../src/object";
 import type { ValidationResult } from "../../../src/types";
 import type { Infer } from "../../../src/types/inference-types";
 import type { BaseValidator, ObjectValidator } from "../../../src/validators";
@@ -88,6 +90,32 @@ describe("discriminated union ~standard typing", () => {
       expect(result.value).toEqual({ type: "sms", phone: "555" });
     } else {
       throw new Error("expected a valid result");
+    }
+  });
+});
+
+describe("object Standard Schema output", () => {
+  const fields = { count: v.int().default(1), name: v.string() };
+
+  it("keeps both object factory paths typed without an extra intersection", async () => {
+    for (const schema of [v.object(fields), object(fields)]) {
+      expectTypeOf<StandardSchemaV1.InferInput<typeof schema>>().toEqualTypeOf<{
+        count?: number;
+        name: string;
+      }>();
+      expectTypeOf<StandardSchemaV1.InferOutput<typeof schema>>().toEqualTypeOf<{
+        count: number;
+        name: string;
+      }>();
+      expectTypeOf(schema).toMatchTypeOf<ObjectValidator<typeof fields>>();
+      const standard: StandardSchemaV1<
+        { count?: number; name: string },
+        { count: number; name: string }
+      > = schema;
+      const result = await standard["~standard"].validate({ name: "Ada" });
+      if (result.issues) throw new Error("expected valid output");
+      expectTypeOf(result.value.count).toEqualTypeOf<number>();
+      expect(result.value).toEqual({ count: 1, name: "Ada" });
     }
   });
 });

@@ -1,34 +1,36 @@
 ---
 name: bridge-standard-schema
-description: 'Diagnose `StandardSchemaV1` interop — phantom-intersection at the `v` factory return, why typed slots reject a schema, cascade `Model<TSchema>` variance. Triggers: `StandardSchemaV1`, `~standard`, `Infer`, `ObjectValidator`, `StringValidator`, `LiteralValidator`, `BaseValidator`, `Model<TSchema>`, `StandardJSONSchemaV1`, `Result<unknown>`; "StandardSchemaV1 slot rejecting my schema", "Result<unknown> error", "drop as unknown as cast", "cascade Model schema variance"; typical import `import { v, type Infer } from "@warlock.js/seal"`. Skip: foundations — the `seal-basics` topic; JSON Schema gen — the `generate-json-schema` topic; competing spec `@standard-schema/spec`.'
+description: 'Diagnose `StandardSchemaV1` interop — input/output class parameters and primitive factory intersections, why typed slots reject a schema, cascade `Model<TSchema>` variance. Triggers: `StandardSchemaV1`, `~standard`, `Infer`, `ObjectValidator`, `StringValidator`, `LiteralValidator`, `BaseValidator`, `Model<TSchema>`, `StandardJSONSchemaV1`, `Result<unknown>`; "StandardSchemaV1 slot rejecting my schema", "Result<unknown> error", "drop as unknown as cast", "cascade Model schema variance"; typical import `import { v, type Infer } from "@warlock.js/seal"`. Skip: foundations — the `seal-basics` topic; JSON Schema gen — the `generate-json-schema` topic; competing spec `@standard-schema/spec`.'
 ---
 
 # The Standard Schema bridge
 
 Seal validators implement [Standard Schema V1](https://standardschema.dev) — every validator exposes a `~standard` member with `validate()`, JSON Schema metadata, and inferred types. Any consumer that accepts `StandardSchemaV1<T>` (`@warlock.js/ai` supervisor `output`, ai tool `input`, LangGraph state, OpenAI structured outputs, TanStack Form, Conform) accepts a seal schema directly.
 
-This skill is about the **typing** of that interop — the phantom intersection that makes `v.object({...})` satisfy `StandardSchemaV1<T>` without `as unknown as` casts.
+This skill covers the input and output types exposed through `~standard`, and
+compatibility with consumers such as Cascade model schemas and AI tool schemas.
 
 ## The shape of the bridge
 
-The `v` factory returns aren't bare validator classes. Each factory widens its return with a phantom intersection:
+`ObjectValidator<TSchema>` already threads `Infer.Input` and `Infer.Output` shapes
+into `BaseValidator<TInput, TOutput>`. Both `v.object(fields)` and the standalone
+`object(fields)` factory return that class directly. No extra Standard Schema
+intersection is needed for objects: avoiding one keeps large composed schemas
+cheaper for TypeScript to instantiate.
+
+Other factories add a Standard Schema intersection when their class has no precise
+generic output declaration, for example:
 
 ```ts
-// Inside seal's factory:
-object: <T extends Schema>(schema: T) =>
-  new ObjectValidator<T>(schema) as ObjectValidator<T>
-    & StandardSchemaV1<Infer<ObjectValidator<T>>>;
-
+// Inside Seal's factory:
 string: () =>
   new StringValidator() as StringValidator & StandardSchemaV1<string>;
-
-literal: <T extends readonly [...] >(...values: T) =>
-  new LiteralValidator<T>(values) as LiteralValidator<T> & StandardSchemaV1<T[number]>;
-
-// ...one intersection per factory.
 ```
 
-The intersection is **only on the factory return type** — the `BaseValidator` and `ObjectValidator` *class* shapes are unchanged. That distinction is load-bearing: putting `Infer<this>` directly on `BaseValidator['~standard']` breaks `@warlock.js/cascade`'s `Model<TSchema>` because `ObjectValidator` becomes invariant when its members vary with `TSchema`. The factory-side intersection avoids that — bare classes in `Model.schema: ObjectValidator<TSchema>` slots are still structurally compatible with the typed factory return.
+Keep input and output distinct when writing consumer types. Defaults and catches
+can make input fields optional while output fields are required. Avoid computing
+`Infer<this>` in the base class: object shapes are already supplied as generic
+parameters, and recursively walking the full class increases compiler work.
 
 ## What this means for app code
 
@@ -74,7 +76,7 @@ const schema = v.object({
   blocks: v.array(v.literal("text", "image")).optional(),
 });
 
-type Output = Infer<typeof schema>;
+type Output = Infer.Output<typeof schema>;
 // { email: string; blocks?: ("text" | "image")[] }
 ```
 
@@ -84,17 +86,12 @@ Hand-rolled parallel types drift the moment a field changes — and seal's tight
 
 Three failure modes you'll see in real projects:
 
-### 1. You annotated the schema with the bare class type
+### 1. An annotation discarded schema details
 
-```ts
-// ❌ Discards the phantom intersection
-const schema: ObjectValidator<{ email: StringValidator }> = v.object({...});
-
-// ✅ Let inference run
-const schema = v.object({...});
-```
-
-The annotation strips `& StandardSchemaV1<...>` from the type. The schema stops fitting `StandardSchemaV1<T>` slots. Fix: remove the annotation. If you need the value type, use `Infer<typeof schema>`.
+Let the factory infer its concrete schema. An annotation such as bare
+`ObjectValidator` loses the field types; primitive factories also lose their
+Standard Schema intersection when annotated with a bare primitive class.
+`ObjectValidator<typeof fields>` preserves an object's input and output types.
 
 ### 2. The schema's inferred shape doesn't match the target type
 
@@ -109,23 +106,25 @@ The supervisor's explicit `<MyOutput>` generic is a constraint the schema must s
 - **Drop the explicit generic** — let the supervisor infer output type from the schema. The hand-rolled type was probably documentation-only anyway.
 - **Align them** — if the hand-rolled type is the source of truth (e.g. a domain type from elsewhere), make the schema match.
 
-### 3. The error says `Result<unknown>` even though `Infer<>` resolves correctly
+### 3. The error says `Result<unknown>`
 
-This is a TypeScript reporting quirk, not a bridge bug. When a `StandardSchemaV1<T>` slot rejects a schema, TS picks the simplest mismatch chain to report — often it falls through `BaseValidator['~standard'].validate`'s wider `Result<unknown>` declaration before reaching the factory-side narrower one. The intersection *is* there structurally, but the error message mentions `unknown`.
+Check whether an annotation erased a factory's output type, and compare
+`Infer.Input<typeof schema>` and `Infer.Output<typeof schema>` with the consumer's
+expected types. Output slots should use the post-default output shape. Objects
+carry that shape directly through their class generics; primitive factories add
+it through their Standard Schema intersection.
 
-If you see this, ignore the `unknown` and ask: does `Infer<typeof schema>` match the slot's expected `T`? Probe with:
+## Compiler budget
 
-```ts
-type _Probe = Infer<typeof schema>;
-const _force: { __nope: 1 } = null as unknown as _Probe;
-// Hover the error to see the resolved shape, then compare to the slot's T.
-```
-
-That's the real mismatch.
+From `packages/seal`, run `pnpm bench:types --check` after changes to inference or
+factory types. CI runs the same deterministic composed-schema fixture when Seal
+is selected. Instantiations and type counts may grow at most 5% above the checked-in
+baseline. Refresh with `node scripts/bench-types.mjs --update` only after reviewing
+the measurements; time and memory are diagnostic rather than gated.
 
 ## Why not `Omit<class, "~standard"> & StandardSchemaV1<T>`?
 
-Tempting — it would force the factory's `~standard` to fully replace the class's wider one, fixing the misleading `Result<unknown>` error message. **Don't do it.** `Omit` on a class instance type triggers the same variance trap as putting `Infer<this>` on the class itself: cascade explodes with hundreds of `ObjectValidator<{specific}>` vs `ObjectValidator<TSchema>` errors. The phantom intersection is the only shape that satisfies both ends — narrower for typed slots, structurally identical to the class for cascade's invariant generic positions.
+Tempting — it would force the factory's `~standard` to fully replace the class's wider one, fixing the misleading `Result<unknown>` error message. **Don't do it.** `Omit` on a class instance type triggers the same variance trap as putting `Infer<this>` on the class itself: cascade explodes with hundreds of `ObjectValidator<{specific}>` vs `ObjectValidator<TSchema>` errors. Keep object factories as their existing generic class, and retain factory-side intersections for primitive classes that need them. Both preserve the validator's class members for generic consumers.
 
 ## Why not import `@standard-schema/spec` instead of forking the types?
 

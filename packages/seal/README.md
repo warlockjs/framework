@@ -382,6 +382,21 @@ The documentation includes:
 
 ---
 
+## Type inference compiler budget
+
+From `packages/seal`, run `pnpm bench:types --check` to compile a deterministic
+fixture of 16 composed entities and 8 services. CI runs the same check when Seal
+is selected. It rejects compiler errors and growth above 5% in instantiations or
+types; memory and elapsed time are recorded for context. Object factories use the
+class's existing input/output generics directly, avoiding a duplicate Standard
+Schema intersection on every nested object.
+
+After reviewing a deliberate change, refresh the baseline with
+`node scripts/bench-types.mjs --update`. Keep fixture sizes and TypeScript versions
+the same when comparing counts.
+
+---
+
 ## 📄 License
 
 MIT

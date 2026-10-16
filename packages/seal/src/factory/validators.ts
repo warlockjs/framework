@@ -220,10 +220,7 @@ export type ValidateOptions = {
 } & SealConfig;
 
 export interface ValidatorV {
-  object: <T extends Schema>(
-    schema: T,
-    errorMessage?: string,
-  ) => ObjectValidator<T> & StandardSchemaV1<Infer<ObjectValidator<T>>>;
+  object: <T extends Schema>(schema: T, errorMessage?: string) => ObjectValidator<T>;
   any: () => AnyValidator & StandardSchemaV1<any>;
   array: <T extends BaseValidator>(
     validator: T,

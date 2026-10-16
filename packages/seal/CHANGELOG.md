@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **BREAKING:** `.refine()` now runs against successful output after child validation and transformers, and skips absent/null or invalid values. Callbacks are typed from the validator's output instead of `any`. Move checks that need input before child validation to `.addRule()`.
 
+### Changed
+
+- Object factories return their already typed class directly, avoiding a duplicate Standard Schema intersection and reducing compiler work for composed schemas. CI now checks the Seal inference benchmark against its updated baseline.
+
 ### Fixed
 
 - Object, array, tuple and lazy Standard Schema output declarations preserve child defaults and catches independently of their input types.
