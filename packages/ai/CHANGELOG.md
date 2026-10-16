@@ -8,7 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Upgrading
 
-- **The tool calls of one trip now run concurrently.** Results still reach the model in request order. Tools that share mutable state can keep the old behaviour with `ai.agent({ toolDispatch: "sequential" })` (or per call).
+- **The tool calls of one trip now run concurrently**, at most four at a time (`maxConcurrentTools`). Results still reach the model in request order. Tools that share mutable state can keep the old behaviour with `ai.agent({ toolDispatch: "sequential" })` (or per call): each call is awaited and its result appended to the conversation before the next starts, so tool middleware sees the earlier results of the same turn, as in 5.29.
+- **`AgentResult.blocks` is set only for a single-trip run.** A multi-trip run's final thinking is signed against the intermediate tool-call turns, so `{ content: text, blocks }` alone cannot be replayed. Keep blocks across runs through `captureMessages: true` → `report.messages` plus the last trip's `output` and `blocks` (see "Finish reasons and provider blocks" in the agent docs).
+- **`result.text` joins a resumed `pause_turn`.** The paused segments' text comes before the final segment's, and structured output is parsed from the joined text.
 - `FinishReason` gained `context_exceeded`, `pause_turn` and `refusal`. Code that switches exhaustively over it needs the new cases; adapters now report these instead of `length` / `error`.
 
 ### Added
@@ -16,13 +18,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Provider content blocks**: `ProviderContentBlock` (`{ provider, type, data }`) on `ModelResponse.blocks`, the streaming `done` chunk, `Message.blocks`, `CapturedMessage.blocks`, `LLMTrip.blocks` and `AgentResult.blocks`. The agent copies a response's blocks onto the assistant turn so the adapter can replay it verbatim (thinking, compaction) (WR-022).
 - `FinishReason` values `context_exceeded`, `pause_turn` and `refusal`. The agent resumes a `pause_turn` by replaying the paused turn, within `maxTrips` (WR-023).
 - `toolDispatch: "concurrent" | "sequential"` on `AgentConfig` and `AgentExecuteOptions` (`ToolDispatchMode`), concurrent by default (WR-024).
+- `maxConcurrentTools` on `AgentConfig` and `AgentExecuteOptions` (default `4`): the cap on a trip's tool calls running at once, so a model (or a prompt injected into its context) cannot start an unbounded number of tool calls in one turn.
+- `mapWithConcurrency(items, limit, mapper)` utility: an order-preserving `Promise.all` with a concurrency cap.
 - `ModelCallOptions.providerOptions` (adapter-only options keyed by wire format) and `cacheControl.ttl` (`"5m" | "1h"`) (WR-025).
 - `MockModelResponse.blocks` for scripting provider blocks in tests.
 
 ### Fixed
 
-- The semantic cache no longer stores a paused (`pause_turn`) turn as a final answer.
-- VCR request hashes include `providerOptions`, so two calls that differ only in provider options (betas, `context_management`, …) no longer replay the same recording. It joins the hash only when a provider entry is set, so existing cassettes recorded without it still match. `cacheControl` (breakpoints, `ttl`) stays out of the hash: it changes billing, not output (WR-025).
+- The semantic cache no longer stores a paused (`pause_turn`) turn as a final answer, and stores a resumed turn whole (every segment), not only its last segment.
+- VCR request hashes include `providerOptions`, so two calls that differ only in provider options (betas, `context_management`, …) no longer replay the same recording. It joins the hash only when a provider entry carries a value — `{}`, `{ anthropic: {} }` and `{ anthropic: { betas: undefined } }` hash like no `providerOptions` — so existing cassettes recorded without it still match. `cacheControl` (breakpoints, `ttl`) stays out of the hash: it changes billing, not output (WR-025).
 
 ## 5.29.0 - 2026-10-01
 

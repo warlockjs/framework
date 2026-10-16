@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.30.0 - 2026-10-16
 
+### Upgrading
+
+- `RunShellResult.cancelled` is now a required field: a custom `WorkspaceOps`/`Workspace` implementation or a test double that builds a `RunShellResult` must set it (`false` unless the command was cancelled).
+- `Workspace.readFile()` and `WorkspaceOps.readFile()` now return `ReadFileResult` (adds `startLine`, `endLine`, `truncated`, `bytesCapped`, `totalBytes`); custom implementations must return those fields.
+- A read window that starts past the end of the file now returns empty `content` instead of one numbered empty line.
+- `read.maxBytes` now actually caps the returned `content`; a read that used to return a whole long file under a small cap now comes back cut, with `bytesCapped: true`.
+
 ### Added
 
 - `exec()` takes a per-call `signal` (`ExecOptions`); `run_shell` and `run_tests` pass the agent run's `ctx.signal`. An already-aborted signal never starts the command; an abort mid-run kills the process tree. Both resolve with the new `cancelled: true` on `RunShellResult`, never together with `timedOut` (WR-010).
@@ -17,6 +24,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `read.maxBytes` is enforced: the returned `content` (line-number prefixes and newlines included) never exceeds it, so a single long line no longer bypasses the cap. Lines are cut on a character boundary, never mid-character; `hash` remains the SHA-256 of the whole file (WR-009).
 - Command output clipped at `shell.maxOutputBytes` is cut on a character boundary instead of ending in a replacement character.
 - A read window past the end of the file returns empty `content` instead of one numbered empty line.
+- Writes, edits and removes of the same path are serialized, so two concurrent `edit_file` calls (the agent now dispatches a trip's tool calls concurrently) can no longer both pass the stale-hash guard and silently drop one edit; the second re-reads and is rejected as stale, or applies on top when it pinned no hash.
+- Aborting a command after it has already exited (while its stdio is still draining) no longer reports it as `cancelled`; the tree is still reaped so the result settles.
+- On Windows, a `taskkill` that cannot be started no longer crashes the process with an unhandled `'error'` event; the direct child is killed instead.
 
 ## 5.29.0 - 2026-10-01
 

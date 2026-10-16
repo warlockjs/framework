@@ -168,15 +168,29 @@ await agent.execute("Plan the migration.", {
 
 ## Provider blocks and compaction
 
-Thinking, redacted-thinking, compaction and server-tool blocks have no place in the neutral `content` string, and several features only work when the assistant turn goes back exactly as Claude sent it. When a response has such a block, the adapter returns the whole ordered turn as `blocks`. The agent stores it on the assistant message and the adapter replays it verbatim on the next call. The final trip's blocks are on `result.blocks`; keep them if you persist your own transcript:
+Thinking, redacted-thinking, compaction and server-tool blocks have no place in the neutral `content` string, and several features only work when the assistant turn goes back exactly as Claude sent it. When a response has such a block, the adapter returns the whole ordered turn as `blocks`. The agent stores it on the assistant message and the adapter replays it verbatim on the next call.
+
+Claude checks that every turn before a replayed thinking block is unchanged, including the tool-call turns and tool results in between. Storing only the final reply with its blocks drops those turns, and the next request fails (or the block is dropped). To carry blocks across runs, keep the run's turns from `report.messages` (set `captureMessages: true`) and append the final reply:
 
 ```ts
-const result = await agent.execute(question);
+// The agent runs with `captureMessages: true`.
+const result = await chat.execute(question, { history });
+const finalTrip = result.report.trips.at(-1);
 
-history.push({ role: "assistant", content: result.text ?? "", blocks: result.blocks });
+history = [
+  // Your history, the question, and every tool-call turn and tool result of the run.
+  // The agent re-adds the system prompt on each run, so leave it out here.
+  ...(result.report.messages ?? []).filter((message) => message.role !== "system"),
+  // The final reply, as the model sent it.
+  { role: "assistant", content: finalTrip?.output ?? "", blocks: finalTrip?.blocks },
+];
 ```
 
-Beta features go through `providerOptions.anthropic`: `betas` routes the call to the beta endpoint, and `body` adds request fields as-is, after the adapter's own. Server-side compaction:
+`result.blocks` is set only for a single-trip run, where the reply is the whole turn.
+
+The adapter replays a stored block only when it is a well-formed assistant-turn block from this adapter (its `data.type` matches its `type`); otherwise it rebuilds the turn from `content` and `toolCalls`. Treat a transcript that comes from a client like any other client input.
+
+Beta features go through `providerOptions.anthropic`: `betas` routes the call to the beta endpoint, and `body` adds request fields as-is, after the adapter's own. `body` may not set `model`, `messages`, `system`, `tools`, `mcp_servers` or `stream`, which the adapter builds from the call; the call fails with `InvalidRequestError` if it tries. Server-side compaction:
 
 ```ts
 const agent = ai.agent({

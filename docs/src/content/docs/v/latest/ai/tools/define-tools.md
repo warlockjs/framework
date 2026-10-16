@@ -80,7 +80,13 @@ execute: async ({ query }) => {
 
 When the model asks for several tools in one turn, the agent runs them **concurrently** and waits for all of them before the next trip. The results reach the model in the order it requested them, whichever finishes first.
 
-Tools that share mutable state, or must see each other's side effects, can run one after another instead:
+At most four run at once by default; further calls start as earlier ones finish. A model (or text injected into its context) can request many calls in one turn, so the cap bounds the processes and requests they can start. Change it with `maxConcurrentTools`:
+
+```ts
+const agent = ai.agent({ model, tools, maxConcurrentTools: 2 });
+```
+
+Tools that share mutable state, or must see each other's side effects, can run one after another instead. Each call's result is added to the conversation before the next call starts, so tool middleware sees the earlier results of the same turn:
 
 ```ts
 const agent = ai.agent({ model, tools: [reserveSeat, chargeCard], toolDispatch: "sequential" });

@@ -61,7 +61,14 @@ function killTree(pid: number | undefined, child: { kill(signal: NodeJS.Signals)
   }
 
   if (platform === "win32") {
-    spawn("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true });
+    const killer = spawn("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true });
+
+    // Without a listener a failed spawn (taskkill missing from PATH) is an
+    // unhandled 'error' event that crashes the process; fall back to the
+    // direct child instead.
+    killer.on("error", () => {
+      child.kill("SIGKILL");
+    });
 
     return;
   }
@@ -286,6 +293,9 @@ class LocalBackend implements WorkspaceBackend {
       let timedOut = false;
       let cancelled = false;
       let settled = false;
+      // The direct child has exited; 'close' may still be pending while its
+      // stdio drains (or a grandchild holds the pipes open).
+      let exited = false;
 
       // Timeout and cancellation are mutually exclusive: whichever kills the
       // tree first owns the outcome, so a result is never both.
@@ -306,7 +316,13 @@ class LocalBackend implements WorkspaceBackend {
           return;
         }
 
-        cancelled = true;
+        // The command already finished: report its real outcome, not a
+        // cancellation. Still reap the tree so a grandchild holding the
+        // pipes open cannot keep `close` (and this promise) pending.
+        if (!exited) {
+          cancelled = true;
+        }
+
         killTree(child.pid, child);
       };
 
@@ -350,6 +366,10 @@ class LocalBackend implements WorkspaceBackend {
       // "command not found" exit code rather than rejecting.
       child.on("error", () => {
         settle(127);
+      });
+
+      child.on("exit", () => {
+        exited = true;
       });
 
       child.on("close", (code, signal) => {

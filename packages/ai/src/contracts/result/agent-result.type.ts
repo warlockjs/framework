@@ -32,9 +32,14 @@ export type AgentResult<TOutput = unknown> = BaseResult & {
   /** Raw text from the final LLM trip. */
   text?: string;
   /**
-   * The final trip's raw provider blocks (thinking, compaction, …), when
-   * the adapter returned them. Store them on the assistant `Message.blocks`
-   * of your own transcript so the next run replays the turn verbatim.
+   * The final trip's raw provider blocks (thinking, compaction, …), set
+   * only when the run was a single trip and the adapter returned them —
+   * then `{ role: "assistant", content: text, blocks }` is the whole
+   * turn. A multi-trip run's final thinking is signed against the
+   * intermediate tool-call turns, which `text` does not include: to keep
+   * blocks across runs, run with `captureMessages: true` and store
+   * `report.messages` (without its system turn) plus the last trip's
+   * `output` and `blocks`.
    */
   blocks?: ProviderContentBlock[];
   /** Trips, tool calls, status, and timing for this execution. */

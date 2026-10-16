@@ -26,7 +26,8 @@ ai.agent({
   output?: StandardSchemaV1<T>,                // default structured-output schema
   middleware?: AgentMiddleware[],
   streamingToolGuard?: StreamingToolGuardConfig, // opt-in tool-call recovery from text leaks
-  toolDispatch?: "concurrent" | "sequential",  // default "concurrent" — one trip's tool calls run at once
+  toolDispatch?: "concurrent" | "sequential",  // default "concurrent" — one trip's tool calls run in parallel
+  maxConcurrentTools?: number,                 // default 4 — cap on a trip's tool calls running at once
   on?: AgentEventHandlers,
   version?: string,                            // mirrored onto reports for trip archives
 });
@@ -34,7 +35,7 @@ ai.agent({
 
 The factory returns an `AgentContract<TOutput>`. Every execution spawns a fresh internal `Execution` — the factory holds no per-call state.
 
-**Parallel tool calls.** When the model requests several tools in one turn they run concurrently (`toolDispatch: "concurrent"`, the default); tool-result messages and `ToolCall` records still follow the request order. Use `toolDispatch: "sequential"` (factory or per-call `execute(input, { toolDispatch })`) for tools that share mutable state.
+**Parallel tool calls.** When the model requests several tools in one turn they run concurrently (`toolDispatch: "concurrent"`, the default), at most `maxConcurrentTools` (default 4) at a time; tool-result messages and `ToolCall` records still follow the request order. Use `toolDispatch: "sequential"` (factory or per-call `execute(input, { toolDispatch })`) for tools that share mutable state: each call is awaited and its result appended before the next starts, so tool middleware sees earlier results of the same turn.
 
 **Provider options.** `modelOptions.providerOptions.<format>` carries adapter-only options (e.g. `anthropic: { betas, body, thinkingDisplay }`); each adapter reads only its key. `modelOptions.cacheControl.ttl` (`"5m" | "1h"`) sets the cache lifetime per call.
 
@@ -167,7 +168,7 @@ const nestedAgents = report.children.filter((c) => c.type === "agent");
 
 **Finish reasons.** `LLMTrip.finishReason` is `stop | tool_calls | length | context_exceeded | pause_turn | refusal | error`. The agent resumes `pause_turn` itself (replays the paused turn, calls again, counts against `maxTrips`); `refusal` and `context_exceeded` end the run without an `error` — check `report.trips.at(-1)?.finishReason` to fall back to another model or compact the history.
 
-**Provider blocks.** Adapters return blocks the neutral `text` can't carry (Anthropic thinking / redacted thinking / compaction / server tools) as `ModelResponse.blocks`; the agent keeps them on the assistant `Message.blocks`, `LLMTrip.blocks` and `result.blocks`, and the adapter replays them verbatim. Persisting your own transcript? Store `{ role: "assistant", content: text, blocks }`.
+**Provider blocks.** Adapters return blocks the neutral `text` can't carry (Anthropic thinking / redacted thinking / compaction / server tools) as `ModelResponse.blocks`; the agent keeps them on the assistant `Message.blocks` and `LLMTrip.blocks` (and `result.blocks` for a single-trip run), and the adapter replays them verbatim. Persisting your own transcript across runs? A replayed thinking block needs every earlier turn unchanged, so keep the run's turns: `captureMessages: true`, then store `report.messages` without its system turn plus `{ role: "assistant", content: trips.at(-1).output, blocks: trips.at(-1).blocks }`. A resumed `pause_turn` is joined into `result.text`.
 
 Canonical destructuring:
 

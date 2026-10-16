@@ -70,13 +70,13 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | Export | What it is |
 | --- | --- |
 | `AgentContract<T>` | The shape returned by `ai.agent`. Has `.execute()`, `.stream()`, `.resume()`, `.on()`, `.off()`, `.name`, `.isAnonymous`, `.description`. |
-| `AgentConfig` | Config object accepted by `ai.agent`. Includes `captureMessages?` — opt-in full-history capture onto `AgentReport.messages` (off by default; large + sensitive) — `toolDispatch?` (`"concurrent"` default, or `"sequential"`; see `ToolDispatchMode`) and `durable?` (below). |
+| `AgentConfig` | Config object accepted by `ai.agent`. Includes `captureMessages?` — opt-in full-history capture onto `AgentReport.messages` (off by default; large + sensitive) — `toolDispatch?` (`"concurrent"` default, or `"sequential"`; see `ToolDispatchMode`), `maxConcurrentTools?` (default `4`; cap on a trip's tool calls running at once under concurrent dispatch) and `durable?` (below). |
 | `agent.resume(runId, opts?)` | Durable mid-run crash-resume. Re-hydrates completed trips + tool calls + usage from the snapshot and continues from the next trip — never re-issuing a completed trip's model call. Throws `AgentDriftError` on a structural mismatch unless `{ force: true }`. |
 | `AgentConfig.durable` | `{ store?: SnapshotStore<AgentSnapshot>; deleteOnComplete? }` — opt-in checkpointing after every settled trip. `store` falls back to `ai.config({ defaultSnapshotStore })`; when neither is set, writes skip and `resume()` throws. |
 | `AgentSnapshot` / `AgentSnapshotStatus` / `AgentResumeOptions<T>` | The persisted agent state, its status, and `resume()` options (`{ force?, ... }`). |
 | `AgentExecuteOptions` | Per-call options for `execute` / `stream`. |
 | `AgentResult<T>` | Result envelope — `{ type, data?, text?, blocks?, report, usage, error? }`. `blocks` are the final trip's raw provider blocks (see `ProviderContentBlock`). |
-| `ToolDispatchMode` | `"concurrent" \| "sequential"` — how the tool calls of one trip run. Concurrent (default) starts them all at once; results reach the model in request order either way. Set on `AgentConfig.toolDispatch` or per call on `AgentExecuteOptions.toolDispatch`. |
+| `ToolDispatchMode` | `"concurrent" \| "sequential"` — how the tool calls of one trip run. Concurrent (default) runs them in parallel, at most `maxConcurrentTools` (default `4`) at a time; sequential awaits each call and appends its result before the next starts. Results reach the model in request order either way. Set on `AgentConfig.toolDispatch` or per call on `AgentExecuteOptions.toolDispatch`. |
 | `AgentReport` | Trace tree — `BaseReport` plus `model`, `trips`, `systemPrompt?` (the resolved `role: "system"` message), and `messages?` (the full `CapturedMessage[]`, present only when `captureMessages` is on). Tool dispatches live under `children` filtered by `type === "tool"`. |
 | `CapturedMessage` | One normalized conversation turn — `{ role, content, toolCalls?, toolCallId?, blocks? }`. Populates `AgentReport.messages` when `captureMessages` is enabled. |
 | `AgentEventHandlers` | Typed event handler map for `on` (factory / per-call). |

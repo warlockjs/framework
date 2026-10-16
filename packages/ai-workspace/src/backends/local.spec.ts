@@ -313,6 +313,35 @@ describe("createLocalBackend", () => {
       expect(result.cancelled).toBe(false);
     });
 
+    it.skipIf(process.platform === "win32")(
+      "should not report a cancellation when the command exited before the abort",
+      async () => {
+        const backend = createLocalBackend();
+        // The parent exits at once but leaves a grandchild holding its stdio,
+        // so 'exit' fires long before 'close'. An abort in that gap must reap
+        // the tree (or close never fires) without calling the finished
+        // command cancelled.
+        await writeFile(
+          join(root, "exits-first.cjs"),
+          'require("node:child_process").spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "inherit" });\n' +
+            "process.exit(0);\n",
+        );
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 500);
+
+        const result = await backend.exec("node exits-first.cjs", {
+          cwd: root,
+          env: execEnv,
+          timeoutMs: 10_000,
+          signal: controller.signal,
+        });
+
+        expect(result.cancelled).toBe(false);
+        expect(result.timedOut).toBe(false);
+        expect(result.exitCode).toBe(0);
+      },
+    );
+
     it("should remove its abort listener once the command settles", async () => {
       const backend = createLocalBackend();
       const controller = new AbortController();

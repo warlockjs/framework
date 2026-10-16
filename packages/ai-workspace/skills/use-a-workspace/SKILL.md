@@ -126,6 +126,8 @@ A custom `WorkspaceBackend` receives the signal as `exec(command, { signal })` a
 
 `readFile` returns a SHA-256 `hash` of the full file. Pass it to `editFile`'s `expectHash`; if the file changed since you read it, the edit is rejected as stale so you re-read before clobbering. `editFile` also requires the `oldString` to be **exact and unique** — pass `replaceAll: true` to replace every occurrence, or include more surrounding context to disambiguate.
 
+Writes, edits and removes of the same path run one after another, even when the agent dispatches tool calls concurrently: of two edits pinned to the same `expectHash`, the second is rejected as stale instead of silently overwriting the first. `read.maxBytes` bounds what a read returns, not memory — the whole file is still read and hashed.
+
 ## Errors flow as data, not throws
 
 Policy and edit failures are typed errors extending the `@warlock.js/ai` `AIError` base. Inside a tool the `tool()` wrapper catches them and surfaces them in `{ error }`, so the agent reads the failure and self-corrects. Branch on `.type`:

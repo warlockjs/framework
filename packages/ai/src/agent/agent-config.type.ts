@@ -217,6 +217,16 @@ export type AgentConfig<TOutput = unknown> = {
    */
   toolDispatch?: ToolDispatchMode;
   /**
+   * Upper bound on how many tool calls of one trip run at the same time
+   * under `toolDispatch: "concurrent"`. Default `4`. A model (or a prompt
+   * injected into its context) can request many calls in one turn; this
+   * caps the processes, requests and memory they can claim at once.
+   * Further calls start as earlier ones settle. Results reach the model in
+   * request order regardless. Per-call
+   * `AgentExecuteOptions.maxConcurrentTools` wins.
+   */
+  maxConcurrentTools?: number;
+  /**
    * Per-trip usage callback. Fires once after every LLM round-trip
    * (initial trip, continuation trips after tool results, repair
    * trips) with a flat `{ runId, tripIndex, model, provider, usage,

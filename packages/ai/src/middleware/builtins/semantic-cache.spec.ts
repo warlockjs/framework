@@ -124,6 +124,37 @@ describe("semanticCache — exact-match path", () => {
   });
 });
 
+describe("semanticCache — paused turns", () => {
+  it("stores the whole resumed turn, not only its last segment", async () => {
+    const sdk = MockSDK({
+      responses: [
+        { content: "Part one, ", finishReason: "pause_turn" },
+        { content: "part two.", finishReason: "stop" },
+        { content: "never", finishReason: "stop" },
+      ],
+    });
+    const model = sdk.model({ name: "gpt-test" });
+    const mockModel = sdk.models[sdk.models.length - 1];
+    const { driver: store } = makeStore();
+
+    const ai = agent({
+      model,
+      middleware: [
+        semanticCache({ embedder: new DeterministicEmbedder(), store, threshold: 0.99 }),
+      ],
+    });
+
+    const firstRun = await ai.execute("long question");
+
+    expect(firstRun.text).toBe("Part one, part two.");
+
+    const secondRun = await ai.execute("long question");
+
+    expect(secondRun.text).toBe("Part one, part two.");
+    expect(mockModel?.callCount).toBe(2);
+  });
+});
+
 describe("semanticCache — vector-match path", () => {
   it("serves a cached response for a semantically close prompt", async () => {
     const sdk = MockSDK({

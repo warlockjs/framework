@@ -70,7 +70,7 @@ Whatever your `execute` resolves with is `JSON.stringify`'d and sent back as the
 
 ## Parallel calls — tools run concurrently
 
-When the model requests several tools in one turn, the agent runs them **concurrently** (default `toolDispatch: "concurrent"`) and continues once all settled; results reach the model in request order. A tool that shares mutable state with another (or must see its side effects) needs `ai.agent({ toolDispatch: "sequential" })` or per-call `execute(input, { toolDispatch: "sequential" })`. `ctx.signal` carries the run's cancellation into each call.
+When the model requests several tools in one turn, the agent runs them **concurrently** (default `toolDispatch: "concurrent"`, at most `maxConcurrentTools` — default 4 — at a time) and continues once all settled; results reach the model in request order. A tool that shares mutable state with another (or must see its side effects) needs `ai.agent({ toolDispatch: "sequential" })` or per-call `execute(input, { toolDispatch: "sequential" })`. `ctx.signal` carries the run's cancellation into each call.
 
 ## `mode` — feedback vs silent
 

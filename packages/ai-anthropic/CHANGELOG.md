@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Upgrading
 
 - `model_context_window_exceeded` now maps to `finishReason: "context_exceeded"` (was `length`), `pause_turn` to `pause_turn` and `refusal` to `refusal` (both were `error`).
+- `providerOptions.anthropic.body` may not set `model`, `messages`, `system`, `tools`, `mcp_servers` or `stream`: the call fails with `InvalidRequestError` instead of silently replacing the conversation, the model or the registered tools.
 
 ### Added
 
@@ -26,6 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - `providerOptions.anthropic.thinkingDisplay` is applied only to adaptive thinking, so it is never sent beside `between_tools` (a 400).
+- **Security:** a stored block is replayed only when its `data.type` equals its declared `type` and the type is one Claude returns on an assistant turn (text, thinking, redacted thinking, tool use, server-tool use and results, MCP, container upload, compaction). A transcript from outside the process can no longer smuggle a `tool_use` or user-side block past the tool-id check; such turns are rebuilt from `content` + `toolCalls`.
 
 ## 5.29.0 - 2026-10-01
 

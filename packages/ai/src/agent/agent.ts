@@ -54,6 +54,7 @@ import {
   extractJsonLenient,
   extractJsonPayload,
   generateRunId,
+  mapWithConcurrency,
   mergeUsage,
   safeJsonParse,
   stampReportLineage,
@@ -69,6 +70,9 @@ import { computeAgentSignature } from "./signature";
 import { deleteAgentSnapshot, loadAgentSnapshotForResume, persistAgentSnapshot } from "./snapshot";
 
 const LOG_MODULE = "ai.agent";
+
+/** Default cap on a trip's concurrently running tool calls. */
+const DEFAULT_MAX_CONCURRENT_TOOLS = 4;
 
 /** One settled tool dispatch: its record plus the tool-result message for the next trip. */
 type DispatchedToolCall = {
@@ -1224,31 +1228,39 @@ class Execution<TOutput> {
 
   /**
    * Dispatch every tool call one trip requested. By default the calls run
-   * concurrently (`toolDispatch: "concurrent"`) — a model that emits
-   * several `tool_use` blocks in one turn expects them executed in
-   * parallel. `toolDispatch: "sequential"` awaits each call before the
-   * next, for tools that share mutable state. Either way the tool-result
-   * messages and `ToolCall` records are appended in the order the model
-   * requested them, so adapters can group all results of the turn into a
-   * single provider message.
+   * concurrently (`toolDispatch: "concurrent"`), at most
+   * `maxConcurrentTools` at a time — a model that emits several
+   * `tool_use` blocks in one turn expects them executed in parallel.
+   * `toolDispatch: "sequential"` awaits each call before the next and
+   * appends its result before the next call starts, so tool middleware
+   * sees earlier results of the same turn (the 5.29 behaviour). Either
+   * way the tool-result messages and `ToolCall` records are appended in
+   * the order the model requested them, so adapters can group all results
+   * of the turn into a single provider message.
    */
   private async dispatchToolCalls(
     requests: ModelToolCallRequest[],
     tripIndex: number,
   ): Promise<ToolCall[]> {
-    const dispatched: DispatchedToolCall[] = [];
-
     if (this.resolveToolDispatch() === "sequential") {
+      const records: ToolCall[] = [];
+
       for (const request of requests) {
-        dispatched.push(await this.dispatchToolCall(request, tripIndex));
+        const { record, message } = await this.dispatchToolCall(request, tripIndex);
+
+        this.toolCalls.push(record);
+        this.messages.push(message);
+        records.push(record);
       }
-    } else {
-      dispatched.push(
-        ...(await Promise.all(
-          requests.map((request) => this.dispatchToolCall(request, tripIndex)),
-        )),
-      );
+
+      return records;
     }
+
+    const dispatched = await mapWithConcurrency(
+      requests,
+      this.resolveMaxConcurrentTools(),
+      (request) => this.dispatchToolCall(request, tripIndex),
+    );
 
     for (const { record, message } of dispatched) {
       this.toolCalls.push(record);
@@ -1264,6 +1276,19 @@ class Execution<TOutput> {
    */
   private resolveToolDispatch(): ToolDispatchMode {
     return this.options?.toolDispatch ?? this.config.toolDispatch ?? "concurrent";
+  }
+
+  /**
+   * Resolve how many tool calls of one trip may run at once: per-call
+   * option, then agent config, then {@link DEFAULT_MAX_CONCURRENT_TOOLS}.
+   * Anything that is not a positive integer falls back to the default.
+   */
+  private resolveMaxConcurrentTools(): number {
+    const limit = this.options?.maxConcurrentTools ?? this.config.maxConcurrentTools;
+
+    return limit !== undefined && Number.isInteger(limit) && limit > 0
+      ? limit
+      : DEFAULT_MAX_CONCURRENT_TOOLS;
   }
 
   /**
@@ -1492,8 +1517,7 @@ class Execution<TOutput> {
       return "skipped";
     }
 
-    const finalTrip = this.trips[this.trips.length - 1];
-    const text = finalTrip?.output ?? "";
+    const text = this.finalTurnText() ?? "";
 
     if (!text) {
       return "skipped";
@@ -1691,8 +1715,12 @@ class Execution<TOutput> {
     return {
       type: "agent",
       data: this.data,
-      text: finalTrip?.output,
-      ...(finalTrip?.blocks ? { blocks: finalTrip.blocks } : {}),
+      text: this.finalTurnText(),
+      // Only a single-trip run's blocks are safe to replay on their own: a
+      // thinking block is signed against every turn before it, and a
+      // multi-trip run's intermediate tool turns are not part of `text`.
+      // Persist those through `captureMessages` → `report.messages`.
+      ...(this.trips.length === 1 && finalTrip?.blocks ? { blocks: finalTrip.blocks } : {}),
       report,
       usage: this.usage,
       error: this.error,
@@ -1756,6 +1784,37 @@ class Execution<TOutput> {
         error: outcome.error instanceof Error ? outcome.error.message : String(outcome.error),
       });
     }
+  }
+
+  /**
+   * Text of the run's final assistant turn. A turn the provider paused
+   * (`pause_turn`) and the agent resumed arrives in segments, one trip
+   * each, and every continuation carries only its new content — so the
+   * turn's text is the paused trips' output followed by the final trip's.
+   * Without a pause this is the final trip's output.
+   */
+  private finalTurnText(): string | undefined {
+    const last = this.trips.length - 1;
+    const finalTrip = this.trips[last];
+
+    if (!finalTrip) {
+      return undefined;
+    }
+
+    let start = last;
+
+    while (start > 0 && this.trips[start - 1]?.finishReason === "pause_turn") {
+      start--;
+    }
+
+    if (start === last) {
+      return finalTrip.output;
+    }
+
+    return this.trips
+      .slice(start, last + 1)
+      .map((trip) => trip.output)
+      .join("");
   }
 
   /**

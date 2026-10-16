@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import type { Message, ReasoningEffort } from "@warlock.js/ai";
+import { InvalidRequestError, type Message, type ReasoningEffort } from "@warlock.js/ai";
 import { describe, expect, it } from "vitest";
 import { AnthropicModel } from "./model";
 
@@ -342,6 +342,35 @@ describe("AnthropicModel provider options (WR-025)", () => {
     expect(call.body.betas).toEqual(["compact-2026-01-12"]);
     expect(call.body.context_management).toEqual({ edits: [{ type: "compact_20260112" }] });
     expect(call.body.max_tokens).toBe(200);
+  });
+
+  it("refuses body fields that would replace the conversation, model or tools", async () => {
+    for (const field of ["model", "messages", "system", "tools", "mcp_servers", "stream"]) {
+      const { client, calls } = makeClient({});
+      const model = new AnthropicModel(client, { name: "claude-opus-5-5" });
+
+      const attempt = model.complete([{ role: "user", content: "hi" }], {
+        providerOptions: { anthropic: { body: { [field]: "override", inference_geo: "us" } } },
+      });
+
+      await expect(attempt, field).rejects.toBeInstanceOf(InvalidRequestError);
+      await expect(attempt, field).rejects.toThrow(`"${field}"`);
+      expect(calls, field).toHaveLength(0);
+    }
+  });
+
+  it("refuses reserved body fields on the streaming and token-counting paths too", async () => {
+    const { client, calls } = makeClient({});
+    const model = new AnthropicModel(client, { name: "claude-opus-5-5" });
+    const options = { providerOptions: { anthropic: { body: { messages: [] } } } };
+
+    await expect(
+      drain(model.stream([{ role: "user", content: "hi" }], options)),
+    ).rejects.toBeInstanceOf(InvalidRequestError);
+    await expect(
+      model.countTokens([{ role: "user", content: "hi" }], options),
+    ).rejects.toBeInstanceOf(InvalidRequestError);
+    expect(calls).toHaveLength(0);
   });
 
   it("stays on messages.create without betas and ignores other providers' options", async () => {

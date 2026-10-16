@@ -68,24 +68,41 @@ function schemaShape(value: unknown, depth = 0): unknown {
 }
 
 /**
- * The providers in `providerOptions` that carry options, or `undefined`
- * when none do. `{}` and `{ anthropic: undefined }` hash like an absent
- * `providerOptions`, so they replay recordings made without one.
+ * Drop `undefined` values and the plain objects left empty by dropping
+ * them, recursively, so a value hashes the way it serializes. Returns
+ * `undefined` when nothing is left. Arrays keep their items (an
+ * `undefined` item serializes as `null`, so it still counts).
  */
-function pickProviderOptions(value: unknown): Record<string, unknown> | undefined {
-  if (value === null || typeof value !== "object") {
+function pruneEmpty(value: unknown, depth = 0): unknown {
+  if (value === undefined) {
     return undefined;
   }
 
-  const providers: Record<string, unknown> = {};
+  if (depth > 8 || value === null || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
 
-  for (const [provider, options] of Object.entries(value as Record<string, unknown>)) {
-    if (options !== undefined) {
-      providers[provider] = options;
+  const out: Record<string, unknown> = {};
+
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    const kept = pruneEmpty(entry, depth + 1);
+
+    if (kept !== undefined) {
+      out[key] = kept;
     }
   }
 
-  return Object.keys(providers).length > 0 ? providers : undefined;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/**
+ * The providers in `providerOptions` that carry options, or `undefined`
+ * when none do. `{}`, `{ anthropic: undefined }`, `{ anthropic: {} }` and
+ * `{ anthropic: { betas: undefined } }` all hash like an absent
+ * `providerOptions`, so they replay recordings made without one.
+ */
+function pickProviderOptions(value: unknown): Record<string, unknown> | undefined {
+  return pruneEmpty(value) as Record<string, unknown> | undefined;
 }
 
 /**

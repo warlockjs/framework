@@ -202,10 +202,43 @@ function isSafeGrepPattern(pattern: string): boolean {
  * through this object, so there is exactly one set of rules.
  */
 class Ops implements WorkspaceOps {
+  /**
+   * Tail of the mutation chain per resolved absolute path. Writes, edits and
+   * removes on the same path run one after another, so two tool calls the
+   * agent dispatches concurrently cannot both read the same content, both
+   * pass the stale-hash guard and silently drop one edit: the second one
+   * re-reads after the first has written.
+   */
+  private readonly pathLocks = new Map<string, Promise<void>>();
+
   public constructor(
     private readonly backend: WorkspaceBackend,
     private readonly policy: WorkspacePolicy,
   ) {}
+
+  /** Run `task` after every earlier mutation of `absolutePath` has settled. */
+  private async withPathLock<T>(absolutePath: string, task: () => Promise<T>): Promise<T> {
+    const previous = this.pathLocks.get(absolutePath) ?? Promise.resolve();
+    let release: () => void = () => {};
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const tail = previous.then(() => current);
+
+    this.pathLocks.set(absolutePath, tail);
+
+    try {
+      await previous;
+
+      return await task();
+    } finally {
+      release();
+
+      if (this.pathLocks.get(absolutePath) === tail) {
+        this.pathLocks.delete(absolutePath);
+      }
+    }
+  }
 
   /**
    * Recursively collect every file under `absDir` as absolute paths,
@@ -293,20 +326,32 @@ class Ops implements WorkspaceOps {
   ): Promise<{ hash: string; bytesWritten: number }> {
     const { absolutePath } = await resolveInJail(this.policy, inputPath);
 
-    // Ensure the parent directory exists before writing the leaf.
-    const parent = path.dirname(absolutePath);
-    await this.backend.mkdir(parent);
+    return this.withPathLock(absolutePath, async () => {
+      // Ensure the parent directory exists before writing the leaf.
+      const parent = path.dirname(absolutePath);
+      await this.backend.mkdir(parent);
 
-    await this.backend.writeFile(absolutePath, content);
+      await this.backend.writeFile(absolutePath, content);
 
-    return {
-      hash: fs.hash.string(content),
-      bytesWritten: Buffer.byteLength(content, "utf8"),
-    };
+      return {
+        hash: fs.hash.string(content),
+        bytesWritten: Buffer.byteLength(content, "utf8"),
+      };
+    });
   }
 
   public async editFile(input: EditFileInput): Promise<EditFileResult> {
     const { absolutePath, relativePath } = await resolveInJail(this.policy, input.path);
+
+    return this.withPathLock(absolutePath, () => this.applyEdit(input, absolutePath, relativePath));
+  }
+
+  /** The read-check-replace-write of {@link editFile}, run under its path lock. */
+  private async applyEdit(
+    input: EditFileInput,
+    absolutePath: string,
+    relativePath: string,
+  ): Promise<EditFileResult> {
     const current = await this.backend.readFile(absolutePath);
     const currentHash = fs.hash.string(current);
 
@@ -505,7 +550,7 @@ class Ops implements WorkspaceOps {
   public async remove(inputPath: string): Promise<void> {
     const { absolutePath } = await resolveInJail(this.policy, inputPath);
 
-    await this.backend.remove(absolutePath);
+    await this.withPathLock(absolutePath, () => this.backend.remove(absolutePath));
   }
 
   /** Whether a `/`-separated relative path hits the policy deny list. */

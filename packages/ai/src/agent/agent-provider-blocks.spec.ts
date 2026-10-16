@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { describe, expect, it } from "vitest";
 import type { Message } from "../contracts/conversation-message.type";
+import type { AgentMiddleware } from "../contracts/middleware";
 import type { ProviderContentBlock } from "../contracts/provider-content-block.type";
 import { MockSDK } from "../mock/mock-sdk";
 import type { MockModel } from "../mock/mock-model";
@@ -91,6 +92,32 @@ describe("agent — provider content blocks (WR-022)", () => {
     expect(result.blocks).toEqual(finalBlocks);
   });
 
+  it("leaves result.blocks unset after a multi-trip run (they need the intermediate turns)", async () => {
+    const mock = MockSDK({
+      responses: [
+        {
+          content: "",
+          finishReason: "tool_calls",
+          toolCalls: [{ id: "c1", name: "echo", input: "x" }],
+          blocks: [thinking, toolUse],
+        },
+        { content: "done", finishReason: "stop", blocks: [thinking] },
+      ],
+    });
+
+    const result = await agent({
+      model: mock.model({ name: "m" }),
+      tools: [echoTool],
+      captureMessages: true,
+    }).execute("go");
+
+    expect(result.text).toBe("done");
+    expect(result.blocks).toBeUndefined();
+    // The full transcript still carries them, with the turns they were signed against.
+    expect(result.report.trips[1]?.blocks).toEqual([thinking]);
+    expect(result.report.messages?.some((message) => message.blocks !== undefined)).toBe(true);
+  });
+
   it("carries blocks through a streamed trip", async () => {
     const mock = MockSDK({
       responses: [{ content: "hi", finishReason: "stop", blocks: [thinking] }],
@@ -155,9 +182,32 @@ describe("agent — pause_turn (WR-023)", () => {
 
     expect(calls).toHaveLength(2);
     expect(calls[1]?.at(-1)).toEqual({ role: "assistant", content: "searching", blocks: paused });
-    expect(result.text).toBe("found it");
+    // The continuation carries only its new content: the turn's text is both segments.
+    expect(result.text).toBe("searchingfound it");
     expect(result.error).toBeUndefined();
     expect(result.report.trips[1]?.input).toBe("[continue]");
+  });
+
+  it("parses structured output from every segment of a resumed turn", async () => {
+    const objectSchema = makeSchema<{ answer: number }>((value) =>
+      typeof value === "object" && value !== null && "answer" in value
+        ? { value: value as { answer: number } }
+        : { issues: [{ message: "expected { answer }" }] },
+    );
+    const mock = MockSDK({
+      responses: [
+        { content: '{"answer":', finishReason: "pause_turn" },
+        { content: " 42}", finishReason: "stop" },
+      ],
+    });
+
+    const result = await agent({ model: mock.model({ name: "m" }), output: objectSchema }).execute(
+      "go",
+    );
+
+    expect(result.error).toBeUndefined();
+    expect(result.data).toEqual({ answer: 42 });
+    expect(result.text).toBe('{"answer": 42}');
   });
 
   it("reports max trips when the model keeps pausing", async () => {
@@ -262,6 +312,84 @@ describe("agent — tool dispatch (WR-024)", () => {
     await running;
 
     expect(log).toEqual(["start:a", "end:a", "start:b", "end:b"]);
+  });
+
+  it("appends each result before the next call under sequential dispatch", async () => {
+    const seen: string[][] = [];
+    const recorder: AgentMiddleware = {
+      name: "recorder",
+      tool: {
+        before(context) {
+          seen.push(
+            context.messages
+              .filter((message) => message.role === "tool")
+              .map((message) => message.toolCallId ?? ""),
+          );
+        },
+      },
+    };
+    const { gates, tools } = makeTrackedTools();
+    gates.a.resolve();
+    gates.b.resolve();
+
+    await agent({
+      model: twoCalls().model({ name: "m" }),
+      tools,
+      toolDispatch: "sequential",
+      middleware: [recorder],
+    }).execute("go");
+
+    // Call b's middleware sees call a's result, as it did before 5.30.
+    expect(seen).toEqual([[], ["call_a"]]);
+  });
+
+  it("caps concurrently running tools with maxConcurrentTools", async () => {
+    let running = 0;
+    let peak = 0;
+    const slow = tool({
+      name: "slow",
+      description: "slow",
+      input: stringSchema,
+      execute: async (value: string) => {
+        running++;
+        peak = Math.max(peak, running);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        running--;
+
+        return value;
+      },
+    });
+    const calls = Array.from({ length: 6 }, (_, index) => ({
+      id: `c${index}`,
+      name: "slow",
+      input: String(index),
+    }));
+    const mock = () =>
+      MockSDK({
+        responses: [
+          { content: "", finishReason: "tool_calls", toolCalls: calls },
+          { content: "done", finishReason: "stop" },
+        ],
+      });
+
+    const capped = mock().model({ name: "m" }) as MockModel;
+    await agent({ model: capped, tools: [slow], maxConcurrentTools: 2 }).execute("go");
+    expect(peak).toBe(2);
+
+    const order = snapshotCalls(capped)[1]?.filter((message) => message.role === "tool");
+    expect(order?.map((message) => message.toolCallId)).toEqual(calls.map((call) => call.id));
+
+    peak = 0;
+    await agent({ model: mock().model({ name: "m" }), tools: [slow] }).execute("go");
+    expect(peak).toBe(4); // the default cap
+
+    peak = 0;
+    await agent({
+      model: mock().model({ name: "m" }),
+      tools: [slow],
+      maxConcurrentTools: 2,
+    }).execute("go", { maxConcurrentTools: 6 });
+    expect(peak).toBe(6);
   });
 
   it("lets a per-call option override the agent's dispatch mode", async () => {

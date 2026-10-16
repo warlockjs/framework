@@ -130,7 +130,14 @@ describe("hashRequest", () => {
         LEGACY_HASH_OPTIONS,
       );
 
-      for (const providerOptions of [undefined, {}, { anthropic: undefined }]) {
+      for (const providerOptions of [
+        undefined,
+        {},
+        { anthropic: undefined },
+        { anthropic: {} },
+        { anthropic: { betas: undefined } },
+        { anthropic: { body: { context_management: undefined } } },
+      ]) {
         expect(
           hashRequest(messages, {
             temperature: 0.2,
@@ -139,6 +146,23 @@ describe("hashRequest", () => {
           }),
         ).toBe(legacy);
       }
+    });
+
+    it("still hashes a provider whose options keep one real value", () => {
+      expect(
+        hashRequest(messages, {
+          providerOptions: { anthropic: { betas: undefined, thinkingDisplay: "summarized" } },
+        }),
+      ).toBe(
+        hashRequest(messages, {
+          providerOptions: { anthropic: { thinkingDisplay: "summarized" } },
+        }),
+      );
+      expect(
+        hashRequest(messages, {
+          providerOptions: { anthropic: { thinkingDisplay: "summarized" } },
+        }),
+      ).not.toBe(hashRequest(messages, {}));
     });
 
     it("is insensitive to provider and body key order", () => {

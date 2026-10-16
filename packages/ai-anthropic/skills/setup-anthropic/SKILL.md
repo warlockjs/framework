@@ -161,24 +161,30 @@ When a thinking-enabled response also makes tool calls, its signed `thinking` an
 
 When a response contains a block the neutral `content` / `toolCalls` cannot carry (thinking, redacted thinking, `compaction`, server-tool use/results, cited text), the adapter returns the whole ordered turn as `ModelResponse.blocks` (and on the streaming `done` chunk): `{ provider: "anthropic", type, data }` per block. Plain text / tool-use turns have no `blocks`.
 
-The agent copies them onto the assistant `Message.blocks` (tool-call trips, `pause_turn` trips, repair turns), onto `LLMTrip.blocks`, and the final trip's onto `AgentResult.blocks`. On the next request the adapter replays an assistant message **verbatim** from its `blocks` — required for preserved thinking and server-side compaction. It falls back to rebuilding from `content` + `toolCalls` when the blocks come from another provider or their `tool_use` ids no longer match `toolCalls`.
+The agent copies them onto the assistant `Message.blocks` (tool-call trips, `pause_turn` trips, repair turns) and onto `LLMTrip.blocks`; `AgentResult.blocks` is set only for a single-trip run. On the next request the adapter replays an assistant message **verbatim** from its `blocks` — required for preserved thinking and server-side compaction. It falls back to rebuilding from `content` + `toolCalls` when the blocks come from another provider, a block's `data.type` differs from its `type` or is not an assistant-turn type, or their `tool_use` ids no longer match `toolCalls`.
+
+A replayed thinking block requires every earlier turn unchanged, including the run's tool-call turns and tool results. Never store just `{ content: result.text, blocks }` after a multi-trip run. Keep the run's turns:
 
 ```ts
-const result = await agent.execute(input);
+// agent created with `captureMessages: true`
+const result = await agent.execute(input, { history });
+const finalTrip = result.report.trips.at(-1);
 
-// Keep your own transcript? Store the blocks with the reply.
-history.push({ role: "assistant", content: result.text ?? "", blocks: result.blocks });
+history = [
+  ...(result.report.messages ?? []).filter((message) => message.role !== "system"),
+  { role: "assistant", content: finalTrip?.output ?? "", blocks: finalTrip?.blocks },
+];
 ```
 
 ## Provider options (`providerOptions.anthropic`)
 
 Anthropic-only request options, per call or in the agent's `modelOptions`. Other adapters ignore the key. Type: `AnthropicCallOptions`.
 
-| Field             | Effect                                                                                                                                         |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `betas`           | Beta flags. When non-empty the request goes through `client.beta.messages` (needed for beta body fields and beta blocks such as `compaction`). |
-| `body`            | Extra body fields merged **last** (caller wins): `context_management`, `fallbacks`, `inference_geo`, `tool_choice`, … Not validated.           |
-| `thinkingDisplay` | `thinking.display` on adaptive models: `"summarized"`, `"omitted"`, `"updates"` (the last needs its beta).                                     |
+| Field             | Effect                                                                                                                                                                                                                                                   |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `betas`           | Beta flags. When non-empty the request goes through `client.beta.messages` (needed for beta body fields and beta blocks such as `compaction`).                                                                                                           |
+| `body`            | Extra body fields merged **last** (caller wins): `context_management`, `fallbacks`, `inference_geo`, `tool_choice`, … Not validated, except that `model`, `messages`, `system`, `tools`, `mcp_servers` and `stream` are refused (`InvalidRequestError`). |
+| `thinkingDisplay` | `thinking.display` on adaptive models: `"summarized"`, `"omitted"`, `"updates"` (the last needs its beta).                                                                                                                                               |
 
 ```ts
 const agent = ai.agent({

@@ -142,6 +142,12 @@ export type AgentExecuteOptions<TOutput = unknown> = {
    */
   toolDispatch?: ToolDispatchMode;
   /**
+   * Per-call override for the number of a trip's tool calls that may run
+   * at once under concurrent dispatch. Wins over
+   * `AgentConfig.maxConcurrentTools` (default `4`).
+   */
+  maxConcurrentTools?: number;
+  /**
    * Opaque caller-supplied identifier that groups multiple `execute()`
    * calls into one conceptual user session / request. Mirrored onto
    * every report node this run produces (and every nested executable
@@ -173,11 +179,14 @@ export type AgentResumeOptions<TOutput = unknown> = AgentExecuteOptions<TOutput>
 /**
  * How the agent runs the tool calls a model requests in one trip.
  *
- * - `"concurrent"` (default) — every call of the trip starts at once and
- *   the trip continues when all have settled.
- * - `"sequential"` — each call is awaited before the next starts; use it
- *   for tools that share mutable state or must observe each other's
- *   side effects.
+ * - `"concurrent"` (default) — the calls of the trip run in parallel, at
+ *   most `maxConcurrentTools` (default `4`) at a time, and the trip
+ *   continues when all have settled.
+ * - `"sequential"` — each call is awaited before the next starts, and its
+ *   result is appended to the conversation before the next call runs, so
+ *   tool middleware sees earlier results of the same turn; use it for
+ *   tools that share mutable state or must observe each other's side
+ *   effects.
  *
  * Results always reach the model in the order the calls were requested.
  */

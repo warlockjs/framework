@@ -173,13 +173,27 @@ Options that only one provider understands go under `providerOptions`, keyed by 
 
 ### Finish reasons and provider blocks
 
-Each trip records why the model stopped: `stop`, `tool_calls`, `length`, `context_exceeded` (the history filled the context window; compact or trim it), `pause_turn`, `refusal` or `error`. The agent resumes a `pause_turn` by itself, within `maxTrips`. `refusal` and `context_exceeded` end the run; read `report.trips.at(-1)?.finishReason` to decide whether to retry on another model.
+Each trip records why the model stopped: `stop`, `tool_calls`, `length`, `context_exceeded` (the history filled the context window; compact or trim it), `pause_turn`, `refusal` or `error`. The agent resumes a `pause_turn` by itself, within `maxTrips`; the continuation carries only the new content, so `result.text` (and the structured output parsed from it) joins the paused segments with the final one. `refusal` and `context_exceeded` end the run; read `report.trips.at(-1)?.finishReason` to decide whether to retry on another model.
 
-Some providers return content the neutral `text` cannot carry, such as Anthropic thinking and compaction blocks. The adapter puts the whole turn on `blocks`, and the agent replays it verbatim inside the run. If you keep your own transcript between runs, store `result.blocks` on the assistant message:
+Some providers return content the neutral `text` cannot carry, such as Anthropic thinking and compaction blocks. The adapter puts the whole turn on `blocks`, and the agent replays it verbatim inside the run.
+
+A replayed thinking block is only accepted when every turn before it is unchanged, including the assistant tool-call turns and tool results the run made. So keep blocks between runs only together with those turns. `report.messages` (with `captureMessages: true`) has them, each assistant turn with its `blocks`; append the final reply from the last trip:
 
 ```ts
-history.push({ role: "assistant", content: result.text ?? "", blocks: result.blocks });
+// The agent runs with `captureMessages: true`.
+const result = await chat.execute(question, { history });
+const finalTrip = result.report.trips.at(-1);
+
+history = [
+  // Your history, the question, and every tool-call turn and tool result of the run.
+  // The agent re-adds the system prompt on each run, so leave it out here.
+  ...(result.report.messages ?? []).filter((message) => message.role !== "system"),
+  // The final reply, as the model sent it.
+  { role: "assistant", content: finalTrip?.output ?? "", blocks: finalTrip?.blocks },
+];
 ```
+
+`result.blocks` is set only when the run was a single trip, the one case where `{ content: result.text, blocks: result.blocks }` is the whole turn. `report.messages` stores message content as text, so a question sent with attachments comes back as its JSON form; keep your own copy of such turns if you replay them.
 
 ## Structured output
 

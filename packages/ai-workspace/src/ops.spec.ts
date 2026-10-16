@@ -664,3 +664,75 @@ describe("createOps.exec output cap", () => {
     expect(result.truncated).toBe(true);
   });
 });
+
+describe("createOps concurrent mutations on one path", () => {
+  /** Reads wait a tick, so two unserialized edits would both read before either writes. */
+  class SlowReadBackend extends FakeBackend {
+    public override async readFile(absPath: string): Promise<string> {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      return super.readFile(absPath);
+    }
+  }
+
+  let backend: SlowReadBackend;
+
+  beforeEach(() => {
+    backend = new SlowReadBackend();
+    backend.files.set(abs("shared.ts"), "const a = 1;\nconst b = 2;\n");
+  });
+
+  it("applies two concurrent edits without an expected hash on top of each other", async () => {
+    const ops = createOps(backend, policy());
+
+    await Promise.all([
+      ops.editFile({ path: "shared.ts", oldString: "const a = 1;", newString: "const a = 10;" }),
+      ops.editFile({ path: "shared.ts", oldString: "const b = 2;", newString: "const b = 20;" }),
+    ]);
+
+    expect(backend.files.get(abs("shared.ts"))).toBe("const a = 10;\nconst b = 20;\n");
+  });
+
+  it("refuses the second of two concurrent edits pinned to the same read", async () => {
+    const ops = createOps(backend, policy());
+    const { hash } = await ops.readFile("shared.ts");
+
+    const results = await Promise.allSettled([
+      ops.editFile({ path: "shared.ts", oldString: "const a = 1;", newString: "const a = 10;", expectHash: hash }),
+      ops.editFile({ path: "shared.ts", oldString: "const b = 2;", newString: "const b = 20;", expectHash: hash }),
+    ]);
+
+    expect(results[0]?.status).toBe("fulfilled");
+    expect(results[1]).toMatchObject({ status: "rejected", reason: { type: "stale-hash" } });
+    expect(backend.files.get(abs("shared.ts"))).toBe("const a = 10;\nconst b = 2;\n");
+  });
+
+  it("does not hold up mutations of other paths", async () => {
+    const ops = createOps(backend, policy());
+    backend.files.set(abs("other.ts"), "x");
+
+    const order: string[] = [];
+    await Promise.all([
+      ops.editFile({ path: "shared.ts", oldString: "const a = 1;", newString: "const a = 10;" }).then(() => {
+        order.push("shared");
+      }),
+      ops.writeFile("other.ts", "y").then(() => {
+        order.push("other");
+      }),
+    ]);
+
+    expect(order[0]).toBe("other");
+  });
+
+  it("keeps serving a path after a failed mutation", async () => {
+    const ops = createOps(backend, policy());
+
+    await expect(
+      ops.editFile({ path: "shared.ts", oldString: "missing", newString: "x" }),
+    ).rejects.toMatchObject({ type: "not-found" });
+
+    await ops.editFile({ path: "shared.ts", oldString: "const a = 1;", newString: "const a = 10;" });
+
+    expect(backend.files.get(abs("shared.ts"))).toContain("const a = 10;");
+  });
+});

@@ -99,6 +99,12 @@ type PendingWrite = {
   promptKey: string;
   vector: number[];
   scope?: string;
+  /**
+   * Text of `pause_turn` segments seen so far. A resumed turn's
+   * continuation carries only its new content, so the stored answer is
+   * these segments followed by the final response's content.
+   */
+  pausedContent?: string;
 };
 
 const DEFAULT_NAMESPACE = "ai.cache";
@@ -373,14 +379,27 @@ export function semanticCache(options: SemanticCacheOptions): AgentMiddleware {
         // prompt key. Deleting here would orphan the pending and the
         // post-tool answer would never make it into the store. A paused
         // turn (`pause_turn`) is mid-turn the same way: the agent resumes it.
-        if (response.finishReason === "tool_calls" || response.finishReason === "pause_turn") {
+        if (response.finishReason === "pause_turn") {
+          pending.pausedContent = (pending.pausedContent ?? "") + response.content;
+
+          return;
+        }
+
+        if (response.finishReason === "tool_calls") {
+          // A tool trip ends the current assistant turn; text from an
+          // earlier paused segment is not part of the eventual answer.
+          delete pending.pausedContent;
+
           return;
         }
 
         context.state.delete(pendingKey);
 
         const entry: CachedEntry = {
-          response,
+          response:
+            pending.pausedContent === undefined
+              ? response
+              : { ...response, content: pending.pausedContent + response.content },
           storedAt: Date.now(),
           scope: pending.scope,
         };

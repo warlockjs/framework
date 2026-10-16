@@ -2,6 +2,7 @@ export { accumulateCost, computeCost, mergeUsage } from "./compute-cost";
 export { extractJsonLenient } from "./extract-json-lenient";
 export { extractJsonPayload } from "./extract-json-payload";
 export { generateRunId } from "./generate-run-id";
+export { mapWithConcurrency } from "./map-with-concurrency";
 export { extractJsonSchema } from "./json-schema";
 export type { ExtractJsonSchemaOptions, JsonSchemaTarget } from "./json-schema";
 export { prepareAttachmentPart } from "./prepare-attachment-part";

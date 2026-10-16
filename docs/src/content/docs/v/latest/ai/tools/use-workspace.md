@@ -114,6 +114,7 @@ await ws.remove("dist");
 - `truncated` is `true` when anything after `content` was withheld — later lines (by `limit`, the default window or the cap) or the tail of `endLine`.
 - `hash` is always the SHA-256 of the **whole file**, not the window, so it is a valid `expectHash` whatever was returned. `totalBytes` is the whole file's size.
 - No `maxBytes` ⇒ no byte cap (only the line window applies).
+- `maxBytes` bounds what a read **returns**, not what it loads: the whole file is still read into memory and hashed, because `hash` covers the whole file. Keep very large files out of the jail with `denyPaths` if memory matters.
 
 ```ts
 const ws = ai.workspace({ cwd, read: { maxBytes: 64_000, defaultLines: 400 } });
@@ -142,6 +143,8 @@ A custom `WorkspaceBackend` receives the signal as `exec(command, { signal })` a
 ## Read-before-edit (the stale-hash guard)
 
 `readFile` returns a SHA-256 `hash` of the full file. Pass it to `editFile`'s `expectHash`; if the file changed since you read it, the edit is rejected as stale so you re-read before clobbering. `editFile` also requires the `oldString` to be **exact and unique** — pass `replaceAll: true` to replace every occurrence, or include more surrounding context to disambiguate.
+
+Writes, edits and removes of the **same path** run one after another, even when the agent dispatches several tool calls at once. Two `edit_file` calls pinned to the same `expectHash` therefore cannot both succeed: the second re-reads after the first has written and is rejected as stale, instead of silently overwriting it. Without `expectHash`, the second edit applies on top of the first. Different paths are not held up.
 
 ## Errors flow as data, not throws
 

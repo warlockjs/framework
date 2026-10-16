@@ -1,4 +1,5 @@
 import {
+  InvalidRequestError,
   safeJsonParse,
   type Message,
   type ModelCallOptions,
@@ -559,7 +560,10 @@ export class AnthropicModel implements ModelContract {
   /**
    * The full request body: the adapter-built params, then
    * `thinking.display` when thinking is sent on an adaptive model, then
-   * `providerOptions.anthropic.body` merged last (caller fields win).
+   * `providerOptions.anthropic.body` merged last (caller fields win). The
+   * body may add fields the adapter does not build (`context_management`,
+   * `fallbacks`, …) but may not replace the conversation or the model —
+   * see {@link RESERVED_BODY_FIELDS}.
    */
   private buildBody(
     messages: Message[],
@@ -579,6 +583,19 @@ export class AnthropicModel implements ModelContract {
         ...(body.thinking as Record<string, unknown>),
         display: anthropic.thinkingDisplay,
       };
+    }
+
+    const reserved = Object.keys(anthropic.body ?? {}).filter((key) =>
+      RESERVED_BODY_FIELDS.has(key),
+    );
+
+    if (reserved.length > 0) {
+      throw new InvalidRequestError(
+        `providerOptions.anthropic.body cannot set ${reserved.map((key) => `"${key}"`).join(", ")}: ` +
+          "the adapter builds these from the call's messages, tools and model. " +
+          "Use the agent/model options instead.",
+        { context: { fields: reserved } },
+      );
     }
 
     return { ...body, ...anthropic.body };
@@ -965,6 +982,22 @@ export class AnthropicModel implements ModelContract {
     return wrapped;
   }
 }
+
+/**
+ * Request fields `providerOptions.anthropic.body` may not set: they carry
+ * the conversation, the model and the tool surface the agent registered,
+ * so an override would silently replace the agent's input (or let the
+ * model call tools the agent never registered). `stream` is chosen per
+ * call by `complete()` / `stream()`.
+ */
+const RESERVED_BODY_FIELDS: ReadonlySet<string> = new Set([
+  "model",
+  "messages",
+  "system",
+  "tools",
+  "mcp_servers",
+  "stream",
+]);
 
 /** Body fields `messages.countTokens` accepts, copied from the full request body. */
 const COUNT_TOKENS_FIELDS = [

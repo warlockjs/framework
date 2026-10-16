@@ -172,7 +172,9 @@ export type AnthropicCallOptions = {
    * body — e.g. `context_management`, `fallbacks`, `inference_geo`,
    * `tool_choice`, `metadata`. Sent as-is: the adapter does not validate
    * them, so a field the endpoint or model rejects surfaces as the
-   * provider's 400.
+   * provider's 400. The fields the adapter builds from the call —
+   * `model`, `messages`, `system`, `tools`, `mcp_servers`, `stream` — are
+   * refused with `InvalidRequestError`. Never pass end-user input here.
    */
   body?: Record<string, unknown>;
   /**
