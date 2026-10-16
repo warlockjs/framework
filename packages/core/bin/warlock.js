@@ -4,6 +4,12 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+const [nodeMajor, nodeMinor] = process.versions.node.split(".").map(Number);
+if (nodeMajor < 22 || (nodeMajor === 22 && nodeMinor < 15)) {
+  console.error(`[warlock] requires Node 22.15 or newer (running ${process.versions.node}).`);
+  process.exit(1);
+}
+
 const binDir = path.dirname(fileURLToPath(import.meta.url));
 
 /**

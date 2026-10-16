@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.31.0
 
+### Upgrading
+
+- **BREAKING:** upgrade development and production runtimes to Node.js 22.15 or newer before running the CLI.
+
+### Fixed
+
+- The CLI rejects unsupported Node versions with one clear message and a non-zero exit before loading the published entry or registering the source loader.
+
 ### Changed
 
 - **BREAKING:** Node.js 22.15 or newer is required (`engines.node: ">=22.15"`): the `warlock` CLI loads TypeScript through `module.registerHooks`, which Node added in 22.15.

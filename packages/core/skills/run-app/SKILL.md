@@ -123,7 +123,7 @@ preload: {
 
 HTTP + Socket connectors are **Late** phase — they boot later in the dev-server startup sequence, after app modules load. That ordering is what guarantees `app.http` / `app.socket` are live by the time your `main.ts` runs.
 
-**Runs on any Node version.** `warlock.config.ts` is loaded by transpiling it with esbuild when the runtime can't import `.ts` natively (Node < 22.18 / < 23.6) — so `build`/`start` work on older production Node without `--experimental-strip-types` or a newer Node.
+**Requires Node 22.15 or newer.** The CLI checks the runtime before loading either the published entry or the source loader and exits with a clear message on older versions. `warlock.config.ts` is transpiled with esbuild when the supported runtime cannot import `.ts` natively (Node < 22.18 / < 23.6); no `--experimental-strip-types` flag is needed.
 
 **Boot failures are fatal and loud.** Anything that throws during preload — a bad import in a `src/config/*.ts` file, a removed package export, a connector that fails to start — stops `dev`/`start` immediately with the error message and the offending file/line, then exits `1`. A common cause is upgrading `@warlock.js/*` and hitting a removed export (e.g. a config file that pulls in a model importing a symbol the new version no longer exports). If `warlock dev` ever just freezes right after the banner with no message, treat it as a bug and report it — preload errors are meant to print, never hang.
 
@@ -424,14 +424,14 @@ Now `npm run dev` / `npm run build` / `npm run start`. Standard Node hosting pro
 ### Production Dockerfile
 
 ```dockerfile
-FROM node:20-alpine AS build
+FROM node:22.15-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 RUN npx warlock build
 
-FROM node:20-alpine
+FROM node:22.15-alpine
 WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules

@@ -17,7 +17,7 @@ description: Hard-won operational facts about the Warlock.js framework monorepo 
 | `scripts/` | Workspace-wide checks: `check-spec-coverage.mjs`, `ci/affected-packages.mjs`. |
 | `.github/workflows/` | CI, docs, create-warlock and release pipelines. |
 
-- Install once at the root: `pnpm install` (pnpm 11.24.0, Node ≥ 22.13). `linkWorkspacePackages: true` links every `@warlock.js/*` dependency to the package in this repository, never to npm.
+- Install once at the root: `pnpm install` (pnpm 11.24.0, Node ≥ 22.15). `linkWorkspacePackages: true` links every `@warlock.js/*` dependency to the package in this repository, never to npm.
 - `packages/create-warlock` carries its **own** `pnpm-workspace.yaml` and lockfile: pnpm run from inside it treats it as a standalone project, which is how its own CI proves the scaffolder works without the monorepo.
 - The full history of every package was imported from its original repository (rewritten into `packages/<name>/`), so `git log -- packages/core` and `git blame` reach back past the move. The original repositories (`warlockjs/core`, `warlockjs/web`, …, `warlockjs/release`, `warlockjs/documentation`) are **archived**: read-only, kept for their tags.
 

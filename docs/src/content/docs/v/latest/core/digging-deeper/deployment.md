@@ -391,7 +391,7 @@ Before `warlock start` on a fresh host:
 
 ## Where to host
 
-Warlock produces a standard Node ESM bundle plus your `node_modules` — anywhere that runs Node 22+ will serve it. Build in CI (or on the box), ship `dist/` + `node_modules` + your `.env`/config, set `NODE_ENV`, and run `warlock start` under whatever process supervisor your platform provides. The framework deliberately doesn't prescribe a container or process-manager setup; the only hard requirements are a Node runtime, the installed dependencies, and the env vars your config files read.
+Warlock produces a standard Node ESM bundle plus your `node_modules` — anywhere that runs Node 22.15 or newer will serve it. Build in CI (or on the box), ship `dist/` + `node_modules` + your `.env`/config, set `NODE_ENV`, and run `warlock start` under whatever process supervisor your platform provides. The framework deliberately doesn't prescribe a container or process-manager setup; the only hard requirements are a Node runtime, the installed dependencies, and the env vars your config files read.
 
 ## See also
 

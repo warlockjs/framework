@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@v7
 
       # Node 22, not 20: pnpm 11.24 loads `node:sqlite`, which does not exist
-      # before Node 22.13. On Node 20 it prints its version requirement as a WARN
+      # before Node 22.13. Warlock requires Node 22.15 or newer. On Node 20 it prints its version requirement as a WARN
       # and then dies on ERR_UNKNOWN_BUILTIN_MODULE, which names neither pnpm nor
       # the Node version. Move one of these two and you must move the other.
       - uses: actions/setup-node@v7
@@ -101,7 +101,7 @@ jobs:
       - uses: actions/checkout@v7
 
       # Node 22, not 20: pnpm 11.24 loads `node:sqlite`, which does not exist
-      # before Node 22.13. On Node 20 it prints its version requirement as a WARN
+      # before Node 22.13. Warlock requires Node 22.15 or newer. On Node 20 it prints its version requirement as a WARN
       # and then dies on ERR_UNKNOWN_BUILTIN_MODULE, which names neither pnpm nor
       # the Node version. Move one of these two and you must move the other.
       - uses: actions/setup-node@v7
