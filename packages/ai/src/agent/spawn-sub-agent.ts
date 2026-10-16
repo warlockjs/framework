@@ -1,5 +1,5 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import type { AgentExecuteOptions } from "../contracts/agent/agent-options.type";
+import type { AgentExecuteOptions, ToolDispatchMode } from "../contracts/agent/agent-options.type";
 import type { AgentContract } from "../contracts/agent/agent.contract";
 import type { AgentResult } from "../contracts/result/agent-result.type";
 import type { ModelContract } from "../contracts/model.contract";
@@ -38,6 +38,10 @@ export type SpawnSubAgentSpec<TOutput = unknown> = {
   tools?: AgentToolEntry<unknown, unknown>[];
   /** Per-spawn round-trip cap. Forwarded to the agent. Defaults to the agent default. */
   maxTrips?: number;
+  /** Tool calls within a trip run concurrently by default; use sequential for ordered side effects. */
+  toolDispatch?: ToolDispatchMode;
+  /** Maximum concurrent tool calls in a trip (default 4); ignored in sequential mode. */
+  maxConcurrentTools?: number;
   /**
    * Per-task budget. When set, the spawn runs under a `budget` middleware
    * that aborts once a cap (`maxTokens` / `maxCostUSD`) is crossed — a
@@ -128,6 +132,8 @@ function buildSubAgent<TOutput>(spec: SpawnSubAgentSpec<TOutput>): AgentContract
     systemPrompt: spec.systemPrompt,
     tools: spec.tools,
     maxTrips: spec.maxTrips,
+    toolDispatch: spec.toolDispatch,
+    maxConcurrentTools: spec.maxConcurrentTools,
     output: spec.output,
     middleware,
   });

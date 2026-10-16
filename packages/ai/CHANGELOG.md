@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.31.0
+
+### Upgrading
+
+- Sub-agents also use the concurrent tool default introduced in 5.30. Callers upgrading from 5.29 whose tools need ordered side effects can now set `spawnSubAgent({ toolDispatch: "sequential", ... })`.
+
+### Added
+
+- `SpawnSubAgentSpec` accepts `toolDispatch` and `maxConcurrentTools`, forwarded to the fresh agent. Defaults match `ai.agent()` (concurrent, up to four calls).
+
 ## 5.30.0 - 2026-10-16
 
 ### Upgrading
@@ -105,6 +115,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Lockstep release maintenance and dependency refresh.
+
 ## 5.20.0 - 2026-09-24
 
 ### Changed

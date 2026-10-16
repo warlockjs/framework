@@ -3923,11 +3923,16 @@ import { ai } from "@warlock.js/ai";
 const result = await ai.spawnSubAgent({
   name: "extract-entities",
   model,
+  toolDispatch: "sequential", // ordered tool effects; default is concurrent
+  maxConcurrentTools: 2, // cap in concurrent mode (default 4)
+
   task: "Pull every company name from this article: ...",
   budget: { maxCostUSD: 0.05 }, // per-task spend cap — aborts when crossed
   output: companiesSchema,
 });
 ```
+
+`SpawnSubAgentSpec` accepts `toolDispatch` and `maxConcurrentTools` with the same defaults as `ai.agent()`: concurrent calls, up to four at once. Upgrading from 5.29 to 5.30 changed sub-agent tools to this concurrent default too; use `toolDispatch: "sequential"` when tool side effects require ordering.
 
 The one field a bare agent config doesn't surface ergonomically is `budget` (`BudgetOptions` — `maxTokens` / `maxCostUSD`), equivalent to `ai.agent({ middleware: [ai.middleware.budget(...)] })` but promoted to a first-class spec field so a delegated subtask can't overrun its cap (distinct from `maxTrips`, which caps round-trips, not spend). The surface is **narrower** than `agent.execute()`: one-shot, with no `history`, `placeholders`, per-call events, or `repair`. The spawned `report` slots under the caller's `report.children[]`, so cost and traces roll up uniformly. Reach for it when you want a named single-use delegation with a hard spend cap; otherwise just build an `ai.agent()` and call it.
 

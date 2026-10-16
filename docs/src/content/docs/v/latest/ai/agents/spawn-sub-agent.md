@@ -38,6 +38,8 @@ ai.agent({
   systemPrompt: spec.systemPrompt,
   tools: spec.tools,
   maxTrips: spec.maxTrips,
+  toolDispatch: spec.toolDispatch,
+  maxConcurrentTools: spec.maxConcurrentTools,
   output: spec.output,
   middleware: spec.budget ? [ai.middleware.budget(spec.budget)] : undefined,
 }).execute(spec.task, { output: spec.output, signal: spec.signal, sessionId: spec.sessionId });
@@ -49,7 +51,7 @@ Because each spawn is its own `ai.agent()` instance, it starts from an empty con
 
 The single field that earns the helper its name is `budget`. It promotes a per-task spend ceiling to a first-class spec field: when set, the spawn runs under a [`budget` middleware](/v/latest/ai/architecture-concepts/middleware/) that aborts the moment a cap (`maxTokens` / `maxCostUSD`) is crossed, so a delegated subtask can't overrun its allowance. That's distinct from `maxTrips`, which caps round-trips, not spend. It's equivalent to passing `middleware: [ai.middleware.budget(...)]` to a plain agent — `ai.spawnSubAgent` just makes it a named, obvious field for the "delegate with a hard cap" case.
 
-## What it does *not* give you
+## What it does _not_ give you
 
 It is a **narrower** surface than `agent.execute()` — a deliberate one-shot shape:
 
@@ -75,16 +77,18 @@ Otherwise — when you want history, streaming, events, or a long-lived agent �
 
 ```ts
 type SpawnSubAgentSpec<TOutput> = {
-  name: string;                          // stable identifier for the spawned agent
-  model: ModelContract;                  // the model it runs against
-  task: string;                          // the subtask instruction handed to execute()
+  name: string; // stable identifier for the spawned agent
+  model: ModelContract; // the model it runs against
+  task: string; // the subtask instruction handed to execute()
   systemPrompt?: SystemPromptContract | string;
-  tools?: AgentToolEntry[];              // tools the spawn may call in its own loop
-  maxTrips?: number;                     // per-spawn round-trip cap
-  budget?: BudgetOptions;                // per-task spend cap ({ maxTokens } / { maxCostUSD })
-  output?: StandardSchemaV1<TOutput>;    // structured output validated into result.data
-  signal?: AbortSignal;                  // cancellation
-  sessionId?: string;                    // groups the spawn under a session in flat trace queries
+  tools?: AgentToolEntry[]; // tools the spawn may call in its own loop
+  toolDispatch?: ToolDispatchMode; // concurrent (default) or sequential
+  maxConcurrentTools?: number; // default 4; ignored in sequential mode
+  maxTrips?: number; // per-spawn round-trip cap
+  budget?: BudgetOptions; // per-task spend cap ({ maxTokens } / { maxCostUSD })
+  output?: StandardSchemaV1<TOutput>; // structured output validated into result.data
+  signal?: AbortSignal; // cancellation
+  sessionId?: string; // groups the spawn under a session in flat trace queries
 };
 ```
 
@@ -93,3 +97,8 @@ type SpawnSubAgentSpec<TOutput> = {
 - [Run agent](/v/latest/ai/agents/run-agent/) — the full agent surface `spawnSubAgent` builds on (history, streaming, events, repair).
 - [Middleware](/v/latest/ai/architecture-concepts/middleware/) — the `budget` middleware the `budget` field wires up for you.
 - [Planner](/v/latest/ai/architecture-concepts/planner/) — generates and runs a plan; a step can delegate via `spawnSubAgent`, but the planner does not require it.
+
+Tool calls in one trip run concurrently, up to four at once by default. Set
+`toolDispatch: "sequential"` for tools with ordered side effects, or
+`maxConcurrentTools: 2` to lower the concurrency cap. This also applies when
+upgrading a `spawnSubAgent` caller from 5.29 to the concurrent default in 5.30.

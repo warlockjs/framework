@@ -1,6 +1,8 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { describe, expect, it } from "vitest";
 import { MockSDK } from "../mock/mock-sdk";
+import { tool } from "../tool/tool";
+import type { ToolDispatchMode } from "../contracts/agent/agent-options.type";
 import { spawnSubAgent } from "./spawn-sub-agent";
 
 describe("spawnSubAgent", () => {
@@ -21,6 +23,63 @@ describe("spawnSubAgent", () => {
     expect(result.report.name).toBe("extractor");
     expect(result.report.status).toBe("completed");
   });
+
+  it.each([
+    { toolDispatch: "sequential" as ToolDispatchMode, maxConcurrentTools: 3, expected: 1 },
+    { toolDispatch: "concurrent" as ToolDispatchMode, maxConcurrentTools: 2, expected: 2 },
+    { toolDispatch: undefined, maxConcurrentTools: undefined, expected: 4 },
+  ])(
+    "forwards dispatch $toolDispatch and cap $maxConcurrentTools",
+    async ({ toolDispatch, maxConcurrentTools, expected }) => {
+      let active = 0;
+      let peak = 0;
+      const completed: number[] = [];
+      const work = tool({
+        name: "work",
+        description: "Run bounded work",
+        input: {
+          "~standard": {
+            version: 1,
+            vendor: "test",
+            validate: (value: unknown) => ({ value: value as number }),
+          },
+        } satisfies StandardSchemaV1<number>,
+        execute: async (value: number) => {
+          active++;
+          peak = Math.max(peak, active);
+          await new Promise<void>((resolve) => setImmediate(resolve));
+          active--;
+          completed.push(value);
+          return value;
+        },
+      });
+      const model = MockSDK({
+        responses: [
+          {
+            content: "",
+            finishReason: "tool_calls",
+            toolCalls: Array.from({ length: 6 }, (_, i) => ({
+              id: `call-${i}`,
+              name: "work",
+              input: i,
+            })),
+          },
+          { content: "done", finishReason: "stop" },
+        ],
+      }).model({ name: "sub" });
+      const result = await spawnSubAgent({
+        name: "bounded",
+        model,
+        task: "Work",
+        tools: [work],
+        toolDispatch,
+        maxConcurrentTools,
+      });
+      expect(result.error).toBeUndefined();
+      expect(peak).toBe(expected);
+      expect(completed).toEqual([0, 1, 2, 3, 4, 5]);
+    },
+  );
 
   it("validates structured output against the provided schema", async () => {
     const model = MockSDK({
