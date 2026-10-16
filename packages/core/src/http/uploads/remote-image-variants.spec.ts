@@ -14,6 +14,7 @@ import type { StorageDriverContract } from "../../storage/types";
 import { generateImageVariants } from "./generate-image-variants";
 import { purgeImageVariants } from "./purge-image-variants";
 import { resolveImageVariant } from "./resolve-image-variant";
+import * as cacheTrim from "./trim-image-variant-cache";
 
 let root: string;
 let buffer: Buffer;
@@ -46,6 +47,11 @@ afterEach(async () => {
 
 describe("remote disk image variants", () => {
   it("uses ETag metadata on hits and coalesces concurrent misses across variants", async () => {
+    // The initial misses schedule background work independently of later hits.
+    // Isolate that work so it cannot race the no-hit-sweep assertions.
+    const schedule = vi
+      .spyOn(cacheTrim, "scheduleImageVariantCacheTrim")
+      .mockImplementation(() => {});
     let etag = "revision-a";
     vi.mocked(driver.metadata).mockImplementation(async () => ({
       path: "photo.png",
@@ -65,10 +71,12 @@ describe("remote disk image variants", () => {
     expect(driver.getStream).toHaveBeenCalledTimes(1);
     const first = (await resolveImageVariant(input))!;
     vi.mocked(driver.getStream).mockClear();
+    schedule.mockClear();
     const readdir = vi.spyOn(fs, "readdir");
     await Promise.all(Array.from({ length: 20 }, () => resolveImageVariant(input)));
     expect(driver.getStream).not.toHaveBeenCalled();
     expect(readdir).not.toHaveBeenCalled();
+    expect(schedule).not.toHaveBeenCalled();
     etag = "revision-b";
     const revised = (await resolveImageVariant(input))!;
     expect(revised.hash).not.toBe(first.hash);

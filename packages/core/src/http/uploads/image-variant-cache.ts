@@ -1,10 +1,14 @@
 import config from "@mongez/config";
 import { log } from "@warlock.js/logger";
 import fs from "node:fs/promises";
+import { realpathSync } from "node:fs";
+import { configuredLocalDiskRoots } from "../../storage/local-disk-roots";
+import type { UploadsImagesConfigurations } from "../uploads-types";
+import { ImageVariantsConfigError } from "./image-variants-config-error";
 import path from "node:path";
 import { rootPath } from "../../utils/paths";
 import { uploadsConfig } from "../uploads-config";
-import { isPathInside } from "./is-path-inside";
+import { isPathInside, isPathWithin } from "./is-path-inside";
 import {
   variantGenerationTag,
   variantSourceDirectory,
@@ -13,7 +17,7 @@ import {
 
 /*
  * Cache housekeeping for image derivatives. Deliberately free of any
- * `storage` import: the local storage driver calls into this module when it
+ * import of the storage manager or drivers: the local driver calls into this module when it
  * deletes or moves a file, and storage must not import back into the HTTP
  * layer that already imports storage.
  */
@@ -26,19 +30,47 @@ async function realpathOrSelf(target: string): Promise<string> {
   }
 }
 
+function canonicalDirectory(target: string): string {
+  const resolved = path.resolve(target);
+  try {
+    return realpathSync(resolved);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    const parent = path.dirname(resolved);
+    if (parent === resolved) throw error;
+    // Resolve the nearest existing ancestor too, so a symlink followed by a
+    // not-yet-created directory cannot hide an overlap with a future disk root.
+    return path.join(canonicalDirectory(parent), path.basename(resolved));
+  }
+}
+
 /**
  * The derivative cache directory for a local disk: `uploads.images.cacheDirectory`
  * when the app sets one (shared by every disk; derivatives are keyed by the
  * disk's real root, so they never collide), otherwise
  * `<diskRoot>/.cache/image-variants`. The same rule as
- * `resolveImageVariantsConfig`.
+ * `resolveImageVariantsConfig`. Refuses any cache that equals or contains
+ * any configured local root, resolving symlinks before comparison.
+ *
+ * @throws ImageVariantsConfigError when a cache overlaps a local disk root
  */
-export function variantCacheDirectoryFor(diskRoot: string): string {
-  const configured = uploadsConfig("images")?.cacheDirectory;
-
-  return configured
+export function variantCacheDirectoryFor(
+  diskRoot: string,
+  images: Pick<UploadsImagesConfigurations, "cacheDirectory"> | undefined = uploadsConfig("images"),
+): string {
+  const configured = images?.cacheDirectory;
+  const directory = configured
     ? path.resolve(configured)
     : path.join(path.resolve(diskRoot), ".cache", "image-variants");
+  const realCache = canonicalDirectory(directory);
+  for (const root of [diskRoot, ...configuredLocalDiskRoots()]) {
+    if (isPathWithin(canonicalDirectory(root), realCache)) {
+      throw new ImageVariantsConfigError(
+        "uploads.images.cacheDirectory must not equal or contain the storage root of any local disk (including symlinks).",
+      );
+    }
+  }
+  return directory;
 }
 
 /**

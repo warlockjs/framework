@@ -12,6 +12,7 @@ import { R2Driver } from "./drivers/r2-driver";
 import { S3Driver } from "./drivers/s3-driver";
 import { ScopedStorage } from "./scoped-storage";
 import { StorageFile } from "./storage-file";
+import { registerLocalDiskConfigurations } from "./local-disk-roots";
 import { safeFetchToBuffer } from "./utils/safe-fetch";
 import { StorageCapabilityError } from "./utils/storage-capability-error";
 import { StorageNotInitializedError } from "./utils/storage-not-initialized-error";
@@ -113,6 +114,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
   public constructor() {
     // Temp placeholder - will be replaced on first access
     super(null as unknown as StorageDriverContract);
+    registerLocalDiskConfigurations(() => this.configs);
   }
 
   /**

@@ -1,11 +1,10 @@
-import path from "node:path";
-import { isPathWithin } from "./is-path-inside";
 import type {
   ImageVariantDefinition,
   ImageVariantFit,
   ImageVariantOutputFormat,
   UploadsImagesConfigurations,
 } from "../uploads-types";
+import { variantCacheDirectoryFor } from "./image-variant-cache";
 import { ImageVariantsConfigError } from "./image-variants-config-error";
 import type { ResolvedImageVariantsConfig } from "./image-variant-types";
 
@@ -165,15 +164,7 @@ export function resolveImageVariantsConfig(
     variants[name] = resolveVariant(name, raw);
   }
 
-  const cacheDirectory = images.cacheDirectory
-    ? path.resolve(images.cacheDirectory)
-    : path.join(storageRoot, ".cache", "image-variants");
-
-  if (isPathWithin(path.resolve(storageRoot), path.resolve(cacheDirectory))) {
-    throw new ImageVariantsConfigError(
-      "uploads.images.cacheDirectory must not equal or contain the storage root.",
-    );
-  }
+  const cacheDirectory = variantCacheDirectoryFor(storageRoot, images);
 
   return {
     variants,

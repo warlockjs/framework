@@ -29,6 +29,8 @@ export type PurgeImageVariantsOptions = {
  * `deleteMany`, `move`) already purges its derivatives; call this for files
  * removed some other way.
  *
+ * @throws ImageVariantsConfigError when the cache equals or contains any
+ * configured local disk root, including through a symlink
  * @returns `true` when something was removed
  */
 export async function purgeImageVariants(
