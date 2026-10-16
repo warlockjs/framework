@@ -45,6 +45,130 @@ afterEach(async () => {
 });
 
 describe("Oxlint background file checks", () => {
+  it.each(["win32", "linux"] as const)(
+    "batches a large boot scan by argv size on %s and merges diagnostics",
+    async (platform) => {
+      const calls: string[][] = [];
+      let active = 0;
+      let maxActive = 0;
+      const execute = vi.fn(async (_binary: string, args: string[]) => {
+        calls.push(args);
+        maxActive = Math.max(maxActive, ++active);
+        await Promise.resolve();
+        active--;
+        return {
+          stdout: JSON.stringify({
+            diagnostics: [
+              {
+                filename: args[4],
+                severity: "warning",
+                message: "batch diagnostic",
+                code: "test-rule",
+              },
+            ],
+          }),
+          stderr: "",
+        };
+      });
+      const batched = new OxlintRunner({ execute, exists: () => true, platform });
+      batched.initialize(cwd);
+      const files = Array.from({ length: 13_000 }, (_, index) => ({
+        path: path.join(cwd, "src", `${"nested-module-".repeat(15)}${index}.ts`),
+        relativePath: `src/file-${index}.ts`,
+      }));
+      const results = await batched.checkFiles(files);
+      expect(calls.length).toBeGreaterThan(1);
+      expect(maxActive).toBe(1);
+      const argumentsSent = calls.flatMap((args) => args.slice(4));
+      expect(argumentsSent).toEqual(files.map((file) => path.relative(cwd, file.path)));
+      const limit = platform === "win32" ? 24 * 1024 : 512 * 1024;
+      for (const args of calls) {
+        expect(
+          args.reduce(
+            (sum, arg) =>
+              sum + (platform === "win32" ? arg.length + 3 : Buffer.byteLength(arg) + 1),
+            0,
+          ),
+        ).toBeLessThan(limit);
+        expect(args.slice(4).some((arg) => path.isAbsolute(arg))).toBe(false);
+      }
+      expect(results).toHaveLength(files.length);
+      expect(results.filter((result) => result.warnings.length)).toHaveLength(calls.length);
+      expect(results.map((result) => result.path)).toEqual(files.map((file) => file.path));
+    },
+  );
+
+  it.each([
+    {
+      stdout: "Failed to load oxlint.config.ts: TypeScript config requires a newer Node runtime",
+      stderr: "",
+      detail: "TypeScript config requires a newer Node runtime",
+    },
+    {
+      stdout: "Failed to parse config: Rule eslint/unknown-rule not found",
+      stderr: "",
+      detail: "Rule eslint/unknown-rule not found",
+    },
+    {
+      stdout: "not json",
+      stderr: "invalid rule configuration",
+      detail: "invalid rule configuration",
+    },
+  ])("reports actionable non-JSON tool output: $detail", async ({ stdout, stderr, detail }) => {
+    const file = await write("changed.ts", "debugger;\n");
+    const contextual = new OxlintRunner({ execute: async () => ({ stdout, stderr }) });
+    contextual.initialize(cwd);
+    await expect(contextual.checkFiles([file])).rejects.toThrow(
+      `Oxlint could not check changed files: ${detail === stderr ? stderr : stdout}`,
+    );
+  });
+
+  it("includes the real CLI's unknown-rule configuration error in the failure message", async () => {
+    await write(".oxlintrc.json", JSON.stringify({ rules: { "eslint/unknown-rule": "error" } }));
+    const file = await write("changed.ts", "debugger;\n");
+    await expect(runner.checkFiles([file])).rejects.toThrow(
+      /Oxlint could not check changed files:.*Failed/s,
+    );
+  });
+
+  it("retains ESLint checks when only its app configuration exists", async () => {
+    await write("eslint.config.mjs", "export default [];\n");
+    await fs.rm(path.join(cwd, "node_modules", "eslint"));
+    expect(defaultHealthCheckers({}, cwd).map((checker) => checker.name)).toContain("ESLint");
+  });
+
+  it("returns file metadata and diagnostics without echoing serialized source contents", async () => {
+    const file = { ...(await write("changed.ts", "debugger;\n")), content: "private file source" };
+    const [checked] = await runner.checkFiles([file]);
+    expect(checked).not.toHaveProperty("content");
+    const [skipped] = await runner.checkFiles([{ ...file, path: path.join(cwd, "data.json") }]);
+    expect(skipped).not.toHaveProperty("content");
+  });
+
+  it("terminates its running CLI child during shutdown", async () => {
+    const fakeCwd = path.join(cwd, "shutdown");
+    const fake = path.join(fakeCwd, "node_modules", "oxlint");
+    await fs.mkdir(fake, { recursive: true });
+    await fs.writeFile(path.join(fakeCwd, ".oxlintrc.json"), "{}");
+    await fs.writeFile(
+      path.join(fake, "package.json"),
+      JSON.stringify({ name: "oxlint", bin: "cli.cjs" }),
+    );
+    const pidPath = path.join(fakeCwd, "child.pid");
+    await fs.writeFile(
+      path.join(fake, "cli.cjs"),
+      `require("node:fs").writeFileSync(${JSON.stringify(pidPath)}, String(process.pid)); setInterval(() => {}, 1000);`,
+    );
+    runner.initialize(fakeCwd);
+    const file = await write("changed.ts", "debugger;\n");
+    const pending = runner.checkFiles([file]);
+    const rejected = expect(pending).rejects.toThrow("Oxlint could not check changed files");
+    await vi.waitFor(async () => expect(await fs.readFile(pidPath, "utf8")).toMatch(/^\d+$/));
+    const pid = Number(await fs.readFile(pidPath, "utf8"));
+    runner.shutdown();
+    await rejected;
+    expect(() => process.kill(pid, 0)).toThrow();
+  });
   it("maps actual CLI errors, warnings and locations for changed fixture files only", async () => {
     const bad = await write("changed.ts", "const unused = 1;\ndebugger;\n");
     const good = await write("clean.ts", "export const value = 1;\n");

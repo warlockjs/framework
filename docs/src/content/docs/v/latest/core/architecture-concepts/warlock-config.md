@@ -185,7 +185,7 @@ devServer: {
 
 You'll usually leave these alone. The defaults are tuned for typical TypeScript projects.
 
-`healthCheckers: false` disables every background file check; `warlock dev --skip-health` does the same for one run. An array still replaces the default list with custom checkers. For individual built-ins, use `healthCheckers: { typescript: true, eslint: false, oxlint: true }`. TypeScript runs by default, and both ESLint and Oxlint run when their package and app-root configuration exist. Setting a linter to `true` still requires its installation/configuration. See [background file health checks](../cli/file-health-checks).
+`healthCheckers: false` disables every background file check; `warlock dev --skip-health` does the same for one run. An array still replaces the default list with custom checkers. For individual built-ins, use `healthCheckers: { typescript: true, eslint: false, oxlint: true }`. TypeScript runs by default, and ESLint runs when its app-root configuration exists, while Oxlint additionally needs its package installed in the app. Setting a linter to `true` still requires that configuration; both run when available. See [background file health checks](../cli/file-health-checks).
 
 `generateTypings: false` skips the typings regeneration at dev-server boot. Speeds up cold starts in big projects; turn off only if you don't rely on the autocomplete it produces.
 

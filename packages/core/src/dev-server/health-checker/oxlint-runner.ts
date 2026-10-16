@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, type ChildProcess } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -53,12 +53,20 @@ export function parseOxlintResults(
   files: OxlintFile[],
   cwd: string,
 ): OxlintFileResult[] {
-  const report: unknown = JSON.parse(output);
+  let report: unknown;
+  try {
+    report = JSON.parse(output);
+  } catch {
+    throw new Error(
+      `Oxlint could not check changed files: ${output.trim().slice(0, 2000) || "empty diagnostics report"}`,
+    );
+  }
   if (!record(report) || !Array.isArray(report.diagnostics)) {
     throw new Error("Oxlint returned an invalid JSON diagnostics report.");
   }
   const results = files.map((file): OxlintFileResult => ({
-    ...file,
+    path: file.path,
+    relativePath: file.relativePath,
     healthy: true,
     errors: [],
     warnings: [],
@@ -92,10 +100,30 @@ export function parseOxlintResults(
   return results;
 }
 
+type OxlintCommandOutput = { stdout: string; stderr: string };
+type OxlintRunnerDependencies = {
+  execute?: (binaryPath: string, args: string[], cwd: string) => Promise<OxlintCommandOutput>;
+  exists?: (file: string) => boolean;
+  platform?: NodeJS.Platform;
+};
+
+function healthy(file: OxlintFile): OxlintFileResult {
+  return {
+    path: file.path,
+    relativePath: file.relativePath,
+    healthy: true,
+    errors: [],
+    warnings: [],
+  };
+}
+
 /** Invoked in a dedicated worker during development; lints only the supplied disk files. */
 export class OxlintRunner {
   private binaryPath?: string;
   private cwd = process.cwd();
+  private readonly children = new Set<ChildProcess>();
+
+  public constructor(private readonly dependencies: OxlintRunnerDependencies = {}) {}
 
   public initialize(cwd: string): { success: boolean; hasConfig: boolean } {
     this.cwd = cwd;
@@ -103,33 +131,26 @@ export class OxlintRunner {
     return { success: true, hasConfig: this.binaryPath !== undefined };
   }
 
-  public async checkFiles(files: OxlintFile[]): Promise<OxlintFileResult[]> {
-    const lintable = files.filter(
-      (file) => /\.[cm]?[jt]sx?$/i.test(file.path) && existsSync(file.path),
-    );
-    if (!this.binaryPath || lintable.length === 0) {
-      return files.map((file) => ({ ...file, healthy: true, errors: [], warnings: [] }));
-    }
-    const binaryPath = this.binaryPath;
-    const output = await new Promise<string>((resolve, reject) => {
-      execFile(
+  public shutdown(): void {
+    for (const child of this.children) child.kill();
+    this.children.clear();
+  }
+
+  private execute(binaryPath: string, args: string[], cwd: string): Promise<OxlintCommandOutput> {
+    if (this.dependencies.execute) return this.dependencies.execute(binaryPath, args, cwd);
+    return new Promise((resolve, reject) => {
+      const child = execFile(
         process.execPath,
-        [
-          binaryPath,
-          "--format=json",
-          "--threads=1",
-          "--no-error-on-unmatched-pattern",
-          "--",
-          ...lintable.map((file) => file.path),
-        ],
+        [binaryPath, ...args],
         {
-          cwd: this.cwd,
+          cwd,
           encoding: "utf8",
           windowsHide: true,
           timeout: 30_000,
           maxBuffer: 8 * 1024 * 1024,
         },
         (error, stdout, stderr) => {
+          this.children.delete(child);
           // Exit 1 with a JSON report is the normal result for lint errors.
           if (error && (error.code !== 1 || error.killed)) {
             reject(
@@ -137,14 +158,60 @@ export class OxlintRunner {
             );
             return;
           }
-          if (!stdout.trim()) {
-            reject(new Error(`Oxlint returned no diagnostics report: ${stderr.trim()}`));
-            return;
-          }
-          resolve(stdout);
+          resolve({ stdout, stderr });
         },
       );
+      this.children.add(child);
     });
-    return parseOxlintResults(output, files, this.cwd);
+  }
+
+  public async checkFiles(files: OxlintFile[]): Promise<OxlintFileResult[]> {
+    const exists = this.dependencies.exists ?? existsSync;
+    const lintable = files.filter(
+      (file) => /\.[cm]?[jt]sx?$/i.test(file.path) && exists(file.path),
+    );
+    if (!this.binaryPath || lintable.length === 0) return files.map(healthy);
+    const platform = this.dependencies.platform ?? process.platform;
+    const limit = platform === "win32" ? 24 * 1024 : platform === "linux" ? 512 * 1024 : 128 * 1024;
+    const size = (arg: string) =>
+      platform === "win32" ? arg.length + 3 : Buffer.byteLength(arg) + 1;
+    const flags = ["--format=json", "--threads=1", "--no-error-on-unmatched-pattern", "--"];
+    const baseSize = [process.execPath, this.binaryPath, ...flags].reduce(
+      (sum, arg) => sum + size(arg),
+      0,
+    );
+    const batches: OxlintFile[][] = [];
+    let batch: OxlintFile[] = [];
+    let batchSize = baseSize;
+    for (const file of lintable) {
+      const argumentSize = size(path.relative(this.cwd, file.path));
+      if (baseSize + argumentSize > limit)
+        throw new Error(`Oxlint file path exceeds the command-line budget: ${file.relativePath}`);
+      if (batch.length && batchSize + argumentSize > limit) {
+        batches.push(batch);
+        batch = [];
+        batchSize = baseSize;
+      }
+      batch.push(file);
+      batchSize += argumentSize;
+    }
+    if (batch.length) batches.push(batch);
+    const results = new Map(files.map((file) => [file.path, healthy(file)]));
+    for (const filesInBatch of batches) {
+      const output = await this.execute(
+        this.binaryPath,
+        [...flags, ...filesInBatch.map((file) => path.relative(this.cwd, file.path))],
+        this.cwd,
+      );
+      let checked: OxlintFileResult[];
+      try {
+        checked = parseOxlintResults(output.stdout, filesInBatch, this.cwd);
+      } catch {
+        const detail = output.stderr.trim() || output.stdout.trim() || "empty diagnostics report";
+        throw new Error(`Oxlint could not check changed files: ${detail.slice(0, 2000)}`);
+      }
+      for (const result of checked) results.set(result.path, result);
+    }
+    return files.map((file) => results.get(file.path) ?? healthy(file));
   }
 }

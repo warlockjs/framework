@@ -1,5 +1,4 @@
 import { existsSync } from "node:fs";
-import { createRequire } from "node:module";
 import path from "node:path";
 import { EslintHealthChecker } from "./checkers/eslint-health-checker";
 import { OxlintHealthChecker } from "./checkers/oxlint-health-checker";
@@ -11,18 +10,10 @@ import type {
 import { findOxlint } from "./oxlint-runner";
 
 function hasEslint(cwd: string): boolean {
-  if (
-    !["js", "mjs", "cjs", "ts", "mts", "cts"].some((extension) =>
-      existsSync(path.join(cwd, `eslint.config.${extension}`)),
-    )
-  )
-    return false;
-  try {
-    createRequire(path.join(cwd, "package.json")).resolve("eslint/package.json");
-    return true;
-  } catch {
-    return false;
-  }
+  // ESLint is a core dependency, so an app needs only its configuration.
+  return ["js", "mjs", "cjs", "ts", "mts", "cts"].some((extension) =>
+    existsSync(path.join(cwd, `eslint.config.${extension}`)),
+  );
 }
 
 /** Explicit arrays remain custom-only; built-in booleans select among available checkers. */

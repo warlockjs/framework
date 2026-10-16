@@ -8,6 +8,8 @@ type WorkerMessage =
   | { type: "shutdown" };
 
 const runner = new OxlintRunner();
+process.once("exit", () => runner.shutdown());
+parentPort?.once("close", () => runner.shutdown());
 parentPort?.on("message", async (message: WorkerMessage) => {
   try {
     switch (message.type) {
@@ -24,6 +26,7 @@ parentPort?.on("message", async (message: WorkerMessage) => {
         // The CLI reads current disk contents and holds no persistent file cache.
         break;
       case "shutdown":
+        runner.shutdown();
         process.exit(0);
     }
   } catch (error) {
