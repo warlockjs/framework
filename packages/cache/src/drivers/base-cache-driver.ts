@@ -756,7 +756,7 @@ export abstract class BaseCacheDriver<
         // missing, or expired since it was read: a fresh counter
         await this.set(key, newValue, { ttl });
       } else if (expiresAt == null || expiresAt === Infinity) {
-        await this.set(key, newValue, { ttl: Infinity });
+        await this.set(key, newValue, { ttl: options.ttl === undefined ? Infinity : ttl });
       } else {
         await this.set(key, newValue, {
           ttl: Math.max(1, Math.floor((expiresAt - now) / 1000)),

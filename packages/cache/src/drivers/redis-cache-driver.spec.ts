@@ -1049,6 +1049,16 @@ describe("RedisCacheDriver — cross-server atomic ops (wave 2)", () => {
     expect(fakeClient.evalLog.at(-1)?.arguments).toEqual(["1", "86400"]);
   });
 
+  it("repairs a live permanent counter with an explicit TTL", async () => {
+    const driver = await makeDriver();
+    await driver.set("permanent", 3, Infinity);
+    await driver.increment("permanent", 1, { ttl: "1m" });
+    expect(await fakeClient.ttl("permanent")).toBe(60);
+    const deadline = fakeClient.expires.get("permanent");
+    await driver.increment("permanent", 1, { ttl: "1d" });
+    expect(fakeClient.expires.get("permanent")).toBe(deadline);
+  });
+
   it("increment never shortens a TTL the counter already has", async () => {
     const driver = await makeDriver();
     driver.setOptions({ url: "redis://localhost", ttl: 5 });

@@ -1142,7 +1142,7 @@ Pass the TTL on **every increment** of an expiring counter:
 await cache.increment("login.failures", 1, { ttl: "1m" });
 ```
 
-A missing or expired key starts at the amount with that TTL (seconds or duration string); an existing deadline is preserved. Without `options.ttl`, a fresh key uses the driver's default TTL. Redis applies the count and expiry in one Lua call; Postgres uses one upsert. This closes the race where a separate `set(key, 0, { ttl, onConflict: "create" })` seed expires just before the increment recreates the key. Tagged calls forward the option; namespaces use their default TTL unless overridden per call. Decrements keep existing TTLs too. Use `cache.update` (see the `use-cache-update-merge` topic) for objects.
+A missing or expired key starts at the amount with that TTL (seconds or duration string); an existing deadline is preserved. An explicit TTL also adds expiry to a live permanent counter, repairing counters left by an earlier seed/increment race. Without `options.ttl`, a fresh key uses the driver's default TTL. Redis applies the count and expiry in one Lua call; Postgres uses one upsert. This closes the race where a separate `set(key, 0, { ttl, onConflict: "create" })` seed expires just before the increment recreates the key. Tagged calls forward the option; namespaces use their default TTL unless overridden per call. Decrements keep existing TTLs too. Use `cache.update` (see the `use-cache-update-merge` topic) for objects.
 
 ## Common shapes
 

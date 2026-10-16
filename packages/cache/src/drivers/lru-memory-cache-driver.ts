@@ -367,6 +367,14 @@ export class LRUMemoryCacheDriver
 
     if (node) {
       node.value = newValue;
+      if (
+        options.ttl !== undefined &&
+        !Number.isFinite(node.expiresAt) &&
+        Number.isFinite(ttl) &&
+        ttl > 0
+      ) {
+        node.expiresAt = Date.now() + ttl * 1000;
+      }
       this.moveHead(node);
     } else {
       const newNode = new CacheNode(parsedKey, newValue, ttl);

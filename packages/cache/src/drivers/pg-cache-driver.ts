@@ -637,7 +637,9 @@ export class PgCacheDriver
        ON CONFLICT (key) DO UPDATE
          SET value = CASE WHEN ${expired} THEN EXCLUDED.value
                           ELSE to_jsonb((${t}.value #>> '{}')::numeric + $2::numeric) END,
-             expires_at = CASE WHEN ${expired} THEN EXCLUDED.expires_at ELSE ${t}.expires_at END,
+             expires_at = CASE WHEN ${expired} THEN EXCLUDED.expires_at
+                               WHEN $4::boolean AND ${t}.expires_at IS NULL THEN EXCLUDED.expires_at
+                               ELSE ${t}.expires_at END,
              stale_at = CASE WHEN ${expired} THEN NULL ELSE ${t}.stale_at END
          WHERE (${expired}) OR jsonb_typeof(${t}.value) = 'number'
        RETURNING value`,
@@ -645,6 +647,7 @@ export class PgCacheDriver
         parsedKey,
         value,
         this.ttlToSeconds(options.ttl === undefined ? this.ttl : parseTtl(options.ttl)),
+        options.ttl !== undefined,
       ],
     );
 

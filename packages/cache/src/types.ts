@@ -933,6 +933,7 @@ export interface CacheDriver<ClientType, Options> {
   /**
    * Increment a numeric value in cache. A missing key starts from 0 with the
    * per-call `options.ttl` (or driver default); an existing expiry is preserved.
+   * An explicit TTL also repairs a live counter with no expiry.
    * Supply the TTL on every call for expiring counters: a separate seed may
    * expire before the atomic increment recreates the key.
    *

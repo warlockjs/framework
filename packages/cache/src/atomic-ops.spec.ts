@@ -97,6 +97,18 @@ describe.each([
     expect(Math.abs((await expiresAtOf(driver, "window"))! - expiry!)).toBeLessThanOrEqual(1000);
   });
 
+  it("repairs a live permanent counter with an explicit TTL without extending a deadline", async () => {
+    const driver = await make();
+    await driver.set("permanent", 3, Infinity);
+    await driver.increment("permanent");
+    expect(Number.isFinite(await expiresAtOf(driver, "permanent"))).toBe(false);
+    await expect(driver.increment("permanent", 1, { ttl: "1m" })).resolves.toBe(5);
+    const expiry = await expiresAtOf(driver, "permanent");
+    expect(expiry).toBeGreaterThan(Date.now() + 59_000);
+    await driver.increment("permanent", 1, { ttl: "1d" });
+    expect(Math.abs((await expiresAtOf(driver, "permanent"))! - expiry!)).toBeLessThanOrEqual(1000);
+  });
+
   it("forwards per-call TTL through scoped and tagged counters", async () => {
     const driver = await make();
     const scope = new ScopedCache(driver, "namespace", { ttl: "5m" });

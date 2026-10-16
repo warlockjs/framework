@@ -60,12 +60,18 @@ class FakePool implements PgClientLike {
     if (sql.startsWith("/* cache:increment */")) {
       expect(sql).toContain("ON CONFLICT (key) DO UPDATE");
       expect(sql).toContain("jsonb_typeof");
-      const [key, amount, ttlSecs] = values as [string, number, number | null];
+      const [key, amount, ttlSecs, explicitTtl] = values as [
+        string,
+        number,
+        number | null,
+        boolean,
+      ];
       const row = this.store.get(key);
 
       if (isLive(row)) {
         if (typeof row.value !== "number") return { rows: [], rowCount: 0 };
         row.value = row.value + amount;
+        if (explicitTtl && row.expires_at === null) row.expires_at = FakePool.secsToDate(ttlSecs);
         return { rows: [{ value: row.value }], rowCount: 1 };
       }
 
@@ -1039,6 +1045,17 @@ describe("PgCacheDriver — cross-server atomic ops (wave 2)", () => {
     expect(deadline.getTime()).toBeGreaterThan(Date.now() + 119_000);
     await driver.increment("window", 1, { ttl: "1d" });
     expect(pool.store.get("window")!.expires_at).toEqual(deadline);
+  });
+
+  it("repairs a live permanent counter only when its TTL is explicitly supplied", async () => {
+    await driver.set("permanent", 3, Infinity);
+    await driver.increment("permanent");
+    expect(pool.store.get("permanent")!.expires_at).toBeNull();
+    await driver.increment("permanent", 1, { ttl: "1m" });
+    const deadline = pool.store.get("permanent")!.expires_at!;
+    expect(deadline.getTime()).toBeGreaterThan(Date.now() + 59_000);
+    await driver.increment("permanent", 1, { ttl: "1d" });
+    expect(pool.store.get("permanent")!.expires_at).toEqual(deadline);
   });
 
   it("increment starts a missing key from the amount", async () => {

@@ -333,6 +333,16 @@ export class MemoryCacheDriver
 
     if (entry) {
       entry.data = newValue;
+      if (
+        options.ttl !== undefined &&
+        !Number.isFinite(entry.expiresAt) &&
+        Number.isFinite(ttl) &&
+        ttl > 0
+      ) {
+        entry.ttl = ttl;
+        entry.expiresAt = Date.now() + ttl * 1000;
+        this.expiry.set(parsedKey, entry.expiresAt);
+      }
       this.touch(parsedKey, entry);
     } else {
       const data = this.prepareDataForStorage(newValue, ttl);

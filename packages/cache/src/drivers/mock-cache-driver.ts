@@ -272,6 +272,15 @@ export class MockCacheDriver
 
     if (entry) {
       entry.data = newValue;
+      if (
+        options.ttl !== undefined &&
+        !Number.isFinite(entry.expiresAt) &&
+        Number.isFinite(ttl) &&
+        ttl > 0
+      ) {
+        entry.ttl = ttl;
+        entry.expiresAt = Date.now() + ttl * 1000;
+      }
     } else {
       this.storage.set(parsedKey, this.prepareDataForStorage(newValue, ttl));
     }

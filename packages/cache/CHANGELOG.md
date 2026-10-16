@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- `cache.increment(key, amount, { ttl })` supplies a TTL when an atomic increment creates or recreates a counter, through direct, tagged and scoped calls. Existing expiry deadlines are preserved. Redis applies the count and TTL together, so an expired seed cannot leave a permanent counter even when the driver has no default TTL.
+- `cache.increment(key, amount, { ttl })` supplies a TTL when an atomic increment creates or recreates a counter, through direct, tagged and scoped calls. Existing expiry deadlines are preserved; an explicit TTL also repairs a live permanent counter across drivers. Redis applies the count and TTL together, so an expired seed cannot leave a permanent counter even when the driver has no default TTL.
 
 ## 5.30.0 - 2026-10-16
 
