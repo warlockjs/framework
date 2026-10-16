@@ -16,6 +16,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Union and record Standard Schema types now distinguish child input from validated output; `Infer.Output` reads the Standard Schema output parameter. Defaults and catches remain guaranteed in output.
+- Unions return the selected branch's validated data, preserving defaults, computed fields, catches and child transformations before applying union transformers/refinements. Successful custom rules may return a `data` property to replace the current validated value, including explicit `undefined`.
+
 - Object, array, tuple and lazy Standard Schema output declarations preserve child defaults and catches independently of their input types.
 
 ## 5.30.0 - 2026-10-16

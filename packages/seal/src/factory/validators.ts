@@ -56,9 +56,11 @@ export const v: ValidatorV = {
 
   /** Create a record validator - object with dynamic keys and consistent value types */
   record: <T extends BaseValidator>(validator?: T, errorMessage?: string) =>
-    new RecordValidator(validator || v.any(), errorMessage) as RecordValidator & {
-      valueValidator: T;
-    } & StandardSchemaV1<Record<string, Infer<T>>>,
+    new RecordValidator(validator || v.any(), errorMessage) as StandardSchemaV1<
+      Record<string, Infer.Input<T>>,
+      Record<string, Infer.Output<T>>
+    > &
+      RecordValidator & { valueValidator: T },
 
   /** Create a tuple validator - fixed-length array with position-specific types */
   tuple: <T extends BaseValidator[]>(validators: T, errorMessage?: string) =>
@@ -165,8 +167,11 @@ export const v: ValidatorV = {
 
   /** Create a union validator - validates against multiple types */
   union: <T extends BaseValidator[]>(validators: T, errorMessage?: string) =>
-    new UnionValidator().union(validators, errorMessage) as UnionValidator &
-      StandardSchemaV1<Infer<T[number]>>,
+    new UnionValidator().union(validators, errorMessage) as StandardSchemaV1<
+      Infer.Input<T[number]>,
+      Infer.Output<T[number]>
+    > &
+      UnionValidator,
 
   /**
    * Create a discriminated union — routes payloads by a shared literal
@@ -219,6 +224,8 @@ export type ValidateOptions = {
   redactValue?: string;
 } & SealConfig;
 
+// Standard Schema comes first on record/union intersections so direct calls
+// select the precise validate() output overload rather than BaseValidator's.
 export interface ValidatorV {
   object: <T extends Schema>(schema: T, errorMessage?: string) => ObjectValidator<T>;
   any: () => AnyValidator & StandardSchemaV1<any>;
@@ -231,9 +238,8 @@ export interface ValidatorV {
   record: <T extends BaseValidator>(
     validator?: T,
     errorMessage?: string,
-  ) => RecordValidator & {
-    valueValidator: T;
-  } & StandardSchemaV1<Record<string, Infer<T>>>;
+  ) => StandardSchemaV1<Record<string, Infer.Input<T>>, Record<string, Infer.Output<T>>> &
+    RecordValidator & { valueValidator: T };
   tuple: <T extends BaseValidator[]>(
     validators: T,
     errorMessage?: string,
@@ -275,7 +281,7 @@ export interface ValidatorV {
   union: <T extends BaseValidator[]>(
     validators: T,
     errorMessage?: string,
-  ) => UnionValidator & StandardSchemaV1<Infer<T[number]>>;
+  ) => StandardSchemaV1<Infer.Input<T[number]>, Infer.Output<T[number]>> & UnionValidator;
   discriminatedUnion: <K extends string, Branches extends ReadonlyArray<ObjectValidator<any>>>(
     discriminator: K,
     validators: Branches,

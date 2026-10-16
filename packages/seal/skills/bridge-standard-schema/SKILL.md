@@ -114,6 +114,27 @@ expected types. Output slots should use the post-default output shape. Objects
 carry that shape directly through their class generics; primitive factories add
 it through their Standard Schema intersection.
 
+## Union and record outputs
+
+Use `Infer.Output<T>` or `StandardSchemaV1.InferOutput<T>` for downstream data.
+Unions and records preserve their children's output types independently of input
+shapes. Defaults and catches make object fields required in output. Their factory
+intersections put the precise Standard Schema signature first, so direct
+`~standard.validate()` calls return the declared output. `Infer.Output` reads the
+output metadata rather than inferring from overloaded validation signatures. A union
+returns the selected branch's validated data before its own transformers and
+refinements; it does not discard branch defaults, computed values or transformations.
+
+```ts
+const entry = v.object({ count: v.int().optional().default(1) });
+const entries = v.record(entry);
+type Entries = Infer.Output<typeof entries>;
+// Record<string, { count: number }>
+const maybeEntry = v.union([entry, v.string()]);
+type MaybeEntry = Infer.Output<typeof maybeEntry>;
+// { count: number } | string
+```
+
 ## Compiler budget
 
 From `packages/seal`, run `pnpm bench:types --check` after changes to inference or

@@ -33,8 +33,8 @@ export const unionRule: SchemaRule<{ validators: BaseValidator[] }> = {
       const result = await validator.validate(value, context);
 
       if (result.isValid) {
-        // Success! Validator matched and validated
-        return VALID_RULE;
+        // Preserve defaults, computed fields and transformations from the branch.
+        return { isValid: true, data: result.data };
       }
 
       // Failed - collect error message

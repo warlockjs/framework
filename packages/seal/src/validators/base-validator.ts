@@ -751,7 +751,7 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
     // Optional fields with no resolved value are absent, not values to
     // transform. Skipping here protects every mutator while still allowing
     // defaults and present values through the normal mutation pipeline.
-    const mutatedData =
+    let mutatedData =
       this.isOptional && valueForRules === undefined
         ? undefined
         : await this.mutate(valueForRules, context);
@@ -795,6 +795,10 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
       this.setRuleAttributesList(rule);
 
       const result = await rule.validate(mutatedData, context);
+
+      if (result.isValid && "data" in result) {
+        mutatedData = result.data;
+      }
 
       if (result.isValid === false) {
         isValid = false;

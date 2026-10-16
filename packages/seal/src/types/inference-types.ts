@@ -244,8 +244,8 @@ export namespace Infer {
                       // produced by `v.enum([...])`). Must come BEFORE the broad
                       // primitive branches below — otherwise `T extends StringValidator`
                       // would match first and widen `"a"|"b"` back to `string`.
-                      T extends StandardSchemaV1<infer V, any>
-                      ? WithNullable<T, V>
+                      T extends StandardSchemaV1
+                      ? WithNullable<T, StandardSchemaV1.InferOutput<T>>
                       : T extends StringValidator
                         ? WithNullable<T, string>
                         : T extends IntValidator

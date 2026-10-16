@@ -12,6 +12,8 @@ export type RuleResult =
     }
   | {
       isValid: true;
+      /** Replace the validated value, including an explicit undefined output. */
+      data?: unknown;
     };
 
 type AttributeValue = string | number;

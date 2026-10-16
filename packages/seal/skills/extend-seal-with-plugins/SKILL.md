@@ -176,3 +176,12 @@ Use these in startup diagnostics or in tests that need to assert a plugin is reg
 - Don't make the plugin's `install` function depend on shared state mutable from elsewhere. Plugins should be idempotent — installing twice (or registering across hot-reloads) should not break anything.
 - Don't ship a plugin that overrides a built-in method without a clear reason. If you must, `uninstall` should restore the original — but the better path is a different method name.
 - Don't author one plugin per method. Group related methods (e.g. "country-specific validators") into one plugin so the install/uninstall lifecycle is coherent.
+
+
+## Returning validated rule output
+
+A custom rule's success result can contain `data` to replace the current value:
+`{ isValid: true, data: replacement }`. Later rules, transformers and refinements
+receive that replacement. Omitting `data` preserves the current value; a present
+`data: undefined` explicitly clears it. This is also how a union preserves the
+selected branch's validated defaults, catches and child transformations.

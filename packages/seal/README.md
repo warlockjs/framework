@@ -181,6 +181,23 @@ const schema = v.object({
 });
 ```
 
+### Union and record output types
+
+`v.union(...)` and `v.record(...)` expose separate Standard Schema input and output
+types. `Infer.Output` and `~standard.validate()` describe validated child output:
+defaults and catches guarantee fields even when callers may omit them. A union
+returns its matching branch's validated data, including computed fields and child
+transformers, before running its own transformers and refinements.
+
+```ts
+const entry = v.object({ count: v.int().optional().default(1) });
+const union = v.union([entry, v.string()]);
+const record = v.record(entry);
+// Infer.Input<typeof union>: { count?: number } | string
+// Infer.Output<typeof union>: { count: number } | string
+// Infer.Output<typeof record>: Record<string, { count: number }>
+```
+
 ### ✅ Custom Validation
 
 Add your own validation logic:
@@ -193,6 +210,10 @@ v.string().refine(async value => {
 ```
 
 The callback's `value` is typed from the validator's output. Refinements run after value rules, child validation (including defaults and computed fields), and output transformers succeed. They skip absent/null values and failed validation, even with `firstErrorOnly: false`. Multiple refinements run in declaration order and respect `firstErrorOnly`. Use `.addRule()` for checks that need the input before child validation.
+
+A successful `.addRule()` callback may return `{ isValid: true, data: replacement }`
+to replace the value for later rules, transformers and refinements. Omitting `data`
+keeps the current value; including `data: undefined` explicitly clears it.
 
 ### ✅ Mutators & Transformers
 
