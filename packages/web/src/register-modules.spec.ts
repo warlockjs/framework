@@ -74,6 +74,7 @@ describe("registerModules", () => {
   });
 
   it("rejects thenable-returning hooks", () => {
+    // oxlint-disable-next-line unicorn/no-thenable -- An intentionally misleading then export tests module-loader thenable handling.
     const module = moduleWith(() => ({ then() {} }));
 
     expect(() => registerModules([module])).toThrow("Warlock register() hooks must be synchronous");

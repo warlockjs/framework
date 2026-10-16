@@ -28,7 +28,7 @@ describe("DataSourceRegistry", () => {
       const mockDriver1 = createMockDriver();
       const mockDriver2 = createMockDriver();
 
-      const ds1 = dataSourceRegistry.register({
+      dataSourceRegistry.register({
         name: "first-" + Date.now(),
         driver: mockDriver1,
       });

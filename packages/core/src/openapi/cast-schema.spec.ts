@@ -40,7 +40,7 @@ describe("castToJsonSchema", () => {
     const schema = castToJsonSchema("date[]?");
 
     expect(schema?.type).toEqual(["array", "null"]);
-    expect((schema?.items as { type: string }).type).toBe("object");
+    expect((schema!.items as { type: string }).type).toBe("object");
   });
 
   it("returns undefined for an unknown cast", () => {

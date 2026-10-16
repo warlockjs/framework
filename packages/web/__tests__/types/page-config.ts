@@ -13,7 +13,7 @@ const validator = {} as BaseValidator;
 const loader = async () => ({ product: { name: "Warlock", price: 12 } });
 
 const setupProps = {} as PageProps<typeof setupLoader>;
-setupProps.data.product.name;
+void setupProps.data.product.name;
 
 const pageConfig = {
   route: { path: "/products/:id", name: "products.detail" },
@@ -22,7 +22,7 @@ const pageConfig = {
   metadata: ({ data }) => ({ title: `${data.product.name} ${data.product.price}` }),
 } satisfies PageConfig<typeof loader>;
 
-pageConfig.route?.path;
+void pageConfig.route?.path;
 
 const schemaValidation: PageConfigValidation = { schema: validator, validating: ["body"] };
 const paramsValidation: PageConfigValidation = { params: validator, query: validator };

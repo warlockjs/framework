@@ -340,7 +340,7 @@ describe.each<Mode>(["dev", "prod"])("multi-site dispatch (%s)", (mode) => {
     await handler(requestContext("a.test", "/admin/").context);
 
     expect(rendered.map((entry) => entry.page)).toEqual(["admin/home", "admin/home"]);
-    expect((rendered[0]?.site as { basePath: string }).basePath).toBe("/admin");
+    expect((rendered[0]!.site as { basePath: string }).basePath).toBe("/admin");
   });
 
   it("falls back to the site's own not-found page, else the plain 404", async () => {

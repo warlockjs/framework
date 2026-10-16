@@ -19,7 +19,6 @@ export function buildQuery<TModel extends Model>(
   BaseModel: typeof Model,
 ): QueryBuilderContract<TModel> {
   const queryBuilder = ModelClass.newQueryBuilder<TModel>();
-  const qb = queryBuilder;
 
   // Collect global scopes from base Model and child model
   const allGlobalScopes = new Map<string, GlobalScopeDefinition>([

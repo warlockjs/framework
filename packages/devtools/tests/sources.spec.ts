@@ -13,7 +13,6 @@ import { dataSourceRegistry } from "@warlock.js/cascade";
 import { log } from "@warlock.js/logger";
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-
 import { attachCacheSource } from "../src/sources/cache-source";
 import { attachLogSource } from "../src/sources/log-source";
 import { attachMailSource } from "../src/sources/mail-source";
@@ -171,7 +170,7 @@ describe("attachQuerySource", () => {
       sql: "SELECT * FROM users WHERE id = $1",
       rowCount: 1,
     });
-    expect((queries[0]?.query.bindings?.[0] as { password: string }).password).toBe("[REDACTED]");
+    expect((queries[0]!.query.bindings![0] as { password: string }).password).toBe("[REDACTED]");
 
     dispose();
     driver.emit("query", {
@@ -261,7 +260,7 @@ describe("attachLogSource", () => {
       module: "devtools-test",
       action: "action",
     });
-    expect((logs[0]?.entry.context as { password: string }).password).toBe("[REDACTED]");
+    expect((logs[0]!.entry.context as { password: string }).password).toBe("[REDACTED]");
 
     dispose();
     await log.error("devtools-test", "action-2", "ignored");

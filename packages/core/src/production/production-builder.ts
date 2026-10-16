@@ -42,7 +42,6 @@ import {
 } from "./promote-dist";
 import { resolveBuildConfig, type ResolvedBuildConfig } from "./resolve-build-config";
 import { tsconfigPathAliases } from "./tsconfig-path-aliases";
-import { toKebabCase } from "@mongez/reinforcements";
 
 /**
  * Recreates `require`, `__filename` and `__dirname` at the top of an ESM bundle.

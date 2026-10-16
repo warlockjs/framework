@@ -1,4 +1,5 @@
 // biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting control characters is the point.
+// oxlint-disable-next-line eslint/no-control-regex -- Redirect validation deliberately rejects ASCII control characters.
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 
 /**

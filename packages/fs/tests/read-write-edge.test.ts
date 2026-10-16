@@ -6,7 +6,6 @@ import {
   getFileAsync,
   getJsonFile,
   getJsonFileAsync,
-  putFile,
   putFileAsync,
   putJsonFile,
   putJsonFileAsync,

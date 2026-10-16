@@ -125,7 +125,7 @@ function readRoute(value: ValueNode, sourceFile: string): { path: string; name?:
     else name = literal;
   }
 
-  if (routePath === undefined) fail(sourceFile, "config.route must declare a literal \`path\`");
+  if (routePath === undefined) fail(sourceFile, "config.route must declare a literal `path`");
   return name === undefined ? { path: routePath } : { path: routePath, name };
 }
 
@@ -185,7 +185,7 @@ function inspectConfig(
   actionKeys: string[];
 } {
   if (declarator.id.type !== "Identifier" || declarator.id.name !== "config" || !declarator.init) {
-    fail(sourceFile, "the \`config\` export cannot use an alias or destructuring");
+    fail(sourceFile, "the `config` export cannot use an alias or destructuring");
   }
   const object = directObject(declarator.init, sourceFile, "config");
   const seen = new Set<string>();
@@ -312,7 +312,7 @@ export function readModuleConfig(
       if (!allowedExports.has(exported))
         fail(sourceFile, `runtime export \`${exported}\` is not allowed`);
       if (exported === "config")
-        fail(sourceFile, "the \`config\` export cannot use an export list or alias");
+        fail(sourceFile, "the `config` export cannot use an export list or alias");
       if (exported === "default") hasDefault = true;
       if (exported === "action" || exported === "actions") declaresAction = true;
       if (exported === "action") hasSingleAction = true;
@@ -344,9 +344,9 @@ export function readModuleConfig(
         for (const key of literalKeys(declarator.init as ValueNode)) actionNames.add(key);
       }
       if (name !== "config") continue;
-      if (configSeen) fail(sourceFile, "the module declares \`config\` more than once");
+      if (configSeen) fail(sourceFile, "the module declares `config` more than once");
       if (statement.declaration.kind !== "const") {
-        fail(sourceFile, "the \`config\` export must be declared with \`const\`");
+        fail(sourceFile, "the `config` export must be declared with `const`");
       }
       configSeen = true;
       const read = inspectConfig(declarator, sourceFile, kind, bindings);

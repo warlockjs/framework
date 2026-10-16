@@ -507,9 +507,8 @@ class Cdp {
       const pending = this.pending.get(message.id);
       if (!pending) return;
       this.pending.delete(message.id);
-      message.error
-        ? pending.reject(new Error(`CDP ${message.error.message}`))
-        : pending.resolve(message.result);
+      if (message.error) pending.reject(new Error(`CDP ${message.error.message}`));
+      else pending.resolve(message.result);
       return;
     }
     for (const item of this.listeners) {

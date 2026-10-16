@@ -95,12 +95,12 @@ describe("ai.orchestrator() — first call (seed + persist)", () => {
     expect(result.sessionId).toBe("s1");
     expect(result.turnIndex).toBe(0);
     expect(result.report.type).toBe("orchestrator");
-    expect((result.report.turns[0]?.state as CounterState).count).toBe(1);
+    expect((result.report.turns[0]!.state as CounterState).count).toBe(1);
 
     const persisted = await store.load("counter", "s1");
     expect(persisted?.turn_index).toBe(0);
     expect(persisted?.signature).toBe(orchestrator.signature);
-    expect((persisted?.state as CounterState).lastInput).toBe("hello");
+    expect((persisted!.state as CounterState).lastInput).toBe("hello");
   });
 
   it("reports a clean turn as the non-terminal awaiting-input status (§15.6)", async () => {
@@ -126,7 +126,7 @@ describe("ai.orchestrator() — first call (seed + persist)", () => {
     expect(result.turnIndex).toBe(0);
 
     const persisted = await store.load("counter", "s1");
-    expect((persisted?.state as CounterState).count).toBe(42);
+    expect((persisted!.state as CounterState).count).toBe(42);
   });
 });
 
@@ -148,8 +148,8 @@ describe("ai.orchestrator() — multi-turn state carry-over", () => {
     expect(third.turnIndex).toBe(2);
 
     const latest = await store.load("counter", "s1");
-    expect((latest?.state as CounterState).count).toBe(3);
-    expect((latest?.state as CounterState).lastInput).toBe("three");
+    expect((latest!.state as CounterState).count).toBe(3);
+    expect((latest!.state as CounterState).lastInput).toBe("three");
   });
 
   it("does not re-seed config.state on subsequent turns", async () => {
@@ -158,7 +158,7 @@ describe("ai.orchestrator() — multi-turn state carry-over", () => {
     await orchestrator.execute("one", { sessionId: "s1", history: [] });
     const second = await orchestrator.execute("two", { sessionId: "s1", history: [] });
 
-    expect((second.report.turns[0]?.state as CounterState).count).toBe(2);
+    expect((second.report.turns[0]!.state as CounterState).count).toBe(2);
   });
 
   it("isolates sessions by sessionId", async () => {
@@ -171,8 +171,8 @@ describe("ai.orchestrator() — multi-turn state carry-over", () => {
     const alice = await store.load("counter", "alice");
     const bob = await store.load("counter", "bob");
 
-    expect((alice?.state as CounterState).count).toBe(2);
-    expect((bob?.state as CounterState).count).toBe(1);
+    expect((alice!.state as CounterState).count).toBe(2);
+    expect((bob!.state as CounterState).count).toBe(1);
   });
 });
 
@@ -294,8 +294,8 @@ describe("ai.orchestrator() — iterate:true delegates to the internal superviso
 
     // Both steps ran — the accumulator was incremented twice in-turn.
     const latest = await checkpointStore.load("iterating", "s1");
-    expect((latest?.state as CounterState).count).toBe(2);
-    expect((latest?.state as CounterState).via).toBe("second");
+    expect((latest!.state as CounterState).count).toBe(2);
+    expect((latest!.state as CounterState).via).toBe("second");
   });
 
   it("throws at construction when iterate:true has no snapshotStore", () => {

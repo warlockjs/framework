@@ -29,7 +29,6 @@ let scheduler: SitemapRefreshScheduler | undefined;
 let subscriptions: SitemapModelSubscriptions | undefined;
 let servingState: SitemapServingState | undefined;
 let lastFailure: SitemapFailure | undefined;
-let latestManifestAt = 0;
 let lifecycleGeneration = 0;
 
 function disabledResult(): SitemapResult {
@@ -178,7 +177,6 @@ export async function regenerateSitemap(
   try {
     const generated = await runtime.request();
     lastFailure = undefined;
-    latestManifestAt = Date.now();
     void runtime.store.cleanupRetainedGenerations(generated.manifest).catch(reportFailure);
     return generated.result;
   } catch (error) {
@@ -207,7 +205,6 @@ export async function shutdownSitemapRuntime(): Promise<void> {
   runtime?.dispose();
   runtime = undefined;
   servingState = undefined;
-  latestManifestAt = 0;
 }
 
 export function resetSitemapLifecycleForTests(): void {

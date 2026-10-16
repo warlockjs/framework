@@ -14,7 +14,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import Fastify from "fastify";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Router, router } from "@warlock.js/core";
 import { registerProductionPublicFiles } from "./register-production-public-files";
 import { productionAssetsDirectoryOptions } from "./web-connector";

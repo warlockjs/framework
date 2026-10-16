@@ -1,4 +1,4 @@
-import type { PageContextRunner, PipelineStore } from "./execute-page-request.types";
+import type { PageContextRunner } from "./execute-page-request.types";
 
 /**
  * Boot-time wiring for the per-request context, once per process.
@@ -15,7 +15,6 @@ import type { PageContextRunner, PipelineStore } from "./execute-page-request.ty
  */
 
 let pageContextRunner: PageContextRunner | undefined;
-let additionalSharedScopeEntry: ((store: PipelineStore) => void) | undefined;
 
 /** Returns the previous runner so tests can restore it. */
 export function connectPageContext(
@@ -26,10 +25,6 @@ export function connectPageContext(
   pageContextRunner = runner;
 
   return previous;
-}
-
-export function enterAdditionalSharedScope(store: PipelineStore): void {
-  additionalSharedScopeEntry?.(store);
 }
 
 export function requireRunner(): PageContextRunner {

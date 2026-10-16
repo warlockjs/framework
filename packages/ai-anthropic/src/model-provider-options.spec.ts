@@ -191,11 +191,11 @@ describe("AnthropicModel provider blocks", () => {
       { role: "tool", toolCallId: "tu_2", content: "r" },
     ]);
 
-    expect((calls[0]?.body.messages as unknown[])[1]).toEqual({
+    expect((calls[0]!.body.messages as unknown[])[1]).toEqual({
       role: "assistant",
       content: "plain",
     });
-    expect((calls[1]?.body.messages as unknown[])[1]).toEqual({
+    expect((calls[1]!.body.messages as unknown[])[1]).toEqual({
       role: "assistant",
       content: [{ type: "tool_use", id: "tu_2", name: "lookup", input: {} }],
     });

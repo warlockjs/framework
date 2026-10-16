@@ -233,7 +233,6 @@ export class TypeGenerator {
    */
   private async reconcile(): Promise<void> {
     const files = filesOrchestrator.getFiles();
-    let storageChanged = false;
     let configChanged = false;
     let unchangedCount = 0;
 
@@ -244,7 +243,6 @@ export class TypeGenerator {
       if (path.startsWith("src/config/storage")) {
         const manifestEntry = this.manifest?.storage;
         if (!manifestEntry || manifestEntry.sourceHash !== fileManager.hash) {
-          storageChanged = true;
           await this.generateStorageTypes(path);
         }
         break;

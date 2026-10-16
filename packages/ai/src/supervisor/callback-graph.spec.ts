@@ -240,11 +240,3 @@ describe("ai.supervisor — callback-only graph (LangGraph-style)", () => {
 
 // Stage 4c removed the combine helpers — combine no longer exists,
 // and state accumulation across iterations does the work directly.
-// The legacy helpers below are dead but kept temporarily because
-// other parts of the file may still reference them.
-function ctx_classifySnapshot(_branches: Record<string, { output: unknown }>): string {
-  return "billing";
-}
-function ctx_lookupSnapshot(_branches: Record<string, { output: unknown }>): string | undefined {
-  return undefined;
-}

@@ -55,6 +55,7 @@ function mountHook(): HookHandle {
   // concerned, so it remounts and the hook starts over — which looks exactly
   // like an unstable callback identity and is not.
   function Probe(): ReactElement | null {
+    // oxlint-disable-next-line react/immutability -- This test probe records the hook result for assertions outside React.
     handle.current = useChangeLocaleCode();
     return null;
   }

@@ -262,7 +262,6 @@ describe("gateAResolve — Gate A resolveId refusal (real Vite builds)", () => {
   // not true. Removing the stand-in is the proof that the REAL marker does the
   // work the fake was doing. Do not reintroduce it: if this case ever needs the
   // option again, core's marker has been lost.
-  const CORE_AS_SERVER: GateAOptions = { serverPackages: ["@warlock.js/core"] };
 
   it("case 1: a page importing a server-classified @warlock.js/core service directly fails, chain printed", async () => {
     await expect(buildPage("case1-core-import.page.tsx")).rejects.toThrow();

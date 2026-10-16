@@ -45,7 +45,7 @@ function build(overrides: Record<string, any> = {}, record = makeRecord()) {
 
 describe("Restful", () => {
   it("B4: persists only validated input when a schema exists, `role: admin` is dropped", async () => {
-    const { resource, repository, record } = build({ validation: { all: {} } });
+    const { resource, record } = build({ validation: { all: {} } });
 
     await resource.create({ request: makeRequest(), response: makeResponse() });
     expect(record.save).toHaveBeenCalledWith({ name: "a" });

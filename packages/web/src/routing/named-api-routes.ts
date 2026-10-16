@@ -23,7 +23,7 @@ export function resolveApiRoute(name: string): Readonly<{ path: string; method: 
   }
   if (route.method === "all") {
     throw new Error(
-      `Named API route ${JSON.stringify(name)} accepts method \"all\" and cannot choose a browser request verb. Use an explicit path and method.`,
+      `Named API route ${JSON.stringify(name)} accepts method "all" and cannot choose a browser request verb. Use an explicit path and method.`,
     );
   }
   return route;

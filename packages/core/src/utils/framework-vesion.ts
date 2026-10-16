@@ -16,7 +16,7 @@ export async function getWarlockVersion(): Promise<string> {
     path.join(import.meta.dirname, "./../../package.json"),
   )) as { version: string };
 
-  const version = frameworkPackageJson.version.replace(/\^|\~/g, "");
+  const version = frameworkPackageJson.version.replace(/\^|~/g, "");
   cachedVersion = version;
   return version;
 }

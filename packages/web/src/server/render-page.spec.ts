@@ -752,7 +752,7 @@ describe("finishRender — failed page validation on a full-document request (de
     expect(rendered.html).toBe("");
     expect(rendered.bundle?.shortCircuit).toMatchObject({ stage: "validation", status: 400 });
 
-    const errors = (rendered.bundle?.shortCircuit as { errors: { input: string }[] }).errors;
+    const errors = (rendered.bundle!.shortCircuit as { errors: { input: string }[] }).errors;
     expect(errors.some((issue) => issue.input.includes("page"))).toBe(true);
   });
 });

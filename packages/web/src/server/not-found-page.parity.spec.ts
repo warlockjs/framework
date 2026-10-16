@@ -190,7 +190,6 @@ describe("not-found route parity gate", () => {
   ])("diffs dev and production outputs for %s", async (_label, shape) => {
     const subject = fixture(shape);
     const appRoot = materialize(subject.files);
-    const appSrcRoot = path.join(appRoot, "src");
 
     for (const relative of Object.keys(subject.files)) {
       subject.modules[path.join(appRoot, relative)] = relative.endsWith("home.page.tsx")

@@ -89,7 +89,6 @@ vi.mock("react-dom/server", async (importOriginal) => {
 });
 
 const APP_FILE = "/fixtures/web/root.tsx";
-const LAYOUT_FILE = "/fixtures/web/layout.tsx";
 const PAGE_FILE = "/fixtures/web/streamed.page.tsx";
 
 let previousRunner: PageContextRunner | undefined;

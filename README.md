@@ -144,7 +144,7 @@ Each package keeps its own `README.md`, `CHANGELOG.md`, tests and agent skills. 
 
 ## Development
 
-**Requirements:** Node.js 22.13 or newer (CI uses Node 24) and [pnpm](https://pnpm.io) 11.24.0. With Corepack enabled, the right pnpm is picked up from `packageManager` automatically:
+**Requirements:** Node.js 22.15 or newer (CI uses Node 24) and [pnpm](https://pnpm.io) 11.24.0. With Corepack enabled, the right pnpm is picked up from `packageManager` automatically:
 
 ```bash
 corepack enable
@@ -166,6 +166,7 @@ Packages resolve each other from this repository, never from npm, so a change in
 | Run the docs site locally | `pnpm docs:dev` |
 | Build the docs site | `pnpm docs:build` |
 | Check formatting | `pnpm format:check` |
+| Check shared correctness rules | `pnpm lint:oxlint` |
 | List packages a branch affects | `pnpm ci:affected --base origin/main` |
 | Move the whole family to a new version | `pnpm release:version 5.30.0` |
 
@@ -176,6 +177,13 @@ docker run -d --name warlock-redis -p 6390:6379 redis:7
 ```
 
 ### Continuous integration
+
+The shared Oxlint check fails on correctness errors; warnings remain advisory.
+Unused locals and unsafe optional access stay errors. Override parameters,
+intentionally ignored catches, object-rest omissions, snapshot spreads, numeric
+array allocation and typed `createElement` children follow the repository's
+existing conventions. Exceptions to safety checks belong on the specific line
+with a reason; do not disable a safety rule to conceal a failing check.
 
 | Workflow | Runs on | What it does |
 | --- | --- | --- |

@@ -36,12 +36,6 @@ const request = {
   params: { id: "42" },
 };
 
-/** The lossy shape stage 4 used to read. Present only to prove it is unused. */
-const match = {
-  query: { tags: "b", "filter[status]": "active" },
-  params: { id: "42" },
-};
-
 describe("resolveValidationData — every source is the request", () => {
   it("takes query from the request, not a re-parsed URL", () => {
     const data = resolveValidationData(["query"], request);

@@ -7,7 +7,6 @@ import {
   type ResourceArraySchema,
   type ResourceFieldConfig,
   type ResourceOutputValueCastType,
-  type ResourceSchema,
 } from "./types";
 
 /**

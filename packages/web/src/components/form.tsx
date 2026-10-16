@@ -242,6 +242,7 @@ export function Form({
 
   return createElement(
     "form",
+    // oxlint-disable-next-line react/refs -- The native form receives the forwarded ref; createElement does not read its current value.
     {
       ...rest,
       ref,

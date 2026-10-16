@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
-
 import type { PublishHandoff } from "../local-registry-gate.ts";
 import {
   NPM_ORIGIN,
@@ -363,7 +362,6 @@ describe("runReleaseFamily gate mode", () => {
 
 describe("per-package clean-tree gate (card 9555ba00)", () => {
   const notificationsRoot = FAMILY.members[0].root; // "@warlock.js/notifications"
-  const createWarlockRoot = FAMILY.members[1].root; // "create-warlock"
 
   function withGitStatus(dirtyByRoot: ReadonlyMap<string, string>): ReturnType<typeof fixture> {
     const control = fixture();

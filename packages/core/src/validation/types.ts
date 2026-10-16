@@ -13,7 +13,6 @@ import type {
   BaseValidator,
   Infer,
   ObjectValidator,
-  ScalarValidator,
   StandardSchemaV1,
   StringValidator,
   TranslateAttributeCallback,

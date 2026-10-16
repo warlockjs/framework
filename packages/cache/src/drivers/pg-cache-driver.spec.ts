@@ -1136,7 +1136,7 @@ describe("PgCacheDriver — tag index (atomic JSON-array row)", () => {
 
     const adds = pool.queryLog.filter((q) => q.text.trim().startsWith("/* cache:tag-add */"));
     expect(adds).toHaveLength(20);
-    expect((pool.store.get("cache.tags.products")?.value as string[]).length).toBe(20);
+    expect((pool.store.get("cache.tags.products")!.value as string[]).length).toBe(20);
 
     await driver.tags(["products"]).invalidate();
 

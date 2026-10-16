@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Application, Router, container, resetRolesCacheForTests } from "@warlock.js/core";
+import { Router, container, resetRolesCacheForTests } from "@warlock.js/core";
 import type { SitesConfig } from "../sites/site-config.types";
 import { installPageRoutes, type InstallPageRoutesOptions } from "./install-page-routes";
 import { createSiteDispatch } from "./site-dispatch";

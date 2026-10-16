@@ -11,7 +11,7 @@ import { getSealConfig, v } from "@warlock.js/seal";
 import { enterSharedScope, sealShared, shared } from "../shared";
 import { connectRequestSearch } from "../routing/query-string";
 import type { PageRoute } from "../context";
-import { enterAdditionalSharedScope, requireRunner } from "./page-context";
+import { requireRunner } from "./page-context";
 import { createRequestAbortController } from "./request-abort-signal";
 import { ClientDisconnectedError } from "./client-disconnected-error";
 import { beginLayoutLoaderCapture, endLayoutLoaderCapture } from "./layout-loader-capture";
@@ -327,7 +327,7 @@ type ActionStageOptions = {
  * `bundle.shortCircuit = { stage: "action" }` and answers `stop`.
  */
 async function runActionStage(options: ActionStageOptions): Promise<ActionStageOutcome> {
-  const { triple, request, response, bundle, buffer } = options;
+  const { triple, request, bundle, buffer } = options;
   const page = triple.page;
   const resolved = resolveActionInput(request);
   const isDefault = resolved.name === DEFAULT_ACTION_NAME;
@@ -454,7 +454,6 @@ export async function runPageMiddlewareGate(
   return runner.run(store, async () => {
     enterSharedScope(store);
     mergeResolvedSiteShared(request);
-    enterAdditionalSharedScope(store);
 
     const halted = await runMiddlewareChain(options);
 
@@ -521,7 +520,6 @@ export async function executePageRequest<TResult = PageDataBundle>(
   return runner.run(store, async () => {
     enterSharedScope(store);
     mergeResolvedSiteShared(request);
-    enterAdditionalSharedScope(store);
 
     const finish = async (bundle: PageDataBundle): Promise<TResult> => {
       throwIfClientDisconnected(stageFailure);

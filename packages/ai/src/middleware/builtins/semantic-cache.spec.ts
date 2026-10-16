@@ -9,7 +9,6 @@ import type {
 import { MockSDK } from "../../mock/mock-sdk";
 import { tool } from "../../tool/tool";
 import { semanticCache } from "./semantic-cache";
-
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 /**
@@ -165,7 +164,7 @@ describe("semanticCache — vector-match path", () => {
     });
     const model = sdk.model({ name: "gpt-test" });
     const mockModel = sdk.models[sdk.models.length - 1];
-    const { driver: store, countEntries } = makeStore();
+    const { driver: store } = makeStore();
 
     const ai = agent({
       model,
@@ -226,7 +225,7 @@ describe("semanticCache — TTL expiry", () => {
     });
     const model = sdk.model({ name: "gpt-test" });
     const mockModel = sdk.models[sdk.models.length - 1];
-    const { driver: store, countEntries } = makeStore();
+    const { driver: store } = makeStore();
 
     const now = { value: 1_000_000 };
     const originalNow = Date.now;
@@ -304,7 +303,7 @@ describe("semanticCache — namespace isolation", () => {
     });
     const model = sdk.model({ name: "gpt-test" });
     const mockModel = sdk.models[sdk.models.length - 1];
-    const { driver: store, countEntries } = makeStore();
+    const { driver: store } = makeStore();
 
     const firstAgent = agent({
       model,

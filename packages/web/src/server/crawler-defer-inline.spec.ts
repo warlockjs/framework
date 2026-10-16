@@ -17,7 +17,7 @@
  */
 import { createElement, Suspense, use } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { Response } from "@warlock.js/core";
 import { createCoreHttp, requestContext } from "./__fixtures__/core-http";
 import * as App from "../../__tests__/server/fixtures/root";

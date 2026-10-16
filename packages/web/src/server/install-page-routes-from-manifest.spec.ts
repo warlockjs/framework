@@ -13,7 +13,6 @@ import {
 } from "./install-page-routes-from-manifest";
 import {
   DuplicateNotFoundPageError,
-  frameworkDefaultNotFoundDocument,
   NotFoundPageDeclaresRouteError,
   NOT_FOUND_ROUTE_NAME,
   NOT_FOUND_ROUTE_PATH,
@@ -261,7 +260,7 @@ describe("production page route installation", () => {
       layouts: [],
     };
 
-    const { run, registered, built } = install(manifestOf([page]));
+    const { run, registered } = install(manifestOf([page]));
 
     const installed = run();
 

@@ -9,7 +9,6 @@ import { BaseValidator, v } from "@warlock.js/seal";
 import type { FastifyRequest } from "fastify";
 import { randomBytes } from "node:crypto";
 import { type IncomingHttpHeaders } from "node:http2";
-import { Application } from "../application/application";
 import { config } from "../config/config-getter";
 import {
   LOCALE_COOKIE_NAME,

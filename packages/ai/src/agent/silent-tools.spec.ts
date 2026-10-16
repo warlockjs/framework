@@ -1,6 +1,5 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { describe, expect, it, vi } from "vitest";
-import type { ToolCall } from "../contracts/result/tool-call.type";
 import { MockSDK } from "../mock/mock-sdk";
 import { tool } from "../tool/tool";
 import { agent } from "./agent";

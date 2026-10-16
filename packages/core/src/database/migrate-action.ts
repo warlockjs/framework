@@ -3,7 +3,6 @@ import {
   exportMigrationsSQL,
   freshMigrate,
   listExecutedMigrations,
-  Migration,
   type MigrationConstructor,
   migrationRunner,
   rollbackMigrations,

@@ -95,8 +95,8 @@ describe("orchestrator lifecycle — happy path", () => {
     expect(second.turnIndex).toBe(1);
 
     const latest = await store.load("counter", "s1");
-    expect((latest?.state as CounterState).count).toBe(2);
-    expect((latest?.state as CounterState).lastInput).toBe("two");
+    expect((latest!.state as CounterState).count).toBe(2);
+    expect((latest!.state as CounterState).lastInput).toBe("two");
   });
 
   it("seeds first-call state from config.state, not on subsequent turns (Phase 1)", async () => {
@@ -104,7 +104,7 @@ describe("orchestrator lifecycle — happy path", () => {
 
     const first = await orch.execute("one", { sessionId: "fresh", history: [] });
 
-    expect((first.report.turns[0]?.state as CounterState).count).toBe(1);
+    expect((first.report.turns[0]!.state as CounterState).count).toBe(1);
   });
 
   it("applies the per-call state patch over the loaded seed (§5)", async () => {
@@ -117,7 +117,7 @@ describe("orchestrator lifecycle — happy path", () => {
     });
 
     const latest = await store.load("counter", "s1");
-    expect((latest?.state as CounterState).count).toBe(42);
+    expect((latest!.state as CounterState).count).toBe(42);
     expect(result.turnIndex).toBe(0);
   });
 
@@ -131,8 +131,8 @@ describe("orchestrator lifecycle — happy path", () => {
     const alice = await store.load("counter", "alice");
     const bob = await store.load("counter", "bob");
 
-    expect((alice?.state as CounterState).count).toBe(2);
-    expect((bob?.state as CounterState).count).toBe(1);
+    expect((alice!.state as CounterState).count).toBe(2);
+    expect((bob!.state as CounterState).count).toBe(1);
   });
 });
 

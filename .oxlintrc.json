@@ -5,6 +5,20 @@
     "correctness": "error",
     "suspicious": "warn"
   },
+  "rules": {
+    // Public override signatures and catch clauses intentionally keep unused parameters.
+    "no-unused-vars": ["error", { "args": "none", "caughtErrors": "none", "ignoreRestSiblings": true, "varsIgnorePattern": "^_" }],
+    // Framework renderers use createElement's typed props object, including children.
+    "react/no-children-prop": "off",
+    // Snapshot arrays are intentional when callbacks can mutate a live collection.
+    "unicorn/no-useless-spread": "off",
+    // Defensive object-spread fallbacks are harmless and document optional inputs.
+    "unicorn/no-useless-fallback-in-spread": "off",
+    // Single numeric arguments intentionally allocate length-sized arrays before fill/map.
+    "unicorn/no-new-array": "off",
+    // Literal regex anchors are an accepted spelling; keep suggestions visible.
+    "unicorn/prefer-string-starts-ends-with": "warn"
+  },
   "env": {
     "node": true,
     "browser": true,

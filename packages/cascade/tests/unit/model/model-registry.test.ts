@@ -1,3 +1,4 @@
+// oxlint-disable no-unused-vars -- Decorated class definitions register models as the tested side effect.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Model } from "../../../src/model/model";
 import {

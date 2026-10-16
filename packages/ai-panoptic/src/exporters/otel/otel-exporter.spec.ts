@@ -18,7 +18,6 @@ const recorded: RecordedSpan[] = [];
 
 vi.mock("@opentelemetry/api", () => {
   const SpanStatusCode = { UNSET: 0, OK: 1, ERROR: 2 };
-  let contextCounter = 0;
 
   function makeOtelSpan(name: string, startTime: unknown, parentContextId: number | undefined) {
     const entry: RecordedSpan = {
@@ -58,8 +57,6 @@ vi.mock("@opentelemetry/api", () => {
     trace: {
       getTracer: () => tracer,
       setSpan: (_context: unknown, span: { __entry: RecordedSpan }) => {
-        contextCounter += 1;
-        span.__entry.endTime = span.__entry.endTime; // no-op, keep ref
         return { id: recorded.indexOf(span.__entry) };
       },
     },

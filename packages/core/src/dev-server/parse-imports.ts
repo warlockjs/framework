@@ -124,7 +124,7 @@ export function isTypeOnlyFile(source: string): boolean {
 function isTypeOnlyImport(line: string): boolean {
   const trimmed = line.trim();
 
-  return trimmed.startsWith("import type ") || !!trimmed.match(/^import\s+type\s+[\{\*]/);
+  return trimmed.startsWith("import type ") || !!trimmed.match(/^import\s+type\s+[{*]/);
 }
 
 /**

@@ -17,7 +17,6 @@ vi.mock("@warlock.js/fs", () => ({
 import { accessFeature } from "./access.feature";
 
 const accessJson = /src[\\/]app[\\/]access[\\/]utils[\\/]locales\.json$/;
-const sharedLegacy = /src[\\/]app[\\/]shared[\\/]utils[\\/]locales\.ts$/;
 
 function jsonFile(): [string, string] | undefined {
   return [...files.entries()].reverse().find(([path]) => accessJson.test(path));

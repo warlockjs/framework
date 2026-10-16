@@ -161,6 +161,7 @@ export class LevelErrorBoundary extends Component<
 
   public componentDidUpdate(previousProps: LevelErrorBoundaryProps): void {
     if (previousProps.resetToken !== this.props.resetToken && this.state.caught) {
+      // oxlint-disable-next-line react/no-did-update-set-state -- The changed reset token guards this boundary reset and prevents an update loop.
       this.setState({ error: undefined, caught: false });
     }
   }

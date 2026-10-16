@@ -1,5 +1,5 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { CompleteEvent } from "../contracts/events/complete-event.type";
 import type { UsageEvent } from "../contracts/events/usage-event.type";
 import { MockSDK } from "../mock/mock-sdk";

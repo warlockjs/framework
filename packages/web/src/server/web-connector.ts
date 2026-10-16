@@ -294,7 +294,7 @@ export type WebConnectorOptions = {
   webRoot?: string;
   /**
    * Extra `resolve.alias` entries, prepended to the app-convention aliases
-   * (`web/*` Ã¢â€ â€™ `src/web`, `app/*` Ã¢â€ â€™ `src/app`) so a caller can win a conflict.
+   * (`web/*` -> `src/web`, `app/*` -> `src/app`) so a caller can win a conflict.
    * A normal application needs none of these; a monorepo checkout with unbuilt
    * workspace packages does.
    */
@@ -337,7 +337,7 @@ export class WebConnector extends BaseConnector {
   protected sitemapAppRoot?: string;
 
   /**
-   * The buildÃ¢â€ â€™runtime handoff table, read once at boot.
+   * The build->runtime handoff table, read once at boot.
    *
    * `undefined` in dev is the normal case and carries no meaning beyond "no
    * build has run" Ã¢â‚¬â€ see {@link WebPageManifestMissingError} for why the

@@ -3,7 +3,6 @@ import type { BrokerDriverContract, ChannelContract } from "../../contracts";
 import { EventMessage } from "../../message-managers/event-message";
 import { type EventConsumerClass } from "../../message-managers/types";
 import type {
-  BrokerDriverType,
   BrokerEvent,
   BrokerEventListener,
   ChannelOptions,

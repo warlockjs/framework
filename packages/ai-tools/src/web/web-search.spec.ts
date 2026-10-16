@@ -59,7 +59,7 @@ describe("webSearchTool", () => {
 
     // The model asked for 50, but the constructor cap is 3.
     expect(data?.results).toHaveLength(3);
-    const sentBody = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
+    const sentBody = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
     expect(sentBody.max_results).toBe(3);
   });
 
@@ -72,7 +72,7 @@ describe("webSearchTool", () => {
     const { error } = await tool.invoke({ query: "q" });
 
     expect(error).toBeUndefined();
-    const sentBody = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string);
+    const sentBody = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
     expect(sentBody.api_key).toBe("env-key");
   });
 

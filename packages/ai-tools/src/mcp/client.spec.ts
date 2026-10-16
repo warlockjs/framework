@@ -190,7 +190,7 @@ describe("mcp() client — namePrefix + filter", () => {
     await contract.invoke({ message: "hi" });
 
     const call = transport.requests.find((r) => r.method === "tools/call");
-    expect((call?.params as { name: string }).name).toBe("echo");
+    expect((call!.params as { name: string }).name).toBe("echo");
   });
 
   it("only adapts tools whose name passes the filter", async () => {
@@ -234,7 +234,7 @@ describe("mcp() client — tools/call execution", () => {
     await contract.invoke({ message: "payload" });
 
     const call = transport.requests.find((r) => r.method === "tools/call");
-    expect((call?.params as { arguments: unknown }).arguments).toEqual({ message: "payload" });
+    expect((call!.params as { arguments: unknown }).arguments).toEqual({ message: "payload" });
   });
 
   it("maps an isError result into the contract's error field", async () => {

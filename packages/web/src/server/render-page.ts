@@ -1142,7 +1142,6 @@ async function finishRender(
   // render) and is replaced by each escalation — `bundle.error` itself is
   // never mutated, staying a truthful stage 1-8 record.
   let currentError = bundle.error;
-  let renderTimeThrow = false;
   let body: string;
 
   const renderFrameworkRoot = (): string => {
@@ -1234,7 +1233,6 @@ async function finishRender(
           );
           body = renderFrameworkAfterErrorPageFailure();
         }
-        renderTimeThrow = true;
         break;
       }
 
@@ -1245,7 +1243,6 @@ async function finishRender(
       body = renderWithContext(element);
       break;
     } catch (thrown) {
-      renderTimeThrow = true;
 
       // Floor first: whatever we do next (escalate to a boundary, fall to the
       // framework terminal), the throw must not vanish. See reportRenderError.

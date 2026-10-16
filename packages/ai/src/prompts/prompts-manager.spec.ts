@@ -3,7 +3,7 @@ import { InvalidRequestError } from "../errors";
 import { instruction } from "../system-prompt/instruction";
 import { persona } from "../system-prompt/persona";
 import { systemPrompt } from "../system-prompt/system-prompt";
-import { defaultPromptsManager, prompts } from "./prompts-manager";
+import { prompts } from "./prompts-manager";
 
 describe("systemPrompt meta", () => {
   it("is anonymous by default — meta() returns undefined", () => {

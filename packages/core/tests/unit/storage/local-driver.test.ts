@@ -3,7 +3,7 @@ import { readFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { Readable } from "stream";
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { LocalDriver } from "../../../src/storage/drivers/local-driver";
 import { StorageError } from "../../../src/storage/utils/storage-error";
 

@@ -182,7 +182,7 @@ describe("currentRoute", () => {
     const params = { id: "42" };
 
     modules.recordCurrentRoute(payloadOf("products.details", params));
-    (modules.currentRoute()?.params as Record<string, string>).id = "99";
+    (modules.currentRoute()!.params as Record<string, string>).id = "99";
 
     expect(params).toEqual({ id: "42" });
   });

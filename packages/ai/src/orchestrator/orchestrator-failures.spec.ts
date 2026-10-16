@@ -4,7 +4,7 @@ import type {
   CheckpointRecord,
   CheckpointStore,
 } from "../contracts/orchestrator/checkpoint-store.contract";
-import type { SnapshotStore } from "../contracts/orchestrator/snapshot-store.contract";
+
 import type { SupervisorSnapshot } from "../contracts/supervisor/supervisor-snapshot.type";
 import { checkpointMemory } from "../checkpoint";
 import { setAIConfig } from "../config";
@@ -257,7 +257,7 @@ describe("orchestrator failures — lock fail-open (§4 Phase 3 / §12.3)", () =
     // pre-lock state of count 5).
     const latest = await store.load("counter", "locked");
     expect(latest?.turn_index).toBe(1);
-    expect((latest?.state as CounterState).count).toBe(6);
+    expect((latest!.state as CounterState).count).toBe(6);
   });
 });
 
@@ -320,7 +320,7 @@ describe("orchestrator failures — mid-turn cancel (§17 / Q10)", () => {
     // aborted turn (§17 — state reverts to the pre-turn checkpoint).
     const after = await checkpointStore.load("cancellable", "s1");
     expect(after?.turn_index).toBe(0);
-    expect((after?.state as CounterState).count).toBe((before?.state as CounterState).count);
+    expect((after!.state as CounterState).count).toBe((before!.state as CounterState).count);
   });
 
   it("emits orchestrator.turn.cancelled for the aborted turn", async () => {

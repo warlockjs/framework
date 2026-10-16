@@ -1,5 +1,5 @@
 import type { QueryBuilderContract } from "../../contracts";
-import type { GlobalScopeOptions, LocalScopeCallback, ChildModel, Model } from "../model";
+import type { GlobalScopeOptions, LocalScopeCallback, ChildModel } from "../model";
 
 /**
  * Give the model class its OWN scope map before mutating.

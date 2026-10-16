@@ -1619,6 +1619,7 @@ export class MongoQueryParser {
       $switch: {
         branches: cases.map((item) => ({
           case: this.resolveProjectionExpression(item.when),
+          // oxlint-disable-next-line unicorn/no-thenable -- MongoDB aggregation uses a literal $cond.then field, not a JavaScript thenable.
           then: this.resolveLiteralOrExpression(item.then),
         })),
         default: this.resolveLiteralOrExpression(otherwise),

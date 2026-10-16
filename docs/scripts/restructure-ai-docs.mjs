@@ -221,7 +221,6 @@ function mapOldAiPath(oldAiRel) {
   return slugOf(`v/latest/ai/${newRel}`);
 }
 
-const newToOld = new Map([...moves].map(([o, n]) => [n, o]));
 const failures = [];
 const edits = []; // [absFilePath, newText]
 let linksRewritten = 0;

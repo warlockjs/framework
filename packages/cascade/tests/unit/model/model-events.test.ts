@@ -5,11 +5,6 @@ import { Model } from "../../../src/model/model";
 import { RegisterModel } from "../../../src/model/register-model";
 import { createMockDriver } from "../../utils/test-helpers";
 
-// Mock QueryBuilder since events use it
-const mockQueryBuilder = {
-  where: vi.fn(),
-};
-
 @RegisterModel()
 class TestUser extends Model {
   static table = "test_users";

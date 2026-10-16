@@ -86,7 +86,7 @@ import {
   NotFoundPageDeclaresRouteError,
   registerNotFoundPageRoute,
 } from "./not-found-page";
-import type { LayoutModuleShape, PageRouteExport } from "./page-module-shapes";
+import type { LayoutModuleShape } from "./page-module-shapes";
 import { createRouteTranslationsResolver } from "./route-translations";
 import {
   filterActiveSites,

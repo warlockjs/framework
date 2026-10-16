@@ -67,8 +67,10 @@ async function hydrateWith(strictMode: boolean | undefined): Promise<{
   }
 
   function Probe() {
+    // oxlint-disable-next-line react/globals -- This test probe records renders or hook values for assertions outside React.
     renders += 1;
     const [visible, setVisible] = useState(false);
+    // oxlint-disable-next-line react/globals -- This test probe records renders or hook values for assertions outside React.
     reveal = () => setVisible(true);
     useEffect(() => {
       setup += 1;

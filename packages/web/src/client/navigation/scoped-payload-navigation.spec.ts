@@ -8,7 +8,7 @@ import type { HydrationDocumentPayloadSource } from "../../hydration-payload";
 import { useLocale, useTrans } from "../../localization";
 import { currentNavigator } from "../../routing/navigator";
 import { buildHydratedTree } from "../build-hydrated-tree";
-import type { ClientPageEntry, ClientRouteComposition } from "../runtime/types";
+import type { ClientPageEntry } from "../runtime/types";
 import { NavigationRoot } from "./navigation-root";
 import { resetScrollPositions } from "./scroll-positions";
 import { resetManualScrollRestorationInstalled } from "./scroll-restoration";

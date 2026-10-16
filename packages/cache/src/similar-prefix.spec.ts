@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { LRUMemoryCacheDriver, MemoryCacheDriver, MemoryExtendedCacheDriver } from "./drivers";
 import type { CacheDriver } from "./types";
 

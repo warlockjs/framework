@@ -182,7 +182,7 @@ function isAllowlisted(relPath: string, text: string): boolean {
 }
 
 /** `pnpm <word>` or `yarn <word>` — a real invocation, not just the bare word "pnpm"/"yarn" appearing in prose. */
-const INVOCATION_RE = /\b(pnpm|yarn)\s+[A-Za-z@.\-]/;
+const INVOCATION_RE = /\b(pnpm|yarn)\s+[A-Za-z@.-]/;
 
 function isDirectory(p: string): boolean {
   try {

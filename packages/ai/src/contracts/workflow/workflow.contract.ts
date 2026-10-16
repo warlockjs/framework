@@ -148,7 +148,7 @@ export type WorkflowDefinition<
 export interface WorkflowInstance<
   TInput = unknown,
   TOutput = unknown,
-  TState = Record<string, unknown>,
+  _TState = Record<string, unknown>,
   TContext = unknown,
 > extends ExecutableContract<TInput, WorkflowRunOptions<TContext>, WorkflowResult<TOutput>> {
   readonly name: string;

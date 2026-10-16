@@ -29,7 +29,6 @@ import {
   Response,
   type FastifyInstance,
   type HttpContext,
-  type Request,
 } from "@warlock.js/core";
 
 import {

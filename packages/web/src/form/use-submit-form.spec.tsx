@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useSubmitForm } from "./use-submit-form";
 import { publishNamedApiRoutes } from "../routing/named-api-routes";
@@ -71,6 +71,7 @@ function mount(options: any) {
   const root = createRoot(container);
   let value: ReturnType<typeof useSubmitForm> | undefined;
   function Probe() {
+    // oxlint-disable-next-line react/globals -- This test probe records renders or hook values for assertions outside React.
     value = useSubmitForm(options);
     return null;
   }

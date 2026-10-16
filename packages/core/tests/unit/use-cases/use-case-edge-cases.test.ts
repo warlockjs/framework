@@ -1,7 +1,7 @@
 import config from "@mongez/config";
 import { cache, MemoryCacheDriver } from "@warlock.js/cache";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { getUseCase, useCase } from "../../../src/use-cases";
+import { useCase } from "../../../src/use-cases";
 import type { UseCaseBroadcastChannel, UseCaseBroadcastEvent } from "../../../src/use-cases/types";
 
 /**

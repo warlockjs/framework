@@ -1,4 +1,4 @@
-import fs from "node:fs/promises";
+
 import type { StorageDriverName } from "../../storage/types";
 import { HttpError } from "../errors";
 import { uploadsConfig } from "../uploads-config";

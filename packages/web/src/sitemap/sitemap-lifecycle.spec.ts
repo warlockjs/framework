@@ -20,7 +20,6 @@ import {
   getSitemapServingState,
   regenerateSitemap,
   refreshSitemapModelSubscriptions,
-  resetSitemapLifecycleForTests,
   shutdownSitemapRuntime,
   startSitemapRuntime,
 } from "./sitemap-lifecycle";

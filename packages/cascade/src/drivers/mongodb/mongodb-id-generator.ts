@@ -187,6 +187,7 @@ export class MongoIdGenerator implements IdGeneratorContract {
                   if: {
                     $or: [{ $eq: [{ $type: "$id" }, "missing"] }, { $eq: ["$id", null] }],
                   },
+                  // oxlint-disable-next-line unicorn/no-thenable -- MongoDB aggregation uses a literal $cond.then field, not a JavaScript thenable.
                   then: initialId + (count - 1) * incrementIdBy,
                   else: { $add: ["$id", count * incrementIdBy] },
                 },

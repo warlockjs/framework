@@ -1068,7 +1068,7 @@ describe("AnthropicModel.stream()", () => {
     const done = chunks.find((chunk) => chunk.type === "done");
 
     expect(done?.usage).toEqual({ input: 8, output: 2, total: 10 });
-    expect((done?.usage as { cachedTokens?: number }).cachedTokens).toBeUndefined();
+    expect((done!.usage as { cachedTokens?: number }).cachedTokens).toBeUndefined();
   });
 
   it("surfaces cache_creation_input_tokens from message_start as cacheWriteTokens in done", async () => {

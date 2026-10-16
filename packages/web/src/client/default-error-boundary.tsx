@@ -91,6 +91,7 @@ export class DefaultErrorBoundary extends Component<
     if (previousProps.resetToken !== this.props.resetToken) {
       this.reportedSinceSwap = false;
 
+      // oxlint-disable-next-line react/no-did-update-set-state -- The changed reset token guards this boundary reset and prevents an update loop.
       if (this.state.error !== undefined) this.setState({ error: undefined });
     }
   }

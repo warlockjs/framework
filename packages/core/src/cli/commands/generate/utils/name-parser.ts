@@ -1,6 +1,5 @@
 import { toCamelCase, toKebabCase, toSnakeCase, toStudlyCase } from "@mongez/reinforcements";
 import pluralize from "pluralize-esm";
-import type { ParsedName } from "../types";
 
 /**
  * Parse module path from input

@@ -6,7 +6,7 @@
  * source; `collectSitemapEntries` uses it whenever one is registered
  * (`./production-sitemap-page-source.ts`) or passed explicitly.
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { collectSitemapEntries } from "./collect-sitemap-entries";
 import { createManifestSitemapPageSource } from "./manifest-sitemap-page-source";
 import {

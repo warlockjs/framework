@@ -14,7 +14,6 @@ import type {
   WhereOperator,
 } from "../../contracts/query-builder.contract";
 import type { SqlDialectContract } from "../sql/sql-dialect.contract";
-
 import { escapeSqlLiteral, PostgresDialect } from "./postgres-dialect";
 
 /** Allowed `::cast` type names, e.g. `int`, `numeric(10,2)`, `text[]`. */
@@ -1085,11 +1084,6 @@ export class PostgresQueryParser {
       }
 
       // Wrap with ORDER/LIMIT only when constraints are present (json_agg ignores ORDER)
-      const innerQuery =
-        orderBy || limitClause
-          ? `SELECT row_to_json(sub.*) FROM (SELECT * FROM ${quotedRelatedTable} a WHERE ${fkCondition}${extraWhere}${orderBy}${limitClause}) sub`
-          : `SELECT ${innerSelect.replace("json_agg(", "").replace(/\)$/, "")} FROM ${quotedRelatedTable} a WHERE ${fkCondition}${extraWhere}`;
-
       const aggregated =
         orderBy || limitClause
           ? `(SELECT json_agg(row_to_json(sub.*)) FROM (SELECT * FROM ${quotedRelatedTable} a WHERE ${fkCondition}${extraWhere}${orderBy}${limitClause}) sub) AS ${quotedAlias}`

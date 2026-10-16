@@ -85,7 +85,7 @@ describe("ai.orchestrator() — memory recall injection (M2)", () => {
       history: [],
     });
 
-    const seen = (result.report.turns[0]?.state as SeenState).seen;
+    const seen = (result.report.turns[0]!.state as SeenState).seen;
 
     expect(result.error).toBeUndefined();
     expect(seen).toBeDefined();
@@ -104,7 +104,7 @@ describe("ai.orchestrator() — memory recall injection (M2)", () => {
       history: [],
     });
 
-    expect((first.report.turns[0]?.state as SeenState).seen ?? []).toHaveLength(0);
+    expect((first.report.turns[0]!.state as SeenState).seen ?? []).toHaveLength(0);
 
     // Turn 1 — the prior turn's remembered outcome is recalled + injected.
     const second = await bot.execute("when is the launch?", {
@@ -112,7 +112,7 @@ describe("ai.orchestrator() — memory recall injection (M2)", () => {
       history: [],
     });
 
-    const seen = (second.report.turns[0]?.state as SeenState).seen ?? [];
+    const seen = (second.report.turns[0]!.state as SeenState).seen ?? [];
 
     expect(seen.length).toBeGreaterThan(0);
     expect(seen.some((hit) => hit.text.includes("the launch is in March"))).toBe(true);
@@ -150,7 +150,7 @@ describe("ai.orchestrator() — memory config knobs (M2)", () => {
 
     const result = await bot.execute("query", { sessionId: "s1", history: [] });
 
-    const seen = (result.report.turns[0]?.state as SeenState).seen;
+    const seen = (result.report.turns[0]!.state as SeenState).seen;
 
     expect(seen?.some((hit) => hit.text === "custom-key memory")).toBe(true);
   });
@@ -168,7 +168,7 @@ describe("ai.orchestrator() — memory config knobs (M2)", () => {
 
     const result = await bot.execute("query", { sessionId: "s1", history: [] });
 
-    const seen = (result.report.turns[0]?.state as SeenState).seen ?? [];
+    const seen = (result.report.turns[0]!.state as SeenState).seen ?? [];
 
     // Nothing injected — but the turn outcome is still remembered.
     expect(seen).toHaveLength(0);
@@ -197,7 +197,7 @@ describe("ai.orchestrator() — memory config knobs (M2)", () => {
     });
 
     expect(
-      (result.report.turns[0]?.state as SeenState).seen?.some(
+      (result.report.turns[0]!.state as SeenState).seen!.some(
         (hit) => hit.text === "seeded read-only memory",
       ),
     ).toBe(true);
@@ -240,7 +240,7 @@ describe("ai.orchestrator() — memory session isolation (security)", () => {
       history: [],
     });
 
-    const seen = (bTurn.report.turns[0]?.state as SeenState).seen ?? [];
+    const seen = (bTurn.report.turns[0]!.state as SeenState).seen ?? [];
 
     expect(seen).toHaveLength(0);
     expect(seen.some((hit) => hit.text.includes("a@example.com"))).toBe(false);
@@ -252,7 +252,7 @@ describe("ai.orchestrator() — memory session isolation (security)", () => {
     });
 
     expect(
-      ((aTurn.report.turns[0]?.state as SeenState).seen ?? []).some((hit) =>
+      ((aTurn.report.turns[0]!.state as SeenState).seen ?? []).some((hit) =>
         hit.text.includes("a@example.com"),
       ),
     ).toBe(true);
@@ -296,7 +296,7 @@ describe("ai.orchestrator() — memory session isolation (security)", () => {
       history: [],
     });
 
-    const seen = (bTurn.report.turns[0]?.state as SeenState).seen ?? [];
+    const seen = (bTurn.report.turns[0]!.state as SeenState).seen ?? [];
 
     expect(seen.some((hit) => hit.text.includes("the launch is in March"))).toBe(true);
   });
@@ -323,7 +323,7 @@ describe("ai.orchestrator() — memory session isolation (security)", () => {
     });
 
     expect(
-      ((sameTenant.report.turns[0]?.state as SeenState).seen ?? []).some((hit) =>
+      ((sameTenant.report.turns[0]!.state as SeenState).seen ?? []).some((hit) =>
         hit.text.includes("the acme contract renews in June"),
       ),
     ).toBe(true);
@@ -335,7 +335,7 @@ describe("ai.orchestrator() — memory session isolation (security)", () => {
     });
 
     expect(
-      ((otherTenant.report.turns[0]?.state as SeenState).seen ?? []).some((hit) =>
+      ((otherTenant.report.turns[0]!.state as SeenState).seen ?? []).some((hit) =>
         hit.text.includes("the acme contract renews in June"),
       ),
     ).toBe(false);
@@ -351,6 +351,6 @@ describe("ai.orchestrator() — without memory (unchanged)", () => {
     const result = await bot.execute("plain", { sessionId: "s1", history: [] });
 
     expect(result.error).toBeUndefined();
-    expect((result.report.turns[0]?.state as SeenState).rawInjectKey).toBeUndefined();
+    expect((result.report.turns[0]!.state as SeenState).rawInjectKey).toBeUndefined();
   });
 });

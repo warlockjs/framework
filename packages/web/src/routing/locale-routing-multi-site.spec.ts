@@ -14,7 +14,7 @@ import { createSiteDispatch, type SiteDispatchInstall } from "../server/site-dis
 import type { SitesConfig } from "../sites/site-config.types";
 import { Link } from "../components/link";
 import { localizedPath } from "./localized-path";
-import { publishLocaleRouting, readLocaleRouting, resetLocaleRouting, type LocaleRouting } from "./locale-routing";
+import { readLocaleRouting, resetLocaleRouting, type LocaleRouting } from "./locale-routing";
 import { resetRouteTable } from "./route-table";
 import { connectCurrentSite } from "./site-url";
 

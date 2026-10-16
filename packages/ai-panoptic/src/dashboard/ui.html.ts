@@ -1026,7 +1026,7 @@ export function dashboardHtml(
   // "Supervisor Terminated By", "span id" → "Span ID", "agent.trips" →
   // "Agent Trips". Underlying attribute keys are untouched.
   // NB: this whole script is a template literal — regex backslash classes
-  // MUST be double-escaped (\\s, not \s) or "\\s" collapses to a literal "s".
+  // MUST be double-escaped (\\s) so the rendered script retains its backslash.
   function humanizeKey(key) {
     return String(key).split(/[.\\s]+/).map(function (seg) {
       return seg.replace(/([a-z0-9])([A-Z])/g, "$1 $2").split(/\\s+/).map(function (w) {

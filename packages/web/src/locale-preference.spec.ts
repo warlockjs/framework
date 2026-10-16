@@ -10,7 +10,7 @@ describe("locale preference cookie contract", () => {
     );
 
     expect(source).toContain(
-      `LOCALE_PREFERENCE_COOKIE_NAME = \"${LOCALE_PREFERENCE_COOKIE_NAME}\"`,
+      `LOCALE_PREFERENCE_COOKIE_NAME = "${LOCALE_PREFERENCE_COOKIE_NAME}"`,
     );
   });
 });

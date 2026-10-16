@@ -1,6 +1,6 @@
 import type { BaseReport } from "@warlock.js/ai";
 import type { TraceSpan } from "../contracts/trace.type";
-import type { ContentCaptureOptions, ContentRedactor } from "./content-capture.type";
+import type { ContentCaptureOptions } from "./content-capture.type";
 import { extractSpanAttributes } from "./extract-span-attributes";
 import { normalizeError } from "./normalize-error";
 

@@ -45,7 +45,6 @@ type _WebConfigExposesSession = Assert<
 // @ts-expect-error a resolver whose user has no `id` is rejected
 type _ResolverWithoutId = SessionResolver<unknown, { name: string }>;
 
-export {};
 
 type _PageSessionCarriesUserAndModel = Assert<
   PageSession extends { user: unknown; model: unknown } ? true : false

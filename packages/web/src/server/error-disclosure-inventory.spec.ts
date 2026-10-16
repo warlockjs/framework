@@ -270,8 +270,8 @@ describe("error disclosure inventory — production sanitization, per path", () 
       throw new Error("unexpected terminal result");
     }
 
-    expect((bundle.error?.error as Error).message).not.toContain(SECRET);
-    expect((bundle.error?.error as Error).message).toBe("An unexpected error occurred.");
+    expect((bundle.error!.error as Error).message).not.toContain(SECRET);
+    expect((bundle.error!.error as Error).message).toBe("An unexpected error occurred.");
     expect(bundle.error?.scrubbed).toBe(true);
   });
 

@@ -8,7 +8,6 @@ import {
   changeLocaleCode,
   connectLocaleChanger,
   createLocaleChanger,
-  type LocaleChanger,
 } from "./change-locale-code";
 import type { RefreshRuntime, RefreshablePage } from "./refresh";
 
@@ -152,7 +151,6 @@ function listen() {
 }
 
 let events: ReturnType<typeof listen>;
-let changer: LocaleChanger;
 
 beforeEach(() => {
   events = listen();

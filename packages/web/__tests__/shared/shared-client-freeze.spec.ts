@@ -103,6 +103,7 @@ function readSharedInComponent(): Record<string, any> {
   let view: Record<string, any> | undefined;
 
   function Probe() {
+    // oxlint-disable-next-line react/globals -- This test probe records renders or hook values for assertions outside React.
     view = useShared() as Record<string, any>;
     return null;
   }

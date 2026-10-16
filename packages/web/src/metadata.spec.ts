@@ -35,7 +35,7 @@ const metadataContractLoader = async () => ({ locale: "en", title: "Home" });
 const metadataContractRoot: RootConfig<typeof metadataContractLoader> = {
   metadata: ({ data }) => ({ title: data.locale }),
 };
-const metadataContractLayout: LayoutConfig<typeof metadataContractLoader> = {
+const _metadataContractLayout: LayoutConfig<typeof metadataContractLoader> = {
   metadata: ({ data, child }) => ({
     title: child?.metadata.title ?? data.title,
   }),

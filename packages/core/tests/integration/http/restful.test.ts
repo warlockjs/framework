@@ -39,6 +39,7 @@ class InMemoryRepository {
   }
 
   public newModel(data?: Partial<RecordRow>) {
+    // oxlint-disable-next-line typescript/no-this-alias -- Returned model methods need the outer model/repository while their own this refers to the row.
     const repository = this;
     const model = this.decorate({ id: 0, title: "", ...data } as RecordRow);
     const decoratedSave = model.save;
@@ -72,6 +73,7 @@ class InMemoryRepository {
    * delete paths invoke. Persistence is faked against the in-memory array.
    */
   private decorate(row: RecordRow) {
+    // oxlint-disable-next-line typescript/no-this-alias -- Returned model methods need the outer model/repository while their own this refers to the row.
     const repository = this;
 
     return {

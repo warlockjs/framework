@@ -143,6 +143,7 @@ function writeJson(file, value) {
 }
 
 function stripAnsi(text) {
+  // oxlint-disable-next-line eslint/no-control-regex -- ANSI escape sequences begin with the ESC control character.
   return text.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "");
 }
 

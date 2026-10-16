@@ -1,12 +1,10 @@
 import type {
   DevtoolsBackground,
-  DevtoolsCacheOperation,
   DevtoolsCollector,
   DevtoolsDisposer,
   DevtoolsLogEntry,
   DevtoolsMail,
   DevtoolsMailSummary,
-  DevtoolsPhase,
   DevtoolsQuery,
   DevtoolsRequest,
   DevtoolsRequestSummary,

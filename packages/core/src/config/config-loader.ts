@@ -37,24 +37,20 @@ export class ConfigLoader {
   public async loadConfig(file: FileManager): Promise<void> {
     const configName = this.getConfigName(file.relativePath);
 
-    try {
-      const fileUrl = pathToFileURL(file.absolutePath).href;
-      const configModule = await importAppModule(fileUrl);
-      const configValue = configModule.default;
+    const fileUrl = pathToFileURL(file.absolutePath).href;
+    const configModule = await importAppModule(fileUrl);
+    const configValue = configModule.default;
 
-      if (configValue === undefined) {
-        console.log(
-          colors.red(`config error: `),
-          `Config file ${colors.yellow(file.relativePath)} does not have a default export`,
-        );
-        return;
-      }
-
-      config.set(configName, configValue);
-      await configSpecialHandlers.execute(configName, configValue);
-    } catch (error) {
-      throw error;
+    if (configValue === undefined) {
+      console.log(
+        colors.red(`config error: `),
+        `Config file ${colors.yellow(file.relativePath)} does not have a default export`,
+      );
+      return;
     }
+
+    config.set(configName, configValue);
+    await configSpecialHandlers.execute(configName, configValue);
   }
 
   public async reloadConfig(file: FileManager): Promise<void> {

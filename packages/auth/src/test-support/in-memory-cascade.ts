@@ -108,6 +108,7 @@ export class InMemoryModel {
   }
 
   public static query(this: ModelClass) {
+    // oxlint-disable-next-line typescript/no-this-alias -- Returned model methods need the outer model/repository while their own this refers to the row.
     const ModelRef = this;
     let filter: Filter = {};
     let order: [string, "asc" | "desc"] | undefined;

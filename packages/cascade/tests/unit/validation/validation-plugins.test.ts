@@ -11,7 +11,7 @@
  * `context.options`, which is exactly what these plugins populate.
  */
 import { ScalarValidator, v } from "@warlock.js/seal";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { Model } from "../../../src/model/model";
 import { databaseRulesPlugin } from "../../../src/validation/plugins/database-rules-plugin";
 import { embedValidator } from "../../../src/validation/plugins/embed-validator-plugin";

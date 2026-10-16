@@ -186,6 +186,7 @@ describe("serve (A3)", () => {
       stream(_input, streamOptions) {
         receivedSignal = streamOptions?.signal as AbortSignal;
         return {
+          // oxlint-disable-next-line eslint/require-yield -- This cancellation fixture intentionally waits for abort and emits no stream items.
           async *[Symbol.asyncIterator]() {
             await new Promise<void>((resolve) => {
               receivedSignal?.addEventListener("abort", () => resolve(), { once: true });

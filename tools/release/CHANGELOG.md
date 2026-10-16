@@ -6,6 +6,8 @@
 
 - Release CI and local gate quality commands require real Redis integration specs; configured-port reporting tests mock availability checks and no longer need fixed ports free.
 
+- Shared Oxlint correctness checks now block CI errors while style warnings remain advisory. Removed dead bindings, preserved deliberate collection snapshots and documented precise exceptions for aggregation fields, test probes, control-character rejection and model method bindings.
+
 - Ratcheted strictness budgets to measured counts: AI 453, Core 41, Web 169, Auth 16, Cache 15, Scheduler 7, scaffolder 8 and Ollama 29. Indexed reads now retain proven bounds and test preconditions.
 - Skill compilation resolves source subpaths and each owning package's installed dependencies, isolates application declaration merging between skills, and checks missing modules/registry leakage with compiler-backed controls.
 

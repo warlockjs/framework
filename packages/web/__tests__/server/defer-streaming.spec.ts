@@ -9,7 +9,7 @@
  */
 import { createElement } from "react";
 import { parse } from "devalue";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { Response, setConfig } from "@warlock.js/core";
 import { createCoreHttp, requestContext } from "../../src/server/__fixtures__/core-http";
 import * as App from "./fixtures/root";

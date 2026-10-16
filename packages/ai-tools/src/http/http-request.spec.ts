@@ -307,7 +307,7 @@ describe("httpRequestTool", () => {
 
     expect(data?.truncated).toBe(true);
     expect(typeof data?.body).toBe("string");
-    expect((data?.body as string).length).toBe(1_000);
+    expect((data!.body as string).length).toBe(1_000);
   });
 
   it("does not truncate a body under the cap", async () => {

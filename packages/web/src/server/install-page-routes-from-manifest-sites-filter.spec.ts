@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Application, resetRolesCacheForTests } from "@warlock.js/core";
+import { resetRolesCacheForTests } from "@warlock.js/core";
 import {
   installPageRoutesFromManifest,
   type InstallPageRoutesFromManifestOptions,

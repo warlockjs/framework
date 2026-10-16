@@ -1,7 +1,7 @@
 import type { BaseValidator } from "@warlock.js/seal";
 import type { DeadLetterOptions } from "./subscribe.types";
 
-export type ChannelOptions<TPayload = unknown> = {
+export type ChannelOptions<_TPayload = unknown> = {
   type?: "queue" | "topic" | "fanout";
   durable?: boolean;
   autoDelete?: boolean;
