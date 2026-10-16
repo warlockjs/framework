@@ -21,10 +21,14 @@
  *   node scripts/bench-types.mjs --update    measure and rewrite the baseline
  *
  * Options: --entities <n> (default 16), --services <n> (default 8),
- * --tolerance <fraction> (default 0.05), --keep (leave the fixture on disk).
+ * --tolerance <fraction> (default 0.05), --keep (leave the fixture on disk),
+ * --strict (with --check, also fail when the TypeScript version differs from
+ * the baseline's; without it a mismatch is only a warning, because a compiler
+ * upgrade moves instantiation counts on its own).
  *
  * Any compiler error — including TS2589 "excessively deep" — or a compiler
- * crash (out of heap) fails the run.
+ * crash (out of heap) fails the run, and so does a metric the compiler output
+ * no longer reports: a check that cannot read its numbers must not pass.
  */
 
 import { spawnSync } from "node:child_process";
@@ -44,13 +48,36 @@ const tsVersion = require("typescript/package.json").version;
 
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(`--${name}`);
-const option = (name, fallback) => {
+
+function usageError(message) {
+  console.error(`bench-types: ${message}`);
+  process.exit(2);
+}
+
+/** A numeric option; refuses a missing, non-finite or out-of-range value. */
+const option = (name, fallback, { integer = false, min = 0 } = {}) => {
   const index = args.indexOf(`--${name}`);
-  return index === -1 ? fallback : Number(args[index + 1]);
+
+  if (index === -1) return fallback;
+
+  const raw = args[index + 1];
+  const value = Number(raw);
+
+  if (raw === undefined || raw.startsWith("--") || !Number.isFinite(value) || value < min) {
+    usageError(
+      `--${name} needs a number >= ${min}, got ${raw === undefined ? "nothing" : `"${raw}"`}.`,
+    );
+  }
+
+  if (integer && !Number.isInteger(value)) {
+    usageError(`--${name} needs a whole number, got "${raw}".`);
+  }
+
+  return value;
 };
 
-const entities = option("entities", 16);
-const services = option("services", 8);
+const entities = option("entities", 16, { integer: true, min: 1 });
+const services = option("services", 8, { integer: true, min: 1 });
 const tolerance = option("tolerance", 0.05);
 
 /** One entity schema module; every entity but each fourth nests the previous one. */
@@ -210,8 +237,33 @@ function readMetric(output, label) {
   return match ? Number(match[1]) : undefined;
 }
 
+/** The metrics a check or a baseline update depends on. */
+const GATED_METRICS = ["instantiations", "types"];
+
 const root = mkdtempSync(join(tmpdir(), "seal-bench-types-"));
 let failed = false;
+let cleanedUp = false;
+
+function cleanUp() {
+  if (cleanedUp) return;
+  cleanedUp = true;
+
+  if (flag("keep")) {
+    console.log(`Fixture kept at ${root}`);
+  } else {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// `finally` does not run when a signal ends the process. Ctrl+C also reaches
+// the tsc child (same process group), so spawnSync returns and these handlers
+// run before node exits.
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, () => {
+    cleanUp();
+    process.exit(signal === "SIGINT" ? 130 : 143);
+  });
+}
 
 try {
   writeFixture(root);
@@ -227,7 +279,11 @@ try {
   const output = `${run.stdout}${run.stderr}`;
   const errors = output.split("\n").filter((line) => /error TS\d+/.test(line));
 
-  if (run.status !== 0 && errors.length === 0) {
+  if (run.signal === "SIGINT" || run.signal === "SIGTERM") {
+    console.error(`tsc was interrupted (${run.signal}).`);
+    process.exitCode = 1;
+    failed = true;
+  } else if (run.status !== 0 && errors.length === 0) {
     console.error(
       `tsc crashed (exit ${run.status ?? run.signal}); likely out of heap.\n${output.slice(-2000)}`,
     );
@@ -256,6 +312,16 @@ try {
       failed = true;
     }
 
+    const unreadable = GATED_METRICS.filter((metric) => !Number.isFinite(result[metric]));
+
+    if (!failed && unreadable.length > 0) {
+      console.error(
+        `Could not read ${unreadable.join(", ")} from the tsc output; the --extendedDiagnostics format may have changed.`,
+      );
+      process.exitCode = 1;
+      failed = true;
+    }
+
     if (!failed && flag("update")) {
       mkdirSync(dirname(baselinePath), { recursive: true });
       writeFileSync(baselinePath, `${JSON.stringify(result, null, 2)}\n`);
@@ -265,11 +331,27 @@ try {
     if (!failed && flag("check")) {
       const baseline = JSON.parse(readFileSync(baselinePath, "utf8"));
 
-      if (baseline.entities !== entities || baseline.services !== services) {
+      const missing = GATED_METRICS.filter((metric) => !Number.isFinite(baseline[metric]));
+
+      if (baseline.typescript !== tsVersion) {
+        const message = `Baseline was recorded with TypeScript ${baseline.typescript}, this run uses ${tsVersion}; instantiation counts move with the compiler. Rerun with --update after checking the numbers.`;
+
+        if (flag("strict")) {
+          console.error(message);
+          process.exitCode = 1;
+        } else {
+          console.warn(`Warning: ${message}`);
+        }
+      }
+
+      if (missing.length > 0) {
+        console.error(`Baseline has no usable ${missing.join(", ")}; rerun with --update.`);
+        process.exitCode = 1;
+      } else if (baseline.entities !== entities || baseline.services !== services) {
         console.error("Baseline was recorded with a different fixture size; rerun with --update.");
         process.exitCode = 1;
       } else {
-        for (const metric of ["instantiations", "types"]) {
+        for (const metric of GATED_METRICS) {
           const budget = Math.ceil(baseline[metric] * (1 + tolerance));
           const growth = ((result[metric] - baseline[metric]) / baseline[metric]) * 100;
 
@@ -286,9 +368,5 @@ try {
     }
   }
 } finally {
-  if (flag("keep")) {
-    console.log(`Fixture kept at ${root}`);
-  } else {
-    rmSync(root, { recursive: true, force: true });
-  }
+  cleanUp();
 }

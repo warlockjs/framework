@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `TypedValidationResult<T>` and `ValidatedOutput<T>` types.
-- `pnpm bench:types` measures inference compile cost on a generated composed-schema project (16 entities, 8 services) and fails when instantiations or types grow more than 5% over `bench/types-baseline.json` (WR-001).
+- `pnpm bench:types` measures inference compile cost on a generated composed-schema project (16 entities, 8 services) and fails when instantiations or types grow more than 5% over `bench/types-baseline.json` (WR-001). It also fails when it cannot read a metric or is given a malformed option, warns when the TypeScript version differs from the baseline's (`--strict` makes that a failure), and removes its temporary project on Ctrl+C.
 
 ### Changed
 
@@ -21,12 +21,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `Infer.Input`/`Infer.Output` of an object is one flat object type instead of an intersection of its optional and required halves; the shape is unchanged and compile cost moves by 0.1%.
 - `pnpm typecheck` now also checks the `expectTypeOf` assertions in `tests/unit/types/` (`tsconfig.typecheck.json`); they were never enforced before.
 - `.refine()` callbacks stay `value: any` on purpose: custom rules run before an object or array validates its children, so the value is not the schema output (WR-020).
+- **Behaviour change:** `v.union([...])` now checks a present empty value (`""`) against its members instead of accepting it unchecked; a missing key is still the required/`.optional()` question. `v.union([v.literal("x"), v.int()]).present()` now rejects `""`.
+- `validate()` keeps the typed output of `v.record(...)` (`Record<string, …>`); only an index signature over `any`/`unknown` (the wide `Schema`) stays `any`.
 
 ### Fixed
 
-- `v.literal("")` accepts a present `""` again (regressed in 5.25): required and `.present()` keep it, `.optional()` and `.nullable()` no longer drop it. A literal set without a blank value still reads `""` as missing (WR-008).
-- A field with an empty default (`v.string().max(n).default("")`) no longer fails "is required" when the input omits it (WR-008).
-- `v.discriminatedUnion(...).optional()` accepts an absent or `undefined` field; `null` is still rejected unless `.nullable()`. A required union now reports a missing field with the `required` error, and `.default(...)` is validated through its branch (WR-007).
+- `v.literal("")` accepts a present `""` again (regressed in 5.25): its default (implicit) required state and `.present()` keep it, `.optional()` and `.nullable()` no longer drop it. An explicit `.required()` or `requiredIf(...)` still rejects `""`. A literal set without a blank value still reads `""` as missing (WR-008).
+- A field with an empty default (`v.string().max(n).default("")`) no longer fails "is required" when the input omits it, sends `null`, or sends a blank string (an untouched HTML input); the output is the default (WR-008).
+- A `null` default no longer satisfies "required" on a field that is not `.nullable()`, and an empty default of the wrong type (`v.int().default("")`) now fails the type rule instead of being returned unchecked.
+- `v.discriminatedUnion(...).optional()` accepts an absent, `undefined` or `null` field, as every other validator does; `.default(...)` replaces `null` too and is validated through its branch. A required union reports a missing or `null` field with the `required` error; `.nullable()` keeps `null` (WR-007).
 - `schema["~standard"].validate(...)` on a discriminated union resolves to the branch output union instead of `unknown` (WR-020).
 
 ## 5.29.0 - 2026-10-01

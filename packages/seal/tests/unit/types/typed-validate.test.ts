@@ -61,6 +61,17 @@ describe("validate() result typing", () => {
 
     expect(first.isValid && second.isValid).toBe(true);
   });
+
+  it("keeps a typed record's output instead of widening it to any", async () => {
+    const result = await validate(v.record(v.string()), { a: "x" });
+
+    if (result.isValid) {
+      expectTypeOf(result.data).not.toBeAny();
+      expectTypeOf(result.data).toMatchTypeOf<Record<string, string>>();
+    }
+
+    expect(result.isValid).toBe(true);
+  });
 });
 
 describe("discriminated union ~standard typing", () => {

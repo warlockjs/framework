@@ -7,8 +7,17 @@ import type { BaseValidator } from "../../validators/base-validator";
  */
 export const unionRule: SchemaRule<{ validators: BaseValidator[] }> = {
   name: "union",
+  // Runs on "empty" values too: `v.union([v.literal(""), v.int()]).present()`
+  // must still ask its members about `""` instead of accepting it unchecked.
+  requiresValue: false,
   defaultErrorMessage: "Value must match one of the allowed types",
   async validate(value: any, context) {
+    // Absence is the required/present rule's question, as for `literalRule`;
+    // answering it here would defeat `.optional()`.
+    if (value === undefined) {
+      return VALID_RULE;
+    }
+
     const validators = this.context.options.validators;
     const firstErrorOnly = context.configurations?.firstErrorOnly ?? true;
     const allErrors: string[] = [];

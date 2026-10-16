@@ -545,9 +545,9 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
    *
    * `value` is deliberately untyped: custom rules run in the rule pipeline,
    * before a container validates its children (an object's fields are not yet
-   * validated or defaulted) and, unless `firstErrorOnly` is set, even after the
-   * type rule has failed. Typing it as the schema output would promise a shape
-   * the callback does not always receive.
+   * validated or defaulted) and, when `firstErrorOnly` is `false` (the default
+   * is `true`), even after the type rule has failed. Typing it as the schema
+   * output would promise a shape the callback does not always receive.
    */
   public refine(
     callback: (
@@ -683,18 +683,37 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
     }
 
     const input = isBlank ? undefined : data;
-    const valueForRules = input ?? this.getDefaultValue();
+    let valueForRules = input ?? this.getDefaultValue();
     // A parent object pre-fills an absent key with this field's default and
     // flags it; consume the flag so nested item contexts don't inherit it.
     const parentFilledDefault = context?.valueIsDefault === true;
 
     if (parentFilledDefault) context.valueIsDefault = false;
 
+    // A default only stands in for a value when it is one the field accepts:
+    // a `null` default on a non-nullable field is still "no value".
+    const isUsableDefault = (value: unknown) =>
+      value !== undefined && (value !== null || this.isNullable);
+
+    // A present blank string on a field whose default is itself blank is that
+    // default (an HTML form posts `note=""` for an untouched input).
+    let blankMatchesDefault = false;
+
+    if (typeof input === "string" && input.trim() === "" && this.defaultValue !== undefined) {
+      const fallback = this.getDefaultValue();
+
+      if (typeof fallback === "string" && fallback.trim() === "") {
+        valueForRules = fallback;
+        blankMatchesDefault = true;
+      }
+    }
+
     // The author's own default is a value, even an empty one: `.default("")`
     // must not fail the required check it exists to satisfy.
     const usedDefault =
-      (input == null && valueForRules !== undefined) ||
-      (parentFilledDefault && input !== undefined);
+      blankMatchesDefault ||
+      (input == null && isUsableDefault(valueForRules)) ||
+      (parentFilledDefault && isUsableDefault(input));
     // Optional fields with no resolved value are absent, not values to
     // transform. Skipping here protects every mutator while still allowing
     // defaults and present values through the normal mutation pipeline.
@@ -718,7 +737,18 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
     // `number | undefined` forbids. Non-optional fields are unaffected —
     // their `requiredRule` (not nulled out by `.optional()`) already rejects
     // `""` before these rules matter.
-    const skipEmptyRules = this.isOptional ? valueForRules === undefined : isEmpty;
+    // An empty default of the wrong type (`v.int().default("")`) must still
+    // meet the type rule; skipping it would hand back a value `Infer.Output`
+    // forbids. An empty default of the right type (`v.string().default("")`)
+    // keeps skipping the value rules, so `.min(3).default("")` still passes.
+    const emptyDefaultOfWrongType =
+      usedDefault && isEmpty && valueForRules !== null && !this.matchesType(valueForRules);
+
+    const skipEmptyRules = emptyDefaultOfWrongType
+      ? false
+      : this.isOptional
+        ? valueForRules === undefined
+        : isEmpty;
 
     // Prepend the required-condition rule if set, so it always runs first.
     // requiredRule has requiresValue = false so it runs even on empty values.

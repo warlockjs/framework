@@ -118,12 +118,14 @@ export class DiscriminatedUnionValidator<
       return { isValid: true, errors: [], data: null };
     }
 
-    if (data === undefined) {
+    // `null` on a non-nullable union is absent, as it is for every other
+    // validator: `.optional()` drops it and `.default(...)` replaces it.
+    if (data == null) {
       const fallback = this.getDefaultValue();
 
       // Absent with no default: required/optional is the base pipeline's
       // question (required error, or a valid absent field under `.optional()`).
-      if (fallback === undefined) {
+      if (fallback == null) {
         return super.validate(undefined, context);
       }
 

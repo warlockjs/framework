@@ -103,7 +103,7 @@ async function createUser(body: Infer.Input<typeof userSchema>) {
 }
 ```
 
-`validate()` narrows on `isValid`: on success `result.data` is `Infer.Output<typeof schema>`, on failure it is `undefined`. A schema whose type does not describe its output (a value annotated as bare `BaseValidator` or `ObjectValidator`) keeps `data: any`. The Standard Schema bridge follows the same rule: `schema["~standard"].validate(...)` resolves to the output type, discriminated unions included.
+`validate()` narrows on `isValid`: on success `result.data` is `Infer.Output<typeof schema>`, on failure it is `undefined`. A schema whose type does not describe its output (a value annotated as bare `BaseValidator` or `ObjectValidator`) keeps `data: any`; a typed `v.record(...)` keeps its `Record<string, …>` output. The Standard Schema bridge follows the same rule: `schema["~standard"].validate(...)` resolves to the output type, discriminated unions included.
 
 :::caution[Typing validated data as `Infer<T>`]
 Bare `Infer<T>` is the *input* shape, where `.default()`, `.catch()` and `.optional()` all make a key optional. Annotate post-validation data with it and every defaulted field reads as possibly `undefined`. Use `Infer.Output<T>` (or let `validate()` infer it) for anything downstream of validation.
@@ -166,7 +166,7 @@ TypeScript can't infer recursion from the validator alone. Declare the type expl
 
 ### 4. `.refine()` callbacks are not typed from the schema
 
-The `value` a `.refine()` callback receives is `any`. Custom rules run before an object or array validates its children (and, unless `firstErrorOnly` is set, even after the type rule failed), so the value is the input, not `Infer.Output`. Check the fields you rely on inside the callback.
+The `value` a `.refine()` callback receives is `any`. Custom rules run before an object or array validates its children (and, when `firstErrorOnly` is `false`, even after the type rule failed; the default `true` stops at the first error), so the value is the input, not `Infer.Output`. Check the fields you rely on inside the callback.
 
 ### 5. Very large composed schemas are expensive to compile
 

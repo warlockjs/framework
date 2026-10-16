@@ -151,6 +151,12 @@ await validate(schema, { });
 
 If you want a default that's guaranteed to satisfy the rules, make sure the value satisfies them. Or pair with `.catch()` if you want belt-and-suspenders.
 
+Empty defaults follow three rules (5.30):
+
+- An empty default of the field's own type satisfies "required" and skips the value rules: `v.string().min(3).default("")` turns `{}` into `{ note: "" }`. A blank string the caller sends (`note=""` from an untouched form input) is treated as that default too.
+- An empty default of the wrong type still meets the type rule: `v.int().default("")` fails with `int` rather than returning a string.
+- A `null` default is a value only on a `.nullable()` field. On any other field it does not satisfy "required".
+
 For values that should be fresh per validation (timestamps, ids), pass a callback:
 
 ```ts

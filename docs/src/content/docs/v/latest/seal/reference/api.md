@@ -47,7 +47,7 @@ type TypedValidationResult<TData> =
   | { isValid: false; data: undefined; errors: ValidationResult["errors"] };
 ```
 
-Runs the schema against `data` and returns `{ isValid, data, errors }`. Never throws on bad input. On success `data` is `Infer.Output<T>`; on failure it is `undefined`. A schema typed as bare `BaseValidator`/`ObjectValidator` keeps `data: any`.
+Runs the schema against `data` and returns `{ isValid, data, errors }`. Never throws on bad input. On success `data` is `Infer.Output<T>`; on failure it is `undefined`. A schema typed as bare `BaseValidator`/`ObjectValidator` keeps `data: any`; a typed `v.record(...)` keeps `Record<string, …>`.
 
 ```ts
 const result = await validate(userSchema, request.body);

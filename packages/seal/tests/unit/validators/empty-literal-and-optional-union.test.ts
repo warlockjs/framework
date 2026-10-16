@@ -93,6 +93,26 @@ describe("empty-string literal", () => {
     expect(await validate(schema, { alt: "" })).toMatchObject({ isValid: true, data: { alt: "" } });
     expect((await validate(schema, { alt: "prose" })).isValid).toBe(true);
   });
+
+  it("a union without an empty member rejects a present empty string", async () => {
+    // Guards the case above: before 5.30 the union rule skipped "" entirely,
+    // so any `.present()` union accepted it whatever its members were.
+    const schema = v.object({ alt: v.union([v.literal("x"), v.int()]).present() });
+
+    expect((await validate(schema, { alt: "" })).isValid).toBe(false);
+  });
+
+  it("an optional union still treats a missing key as absent", async () => {
+    const schema = v.object({ alt: v.union([v.literal("x"), v.int()]).optional() });
+
+    expect(await validate(schema, {})).toMatchObject({ isValid: true, data: {} });
+  });
+
+  it("an explicit .required() puts back the strict rule and rejects the empty string", async () => {
+    const schema = v.object({ alt: v.literal("", "a").required() });
+
+    expect((await validate(schema, { alt: "" })).isValid).toBe(false);
+  });
 });
 
 describe("an empty default satisfies the required check", () => {
@@ -112,6 +132,54 @@ describe("an empty default satisfies the required check", () => {
     const schema = v.object({ note: v.string().max(10) });
 
     expect((await validate(schema, {})).isValid).toBe(false);
+  });
+
+  it("a present empty string on a field whose default is '' is that default", async () => {
+    // An HTML form posts `note=""` for an untouched input.
+    const schema = v.object({ note: v.string().max(10).default("") });
+
+    expect(await validate(schema, { note: "" })).toMatchObject({
+      isValid: true,
+      data: { note: "" },
+    });
+    expect(await validate(schema, { note: null })).toMatchObject({
+      isValid: true,
+      data: { note: "" },
+    });
+  });
+
+  it("a present empty string still fails required when the default is not blank", async () => {
+    const schema = v.object({ note: v.string().default("n/a") });
+
+    expect((await validate(schema, { note: "" })).isValid).toBe(false);
+  });
+
+  it("a null default does not satisfy required on a non-nullable field", async () => {
+    const schema = v.object({ s: v.string().default(null) });
+
+    expect((await validate(schema, {})).isValid).toBe(false);
+    expect((await validate(schema, { s: null })).isValid).toBe(false);
+  });
+
+  it("a null default is a value on a nullable field", async () => {
+    const schema = v.object({ s: v.string().nullable().default(null) });
+
+    expect(await validate(schema, {})).toMatchObject({ isValid: true, data: { s: null } });
+  });
+
+  it("an empty default of the wrong type fails the type rule", async () => {
+    const schema = v.object({ n: v.int().default("") });
+    const result = await validate(schema, {});
+
+    expect(result.isValid).toBe(false);
+    // `v.int()` extends `v.number()`, whose type rule runs first.
+    expect(result.errors.map((error) => error.type)).toContain("number");
+  });
+
+  it("an empty default of the right type still skips the value rules", async () => {
+    const schema = v.object({ note: v.string().min(3).default("") });
+
+    expect(await validate(schema, {})).toMatchObject({ isValid: true, data: { note: "" } });
   });
 });
 
@@ -149,8 +217,15 @@ describe("optional discriminated union", () => {
     expect((await validate(optional, { entry: { type: "gamma" } })).isValid).toBe(false);
   });
 
-  it("rejects null unless nullable", async () => {
-    expect((await validate(optional, { entry: null })).isValid).toBe(false);
+  it("treats null as absent under .optional(), like every other validator", async () => {
+    expect(await validate(optional, { entry: null })).toMatchObject({ isValid: true, data: {} });
+  });
+
+  it("rejects null on a required union and keeps it on a nullable one", async () => {
+    const result = await validate(required, { entry: null });
+
+    expect(result.isValid).toBe(false);
+    expect(result.errors.map((error) => error.type)).toContain("required");
 
     const nullable = v.object({ entry: tagged().nullable() });
     expect(await validate(nullable, { entry: null })).toMatchObject({
@@ -170,6 +245,15 @@ describe("optional discriminated union", () => {
     const schema = v.object({ entry: tagged().default({ type: "beta", count: 1 }) });
 
     expect(await validate(schema, {})).toMatchObject({
+      isValid: true,
+      data: { entry: { type: "beta", count: 1 } },
+    });
+  });
+
+  it("a null value is replaced by the default, as on v.object()", async () => {
+    const schema = v.object({ entry: tagged().default({ type: "beta", count: 1 }) });
+
+    expect(await validate(schema, { entry: null })).toMatchObject({
       isValid: true,
       data: { entry: { type: "beta", count: 1 } },
     });

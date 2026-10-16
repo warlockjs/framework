@@ -290,15 +290,19 @@ export type IsOptionalKey<V> = IsOutputOptionalKey<V>;
  *
  * It is `Infer.Output<T>`, except where the schema's type does not describe
  * its output: a bare `BaseValidator`, an `ObjectValidator` over the wide
- * `Schema`, or anything whose output is `unknown`. Those stay `any`, as they
- * were before `validate()` was typed, so untyped call sites keep compiling.
+ * `Schema` (an index signature whose values are `any`/`unknown`), or anything
+ * whose output is `unknown`. Those stay `any`, as they were before
+ * `validate()` was typed, so untyped call sites keep compiling. A
+ * `v.record(...)` with a typed value keeps its `Record<string, …>` output.
  */
 export type ValidatedOutput<T> = [Infer.Output<T>] extends [infer O]
   ? unknown extends O
     ? any
     : O extends object
       ? string extends keyof O
-        ? any
+        ? unknown extends O[keyof O]
+          ? any
+          : O
         : O
       : O
   : never;
