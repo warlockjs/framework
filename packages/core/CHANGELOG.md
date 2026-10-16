@@ -14,8 +14,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `actingAs(user)` at `@warlock.js/core/tests` issues a real persisted access token and returns isolated authenticated HTTP helpers. Middleware remains active; `client.dispose()` revokes only its token.
+
 - Optional Oxlint background file checks during development. Install Oxlint in the app and add `.oxlintrc.json`, `.oxlintrc.jsonc`, `oxlint.config.ts` or `oxlint.config.mts`; changed files are linted in sequential batches in a worker and JSON diagnostics appear with rule, location and severity. Large boot scans stay within platform command-line limits, tool/config failures include actionable CLI output, and results omit source contents. Both configured ESLint and Oxlint run by default; ESLint still needs only its app configuration and uses core's own dependency. `devServer.healthCheckers` also accepts `{ typescript?, eslint?, oxlint? }` switches while preserving custom arrays and `false`.
 - Real Redis integration coverage for cache-backed HTTP rate-limit stores, including concurrent requests, preserved deadlines and counters recreated after a seeded key expires. Local runs opt in with `WARLOCK_REDIS_INTEGRATION=1`; CI requires a live Redis service. Tests use UUID prefixes and clean only their own keys.
+
 
 
 - Image variants support object-storage disks through `resolveImageVariant`, `createUploadedFileController` and `generateImageVariants({ disk, urlPrefix })`. Remote originals retain their driver URL; derivatives are cached locally, with bounded source reads and generation keys that isolate buckets and tenant prefixes. ETag metadata avoids downloads on cache hits; sources without an ETag use content hashes. Concurrent downloads are shared, and ingest downloads once for all variants/formats. The default public uploads controller keeps returning 404 for cloud default disks; an explicit `disk` or `remote: true` deliberately opts a controller into cloud serving.

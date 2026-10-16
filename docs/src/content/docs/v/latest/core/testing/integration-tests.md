@@ -323,3 +323,28 @@ Either works. The first is easier to find when you're fixing a specific endpoint
 - For pure unit tests against services/repos/models (no HTTP), see the [Testing guide → Mode 1](../testing/testing.md#mode-1--unit-tests) and `test-service/SKILL.md`.
 - For the full HTTP helper reference, see `test-http/SKILL.md`.
 - For mail tests (assert "the welcome email got sent"), see the [Mail guide → Test mailbox](../digging-deeper/mail.md).
+
+
+## Signed-in HTTP requests
+
+`actingAs(user)` from `@warlock.js/core/tests` issues a real persisted access token
+through an Auth-compatible model and returns a client with `get`, `post`, `put`,
+`patch`, `delete` and `request` methods. Authentication middleware and account
+policies still run. No global credential or test-only middleware is installed.
+
+```ts
+import { actingAs, expectJson } from "@warlock.js/core/tests";
+
+const client = await actingAs(user); // your fixture creates the user
+try {
+  const body = await expectJson<{ count: number }>(await client.get("/notifications/unread-count"));
+  expect(body.count).toBe(0);
+} finally {
+  await client.dispose(); // revoke only this client's token
+}
+```
+
+Clients remain independent during parallel requests. Extra request headers and
+signals are supported, while Authorization always identifies the bound user.
+Use the anonymous helpers to test 401s, and your actual login route to test
+password/cookie behavior. Clean up fixture users and data separately.

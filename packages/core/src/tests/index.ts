@@ -5,6 +5,7 @@
  */
 export * from "./start-http-development-server";
 export * from "./test-helpers";
+export * from "./authenticated-test-client";
 export * from "./vitest-setup";
 export { assertPortIsAvailable, isPortAvailable } from "../http/port-preflight";
 

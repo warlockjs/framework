@@ -1,6 +1,6 @@
 ---
 name: test-http
-description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `stopHttpTestServer`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core/tests"`. Skip: pure unit tests — the `test-service` topic; controller shape — the `create-controller` topic; competing libs `supertest`, `light-my-request`, `nock`.'
+description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `stopHttpTestServer`, `actingAs`, `AuthenticatedTestClient`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core/tests"`. Skip: pure unit tests — the `test-service` topic; controller shape — the `create-controller` topic; competing libs `supertest`, `light-my-request`, `nock`.'
 ---
 
 # Warlock — HTTP integration tests
@@ -37,6 +37,32 @@ describe("Users API", () => {
 ```
 
 No `beforeAll`, no manual server start — the project's `src/test-global-setup.ts` brought the HTTP server up once before any test ran.
+
+## Signed-in requests — `actingAs(user)`
+
+```ts
+import { actingAs, expectJson } from "@warlock.js/core/tests";
+
+const user = await User.create({ name: "Ada", email: "ada@example.com", password: "test-password" });
+const client = await actingAs(user);
+try {
+  const body = await expectJson<{ count: number }>(await client.get("/notifications/unread-count"));
+  expect(body.count).toBe(0);
+} finally {
+  await client.dispose();
+  await user.destroy({ strategy: "permanent" });
+}
+```
+
+The helper calls the user's real `generateAccessToken()` and sends its persisted
+credential as a Bearer header. Auth middleware, account policy and token expiry
+still apply. It does not test the app's login route or create a user for you.
+Use your login route directly when testing credentials/session cookies.
+
+Each client owns its identity, so parallel users and anonymous `testGet()` calls
+remain separate. Extra headers/signals use the normal helper options; a supplied
+Authorization header is replaced by the bound user's token. `client.dispose()`
+revokes only that token. Fixture owners clean up their own users and rows.
 
 ## The bootstrap — `startHttpTestServer` / `stopHttpTestServer`
 
