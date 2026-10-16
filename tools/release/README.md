@@ -1,6 +1,6 @@
 # tools/release — the Warlock.js release runner
 
-This folder is **not** pkgist. It is the harness that *runs* pkgist for the
+This folder is **not** pkgist. It is the harness that _runs_ pkgist for the
 `@warlock.js/*` family — every package under `packages/`, released together at
 one version. It is npm-managed (its own `package-lock.json`) and sits outside the
 pnpm workspace.
@@ -19,7 +19,13 @@ Releases run in GitHub Actions on this repository
    pack, local-registry install, generator matrix at the stated scope.
 2. **publish** — every tarball to npm, re-hashed immediately before each publish.
 3. **confirm** — install/import from the npm origin, then tag `v<version>` once on
-   the release commit and push the tag and the branch.
+   the release commit and push the tag and the branch. Registry reads retry for
+   thirty minutes, with exponential backoff from three to sixty seconds. Failed
+   reads remain pending until the deadline; already-live packages are not re-polled.
+   On exhaustion, the log prints origin reads for every subject and recovery
+   commands to recover the release SHA from build provenance, tag and push it,
+   and dispatch `blog-check.yml` with `mode=registry`. Wait for every subject to
+   be visible before following those commands; do not republish.
 
 ```bash
 npm ci

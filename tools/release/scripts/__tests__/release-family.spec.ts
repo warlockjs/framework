@@ -78,7 +78,10 @@ describe("command failure output", () => {
 
   it("keeps the END of an oversized stream, where a test runner prints what failed", () => {
     const noise = "✓ passing spec\n".repeat(5_000);
-    const output = formatCommandFailureOutput(`${noise} FAIL src/broken.spec.ts > the one that failed\n`, "");
+    const output = formatCommandFailureOutput(
+      `${noise} FAIL src/broken.spec.ts > the one that failed\n`,
+      "",
+    );
 
     assert.ok(output.length < noise.length);
     assert.match(output, /characters omitted/);
@@ -92,10 +95,15 @@ function fixture(overrides: Partial<ReleaseFamilyDependencies> = {}): {
   handoffs: ReleaseHandoff[];
   gateInputs: PublishHandoff[];
 } {
+  let clock = 0;
   const commands: CommandRequest[] = [];
   const handoffs: ReleaseHandoff[] = [];
   const gateInputs: PublishHandoff[] = [];
   const dependencies: ReleaseFamilyDependencies = {
+    now: () => new Date(clock),
+    sleep: async (ms) => {
+      clock += ms;
+    },
     loadFamily: async () => FAMILY,
     makeDirectory: async () => undefined,
     makeTemporaryDirectory: async () => path.resolve("release-temp"),
@@ -1110,7 +1118,10 @@ describe("family release commit (one repository, one commit)", () => {
     const writes = control.commands.filter(
       (command) => isGit(command, "add") || isGit(command, "commit"),
     );
-    assert.ok(writes.some((command) => isGit(command, "commit")), "the release commit must still happen");
+    assert.ok(
+      writes.some((command) => isGit(command, "commit")),
+      "the release commit must still happen",
+    );
     for (const command of writes) {
       assert.ok(
         !command.args.some((arg) => arg.includes("somebody-elses-file")),
@@ -1622,7 +1633,13 @@ describe("checkPackageTreeIsClean", () => {
     assert.equal(result.clean, true);
     assert.ok(git.requests.every((request) => request.cwd === member.root));
     const status = git.requests.find((request) => request.args[0] === "status");
-    assert.deepEqual(status?.args, ["status", "--porcelain=v1", "--untracked-files=all", "--", "."]);
+    assert.deepEqual(status?.args, [
+      "status",
+      "--porcelain=v1",
+      "--untracked-files=all",
+      "--",
+      ".",
+    ]);
   });
 
   it("reads repository-root-relative porcelain paths as member-relative, so the published surface still applies", async () => {
@@ -1641,7 +1658,10 @@ describe("checkPackageTreeIsClean", () => {
 
   it("refuses a status line outside the member's own directory instead of guessing its owner", async () => {
     const git = monorepoGit(" M packages/core/src/index.ts\n");
-    await assert.rejects(checkPackageTreeIsClean(member, git as never), /outside its own directory/);
+    await assert.rejects(
+      checkPackageTreeIsClean(member, git as never),
+      /outside its own directory/,
+    );
   });
 });
 
@@ -2583,6 +2603,7 @@ describe("confirmSubjectsAtOrigin — propagation lag vs. a partial release (D2)
       runCommand(request: CommandRequest): Promise<{ stdout: string; stderr: string }>;
       report(line: string): void;
       sleep(ms: number): Promise<void>;
+      now(): Date;
     };
     reported: string[];
     sleeps: number[];
@@ -2591,12 +2612,14 @@ describe("confirmSubjectsAtOrigin — propagation lag vs. a partial release (D2)
     const reported: string[] = [];
     const sleeps: number[] = [];
     const viewCalls: string[] = [];
+    let clock = 0;
     const attemptsSeen = new Map<string, number>();
     return {
       reported,
       sleeps,
       viewCalls,
       runtime: {
+        now: () => new Date(clock),
         resolveNpmCli: () => path.resolve("npm", "bin", "npm-cli.js"),
         runCommand: async (request) => {
           const name = request.args[2]?.toString().replace(/@[^@]+$/, "") ?? "";
@@ -2610,6 +2633,7 @@ describe("confirmSubjectsAtOrigin — propagation lag vs. a partial release (D2)
         report: (line) => reported.push(line),
         sleep: async (ms) => {
           sleeps.push(ms);
+          clock += ms;
         },
       },
     };
@@ -2636,9 +2660,7 @@ describe("confirmSubjectsAtOrigin — propagation lag vs. a partial release (D2)
       "expected a PENDING line before confirmation",
     );
     assert.ok(
-      reported.some(
-        (line) => line === "@warlock.js/notifications: live (confirmed on attempt 2/5)",
-      ),
+      reported.some((line) => line === "@warlock.js/notifications: live (confirmed on attempt 2)"),
       "expected a live confirmation line naming the successful attempt",
     );
     assert.ok(
@@ -2663,18 +2685,42 @@ describe("confirmSubjectsAtOrigin — propagation lag vs. a partial release (D2)
     );
 
     assert.ok(
-      reported.some((line) => line === "@warlock.js/notifications: MISSING after 5 attempt(s)"),
+      reported.some((line) => line.includes("@warlock.js/notifications: MISSING after 30 minutes")),
       "expected an explicit MISSING line",
     );
     assert.ok(
       reported.some((line) => line.startsWith("Origin confirmation summary: 0/1 live")),
       "expected the terminal summary on the failing path too",
     );
-    assert.equal(sleeps.length, 4, "budget of 5 attempts retries 4 times between them");
-    assert.ok(
-      sleeps.every((ms) => ms === 3_000),
-      "the printed/used budget must be the same delay every time",
+    assert.equal(
+      sleeps.reduce((sum, ms) => sum + ms, 0),
+      30 * 60_000,
     );
+    assert.equal(sleeps[0], 3_000);
+    assert.ok(sleeps.every((ms) => ms <= 60_000));
+    assert.ok(reported.some((line) => line.includes(`git tag v${VERSION}`)));
+    assert.ok(
+      reported.some(
+        (line) => line.includes("gh workflow run blog-check.yml") && line.includes("mode=registry"),
+      ),
+    );
+  });
+
+  it("keeps polling beyond ten minutes and recovers from registry errors", async () => {
+    const handoff: ReleaseHandoff = {
+      kind: "warlock-family-publish-handoff",
+      candidateVersion: VERSION,
+      subjects: ["@warlock.js/notifications"],
+      artifacts: [],
+      verifiedAt: "2026-09-02T12:00:00.000Z",
+    };
+    const { runtime, sleeps } = fakeRuntime(new Map());
+    runtime.runCommand = async () => {
+      if (runtime.now().getTime() < 11 * 60_000) throw new Error("E404 propagation lag");
+      return { stdout: JSON.stringify(VERSION), stderr: "" };
+    };
+    await confirmSubjectsAtOrigin(handoff, runtime, ROOT, CACHE, NPMRC, GLOBAL_NPMRC, ENV);
+    assert.ok(sleeps.reduce((sum, ms) => sum + ms, 0) >= 11 * 60_000);
   });
 
   it("when two subjects are unconfirmed, BOTH are named -- the old code could name only the first", async () => {

@@ -46,13 +46,10 @@ const HANDOFF_ROOT = path.join(BUILDER_ROOT, "release-handoffs");
 const CONFIG_PATH = path.join(BUILDER_ROOT, "pkgist.config.ts");
 const DEPENDENCY_FIELDS = ["dependencies", "peerDependencies", "optionalDependencies"] as const;
 
-/**
- * The confirmation budget: how many times each still-unconfirmed subject is
- * re-polled, and how long between polls, before it is declared MISSING
- * rather than PENDING. Kept small deliberately -- see `confirmAtOrigin`.
- */
-const CONFIRMATION_MAX_ATTEMPTS = 5;
-const CONFIRMATION_RETRY_DELAY_MS = 3_000;
+/** Registry propagation gets a wall-clock budget with capped exponential backoff. */
+const CONFIRMATION_WINDOW_MS = 30 * 60_000;
+const CONFIRMATION_INITIAL_DELAY_MS = 3_000;
+const CONFIRMATION_MAX_DELAY_MS = 60_000;
 
 export type ReleaseMode = "gate" | "publish" | "confirm";
 
@@ -1222,10 +1219,7 @@ export async function checkPackageOwnQuality(
  * Keep collecting failures so a single gate attempt tells the owner every
  * package that is red, rather than revealing them one release retry at a time.
  */
-async function checkAllMembersTypecheck(
-  family: WarlockFamily,
-  runtime: Runtime,
-): Promise<void> {
+async function checkAllMembersTypecheck(family: WarlockFamily, runtime: Runtime): Promise<void> {
   const refusals: string[] = [];
 
   for (const member of family.members) {
@@ -1235,10 +1229,7 @@ async function checkAllMembersTypecheck(
 
   if (refusals.length > 0) {
     throw new Error(
-      [
-        "Refusing to gate: one or more member typechecks are red.",
-        ...refusals,
-      ].join("\n\n"),
+      ["Refusing to gate: one or more member typechecks are red.", ...refusals].join("\n\n"),
     );
   }
 }
@@ -1955,7 +1946,7 @@ type SubjectConfirmationStatus = "live" | "pending" | "missing";
 /**
  * Poll every subject, never throwing on the first miss. A subject
  * unconfirmed on one attempt is PENDING and is retried; one still
- * unconfirmed when `CONFIRMATION_MAX_ATTEMPTS` is spent is MISSING.
+ * unconfirmed when the thirty-minute deadline is reached is MISSING.
  *
  * The terminal summary -- which of the N subjects are live -- prints on
  * BOTH the success and the failure path, because it is what replaces the
@@ -1963,7 +1954,7 @@ type SubjectConfirmationStatus = "live" | "pending" | "missing";
  */
 export async function confirmSubjectsAtOrigin(
   handoff: ReleaseHandoff,
-  runtime: Pick<Runtime, "resolveNpmCli" | "runCommand" | "report" | "sleep">,
+  runtime: Pick<Runtime, "resolveNpmCli" | "runCommand" | "report" | "sleep" | "now">,
   root: string,
   cache: string,
   npmrc: string,
@@ -1974,57 +1965,69 @@ export async function confirmSubjectsAtOrigin(
     handoff.subjects.map((name) => [name, "pending"]),
   );
 
+  const deadline = runtime.now().getTime() + CONFIRMATION_WINDOW_MS;
+  const errors = new Map<string, string>();
+  let delay = CONFIRMATION_INITIAL_DELAY_MS;
+
   runtime.report(
     `Confirming ${handoff.subjects.length} package(s) at ${handoff.candidateVersion} ` +
-      `(up to ${CONFIRMATION_MAX_ATTEMPTS} attempt(s), ${CONFIRMATION_RETRY_DELAY_MS}ms apart)...`,
+      `(up to 30 minutes, backoff from 3 to 60 seconds)...`,
   );
 
-  for (let attempt = 1; attempt <= CONFIRMATION_MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 1; ; attempt++) {
     const outstanding = [...statuses.entries()]
       .filter(([, status]) => status === "pending")
       .map(([name]) => name);
     if (outstanding.length === 0) break;
 
     for (const name of outstanding) {
-      const result = await runtime.runCommand({
-        command: process.execPath,
-        args: [
-          runtime.resolveNpmCli(),
-          "view",
-          `${name}@${handoff.candidateVersion}`,
-          "version",
-          "--json",
-          "--registry",
-          NPM_ORIGIN,
-          "--prefer-online",
-          "--cache",
-          cache,
-          "--userconfig",
-          npmrc,
-          "--globalconfig",
-          globalNpmrc,
-        ],
-        cwd: root,
-        env,
-      });
-      const observed = parseJsonOrText(result.stdout);
+      let observed: unknown;
+      try {
+        const result = await runtime.runCommand({
+          command: process.execPath,
+          args: [
+            runtime.resolveNpmCli(),
+            "view",
+            `${name}@${handoff.candidateVersion}`,
+            "version",
+            "--json",
+            "--registry",
+            NPM_ORIGIN,
+            "--prefer-online",
+            "--cache",
+            cache,
+            "--userconfig",
+            npmrc,
+            "--globalconfig",
+            globalNpmrc,
+          ],
+          cwd: root,
+          env,
+        });
+        observed = parseJsonOrText(result.stdout);
+      } catch (error) {
+        errors.set(name, error instanceof Error ? error.message : String(error));
+      }
       if (observed === handoff.candidateVersion) {
         statuses.set(name, "live");
-        runtime.report(
-          `${name}: live (confirmed on attempt ${attempt}/${CONFIRMATION_MAX_ATTEMPTS})`,
-        );
-      } else if (attempt === CONFIRMATION_MAX_ATTEMPTS) {
-        statuses.set(name, "missing");
-        runtime.report(`${name}: MISSING after ${CONFIRMATION_MAX_ATTEMPTS} attempt(s)`);
+        runtime.report(`${name}: live (confirmed on attempt ${attempt})`);
       } else {
-        runtime.report(`${name}: PENDING (attempt ${attempt}/${CONFIRMATION_MAX_ATTEMPTS})`);
+        runtime.report(`${name}: PENDING (attempt ${attempt})`);
       }
     }
 
-    const stillPending = [...statuses.values()].some((status) => status === "pending");
-    if (stillPending && attempt < CONFIRMATION_MAX_ATTEMPTS) {
-      await runtime.sleep(CONFIRMATION_RETRY_DELAY_MS);
+    const pending = [...statuses.entries()].filter(([, status]) => status === "pending");
+    if (!pending.length) break;
+    const remaining = deadline - runtime.now().getTime();
+    if (remaining <= 0) {
+      for (const [name] of pending) {
+        statuses.set(name, "missing");
+        runtime.report(`${name}: MISSING after 30 minutes (${attempt} attempts)`);
+      }
+      break;
     }
+    await runtime.sleep(Math.min(delay, remaining));
+    delay = Math.min(delay * 2, CONFIRMATION_MAX_DELAY_MS);
   }
 
   const live = [...statuses.entries()]
@@ -2040,9 +2043,24 @@ export async function confirmSubjectsAtOrigin(
   );
 
   if (missing.length > 0) {
+    runtime.report("Manual recovery after all packages become visible (run from repository root):");
+    for (const name of handoff.subjects) {
+      runtime.report(
+        `npm view ${name}@${handoff.candidateVersion} version --registry ${NPM_ORIGIN} --prefer-online`,
+      );
+    }
+    runtime.report(
+      `release_sha=$(node -p "require('./tools/release/release-artifacts/${handoff.candidateVersion}/build-provenance.json').members[0].releaseCommitSha")`,
+    );
+    runtime.report(`git tag v${handoff.candidateVersion} "$release_sha"`);
+    runtime.report(`git push origin v${handoff.candidateVersion}`);
+    runtime.report(
+      `gh workflow run blog-check.yml -f version=${handoff.candidateVersion} -f mode=registry`,
+    );
     throw new Error(
       `npm origin did not confirm ${missing.length} of ${handoff.subjects.length} package(s) at ` +
-        `${handoff.candidateVersion} within budget (${CONFIRMATION_MAX_ATTEMPTS} attempts): ${missing.join(", ")}.`,
+        `${handoff.candidateVersion} within 30 minutes: ${missing.join(", ")}. ` +
+        [...errors.entries()].map(([name, error]) => `${name}: ${error}`).join("; "),
     );
   }
 }
@@ -2141,7 +2159,10 @@ export interface ReleaseRepository {
 }
 
 /** The monorepo every family member lives in. */
-export const FAMILY_REPOSITORY: ReleaseRepository = { name: "warlockjs/framework", root: REPO_ROOT };
+export const FAMILY_REPOSITORY: ReleaseRepository = {
+  name: "warlockjs/framework",
+  root: REPO_ROOT,
+};
 
 export interface ReleaseTagPushOutcome {
   name: string;
@@ -2507,7 +2528,9 @@ export async function tagAndPushFamily(
 
   const outcome = await tagAndPushRelease(repository, version, releaseCommitSha!, runtime);
   if (outcome.refused) {
-    console.warn(`[release-family] REFUSED (tag/push) ${repository.name}: ${outcome.refusalMessage}`);
+    console.warn(
+      `[release-family] REFUSED (tag/push) ${repository.name}: ${outcome.refusalMessage}`,
+    );
     throw new Error(outcome.refusalMessage);
   }
 
@@ -3024,10 +3047,16 @@ export function resolveNpmCli(): string {
  * absolute override wins, and a path that does not exist is an error here,
  * not a confusing spawn failure later.
  */
-function firstExistingBesideNode(override: string | undefined, entry: string, label: string): string {
+function firstExistingBesideNode(
+  override: string | undefined,
+  entry: string,
+  label: string,
+): string {
   if (override) {
     if (!path.isAbsolute(override) || !existsSync(override)) {
-      throw new Error(`${label} override "${override}" must be an absolute path to an existing file.`);
+      throw new Error(
+        `${label} override "${override}" must be an absolute path to an existing file.`,
+      );
     }
     return override;
   }
@@ -3062,7 +3091,11 @@ export function resolvePnpmCli(): string {
   ) {
     return invokedByPnpm;
   }
-  return firstExistingBesideNode(process.env.WARLOCK_PNPM_CLI, "pnpm/bin/pnpm.mjs", "pnpm's CLI (pnpm.mjs)");
+  return firstExistingBesideNode(
+    process.env.WARLOCK_PNPM_CLI,
+    "pnpm/bin/pnpm.mjs",
+    "pnpm's CLI (pnpm.mjs)",
+  );
 }
 
 function originEnvironment(
