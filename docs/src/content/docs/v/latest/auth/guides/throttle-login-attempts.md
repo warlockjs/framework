@@ -62,3 +62,6 @@ Storage is `@warlock.js/cache`. If the cache driver is unavailable the middlewar
 - [Verify email and reset password](./verify-email-and-reset-password.md) — presets that wrap `loginThrottleMiddleware`.
 
 The failure counter passes the configured `window` TTL to every atomic increment. If a key expires after its create-only seed and before the increment, the replacement counter still expires. Existing windows keep their deadlines; this works even when the Redis driver has no default TTL.
+
+
+Framework contributors can verify the throttle against real Redis from `packages/auth` with `WARLOCK_REDIS_INTEGRATION=1 npx vitest run src/middleware/login-throttle.redis.spec.ts`. The suite uses `QUEUE_REDIS_HOST` / `QUEUE_REDIS_PORT` (default `127.0.0.1:6390`) and UUID-prefixed keys; it never flushes the database. It covers shared failures and lockouts, concurrent counts, success resets, lock expiry and a seed expiring before increment. Local runs without the flag clearly skip; an opted-in run fails when Redis is unavailable, and CI always opts in.

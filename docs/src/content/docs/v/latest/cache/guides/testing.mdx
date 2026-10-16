@@ -164,3 +164,21 @@ Default to `MockCacheDriver`. Reach for the others when the test is about real b
 - [Memory Cache Driver](/v/latest/cache/memory/) — runtime semantics for the in-memory backend.
 - [Null Cache Driver](/v/latest/cache/null/) — no-op driver reference.
 - [Event System](/v/latest/cache/events/) — full event payload reference.
+
+
+## Framework Redis integration checks
+
+The framework's cache, core and auth test suites include real Redis checks for atomic counters, shared HTTP rate limits, login failures and lockouts. The checks opt in locally with `WARLOCK_REDIS_INTEGRATION=1`; without it they report a skip. They use `QUEUE_REDIS_HOST` (default `127.0.0.1`) and `QUEUE_REDIS_PORT` (default `6390`). A requested integration run fails if Redis is unreachable; it never turns a connection failure into a skipped test. The package CI job enables the flag and provides a Redis service.
+
+From the corresponding package directory:
+
+```bash
+# packages/cache
+WARLOCK_REDIS_INTEGRATION=1 npx vitest run src/drivers/redis-cache-driver.integration.spec.ts
+# packages/core
+WARLOCK_REDIS_INTEGRATION=1 npx vitest run src/http/rate-limit-cache-store.redis.spec.ts
+# packages/auth
+WARLOCK_REDIS_INTEGRATION=1 npx vitest run src/middleware/login-throttle.redis.spec.ts
+```
+
+Each run uses an isolated UUID key prefix and deletes only that prefix's keys. It never flushes the Redis database, so these checks can share the local test service. They verify real Lua increments through separate Redis clients, fixed expiry deadlines, actual expiry between a create-only seed and increment, and successful-login resets and lockout expiry.

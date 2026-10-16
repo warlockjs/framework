@@ -109,7 +109,7 @@ jobs:
       matrix:
         package: ${{ fromJSON(needs.plan.outputs.matrix) }}
     services:
-      # The queue and notifications suites need a real Redis on 6390.
+      # Queue/notifications and opt-in cache/rate-limit/throttle specs use Redis on 6390.
       redis:
         image: redis:7
         ports:
@@ -121,6 +121,7 @@ jobs:
       NO_COLOR: "1"
       QUEUE_REDIS_HOST: 127.0.0.1
       QUEUE_REDIS_PORT: "6390"
+      WARLOCK_REDIS_INTEGRATION: "1"
     defaults:
       run:
         working-directory: ${{ matrix.package.dir }}

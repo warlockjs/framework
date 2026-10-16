@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.31.0
 
+### Added
+
+- Real Redis integration coverage for login failure counters and lockouts, including concurrent requests, preserved deadlines and counters recreated after a seeded key expires. Local runs opt in with `WARLOCK_REDIS_INTEGRATION=1`; CI requires a live Redis service. Tests use UUID prefixes and clean only their own keys.
+
 ### Fixed
 
 - Login, token and OTP throttles pass their counting-window TTL into each atomic increment. A counter that expires between the create-only seed and increment is recreated with an expiry rather than becoming permanent.

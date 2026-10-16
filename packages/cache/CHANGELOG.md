@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.31.0
 
+### Added
+
+- Real Redis integration coverage for atomic counters and their expiry behavior, including concurrent requests, preserved deadlines and counters recreated after a seeded key expires. Local runs opt in with `WARLOCK_REDIS_INTEGRATION=1`; CI requires a live Redis service. Tests use UUID prefixes and clean only their own keys.
+
 ### Fixed
 
 - `cache.increment(key, amount, { ttl })` supplies a TTL when an atomic increment creates or recreates a counter, through direct, tagged and scoped calls. Existing expiry deadlines are preserved; an explicit TTL also repairs a live permanent counter across drivers. Redis applies the count and TTL together, so an expired seed cannot leave a permanent counter even when the driver has no default TTL.
