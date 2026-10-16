@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **BREAKING:** `.refine()` now runs against successful output after child validation and transformers, and skips absent/null or invalid values. Callbacks are typed from the validator's output instead of `any`. Move checks that need input before child validation to `.addRule()`.
 - **BREAKING:** `.catch()` is a no-op on container validators, including failures in the container's own rules. Inputs previously accepted by an array/object catch after a length or unknown-key error now fail. Apply catches to child validators or handle a failed container result explicitly.
+- **BREAKING:** `v.union()` now returns its matched branch's validated output. Trimming and date parsing change values; object defaults/computed fields are retained, stripped unknown keys disappear, and an explicit `undefined` output drops the containing object field. Persisted, compared or serialized output can differ. Read and keep the raw input before validation when you need it.
 - Refinements now also check successful empty defaults such as `.default("")`; callbacks that reject those defaults now reject validation.
 
 ### Changed
@@ -20,9 +21,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Object `.merge()` retains refinements from both schemas, in their original order; cloning, extending and selecting fields preserve the original schema's refinements.
 - Union and record Standard Schema types now distinguish child input from validated output; `Infer.Output` reads the Standard Schema output parameter. Defaults and catches remain guaranteed in output.
-- Unions return the selected branch's validated data, preserving defaults, computed fields, catches and child transformations before applying union transformers/refinements. Successful custom rules may return a `data` property to replace the current validated value, including explicit `undefined`.
-
 - Object, array, tuple and lazy Standard Schema output declarations preserve child defaults and catches independently of their input types.
+
+### Added
+
+- Successful custom rules may return a `data` property to replace the current validated value, including explicit `undefined`; omitting the property preserves the value.
 
 ## 5.30.0 - 2026-10-16
 

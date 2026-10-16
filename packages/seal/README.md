@@ -198,6 +198,11 @@ const record = v.record(entry);
 // Infer.Output<typeof record>: Record<string, { count: number }>
 ```
 
+**Upgrading:** union output now includes member trimming, date parsing, defaults,
+computed fields and unknown-key stripping. A member that outputs `undefined`
+causes the containing object field to be omitted. This can change stored,
+compared or serialized values. Keep any raw input you need before validation.
+
 ### ✅ Custom Validation
 
 Add your own validation logic:

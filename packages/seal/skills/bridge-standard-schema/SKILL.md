@@ -135,6 +135,11 @@ type MaybeEntry = Infer.Output<typeof maybeEntry>;
 // { count: number } | string
 ```
 
+When upgrading, union output can change through member trimming, Date parsing,
+defaults, computed fields and unknown-key stripping. An explicit `undefined`
+member output drops its containing object field. Keep the raw input before
+validation if storage, comparisons or serialization also need that value.
+
 ## Compiler budget
 
 From `packages/seal`, run `pnpm bench:types --check` after changes to inference or
