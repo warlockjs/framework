@@ -38,7 +38,7 @@ pnpm create warlock my-web-app --yes --stack=web
 pnpm create warlock --interactive
 ```
 
-The first positional argument (or `--name`) is the project name. Value flags accept either `--db=postgres` or `--db postgres`. Unknown `--db`, `--features`, `--ai`, `--pm`, or `--agents` keys fail fast — before anything is written to disk — so a typo (or a hostile value) never leaves you with a half-scaffolded project.
+The first positional argument (or `--name`) is the project name. Value flags accept either `--db=postgres` or `--db postgres`. Unknown `--db`, `--features`, `--ai`, `--pm`, `--agents`, or `--lint` values fail fast — before anything is written to disk — so a typo (or a hostile value) never leaves you with a half-scaffolded project.
 
 | Flag | Takes value | Default | Purpose |
 | --- | --- | --- | --- |
@@ -47,6 +47,7 @@ The first positional argument (or `--name`) is the project name. Value flags acc
 | `--db` / `--no-db` | yes / no | `mongodb` | Database driver — `mongodb`, `postgres`, or `none` (`--no-db` is shorthand for `--db=none`) |
 | `--pm` | yes | inferred (`npm_config_user_agent` or the system) | Package manager — must be `npm` / `yarn` / `pnpm` / `bun`; any other value is rejected before scaffolding starts |
 | `--features` | yes (CSV) | none, or `["web"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys |
+| `--lint` | yes | `eslint` | Development toolchain: `oxc` for Oxlint/Oxfmt or `eslint` for ESLint/Prettier; invalid or missing values fail before writes |
 | `--ai` | yes (CSV) | none | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`) |
 | `--agents` | yes (CSV) | `claude` | Comma-separated [agent-kit](https://mongez.js.org/agent-kit) targets to derive docs/skills for — validated against the published target list, cached after the first lookup |
 | `--git` / `--no-git` | no | off | Force-enable or force-disable git initialization |
@@ -67,7 +68,7 @@ The one thing that can't fall back to a default is the project name. With no TTY
 ```
 A project name is required and no terminal is available to ask for one. Pass it as
 the first argument or --name=<name>. Non-interactive flags: --yes, --pm=<npm|yarn|pnpm>,
---db=<driver>|--no-db, --features=<list>, --ai=<list>, --git|--no-git, --jwt|--no-jwt.
+--db=<driver>|--no-db, --features=<list>, --ai=<list>, --lint=<oxc|eslint>, --git|--no-git, --jwt|--no-jwt.
 ```
 
 ### AI choice in Customize
@@ -84,7 +85,7 @@ unchanged.
 | Exit code | When |
 | --- | --- |
 | `0` | Success — including `--help`, `--version`, and a user cancelling an interactive prompt (Ctrl+C / Esc). |
-| `1` | A validation failure (unknown `--pm`/`--db`/`--features`/`--ai`/`--agents` value, missing project name with no TTY to ask), the target directory already exists, or the scaffold itself failed partway through (dependency install, git init, feature addition, or cache warm-up). |
+| `1` | A validation failure (unknown `--pm`/`--db`/`--features`/`--ai`/`--agents`/`--lint` value, missing project name with no TTY to ask), the target directory already exists, or the scaffold itself failed partway through (dependency install, git init, feature addition, or cache warm-up). |
 
 A scaffold failure surfaces the error and halts — there is no automatic rollback of partially-written files.
 
@@ -118,3 +119,10 @@ Inside an existing pnpm workspace the app gets neither: the parent workspace's s
 - **Full walkthrough** → [Core · Installation](/v/latest/core/getting-started/02-installation/) — every question, the scaffolded file tree, and booting the dev server, step by step.
 - **Your first endpoint** → [Core · Getting Started](/v/latest/core/getting-started/01-introduction/) — from a fresh project to a working route.
 - **Scaffold as you build** → [Core · Generators](/v/latest/core/cli/generators/) — `warlock generate.module`, `generate.controller`, and the rest of the family.
+
+
+Oxc scaffolds also write VS Code settings that select the official
+[Oxc extension](https://marketplace.visualstudio.com/items?itemName=oxc.oxc-vscode)
+for format-on-save (`editor.defaultFormatter: "oxc.oxc-vscode"`) and lint fixes
+(`source.fixAll.oxc`), and recommend it in `.vscode/extensions.json`. The default
+ESLint toolchain retains its existing Prettier/ESLint editor settings.

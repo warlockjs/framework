@@ -40,6 +40,7 @@ was decided prints after scaffolding, along with how to change each one.
 | `--stack=<api\|web>` | API-only or full-stack web; the structural choice | `api` |
 | `--db=<driver>` / `--no-db` | Database driver (`postgres`, `mongodb`, …), or skip one entirely | `mongodb` |
 | `--features=<list>` | Comma-separated feature keys (e.g. `test,herald`) | none (or `["web"]` when `--stack=web` and `--features` is not given) |
+| `--lint=<oxc\|eslint>` | Development lint/format toolchain: Oxlint/Oxfmt or ESLint/Prettier | `eslint` |
 | `--ai=<list>` | Comma-separated AI provider keys (e.g. `openai,anthropic`) | none |
 | `--pm=<manager>` | Package manager (`npm`, `yarn`, `pnpm`, `bun`) | inferred from the invoking agent (`npm_config_user_agent`) or the system |
 | `--agents=<list>` | Comma-separated [agent-kit](https://mongez.js.org/agent-kit) targets | `claude` |
@@ -174,7 +175,6 @@ The decisions overview shows the total selected feature/AI count and up to six
 keys, followed by `+N more` for longer selections. The final success screen lists
 all selected feature keys.
 
-
 ### Optional Oxc tooling
 
 Pass `--lint=oxc` (or `--lint oxc`) to scaffold with Oxlint **1.88.0** and Oxfmt
@@ -190,6 +190,10 @@ Oxc projects receive `.oxlintrc.json` and `.oxfmtrc.json`, replace the template'
 ESLint/Prettier dependencies and configs, and enable the Oxlint development health
 checker while retaining TypeScript checks. Both choices provide `lint`, `format`,
 `lint:check` and `format:check` scripts. The check variants do not modify files.
+Oxc projects also receive VS Code format-on-save settings and an extension
+recommendation for [Oxc](https://marketplace.visualstudio.com/items?itemName=oxc.oxc-vscode).
+Its formatter is `oxc.oxc-vscode` and lint fixes use `source.fixAll.oxc`;
+ESLint/Prettier editor settings remain the default for the ESLint toolchain.
 
 The Oxlint config preserves the template's unused-variable/import checks,
 explicit class accessibility and type-import style. Oxfmt uses the same 100-column,

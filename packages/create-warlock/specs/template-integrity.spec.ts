@@ -441,7 +441,6 @@ describe("the scaffolded root is mobile-ready", () => {
   });
 });
 
-
 describe("optional Oxc toolchain templates", () => {
   it("keeps the default template on ESLint and supplies matching Oxc style", () => {
     const pkg = JSON.parse(read("package.json"));

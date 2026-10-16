@@ -141,6 +141,14 @@ describe("generated toolchains", () => {
     expect(pkg.scripts["format:check"]).toContain("prettier --check");
     expect(existsSync(path.join(appPath, "eslint.config.js"))).toBe(true);
     expect(existsSync(path.join(appPath, ".oxlintrc.json"))).toBe(false);
+    expect(
+      readFileSync(path.join(appPath, ".vscode/settings.json"), "utf8"),
+    ).toBe(
+      readFileSync(
+        path.join(packageRoot, "templates/warlock/.vscode/settings.json"),
+        "utf8",
+      ),
+    );
   });
 
   it.each([false, true])(
@@ -200,6 +208,44 @@ describe("generated toolchains", () => {
     );
     expect(config.match(/healthCheckers:/g)).toHaveLength(1);
     expect(config).toContain("healthCheckers: { eslint: false, oxlint: true }");
+    const settings = JSON.parse(
+      readFileSync(path.join(appPath, ".vscode/settings.json"), "utf8"),
+    );
+    expect(settings["editor.defaultFormatter"]).toBe("oxc.oxc-vscode");
+    expect(settings["editor.formatOnSave"]).toBe(true);
+    expect(settings["editor.codeActionsOnSave"]).toEqual({
+      "source.fixAll.oxc": "explicit",
+      "source.organizeImports": "never",
+    });
+    for (const language of [
+      "typescript",
+      "typescriptreact",
+      "javascript",
+      "javascriptreact",
+      "json",
+      "css",
+    ]) {
+      expect(settings[`[${language}]`]["editor.defaultFormatter"]).toBe(
+        "oxc.oxc-vscode",
+      );
+    }
+    expect(settings["oxc.enable.oxlint"]).toBe(true);
+    expect(settings["oxc.enable.oxfmt"]).toBe(true);
+    expect(settings["oxc.requireConfig"]).toBe(true);
+    expect(
+      Object.keys(settings).some(
+        key => key.startsWith("prettier.") || key.startsWith("eslint."),
+      ),
+    ).toBe(false);
+    const extensions = JSON.parse(
+      readFileSync(path.join(appPath, ".vscode/extensions.json"), "utf8"),
+    );
+    expect(extensions.recommendations).toContain("oxc.oxc-vscode");
+    expect(Object.keys(pkg.devDependencies)).toEqual(
+      Object.keys(pkg.devDependencies).sort((left, right) =>
+        left.localeCompare(right),
+      ),
+    );
     expect(existsSync(path.join(appPath, "src/web"))).toBe(web);
   });
 

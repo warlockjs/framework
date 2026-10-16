@@ -40,7 +40,7 @@ The first positional argument is the project name; it also becomes the directory
 
 1. **Default (a TTY, no `--yes`, no `--interactive`)** — asks the project name (if not already given), API-only or full-stack web (`--stack`), then a database unless `--db` or `--no-db` already supplied it. The stack is the only choice that changes the generated app's shape.
 2. **`--yes` (or no TTY at all — CI, a script, an agent harness)** — fully headless. Every answer comes from a flag or its default; nothing is ever prompted, and stdin is never read.
-3. **`--interactive` (alias `--customize`)** — the full long-form wizard: project name, package manager, database driver, features, AI providers, git, JWT — one prompt after another, exactly like earlier `create-warlock` releases.
+3. **`--interactive` (alias `--customize`)** — the full long-form wizard: project name, package manager, database driver, features, AI providers, lint/format toolchain, git, JWT — one prompt after another, exactly like earlier `create-warlock` releases.
 
 **Without a terminal, `--yes` is not required.** When stdin is not a TTY — CI, a
 script, a container, an agent harness — the scaffolder does not try to prompt,
@@ -54,7 +54,7 @@ that is just the project name, the one required answer with no default:
 ```
 A project name is required and no terminal is available to ask for one. Pass it as
 the first argument or --name=<name>. Non-interactive flags: --yes, --pm=<npm|yarn|pnpm>,
---db=<driver>|--no-db, --features=<list>, --ai=<list>, --git|--no-git, --jwt|--no-jwt.
+--db=<driver>|--no-db, --features=<list>, --ai=<list>, --lint=<oxc|eslint>, --git|--no-git, --jwt|--no-jwt.
 ```
 
 ## After scaffolding: the decisions summary
@@ -63,9 +63,10 @@ Because almost every choice defaults silently, `create-warlock` prints what it
 decided right after scaffolding, e.g.:
 
 ```
-Using npm · database: none · agent-kit targets: claude
+Using npm · database: none · lint: eslint · agent-kit targets: claude
+Features: none
   change these — package manager: --pm, database: --db/--no-db, agents: --agents,
-  features: --features, ai: --ai, git: --git/--no-git, jwt: --jwt/--no-jwt — or
+  features: --features, ai: --ai, lint: --lint, git: --git/--no-git, jwt: --jwt/--no-jwt — or
   re-run with --interactive for the full wizard.
 ```
 
@@ -79,10 +80,13 @@ Using npm · database: none · agent-kit targets: claude
 | `--no-db`                  | no          | —              | Opt out of a database — shorthand for `--db=none`.                  |
 | `--pm`                     | yes         | inferred (`npm_config_user_agent` / system) | Package manager — must be one of `npm` / `yarn` / `pnpm` / `bun`; anything else is rejected before scaffolding starts. |
 | `--features`                | yes (CSV)   | none, or `["web"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys. An explicit `--features` always wins over the `--stack` default. |
+| `--lint` | yes | `eslint` | `oxc` (Oxlint/Oxfmt) or `eslint` (ESLint/Prettier); unknown or missing values fail before writes. |
 | `--ai`                      | yes (CSV)   | none           | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`).     |
 | `--agents`                  | yes (CSV)   | `claude`       | Comma-separated `agent-kit` targets — see below.                    |
 | `--git` / `--no-git`        | no          | off            | Initialize a Git repo (`git init` + `main` branch + initial commit).|
 | `--jwt` / `--no-jwt`        | no          | off            | Generate JWT secrets via the project's `jwt` script.               |
+| `--yes` / `-y`              | no          | off            | Fully headless mode.                                                 |
+| `--interactive`, `--customize` | no       | off            | Restore the full long-form wizard.                                   |
 
 With `--pm=pnpm`, the scaffold reads `pnpm --version` and records install-script
 approvals (esbuild, and Sharp when the `image` feature is selected) where that
@@ -93,10 +97,8 @@ no workspace file (those versions reject one without `packages:`) but
 retained. If selected feature dependencies do
 not install, JWT generation is skipped and reported rather than retried through
 the package manager.
-| `--yes` / `-y`              | no          | off            | Fully headless mode.                                                 |
-| `--interactive`, `--customize` | no       | off            | Restore the full long-form wizard.                                   |
 
-Value flags accept either `--db=postgres` or `--db postgres`. Unknown `--features` / `--ai` / `--agents` keys fail fast before any install.
+Value flags accept either `--db=postgres` or `--db postgres`. Unknown `--pm` / `--db` / `--features` / `--ai` / `--agents` / `--lint` values fail fast before any write or install.
 
 `--help`/`-h` and `--version`/`-v` short-circuit before anything else — no prompt, filesystem write, or network call, and `--help` wins even over a positional project name. `--version` prints the installed `create-warlock` version. `--help` lists every flag above together with its default.
 
@@ -194,7 +196,6 @@ Failures surface the error and halt; there is no rollback. After it finishes, `c
 The project-ready summary wraps the complete feature list to your terminal width.
 Terminals narrower than 50 columns get a plain list; piped output uses 80 columns.
 
-
 ## Custom feature groups
 
 `--customize` opens a section menu for optional features. Open a section to edit
@@ -205,7 +206,6 @@ counts update when returning to the menu, and **Continue** keeps the selection.
 Flags preselect their existing feature keys. Both menus and checklists retain
 terminal paging. The decisions overview previews up to six feature/AI keys with
 a total count; the success screen shows the complete list.
-
 
 ## Choose the linter and formatter
 
@@ -219,7 +219,9 @@ npm create warlock@latest my-app -- --lint=oxc --yes
 ```
 
 Both choices provide `lint`/`format` and non-mutating `lint:check`/`format:check`
-scripts. Oxc config enables `devServer.healthCheckers: { eslint: false, oxlint: true }`
+scripts. Oxc projects also configure VS Code format-on-save with the official
+`oxc.oxc-vscode` formatter, use `source.fixAll.oxc` for lint fixes and recommend
+that extension. The ESLint toolchain retains its Prettier/ESLint editor settings. Oxc config enables `devServer.healthCheckers: { eslint: false, oxlint: true }`
 and leaves TypeScript health checks enabled. Style matches the template's 100-column,
 double-quote, semicolon and trailing-comma settings. Oxfmt does not perform
 `prettier-plugin-organize-imports`' semantic import sorting/removal, so maintain

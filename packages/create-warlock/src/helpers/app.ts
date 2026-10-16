@@ -239,6 +239,9 @@ export class App {
     ])
       delete deps[dependency];
     Object.assign(deps, { oxlint: "1.88.0", oxfmt: "0.73.0" });
+    content.devDependencies = Object.fromEntries(
+      Object.entries(deps).sort(([left], [right]) => left.localeCompare(right)),
+    );
     Object.assign(content.scripts, {
       lint: "oxlint --fix ./src --max-warnings=0",
       "lint:check": "oxlint ./src --max-warnings=0",
@@ -258,6 +261,13 @@ export class App {
       copyFile(
         packageRoot("templates", "toolchains", "oxc", fileName),
         path.join(this.path, fileName),
+      );
+    }
+
+    for (const fileName of ["settings.json", "extensions.json"]) {
+      copyFile(
+        packageRoot("templates", "toolchains", "oxc", ".vscode", fileName),
+        path.join(this.path, ".vscode", fileName),
       );
     }
 
