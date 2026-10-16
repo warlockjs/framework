@@ -1,4 +1,5 @@
 import { colors } from "@mongez/copper";
+import { visibleWidth, wrapText } from "./wrap-text";
 
 export const warlockTextAnsi = `
 \x1b[49m
@@ -69,105 +70,81 @@ export function showIntroBanner(version: string): void {
 /**
  * Get the success screen with project summary
  */
-export function getSuccessScreen(options: {
-  projectName: string;
-  database: string;
-  features: string[];
-  packageManager: string;
-}): string {
+export function getSuccessScreen(
+  options: {
+    projectName: string;
+    database: string;
+    features: string[];
+    packageManager: string;
+  },
+  columns = process.stdout.columns,
+): string {
   const { projectName, database, features, packageManager } = options;
-
-  // Format features text
-  let featuresText = features.join(", ");
-  if (features.length === 0) {
-    featuresText = "none";
-  }
-
-  // Calculate dynamic width
-  const baseLabelLength = 10; // "Project: ".length
-  const padding = 6; // 3 spaces left, 3 spaces right padding for text inside box
-
-  const projectLineLen = projectName.length + baseLabelLength;
-  const dbLineLen = database.length + baseLabelLength;
-  const featuresLineLen = featuresText.length + baseLabelLength;
-
-  // Find the longest line to determine box width
-  // Ensure minimum width of 50 for aesthetics
-  const maxContentLength = Math.max(
-    projectLineLen,
-    dbLineLen,
-    featuresLineLen,
-    40,
-  );
-  const boxWidth = maxContentLength + padding + 2; // +2 for borders │
-
-  // Helper to generate borders
-  const createBorder = (start: string, end: string) =>
-    colors.magentaBright(start + "─".repeat(boxWidth - 2) + end);
-
-  // Helper to pad content lines
-  const padLine = (label: string, value: string, isFeature = false) => {
-    const valueColor = (text: string) => {
-      if (isFeature && text === "none") return colors.dim(text);
-      return colors.white(text);
+  const terminalWidth = columns && columns > 0 ? Math.floor(columns) : 80;
+  const narrow = terminalWidth < 50;
+  const indent = narrow ? "" : "  ";
+  const contentWidth = Math.max(2, terminalWidth - (narrow ? 0 : 10));
+  const heading = "🎉 YOUR PROJECT IS READY! 🎉";
+  const entries = [
+    `Project:  ${projectName}`,
+    `Database: ${database}`,
+    `Features: ${features.join(", ") || "none"}`,
+  ];
+  const rows = entries.flatMap(text => wrapText(text, contentWidth));
+  let summary: string[];
+  if (narrow) {
+    summary = [...wrapText(heading, contentWidth), "", ...rows];
+  } else {
+    const innerWidth =
+      Math.max(visibleWidth(heading), ...rows.map(visibleWidth)) + 6;
+    const border = (left: string, right: string) =>
+      indent + colors.magentaBright(left + "─".repeat(innerWidth) + right);
+    const row = (text: string, center = false) => {
+      const remaining = innerWidth - visibleWidth(text);
+      const left = center ? Math.floor(remaining / 2) : 3;
+      return (
+        indent +
+        colors.magentaBright("│") +
+        " ".repeat(left) +
+        text +
+        " ".repeat(remaining - left) +
+        colors.magentaBright("│")
+      );
     };
-
-    const labelPart = colors.dim(label.padEnd(10)); // "Project:  "
-    const valuePart = valueColor(value);
-
-    // Calculate visible length for padding
-    const contentVisibleLength = 3 + 10 + value.length;
-    const remaining = boxWidth - 2 - contentVisibleLength; // -2 for borders
-
-    return (
-      colors.magentaBright("│") +
-      "   " +
-      labelPart +
-      valuePart +
-      " ".repeat(remaining) +
-      colors.magentaBright("│")
-    );
-  };
-
-  const emptyLine =
-    colors.magentaBright("│") +
-    " ".repeat(boxWidth - 2) +
-    colors.magentaBright("│");
-
-  const headerText = "🎉 YOUR PROJECT IS READY! 🎉";
-  const headerPadding = Math.floor((boxWidth - 2 - headerText.length) / 2);
-  const headerLine =
-    colors.magentaBright("│") +
-    " ".repeat(headerPadding) +
-    colors.bold(colors.green(headerText)) +
-    " ".repeat(boxWidth - 2 - headerPadding - headerText.length) +
-    colors.magentaBright("│");
-
+    summary = [
+      border("╭", "╮"),
+      row(""),
+      row(colors.bold(colors.green(heading)), true),
+      row(""),
+      ...rows.map(text => row(colors.white(text))),
+      row(""),
+      border("╰", "╯"),
+    ];
+  }
   const devCommand =
     packageManager === "npm" ? "npm run dev" : `${packageManager} dev`;
-
-  return `
-  ${createBorder("╭", "╮")}
-  ${emptyLine}
-  ${headerLine}
-  ${emptyLine}
-  ${padLine("Project:", projectName)}
-  ${padLine("Database:", database)}
-  ${padLine("Features:", featuresText, true)}
-  ${emptyLine}
-  ${createBorder("╰", "╯")}
-
-  ${colors.bold(colors.cyan("🚀 Next steps:"))}
-
-     ${colors.cyan("cd")} ${projectName}
-     ${colors.cyan(devCommand)}
-
-  ${colors.dim("💡 Pro tip: Install the")} ${colors.yellow("Generator Z")} ${colors.dim("extension in VSCode")}
-     ${colors.dim("for helpful code snippets and productivity boosters!")}
-
-  ${colors.dim("📚 Docs:")} ${colors.cyan("https://warlock.js.org")}
-  ${colors.dim("⭐ Star us:")} ${colors.cyan("https://github.com/warlockjs/framework")}
-`;
+  const nextSteps = [
+    "",
+    "🚀 Next steps:",
+    "",
+    `cd ${projectName}`,
+    devCommand,
+    "",
+    "💡 Pro tip: Install the Generator Z extension in VSCode for helpful code snippets and productivity boosters!",
+    "",
+    "📚 Docs: https://warlock.js.org",
+    "⭐ Star us: https://github.com/warlockjs/framework",
+  ];
+  return [
+    "",
+    ...summary,
+    ...nextSteps.flatMap(text =>
+      wrapText(text, Math.max(2, terminalWidth - indent.length)).map(
+        line => indent + colors.cyan(line),
+      ),
+    ),
+    "",
+  ].join("\n");
 }
 
 /**

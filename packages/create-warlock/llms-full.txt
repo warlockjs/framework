@@ -191,4 +191,7 @@ Failures surface the error and halt; there is no rollback. After it finishes, `c
 - The `create-module` topic of the `warlock-js-core` skill — generate a new module inside the project.
 - The `add-connector` topic of the `warlock-js-core` skill — what `warlock add` wires when a feature pulls a connector.
 
+The project-ready summary wraps the complete feature list to your terminal width.
+Terminals narrower than 50 columns get a plain list; piped output uses 80 columns.
+
 

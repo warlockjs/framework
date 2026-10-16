@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.31.0
 
+### Fixed
+
+- The project-ready summary wraps feature lists and next steps to the terminal width, measures visible emoji width, and uses a plain list on narrow terminals. Piped output uses an 80-column fallback.
+
 ### Changed
 
 - **BREAKING:** Node.js 22.15 or newer is required, both in `engines` and in the scaffolder's own startup check (which used to accept Node 20), matching what the `warlock` CLI needs.

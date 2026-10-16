@@ -153,3 +153,6 @@ pure logic is exported as `findResolverBoundaryViolations` and covered by
 ## License
 
 This project is licensed under the MIT License.
+
+The project-ready summary wraps the complete feature list to your terminal width.
+Terminals narrower than 50 columns get a plain list; piped output uses 80 columns.

@@ -47,10 +47,10 @@ describe("getIntroBanner", () => {
 
     const shortVersionLine = short
       .split("\n")
-      .find((line) => line.includes("v1") && line.includes("│"));
+      .find(line => line.includes("v1") && line.includes("│"));
     const longVersionLine = long
       .split("\n")
-      .find((line) => line.includes("v10.20.30") && line.includes("│"));
+      .find(line => line.includes("v10.20.30") && line.includes("│"));
 
     expect(shortVersionLine).toBeTruthy();
     expect(longVersionLine).toBeTruthy();
@@ -77,6 +77,49 @@ describe("getSuccessScreen", () => {
     expect(screen).toContain("test, redis");
     expect(screen).toContain("YOUR PROJECT IS READY");
   });
+
+  it.each([60, 80, 120, undefined, 32])(
+    "fits every success-screen line in %s columns without losing features",
+    columns => {
+      const features = Array.from(
+        { length: 22 },
+        (_, index) => `feature-${index}`,
+      );
+      const screen = visible(
+        getSuccessScreen(
+          {
+            projectName: "my-🎉-project",
+            database: "PostgreSQL",
+            features,
+            packageManager: "npm",
+          },
+          columns,
+        ),
+      );
+      for (const line of screen.split("\n")) {
+        const width = [...line].reduce(
+          (total, char) =>
+            total + (/\p{Extended_Pictographic}/u.test(char) ? 2 : 1),
+          0,
+        );
+        expect(width, line).toBeLessThanOrEqual(columns ?? 80);
+      }
+      for (const feature of features) expect(screen).toContain(feature);
+      const frame = screen.split("\n").filter(line => /[╭│╰]/u.test(line));
+      if (columns === 32) expect(frame).toHaveLength(0);
+      else {
+        expect(frame.length).toBeGreaterThan(3);
+        const widths = frame.map(line =>
+          [...line].reduce(
+            (total, char) =>
+              total + (/\p{Extended_Pictographic}/u.test(char) ? 2 : 1),
+            0,
+          ),
+        );
+        expect(new Set(widths).size).toBe(1);
+      }
+    },
+  );
 
   it("prints `none` when no features were selected", () => {
     const screen = visible(
@@ -177,8 +220,8 @@ describe("getSuccessScreen", () => {
     // template indentation are ignored.
     const rows = visible(screen)
       .split("\n")
-      .map((line) => line.replace(/\s+$/, ""))
-      .filter((line) => line.includes("│"));
+      .map(line => line.replace(/\s+$/, ""))
+      .filter(line => line.includes("│"));
 
     expect(rows.length).toBeGreaterThan(3);
 
@@ -197,8 +240,8 @@ describe("getSuccessScreen", () => {
       }),
     );
 
-    const top = screen.split("\n").find((line) => line.includes("╭"));
-    const bottom = screen.split("\n").find((line) => line.includes("╰"));
+    const top = screen.split("\n").find(line => line.includes("╭"));
+    const bottom = screen.split("\n").find(line => line.includes("╰"));
 
     expect(top).toBeTruthy();
     expect(bottom).toBeTruthy();
@@ -220,7 +263,7 @@ describe("console wrappers", () => {
 
     // logo + wordmark + framed banner = three writes.
     expect(logSpy).toHaveBeenCalledTimes(3);
-    const printed = logSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    const printed = logSpy.mock.calls.map(call => String(call[0])).join("\n");
     expect(printed).toContain("v2.3.4");
   });
 
