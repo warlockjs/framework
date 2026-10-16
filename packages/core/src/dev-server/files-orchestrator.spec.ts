@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { FileHealthCheckerContract } from "./health-checker/file-health-checker.contract";
 import { filesOrchestrator } from "./files-orchestrator";
 
 /**
@@ -40,5 +41,33 @@ describe("FilesOrchestrator.load — self-initializes the loader hook (f9d8f99f)
     expect(initSpy.mock.invocationCallOrder[0]).toBeLessThan(
       loadModuleSpy.mock.invocationCallOrder[0],
     );
+  });
+});
+
+describe("FilesOrchestrator background checker selection", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  function isolateManager() {
+    const manager = filesOrchestrator.getHealthCheckerManager();
+    vi.spyOn(manager, "initialize").mockResolvedValue();
+    vi.spyOn(manager, "validateAllFiles").mockResolvedValue();
+    return vi.spyOn(manager, "setHealthCheckers").mockReturnValue(manager);
+  }
+
+  it("preserves explicitly supplied custom checker arrays", async () => {
+    const set = isolateManager();
+    const custom = [{ name: "Custom" }] as FileHealthCheckerContract[];
+    await filesOrchestrator.startCheckingHealth(custom);
+    expect(set).toHaveBeenCalledWith(custom);
+  });
+
+  it("accepts an object disabling every built-in checker", async () => {
+    const set = isolateManager();
+    await filesOrchestrator.startCheckingHealth({
+      typescript: false,
+      eslint: false,
+      oxlint: false,
+    });
+    expect(set).toHaveBeenCalledWith([]);
   });
 });

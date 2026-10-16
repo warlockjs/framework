@@ -177,7 +177,7 @@ devServer: {
 | ---------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | `watch.include`        | `["**/*.{ts,tsx}"]`                                                        | Glob patterns the file watcher tracks                            |
 | `watch.exclude`        | `["**/node_modules/**", "**/dist/**", "**/.warlock/**", "**/.git/**"]`     | Patterns to ignore                                               |
-| `healthCheckers`       | (enabled with defaults)                                                    | Array of file health checkers, or `false` to disable             |
+| `healthCheckers`       | (enabled with defaults)                                                    | Built-in switches, custom checker array, or `false` to disable             |
 | `generateTypings`      | `true`                                                                     | Auto-regenerate ConfigRegistry / route typings on dev-server boot |
 | `checkForUpdates`      | `true`                                                                     | Check npm for a newer `@warlock.js/core` at dev-server start      |
 | `restartOnConfigChange`| `true`                                                                     | Restart the dev server when `warlock.config.ts` or `.env*` changes|
@@ -185,7 +185,7 @@ devServer: {
 
 You'll usually leave these alone. The defaults are tuned for typical TypeScript projects.
 
-`healthCheckers: false` is for projects with custom build steps that interfere with the framework's health checks (the reference codebase sets this because it has unusual layout).
+`healthCheckers: false` disables every background file check; `warlock dev --skip-health` does the same for one run. An array still replaces the default list with custom checkers. For individual built-ins, use `healthCheckers: { typescript: true, eslint: false, oxlint: true }`. TypeScript runs by default, and both ESLint and Oxlint run when their package and app-root configuration exist. Setting a linter to `true` still requires its installation/configuration. See [background file health checks](../cli/file-health-checks).
 
 `generateTypings: false` skips the typings regeneration at dev-server boot. Speeds up cold starts in big projects; turn off only if you don't rely on the autocomplete it produces.
 

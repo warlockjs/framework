@@ -38,7 +38,7 @@ Look at the project's `package.json > scripts` to see the local shortcuts. Under
 
 ### `dev`
 
-Start the development server with hot module reload, type generation, and health checkers.
+Start the development server with hot module reload, type generation, and health checkers. [Background file health checks](./file-health-checks) run TypeScript and auto-detect configured ESLint and Oxlint installations.
 
 ```bash
 warlock dev

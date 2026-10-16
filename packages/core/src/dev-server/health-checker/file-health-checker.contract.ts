@@ -31,8 +31,8 @@ export interface FileHealthCheckerContract {
    *
    * The path should be relative to the checker's location, without file extension.
    * The system automatically handles:
-   * - `.ts` extension in development (with tsx loader)
-   * - `.js` extension in production (compiled)
+   * - `.ts` extension in development (through tsx)
+   * - `.mjs` extension in production (compiled)
    *
    * @example "./workers/ts-health.worker"
    */
@@ -64,3 +64,10 @@ export interface FileHealthCheckerContract {
    */
   stats(): Promise<HealthCheckerFilesStats>;
 }
+
+/** Select built-in background checks; installed/configured linters run by default. */
+export type BuiltInHealthCheckerOptions = {
+  typescript?: boolean;
+  eslint?: boolean;
+  oxlint?: boolean;
+};

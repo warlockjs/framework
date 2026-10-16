@@ -1,4 +1,6 @@
 import path from "node:path";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "url";
 import { Worker, type WorkerOptions } from "worker_threads";
 
@@ -17,7 +19,8 @@ export type CreateWorkerOptions = WorkerOptions & {
  *
  * The worker shares the CALLING module's extension: `.ts` when core runs from
  * source (loaded via tsx), `.mjs` when core is published. Source workers are
- * run through the tsx loader; published `.mjs` workers run as-is.
+ * loaded through tsx's `tsImport` API from a JavaScript bootstrap; published
+ * `.mjs` workers run as-is.
  *
  * @param workerPath - Relative path to worker file WITHOUT extension (e.g., "./workers/ts-health.worker")
  * @param baseUrl - The import.meta.url of the calling module (used to resolve relative paths)
@@ -50,9 +53,15 @@ export function createWorker(
     ...options,
   };
 
-  // Source workers are TypeScript — run them through the tsx loader.
   if (isSource) {
-    workerOptions.execArgv = [...(options?.execArgv || []), "--import", "tsx/esm"];
+    // Node 22.15 resolves a worker's entry before tsx's --import hook can
+    // handle its .ts extension. Bootstrap JS, then load the entry through
+    // tsx's supported API instead. Resolve from core, even when the app does
+    // not depend on tsx directly.
+    const require = createRequire(import.meta.url);
+    const tsxApi = pathToFileURL(require.resolve("tsx/esm/api")).href;
+    const bootstrap = `import(${JSON.stringify(tsxApi)}).then(({ tsImport }) => tsImport(${JSON.stringify(workerUrl.href)}, ${JSON.stringify(baseUrl)}));`;
+    return new Worker(bootstrap, { ...workerOptions, eval: true });
   }
 
   return new Worker(workerFilePath, workerOptions);

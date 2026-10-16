@@ -1,7 +1,10 @@
 import type { MigrationConstructor } from "@warlock.js/cascade";
 import type { CLICommand } from "../commands/cli-command";
 import type { Connector } from "../connectors/types";
-import type { FileHealthCheckerContract } from "../dev-server/health-checker/file-health-checker.contract";
+import type {
+  BuiltInHealthCheckerOptions,
+  FileHealthCheckerContract,
+} from "../dev-server/health-checker/file-health-checker.contract";
 import { type BuildOptions } from "esbuild";
 
 /**
@@ -172,9 +175,10 @@ export type WarlockConfig = {
       exclude?: string[];
     };
     /**
-     * Custom health checkers
+     * Built-in checker switches, custom checker array, or false to disable.
+     * Installed/configured ESLint and Oxlint both run by default.
      */
-    healthCheckers?: FileHealthCheckerContract[] | false;
+    healthCheckers?: FileHealthCheckerContract[] | BuiltInHealthCheckerOptions | false;
     /**
      * Whether to generate typings on dev server start
      * @default true

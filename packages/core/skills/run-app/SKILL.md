@@ -40,14 +40,14 @@ When a flag is **not** passed, the corresponding `warlock.config.ts > devServer.
 
 Once the server is ready, `warlock dev` listens for single keypresses:
 
-| Key      | Does                                                                                                                                                                    |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `r`      | Restart the server on a fresh process.                                                                                                                                  |
-| `c`      | Clear the console.                                                                                                                                                      |
-| `q`      | Graceful shutdown, exit `0` — the same path as `Ctrl+C`.                                                                                                                |
-| `h`      | Print the shortcuts that are armed right now.                                                                                                                           |
+| Key      | Does                                                                                                                                      |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `r`      | Restart the server on a fresh process.                                                                                                    |
+| `c`      | Clear the console.                                                                                                                        |
+| `q`      | Graceful shutdown, exit `0` — the same path as `Ctrl+C`.                                                                                  |
+| `h`      | Print the shortcuts that are armed right now.                                                                                             |
 | `u`      | **Only while an update notice is showing** — update every `@warlock.js/*` package, install, and restart. See the `update-packages` topic. |
-| `Ctrl+C` | Graceful shutdown, unchanged.                                                                                                                                           |
+| `Ctrl+C` | Graceful shutdown, unchanged.                                                                                                             |
 
 A "restart" is a fresh process (`r` and `u` both use it) — see [The supervisor](#the-supervisor) below for how that works.
 
@@ -150,11 +150,35 @@ export default defineConfig({
 
 - **`watch.include` / `watch.exclude`** — globs piped into the file watcher. Override when you have non-`.ts(x)` files driving reloads (e.g. SQL fixtures), or to exclude a generated folder.
 - **`generateTypings`** — turn off if you're committing generated typings and don't want them rewritten on every boot. The `--skip-typings` flag is the per-run version.
-- **`healthCheckers`** — custom file health checker contracts (or `false` to disable). The `--skip-health` flag is the per-run version.
+- **`healthCheckers`** — built-in switches (`{ typescript?, eslint?, oxlint? }`), custom file health checker contracts, or `false` to disable. The `--skip-health` flag disables all checkers for that run. TypeScript runs by default; installed linters with an app-root config are detected at startup. Both ESLint and Oxlint run when configured.
 - **`transpileCacheDebug`** — diagnostic only. Names `.warlock/transpile/*.js` files `<slug>.<hash>.js` and appends `// @source <path>` markers so you can eyeball which cache entry came from which source. Leave off in normal use.
 - **`checkForUpdates`** — on `warlock dev` start, check npm for a newer `@warlock.js/core` and print a one-line notice if one exists. Best-effort and non-blocking; auto-skipped in CI and non-TTY shells. In an interactive terminal the notice arms a **`u` shortcut** that updates every `@warlock.js/*` package, installs, and restarts the server; elsewhere it prints `npx warlock update` instead. The registry answer is cached for 24h in `.warlock/update-check.json`, so a day of restarts costs one lookup. See the `update-packages` topic.
 - **`restartOnConfigChange`** — restart the dev server when `warlock.config.ts` or any `.env*` changes (default `true`). Set `false` to get a warning instead and restart by hand. Neither file can be hot-reloaded, so without a restart the running services keep the old values.
 - **`timings`** — print a one-line, per-phase breakdown next to the `hmr update` line on every hot reload: `watcher`, `debounce`, `graph`, `reimport`, `connectors`. `watcher` is the raw-fs-notification-to-stabilised-event gap (chokidar's `awaitWriteFinish` window); `debounce` is the handler's own adaptive wait; the rest are self-explanatory. Opt-in, off by default — a disabled flag costs one boolean check per reload, since the watcher-settle bookkeeping only runs when this is on. Use it to see which phase a slow reload is actually spending time in.
+
+### Optional Oxlint file checks
+
+Install `oxlint` in the app (`npm install --save-dev oxlint` or `yarn add --dev oxlint`) and add `.oxlintrc.json` at the app root:
+
+```json
+{
+  "rules": { "no-debugger": "error", "no-unused-vars": "warn" }
+}
+```
+
+`warlock dev` then checks changed JavaScript/TypeScript files in an isolated worker and reports rule ids, line/column spans, errors and warnings. It reads saved files from disk, honors the app's Oxlint ignore/config rules, and uses the app-resolved CLI package. A missing package or config skips the checker. Tool/config errors are reported without stopping the dev server.
+
+```ts
+import { defineConfig } from "@warlock.js/core";
+
+export default defineConfig({
+  devServer: {
+    healthCheckers: { typescript: true, eslint: false, oxlint: true },
+  },
+});
+```
+
+Omit the switches to run TypeScript and every installed/configured linter; `true` still requires that linter's package and config. Set `oxlint: false` to disable only Oxlint while leaving other defaults intact. A custom checker array replaces the built-in list. Config discovery also accepts `.oxlintrc.jsonc`, `oxlint.config.ts` and `oxlint.config.mts`; use JSON/JSONC on Node 22.15 because current Oxlint TypeScript configs need Node 22.18 or newer.
 
 ## `warlock build` — production bundle
 
@@ -305,10 +329,10 @@ pnpm 10+ will not run a dependency's install script unless the app names it. esb
 
 Where the approval goes depends on the pnpm version (measured with real installs):
 
-| pnpm             | Approve esbuild in                                                           |
-| ---------------- | ---------------------------------------------------------------------------- |
-| 10.26+, 11, 12   | `pnpm-workspace.yaml`: `allowBuilds:` / `  esbuild: true`                    |
-| 10.5 – 10.25     | `pnpm-workspace.yaml`: `onlyBuiltDependencies:` / `  - esbuild`              |
+| pnpm             | Approve esbuild in                                                                               |
+| ---------------- | ------------------------------------------------------------------------------------------------ |
+| 10.26+, 11, 12   | `pnpm-workspace.yaml`: `allowBuilds:` / `  esbuild: true`                                        |
+| 10.5 – 10.25     | `pnpm-workspace.yaml`: `onlyBuiltDependencies:` / `  - esbuild`                                  |
 | 7 – 9, 10.0–10.4 | `package.json`: `"pnpm": { "onlyBuiltDependencies": ["esbuild"] }`, and no `pnpm-workspace.yaml` |
 
 ```yaml

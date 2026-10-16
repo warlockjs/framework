@@ -11,9 +11,11 @@ import { FileManager } from "./file-manager";
 import { FileOperations } from "./file-operations";
 import { FilesWatcher, createIgnoredMatcher } from "./files-watcher";
 import { FILE_PROCESSING_BATCH_SIZE } from "./flags";
-import { EslintHealthChecker } from "./health-checker/checkers/eslint-health-checker";
-import { TypescriptHealthChecker } from "./health-checker/checkers/typescript-health-checker";
-import type { FileHealthCheckerContract } from "./health-checker/file-health-checker.contract";
+import { defaultHealthCheckers } from "./health-checker/default-health-checkers";
+import type {
+  BuiltInHealthCheckerOptions,
+  FileHealthCheckerContract,
+} from "./health-checker/file-health-checker.contract";
 import { FilesHealthcareManager } from "./health-checker/files-healthcare.manager";
 import { buildTranspileInit } from "./loader/build-transpile-init.js";
 import { trackLoaderPortAcks, type LoaderPortAcks } from "./loader/loader-port-acks";
@@ -208,7 +210,6 @@ export class FilesOrchestrator {
     });
   }
 
-
   /**
    * Discover files on disk, reconcile against the manifest, build the dep
    * graph, and persist the new manifest. Idempotent.
@@ -245,10 +246,14 @@ export class FilesOrchestrator {
     this.healthCheckerManager.checkFiles(filesToCheck);
   }
 
-  public async startCheckingHealth(healthCheckers?: FileHealthCheckerContract[]): Promise<void> {
+  public async startCheckingHealth(
+    healthCheckers?: FileHealthCheckerContract[] | BuiltInHealthCheckerOptions,
+  ): Promise<void> {
     devLogDim("Started File Health Checks in the background.");
 
-    const checkers = healthCheckers ?? [new TypescriptHealthChecker(), new EslintHealthChecker()];
+    const checkers = Array.isArray(healthCheckers)
+      ? healthCheckers
+      : defaultHealthCheckers(healthCheckers);
     await this.healthCheckerManager.setHealthCheckers(checkers).initialize();
     await this.healthCheckerManager.validateAllFiles();
   }
@@ -324,9 +329,13 @@ export class FilesOrchestrator {
   public async watchFiles() {
     devLogSuccess("watching for file changes (not serving yet)");
 
-    this.filesWatcher.onFileChange((p, settleMs) => this.eventHandler.handleFileChange(p, settleMs));
+    this.filesWatcher.onFileChange((p, settleMs) =>
+      this.eventHandler.handleFileChange(p, settleMs),
+    );
     this.filesWatcher.onFileAdd((p, settleMs) => this.eventHandler.handleFileAdd(p, settleMs));
-    this.filesWatcher.onFileDelete((p, settleMs) => this.eventHandler.handleFileDelete(p, settleMs));
+    this.filesWatcher.onFileDelete((p, settleMs) =>
+      this.eventHandler.handleFileDelete(p, settleMs),
+    );
 
     const watchConfig = warlockConfigManager.get("devServer")?.watch;
     if (watchConfig?.include?.length) {

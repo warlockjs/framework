@@ -296,6 +296,7 @@ export default defineConfig({
             // the compiled child by a runtime path rather than importing it.
             "production/route-registration-child.ts",
             "dev-server/health-checker/workers/eslint-health.worker.ts",
+            "dev-server/health-checker/workers/oxlint-health.worker.ts",
             "dev-server/health-checker/workers/ts-health.worker.ts",
             "dev-server/loader/hook-thread.ts",
           ],
