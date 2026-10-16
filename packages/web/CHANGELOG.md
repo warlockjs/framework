@@ -10,6 +10,8 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ### Added
 
+- Development checks compile the optional Web Vitals example against its actual types; Web Vitals remains an app-installed optional dependency.
+
 - `<Form onSettled={outcome => …}>` observes every enhanced submission outcome, including network failures and dropped submissions, after the existing success/error callbacks. Native browser submissions do not invoke it.
 - A submit button marked `data-independent` opts that submission into independent mode, so a Cancel button can run beside Start within the same form.
 
