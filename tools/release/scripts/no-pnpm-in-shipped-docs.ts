@@ -20,7 +20,7 @@
  * postmortem: the JSONC rule was documented in `shadcn.feature.ts` and
  * ignored by `react-email.feature.ts`; the stdout/stderr rule was documented
  * for three functions and missed on a fourth. So this gate scans every
- * shipped doc file directly and fails, naming file and line, on any bare
+ * shipped doc file directly and fails, naming file and line, on any unallowlisted bare
  * `pnpm <anything>` / `yarn <anything>` invocation it finds — no matter how
  * carefully the prose elsewhere says "use npx".
  *
@@ -30,8 +30,8 @@
  * equivalent (e.g. documenting THIS repo's own internal release tooling,
  * rather than something a consumer of the published package runs). Silently
  * excluding a whole file would hide future additions to it. Instead each
- * exception is a single `{ file, line, reason }` entry below — recorded,
- * reviewable, and pinned to an exact line so an unrelated edit to that file
+ * exception is a single `{ relPath, text, reason }` entry below — recorded,
+ * reviewable, and pinned to exact content so an unrelated edit to that file
  * does not silently inherit the exemption.
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -63,59 +63,122 @@ export interface Violation {
   manager: "pnpm" | "yarn";
 }
 
-/**
- * Deliberate exceptions: a genuine pnpm/yarn-workspace-only operation with no
- * npm equivalent, documented as such. Each entry is scoped to one exact file
- * + line, so it never silently exempts a whole file from future scrutiny.
- *
- * Empty today — every occurrence found at authoring time had a valid npm
- * translation (see the four shapes in the fix-up card). Add here, with a
- * reason, the day a real exception appears.
- */
-export const ALLOWLIST: ReadonlyArray<{ relPath: string; line: number; reason: string }> = [
-  // Example shape (not a real exception):
-  // { relPath: "core/skills/example/SKILL.md", line: 42, reason: "documents this repo's own internal pnpm workspace release step, not something a consumer of the published package runs" },
-
-  // core/skills/run-app/SKILL.md — a historical bugfix note and a live
-  // troubleshooting section that are BOTH genuinely pnpm-specific: the
-  // hoisting difference that caused a 4.9.2 bug, and pnpm 10+'s own
-  // install-script gating quirk. Neither is an instruction to use pnpm —
-  // they only fire for a reader who already is. No npm translation exists
-  // because npm never had either behavior. llms-full.txt mirrors these at
-  // different line numbers because it's a generated concatenation of every
-  // skill in the package (see generate-llms.mjs) — allowlisted at its own
-  // lines too, not exempted as a whole file.
-  { relPath: "core/skills/run-app/SKILL.md", line: 108, reason: "historical bugfix note scoped to pnpm's hoisting behavior; no npm equivalent because npm never had the bug" },
-  { relPath: "core/skills/run-app/SKILL.md", line: 109, reason: "same note — mentions yarn/pnpm hoisting behavior as history, not an instruction" },
-  { relPath: "core/skills/run-app/SKILL.md", line: 261, reason: "pnpm 10+'s own install-script gating is pnpm-specific troubleshooting; npm has no equivalent gate to document" },
-  { relPath: "core/skills/run-app/SKILL.md", line: 276, reason: "same pnpm-specific troubleshooting section, explaining where pnpm reads the allowlist from" },
-  { relPath: "core/llms-full.txt", line: 3690, reason: "generated mirror of core/skills/run-app/SKILL.md:108 — see that entry" },
-  { relPath: "core/llms-full.txt", line: 3691, reason: "generated mirror of core/skills/run-app/SKILL.md:109 — see that entry" },
-  { relPath: "core/llms-full.txt", line: 3843, reason: "generated mirror of core/skills/run-app/SKILL.md:261 — see that entry" },
-  { relPath: "core/llms-full.txt", line: 3858, reason: "generated mirror of core/skills/run-app/SKILL.md:276 — see that entry" },
-
-  // core/skills/update-packages/SKILL.md — a reference table documenting
-  // `warlock update`'s REAL lockfile-detection behavior across every
-  // package manager it actually supports (bun/npm/yarn/pnpm). The pnpm and
-  // yarn rows are what the tool does, not an instruction to adopt either —
-  // collapsing them to npm would misdescribe the feature.
-  { relPath: "core/skills/update-packages/SKILL.md", line: 46, reason: "reference table row describing warlock update's real yarn.lock handling, not an instruction to use yarn" },
-  { relPath: "core/skills/update-packages/SKILL.md", line: 47, reason: "reference table row describing warlock update's real pnpm-lock.yaml handling, not an instruction to use pnpm" },
-  { relPath: "core/skills/update-packages/SKILL.md", line: 50, reason: "prose explaining the same lockfile-detection precedence; mentions yarn as a noun, not a command to run" },
-  { relPath: "core/llms-full.txt", line: 5924, reason: "generated mirror of core/skills/update-packages/SKILL.md:46 — see that entry" },
-  { relPath: "core/llms-full.txt", line: 5925, reason: "generated mirror of core/skills/update-packages/SKILL.md:47 — see that entry" },
-  { relPath: "core/llms-full.txt", line: 5928, reason: "generated mirror of core/skills/update-packages/SKILL.md:50 — see that entry" },
-
-  // create-warlock/skills/create-a-warlock-project/SKILL.md — describes the
-  // wizard's REAL interactive step 2, which genuinely offers yarn/pnpm as
-  // choices when they're detected on the system. Not an instruction; a
-  // description of what the tool asks.
-  { relPath: "create-warlock/skills/create-a-warlock-project/SKILL.md", line: 31, reason: "describes the scaffolder's real interactive package-manager picker, which genuinely offers yarn/pnpm when detected" },
-  { relPath: "create-warlock/llms-full.txt", line: 39, reason: "generated mirror of create-warlock/skills/create-a-warlock-project/SKILL.md:31 — see that entry" },
+/** Exact content and file exceptions survive edits above them without exempting new commands. */
+export const ALLOWLIST: ReadonlyArray<{ relPath: string; text: string; reason: string }> = [
+  {
+    "relPath": "core/skills/run-app/SKILL.md",
+    "text": ":::note[Fixed in 4.9.2 — pnpm users]",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "core/skills/run-app/SKILL.md",
+    "text": "Before 4.9.2 those imports were left bare. npm and yarn hoist every transitive dependency into one flat tree, so they resolved by accident; pnpm's strict layout does not, and the dev server failed with `ERR_MODULE_NOT_FOUND: Cannot find package 'esbuild'`. The workaround was declaring `esbuild` and `get-tsconfig` in your own `package.json` — no longer needed, and you can drop them.",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "core/skills/run-app/SKILL.md",
+    "text": "### pnpm needs esbuild's install script allowed",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "core/skills/run-app/SKILL.md",
+    "text": "Where the approval goes depends on the pnpm version (measured with real installs):",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "core/skills/run-app/SKILL.md",
+    "text": "pnpm 11 and 12 ignore `package.json`'s `pnpm` field and fail the install when the workspace file has only `onlyBuiltDependencies`, so keep `allowBuilds` there (listing both keys is fine). pnpm before 10.5 rejects a `pnpm-workspace.yaml` without a `packages:` field (`packages field missing or empty`), and adding `packages: [\".\"]` makes every later dependency add fail with `ERR_PNPM_ADDING_TO_ROOT` — so on those versions use the `package.json` field instead. `create-warlock` 5.30.0 checks the pnpm version and writes the right one, and `warlock add image` follows the same rule when it approves `sharp`.",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "core/skills/update-packages/SKILL.md",
+    "text": "| `yarn.lock`                     | `yarn install`  | `yarn add`          |",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "core/skills/update-packages/SKILL.md",
+    "text": "| `pnpm-lock.yaml`                | `pnpm install`  | `pnpm add`          |",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "core/skills/update-packages/SKILL.md",
+    "text": "Bun is checked **first**: a Bun project may also carry a `yarn.lock` (Bun writes one for tooling compatibility), and matching yarn there would run the wrong installer against the wrong lockfile. `warlock update` and `warlock add` share this detection, so they can never disagree.",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "create-warlock/skills/create-a-warlock-project/SKILL.md",
+    "text": "With `--pm=pnpm`, the scaffold reads `pnpm --version` and records install-script",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "seal/skills/bridge-standard-schema/SKILL.md",
+    "text": "From `packages/seal`, run `pnpm bench:types --check` after changes to inference or",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "core/llms-full.txt",
+    "text": ":::note[Fixed in 4.9.2 — pnpm users]",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "core/llms-full.txt",
+    "text": "Before 4.9.2 those imports were left bare. npm and yarn hoist every transitive dependency into one flat tree, so they resolved by accident; pnpm's strict layout does not, and the dev server failed with `ERR_MODULE_NOT_FOUND: Cannot find package 'esbuild'`. The workaround was declaring `esbuild` and `get-tsconfig` in your own `package.json` — no longer needed, and you can drop them.",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "core/llms-full.txt",
+    "text": "### pnpm needs esbuild's install script allowed",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "core/llms-full.txt",
+    "text": "Where the approval goes depends on the pnpm version (measured with real installs):",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "core/llms-full.txt",
+    "text": "pnpm 11 and 12 ignore `package.json`'s `pnpm` field and fail the install when the workspace file has only `onlyBuiltDependencies`, so keep `allowBuilds` there (listing both keys is fine). pnpm before 10.5 rejects a `pnpm-workspace.yaml` without a `packages:` field (`packages field missing or empty`), and adding `packages: [\".\"]` makes every later dependency add fail with `ERR_PNPM_ADDING_TO_ROOT` — so on those versions use the `package.json` field instead. `create-warlock` 5.30.0 checks the pnpm version and writes the right one, and `warlock add image` follows the same rule when it approves `sharp`.",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "core/llms-full.txt",
+    "text": "| `yarn.lock`                     | `yarn install`  | `yarn add`          |",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "core/llms-full.txt",
+    "text": "| `pnpm-lock.yaml`                | `pnpm install`  | `pnpm add`          |",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "core/llms-full.txt",
+    "text": "Bun is checked **first**: a Bun project may also carry a `yarn.lock` (Bun writes one for tooling compatibility), and matching yarn there would run the wrong installer against the wrong lockfile. `warlock update` and `warlock add` share this detection, so they can never disagree.",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "create-warlock/llms-full.txt",
+    "text": "With `--pm=pnpm`, the scaffold reads `pnpm --version` and records install-script",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "seal/llms-full.txt",
+    "text": "From `packages/seal`, run `pnpm bench:types --check` after changes to inference or",
+    "reason": "Describes package-manager-specific behavior or internal workspace development, not a default consumer invocation."
+  },
+  {
+    "relPath": "core/llms-full.txt",
+    "text": ":::note[Fixed in 4.9.2 — pnpm users]",
+    "reason": "Historical hoisting bug explanation, not a package-manager command."
+  },
+  {
+    "relPath": "core/llms-full.txt",
+    "text": "Before 4.9.2 those imports were left bare. npm and yarn hoist every transitive dependency into one flat tree, so they resolved by accident; pnpm's strict layout does not, and the dev server failed with `ERR_MODULE_NOT_FOUND: Cannot find package 'esbuild'`. The workaround was declaring `esbuild` and `get-tsconfig` in your own `package.json` — no longer needed, and you can drop them.",
+    "reason": "Historical hoisting bug explanation, not a package-manager command."
+  }
 ];
 
-function isAllowlisted(relPath: string, line: number): boolean {
-  return ALLOWLIST.some((entry) => entry.relPath === relPath && entry.line === line);
+function isAllowlisted(relPath: string, text: string): boolean {
+  return ALLOWLIST.some((entry) => entry.relPath === relPath && entry.text === text.trim());
 }
 
 /** `pnpm <word>` or `yarn <word>` — a real invocation, not just the bare word "pnpm"/"yarn" appearing in prose. */
@@ -197,7 +260,7 @@ export function findViolationsInText(relPath: string, text: string): Violation[]
     if (!match) continue;
 
     const lineNumber = i + 1;
-    if (isAllowlisted(relPath, lineNumber)) continue;
+    if (isAllowlisted(relPath, line)) continue;
 
     violations.push({
       relPath,
@@ -248,7 +311,7 @@ function formatReport(report: GateReport): { text: string; failed: boolean } {
       "`pnpm add <pkg>` -> `npm install <pkg>`; `pnpm install` -> `npm install`; " +
       "`pnpm create warlock` -> `npm create warlock@latest`. " +
       "If a line is a genuine pnpm-workspace-only operation with no npm equivalent, " +
-      "add a scoped { relPath, line, reason } entry to ALLOWLIST in this file.",
+      "add a scoped { relPath, text, reason } entry to ALLOWLIST in this file.",
   );
 
   return { text: lines.join("\n"), failed: true };

@@ -408,3 +408,8 @@ yarn dev       # watch mode — recompiles on change
 After any change to `src/`, run `yarn build` before the next `pkgist` invocation.
 
 npx pkgist build:family warlock --bump 4.2.2
+
+CI checks shipped documentation command portability and skill-snippet compile budgets.
+Package-manager-specific troubleshooting exceptions match exact file and text, so
+inserting lines above them cannot hide a new command or break a valid exception.
+The spec-coverage gate passes under the required Node.js 22.15 runtime.

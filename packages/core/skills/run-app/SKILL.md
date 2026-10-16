@@ -158,7 +158,7 @@ export default defineConfig({
 
 ### Optional Oxlint file checks
 
-Install `oxlint` in the app (`npm install --save-dev oxlint` or `yarn add --dev oxlint`) and add `.oxlintrc.json` at the app root:
+Install `oxlint` in the app (`npm install --save-dev oxlint`) and add `.oxlintrc.json` at the app root:
 
 ```json
 {

@@ -82,6 +82,12 @@ jobs:
       - name: Every spec file is reachable by its package's vitest config
         run: node scripts/check-spec-coverage.mjs
 
+      - name: Shipped docs use portable package-manager commands
+        run: node --import tsx tools/release/scripts/no-pnpm-in-shipped-docs.ts
+
+      - name: Skill examples stay within their compile budget
+        run: node --import tsx tools/release/scripts/skill-snippet-gate.ts
+
       - name: Public text contains no private references
         run: pnpm run check:public-text
 

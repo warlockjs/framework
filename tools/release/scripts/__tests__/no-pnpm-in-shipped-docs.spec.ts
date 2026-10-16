@@ -43,7 +43,7 @@ describe("findViolationsInText", () => {
     assert.equal(violations.length, 0);
   });
 
-  it("honours a scoped ALLOWLIST entry, matching file AND line exactly", () => {
+  it("does not exempt unregistered paths", () => {
     const relPath = "core/skills/allowlisted-example/SKILL.md";
     const text = "intro\npnpm needs esbuild's install script allowed\nmore text\n";
     // Line 2 is the offending line in this fixture.
@@ -55,24 +55,17 @@ describe("findViolationsInText", () => {
     assert.equal(violationsElsewhere.length, 1);
   });
 
-  it("real ALLOWLIST entries suppress their exact recorded file:line", () => {
-    assert.ok(ALLOWLIST.length > 0, "expected the real gate to carry at least one recorded exception");
+  it("keeps exact content exceptions stable when preceding lines move", () => {
     const entry = ALLOWLIST[0];
-    const lines = Array.from({ length: entry.line }, (_, i) => (i + 1 === entry.line ? "pnpm add something" : "x"));
-    const violations = findViolationsInText(entry.relPath, lines.join("\n"));
-    assert.equal(violations.length, 0, "an allowlisted file:line must not be reported as a violation");
+    assert.equal(findViolationsInText(entry.relPath, `intro\n\n${entry.text}\n`).length, 0);
+    assert.equal(findViolationsInText("other/skills/example/SKILL.md", entry.text).length, 1);
   });
 
-  it("still flags a pnpm line elsewhere in a file that has an allowlisted line", () => {
+  it("does not exempt changed commands at a previously allowlisted position", () => {
     const entry = ALLOWLIST[0];
-    // Chosen far past every real ALLOWLIST line recorded for this file, so
-    // it cannot collide with another genuine exception on the same path.
-    const farLine = Math.max(...ALLOWLIST.filter((e) => e.relPath === entry.relPath).map((e) => e.line)) + 1000;
-    const lines = Array.from({ length: farLine }, () => "x");
-    lines[entry.line - 1] = "pnpm add allowlisted-line"; // the allowlisted line itself
-    lines[farLine - 1] = "pnpm add not-allowlisted-line"; // far from any recorded exception
-    const violations = findViolationsInText(entry.relPath, lines.join("\n"));
+    const violations = findViolationsInText(entry.relPath, `${entry.text}\npnpm add unrelated\n`);
     assert.equal(violations.length, 1);
-    assert.equal(violations[0].line, farLine);
+    assert.equal(violations[0].line, 2);
+    assert.equal(findViolationsInText(entry.relPath, "pnpm add replacement").length, 1);
   });
 });
