@@ -125,7 +125,7 @@ function mergeAdjacentTurns(messages: BedrockMessage[]): BedrockMessage[] {
   const merged: BedrockMessage[] = [];
   for (const message of messages) {
     const previous = merged[merged.length - 1];
-    if (previous?.role === message.role) {
+    if (previous && previous.role === message.role) {
       previous.content!.push(...(message.content ?? []));
     } else {
       merged.push({ ...message, content: [...(message.content ?? [])] });

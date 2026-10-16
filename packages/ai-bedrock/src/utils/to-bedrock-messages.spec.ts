@@ -3,6 +3,14 @@ import { describe, expect, it } from "vitest";
 import { toBedrockMessages } from "./to-bedrock-messages";
 
 describe("toBedrockMessages", () => {
+  it("keeps empty and system-only histories free of synthetic turns", () => {
+    expect(toBedrockMessages([])).toEqual({ system: undefined, messages: [] });
+    expect(toBedrockMessages([{ role: "system", content: "rules" }])).toEqual({
+      system: [{ text: "rules" }],
+      messages: [],
+    });
+  });
+
   it("hoists system messages into a separate SystemContentBlock[]", () => {
     const messages: Message[] = [
       { role: "system", content: "Be concise." },

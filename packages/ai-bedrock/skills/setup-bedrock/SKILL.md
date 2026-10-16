@@ -231,3 +231,6 @@ content block in order. This keeps parallel tool results in one user turn and
 allows an automatic compaction summary beside an assistant tool-call turn
 without creating consecutive assistant turns. Agent compaction frames a summary
 as user context when it replaces the first non-system turn.
+
+Adjacent-turn normalization preserves empty histories and separate system prompts
+without inserting synthetic conversation turns.
