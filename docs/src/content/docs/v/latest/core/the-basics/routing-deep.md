@@ -397,9 +397,11 @@ The framework collects `directory(...)` calls during route registration and repl
 
 `@fastify/static` is loaded on the first static file request, including when a
 `directory(...)` or an existing public folder was declared at boot. Routes are
-registered before Fastify becomes ready; concurrent first requests share one
+queued after HTTP plugin hooks and registered before Fastify becomes ready; concurrent first requests share one
 sender initialization. `wildcard: false` still enumerates files at boot and keeps
-its exact route snapshot and application fallback behavior. The upstream sender
+its exact route snapshot and application fallback behavior. Only this option loads
+the directory globber at boot; the upstream sender enumerates these roots again
+on its first request, which can add latency for large directories. The upstream sender
 continues to handle ranges, cache headers, listings, allowed paths and compressed
 files. `setHeaders` receives the real Fastify reply.
 

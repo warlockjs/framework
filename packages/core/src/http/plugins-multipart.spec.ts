@@ -1,6 +1,4 @@
-/**
- * Multipart must register with safe limits (finding B10).
- */
+/** Multipart must register with safe limits. */
 import config from "@mongez/config";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { registerHttpPlugins } from "./plugins";
@@ -10,8 +8,12 @@ vi.mock("@fastify/multipart", () => ({ default: "multipart" }));
 
 async function limits() {
   register.mockClear();
-  await registerHttpPlugins({ register, addContentTypeParser: vi.fn() } as any);
-  return register.mock.calls.find(call => call[0] === "multipart")![1].limits;
+  await registerHttpPlugins({
+    register,
+    addContentTypeParser: vi.fn(),
+    after: vi.fn().mockResolvedValue(undefined),
+  } as any);
+  return register.mock.calls.find((call) => call[0] === "multipart")![1].limits;
 }
 
 describe("multipart limits", () => {

@@ -16,6 +16,13 @@ By the end you'll have sensible global limits, a tight cap on `/login`, a higher
 
 ## How rate limiting works in Warlock
 
+HTTP plugins finish registration before the connector scans application routes.
+Global limits therefore cover application routes, health endpoints, the public
+folder and `router.directory()` mounts in production and development. With
+`http.rateLimit: { max: 2, timeWindow: 60_000 }`, the third request in the same
+bucket returns HTTP 429 with rate-limit and retry headers. Per-route settings and
+`global: false` still control which routes participate.
+
 The framework wraps `@fastify/rate-limit`. Two layers, in order:
 
 ```mermaid

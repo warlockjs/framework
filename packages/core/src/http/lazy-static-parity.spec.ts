@@ -150,6 +150,21 @@ describe("lazy static sender preserves upstream behavior", () => {
     expect((await both.lazy.inject({ url: "/assets/late.txt" })).body).toBe("application fallback");
   });
 
+  it("keeps upstream index selection across roots for exact routes", async () => {
+    const first = directory();
+    const second = directory();
+    rmSync(path.join(second, "nested/index.html"));
+    writeFileSync(path.join(second, "nested/index.htm"), "later index");
+    const both = await pair({
+      root: [first, second],
+      prefix: "/assets/",
+      wildcard: false,
+      index: ["index.html", "index.htm"],
+    });
+    expect((await same(both, { url: "/assets/nested/" })).body).toBe("later index");
+    expect((await same(both, { url: "/assets/nested/index.html" })).body).toBe("index");
+  });
+
   it("preserves allowedPath, dotfile controls and constrained routes", async () => {
     const both = await pair({
       root: directory(),

@@ -1,5 +1,4 @@
 import type { FastifyStaticOptions } from "@fastify/static";
-import { globSync } from "glob";
 import { statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -87,7 +86,8 @@ function staticOptions(
 }
 
 /** Mirror the plugin's boot-time route snapshot for wildcard:false. */
-function fileRoutes(options: FastifyStaticOptions, prefix: string): FileRoute[] {
+async function fileRoutes(options: FastifyStaticOptions, prefix: string): Promise<FileRoute[]> {
+  const { glob } = await import("glob");
   const roots = Array.isArray(options.root) ? options.root : [options.root];
   const routes = new Map<string, FileRoute>();
   const indexes = new Set(
@@ -101,7 +101,7 @@ function fileRoutes(options: FastifyStaticOptions, prefix: string): FileRoute[] 
   for (const root of roots) {
     if (typeof root !== "string") continue;
     const rootPath = root.split(path.win32.sep).join(path.posix.sep).replace(/\/?$/, "/");
-    const files = globSync("**/**", {
+    const files = await glob("**/**", {
       cwd: rootPath,
       absolute: false,
       follow: true,
@@ -114,7 +114,10 @@ function fileRoutes(options: FastifyStaticOptions, prefix: string): FileRoute[] 
       const url = prefix + file;
       if (routes.has(url)) continue;
       routes.set(url, { url, file: `/${file}`, rootPath });
-      if (indexes.has(path.posix.basename(url)) && !indexDirectories.has(path.posix.dirname(url)))
+      // Match upstream: distinct index filenames in later roots replace the
+      // directory route, while duplicate file URLs keep the first root.
+      const key = path.posix.basename(url);
+      if (indexes.has(key) && !indexDirectories.has(key))
         indexDirectories.set(path.posix.dirname(url), rootPath);
     }
   }
@@ -133,12 +136,25 @@ function fileRoutes(options: FastifyStaticOptions, prefix: string): FileRoute[] 
 }
 
 /**
- * Register public routes now, and capture the upstream plugin's handlers on the
+ * Queue public routes after earlier plugins, and capture upstream handlers on the
  * first file request. Only public Fastify methods are replaced on the facade;
  * the listening application's route/decorator table never changes after ready.
  */
 export function registerLazyStatic(server: FastifyInstance, input: FastifyStaticOptions): void {
   const options = staticOptions(server, input);
+  // Earlier plugins install onRoute hooks (including global rate limiting).
+  // Keep the decorators on the calling scope, as @fastify/static does.
+  server.register(
+    Object.assign(async (instance: FastifyInstance) => prepareStatic(instance, options), {
+      [Symbol.for("skip-override")]: true,
+    }),
+  );
+}
+
+async function prepareStatic(
+  server: FastifyInstance,
+  options: FastifyStaticOptions,
+): Promise<void> {
   const originalPrefix = options.prefix ?? "/";
   const prefix =
     options.prefixAvoidTrailingSlash || originalPrefix.endsWith("/")
@@ -194,7 +210,7 @@ export function registerLazyStatic(server: FastifyInstance, input: FastifyStatic
   }
   if (options.serve === false) return;
   const routes: FileRoute[] =
-    options.wildcard === false ? fileRoutes(options, prefix) : [{ url: prefix + "*" }];
+    options.wildcard === false ? await fileRoutes(options, prefix) : [{ url: prefix + "*" }];
   if (options.wildcard !== false && options.redirect === true && prefix !== originalPrefix)
     routes.push({ url: originalPrefix });
   const schema: FastifySchema & { hide: boolean } = { hide: options.schemaHide ?? true };
@@ -207,7 +223,7 @@ export function registerLazyStatic(server: FastifyInstance, input: FastifyStatic
       logLevel: options.logLevel,
       ...(route.file ? { config: { file: route.file, rootPath: route.rootPath } } : {}),
       errorHandler(error, request, reply) {
-        if (error.code === "ERR_STREAM_PREMATURE_CLOSE") {
+        if (error?.code === "ERR_STREAM_PREMATURE_CLOSE") {
           reply.request.raw.destroy();
           return;
         }

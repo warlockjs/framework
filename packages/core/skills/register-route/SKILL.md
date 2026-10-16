@@ -90,9 +90,9 @@ Projects with `@warlock.js/auth` usually define a `guarded(...)` helper in `src/
 import { guarded } from "app/shared/utils/router";
 
 router.prefix("/products", () => {
-  router.get("/", listProductsController);             // public
+  router.get("/", listProductsController); // public
   guarded(() => {
-    router.post("/", createProductController);          // requires logged-in user
+    router.post("/", createProductController); // requires logged-in user
     router.delete("/:id", removeProductController);
   });
 });
@@ -105,12 +105,13 @@ If `guarded` doesn't exist in your project yet, see the shared utility conventio
 For a standard CRUD resource, `router.route(path)` returns a builder with five named slots:
 
 ```ts
-router.route("/products")
-  .list(listProductsController)        // GET    /products
-  .show(getProductController)          // GET    /products/:id
-  .create(createProductController)     // POST   /products
-  .update(updateProductController)     // PUT    /products/:id
-  .destroy(removeProductController);   // DELETE /products/:id
+router
+  .route("/products")
+  .list(listProductsController) // GET    /products
+  .show(getProductController) // GET    /products/:id
+  .create(createProductController) // POST   /products
+  .update(updateProductController) // PUT    /products/:id
+  .destroy(removeProductController); // DELETE /products/:id
 ```
 
 Each method returns the builder so you can chain. Methods you don't call don't register. Pair with `guarded`/`group` the same way as plain routes.
@@ -174,14 +175,17 @@ Request log entries otherwise include the body as received (before validation), 
 router.directory({ root: Application.publicPath, prefix: "/assets/" });
 ```
 
-Static routes are declared at scan time. `@fastify/static` itself loads only on
+Static routes are queued at scan time after HTTP plugin hooks, so global
+`http.rateLimit` covers public and directory mounts along with application routes. `@fastify/static` itself loads only on
 the first static file request, even with an existing public folder; concurrent
 first requests share initialization. The upstream sender retains ranges, caching,
 listings, precompressed files, `allowedPath` and `setHeaders` behavior. The
 `setHeaders` callback receives the real Fastify reply.
 
 `wildcard: false` still enumerates exact file routes at boot, so files added later
-follow the application's ordinary fallback until restart. The public folder uses
+follow the application's ordinary fallback until restart. The directory globber
+loads at boot only for this option; the upstream sender enumerates those roots
+again on the first request, which can be noticeable for large directories. The public folder uses
 `storage.publicRoot` (default `public/`) and `storage.publicPrefix` (default
 `/public/`); `false` disables it and missing folders add no routes. Its
 `reply.sendFile`/`reply.download` decorators are lazy too. `router.directory`

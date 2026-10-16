@@ -81,6 +81,10 @@ export async function registerHttpPlugins(server: FastifyInstance) {
     secret: config.get("http.cookies.secret"), // Optional: allow signed cookies
     parseOptions: config.get("http.cookies.options", {}),
   });
+
+  // Install plugin onRoute hooks before the connector registers health and app
+  // routes. after() waits for this queue without closing route registration.
+  await server.after();
 }
 
 /**

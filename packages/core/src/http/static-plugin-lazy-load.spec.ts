@@ -82,13 +82,15 @@ describe("@fastify/static is loaded lazily", () => {
   });
 
   it.each(["../router/router.ts", "./plugins.ts", "../connectors/http-connector.ts"])(
-    "%s reaches @fastify/static only through import()",
+    "%s reaches @fastify/static and glob only through import()",
     async (file) => {
       const externals = await staticExternalImports(path.resolve(__dirname, file));
 
-      expect([...externals].filter((specifier) => specifier.startsWith("@fastify/static"))).toEqual(
-        [],
-      );
+      expect(
+        [...externals].filter(
+          (specifier) => specifier.startsWith("@fastify/static") || specifier === "glob",
+        ),
+      ).toEqual([]);
     },
     30_000,
   );
