@@ -128,6 +128,1061 @@
   ],
   "releases": [
     {
+      "version": "5.30.0",
+      "id": "v5-30-0",
+      "date": "October 16, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Framework findings from the Bureau 0.30 and Kazlak Care builds, plus a security and correctness review.</strong> Security: request logs no longer carry OAuth codes, signed-URL credentials or raw <code>Request</code>/<code>Response</code> objects (route <code>logging</code> policy, masked URLs and query), log and cache output masks email addresses with a linear pattern, <code>&lt;Form&gt;</code> only enhances same-origin targets and redirects refuse <code>javascript:</code> targets on the server and the client, SSE event names and ids are stripped of line breaks, login throttles key by an HMAC of the credential, and parallel AI tool calls are capped and serialised per file. HTTP: a request-lifetime <code>request.signal</code>, bounded SSE and stream retention with backpressure, graceful shutdown that closes idle keep-alive connections, typed <code>http.serverOptions</code>, <code>http.errorMapper</code>, shared rate limits through <code>@warlock.js/cache</code>, and <code>@warlock.js/core/errors</code>. Seal: <code>v.literal(\"\")</code> and <code>.default(\"\")</code> keep empty strings, optional discriminated unions accept omitted fields, and <code>validate()</code> returns typed output. Web: 4xx error pages hydrate, <code>&lt;Head /&gt;</code> renders the viewport, <code>&lt;Form independent&gt;</code>, redirect submissions wait for the new page, and production starts without Vite or Babel. <strong>Breaking:</strong> log methods return the logger instead of a promise (<code>await log.flush()</code> waits), and AI tool calls in one trip run concurrently by default (<code>toolDispatch: \"sequential\"</code>). <code>create-warlock</code> works on pnpm 9 and 10 again. Lockstep release across all 31 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.30.0 tarballs passed the release gate; after publishing, the registry confirm timed out on a delayed <code>@warlock.js/ai-mistral</code> publish, every package was then confirmed at npm origin and the family installed from npm, and the blog check against npm was not run in that job.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 42,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 11
+            },
+            {
+              "type": "Changed",
+              "n": 13
+            },
+            {
+              "type": "Fixed",
+              "n": 18
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>request.signal</code></strong>: an <code>AbortSignal</code> that aborts when the client disconnects before the response finishes (not when the request body finishes reading, never on normal completion); its listener is attached on first access and removed when the response closes (WR-012)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Stream backpressure</strong>: <code>response.stream()</code>'s controller gains <code>write(data)</code> (sends, then waits until the client can take more; <code>false</code> once it is gone), <code>drain()</code>, <code>backpressured</code>, <code>signal</code> (aborted on client disconnect, not on <code>end()</code>) and <code>onDisconnect(fn)</code>, matching <code>response.sse()</code> (WR-006)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>SSE backpressure</strong>: <code>sse.write(event, data, id?)</code> sends and waits until the client can take more (<code>false</code> once it is gone), plus <code>sse.drain()</code>, <code>sse.backpressured</code> and <code>sse.signal</code> (aborted on disconnect) (WR-006)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>http.serverOptions</code> is typed</strong> (<code>HttpServerOptions</code>), including Node's native <code>http</code> options such as <code>serverOptions.http.maxHeaderSize</code>; it was already forwarded to Fastify but the config type could not express it (WR-005)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>@warlock.js/core/errors</code></strong>: a side-effect-free subpath with <code>HttpError</code> and its subclasses (<code>BadRequestError</code>, <code>ResourceNotFoundError</code>, …). A standalone helper or worker can import it without bundling Cascade, Cache or the MongoDB driver; the classes are the same ones the root exports, so <code>instanceof</code> holds across both (WR-017)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>http.errorMapper</code></strong>: map errors that are not an <code>HttpError</code> to <code>{ status, message?, payload? }</code> (or an <code>HttpError</code>), so domain errors shared with non-HTTP processes need not extend Core. A mapped 5xx stays opaque unless the mapper sets a message; a mapper that throws is logged and ignored (WR-018)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Per-route request logging policy</strong>: <code>logging: { body?: boolean, query?: boolean }</code> on a route, with app-wide defaults under <code>http.logging</code> (plus <code>redactQueryParams</code>). It is applied before any log entry is built, so a schema- or middleware-rejected body never reaches a log channel (WR-003)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>request.toLogSnapshot()</code></strong>, <code>buildRequestLogSnapshot()</code> and <code>redactUrlCredentials()</code>: the bounded, plain-data view of a request that log entries now carry (WR-003)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>purgeImageVariants(path?, { disk? })</code></strong> removes one file's cached image derivatives, or a disk's whole derivative cache (FW-10)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>createUploadedFileController({ disk })</code></strong> serves the originals and variants of any local disk, and <strong><code>resolveImageVariant({ disk?, path, variant, format? })</code></strong> resolves (and renders on a miss) one variant for an app's own route, e.g. a private disk behind auth. <code>uploadedFileController</code> is <code>createUploadedFileController()</code> (FW-11)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Shared rate limits:</strong> <code>http.rateLimit.store: \"cache\"</code> counts in <code>@warlock.js/cache</code>, so every process on a shared driver (Redis, Postgres) shares the limit; <code>middleware.rateLimit()</code> follows it or takes its own <code>store</code> and a stable <code>name</code>. A <code>@fastify/rate-limit</code> store class can be passed as <code>store</code> too. Windows are fixed and clock-aligned. Each route with its own <code>rateLimit</code> counts separately (namespaced by method and URL from the plugin's <code>routeInfo</code>, hashed so <code>/users/:id</code> and <code>/users/id</code> never merge). A cache outage fails open on both limiters (<code>skipOnError</code> defaults to <code>true</code> for this store) and is logged at most once a minute. The <code>null</code> and <code>file</code> cache drivers are refused with <code>UnsupportedRateLimitDriverError</code> (one stores nothing, the other never sweeps expired windows and does not share increments between processes) (FW-14)."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong><code>response.stream()</code> no longer keeps rendered chunks.</strong> <code>response.body</code> after <code>end()</code> holds the last <code>retainChunks</code> chunks written by <code>send()</code>, <code>write()</code> or <code>render()</code> (<code>response.stream(type, { retainChunks })</code>, default 0); it used to hold every <code>render()</code> chunk (WR-006)."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>response.stream()</code>: after the client disconnects, <code>send()</code>/<code>render()</code> are silent no-ops and <code>ended</code> is <code>true</code> (they used to write to the closed socket); <code>send()</code> after <code>end()</code> still throws."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong><code>@fastify/static</code> is only loaded when there is something to serve</strong> — at least one <code>router.directory()</code>, or an existing public folder (<code>storage.publicRoot</code>, which now also accepts <code>false</code> to turn it off). Its directory-listing module calls <code>os.cpus()</code> at load, which cost a measured ~0.4–0.5 s of cold start in an app that served neither (WR-027). With no public folder, <code>reply.sendFile</code> is no longer decorated by that plugin; <code>response.sendFile()</code> is unaffected."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>@warlock.js/core/errors</code> also resolves inside the framework repository (a root <code>errors/index.ts</code> re-export, not published), so workspace packages and tests can import it by its package name (WR-017)."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong><code>response.sse()</code> no longer keeps every sent event.</strong> <code>response.body</code> after <code>end()</code> holds the last <code>retainEvents</code> events (<code>response.sse({ retainEvents })</code>, default 0), so long-lived streams no longer grow with their history (WR-006)."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING (only for a custom log channel that reads <code>context.request</code>/<code>context.response</code>):</strong> <strong>request log entries carry a <code>RequestLogSnapshot</code>, not the <code>Request</code>/<code>Response</code> instances</strong> (<code>context.request</code> is <code>{ id, method, url, route, name, ip, userAgent, query?, body? }</code>; <code>response.log</code> adds <code>{ statusCode }</code>). Native request/reply graphs no longer reach log channels, and credential-bearing query values (<code>secret</code>, <code>token</code>, <code>apiKey</code>, <code>signature</code>, <code>code</code>, <code>X-Amz-*</code>, …) are masked in the logged URL (WR-003)."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong><code>warlock add notifications</code> writes a smaller, convention-following module</strong> (FW-09): <code>models/notification/</code> (model with a <code>NotificationResource</code>, migration), <code>resources/</code>, a validated <code>schema/list-notifications.schema.ts</code> (<code>limit</code> capped at 50, no <code>request.all()</code>), a guarded <code>types/notifications-request.type.ts</code>, <code>services/</code>, <code>utils/locales.json</code>, one controller per file for list / unread-count / mark-read / mark-all-read registered through <code>router.route()</code>, a commented <code>gate()</code> permission hook, and a 401 spec per controller when the app has the test feature. The clear-all and delete endpoints are no longer generated. Apps that already have a notification model (5.29 layout included) are skipped, and a freshly ejected <code>config/notifications.ts</code> then imports the 5.29 model path. In an app that already has <code>src/app/notifications</code>, no second model or migration is added, existing files are kept (and listed), and <code>notFound</code> is merged into an existing <code>utils/locales.json</code>. The mark-read controller turns a numeric <code>:id</code> into a number (integer ids on the default MongoDB stack) and keeps other ids as strings; the list query drops unknown keys such as a cache-busting <code>_</code> instead of rejecting them."
+            },
+            {
+              "type": "Changed",
+              "html": "Image derivatives are cached per source (<code>&lt;cacheDirectory&gt;/&lt;2 hex&gt;/&lt;sourceKey&gt;/&lt;size-mtime&gt;/&lt;hash&gt;.&lt;ext&gt;</code>). Deleting or moving a file through a local disk (<code>delete</code>, <code>deleteMany</code>, <code>move</code>, and <code>deleteDirectory</code> for every file under it) removes its derivatives, and a rewritten source's old derivatives are pruned once a new one is written, so the cache no longer grows forever. Pruning re-checks the source first, so a request that read an older version never deletes the newer version's derivatives, and a derivative pruned mid-request is rendered again instead of answering 500 (FW-10)."
+            },
+            {
+              "type": "Changed",
+              "html": "Concurrent variant requests for the same file on two disks (a mirror copied with its mtime) no longer share one generation, which left the second target unwritten and answered 500 (FW-11)."
+            },
+            {
+              "type": "Changed",
+              "html": "A warning is logged once when the image-variant cache sits inside the public folder: a configured <code>uploads.images.cacheDirectory</code> is shared by every local disk, so private derivatives there would be publicly served."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>storage.use(name)</code> (and <code>StorageManagerContract.use</code>) is typed as <code>ScopedStorage</code>, the class it returns, so <code>deleteDirectory</code>, <code>copyDirectory</code>, <code>moveDirectory</code>, <code>emptyDirectory</code>, <code>putFromUrl</code>, <code>prepend</code> and <code>append</code> type-check without a cast (FW-12)."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>middleware.rateLimit()</code> returns an async middleware (its in-memory path still completes synchronously)."
+            },
+            {
+              "type": "Changed",
+              "html": "The <code>run-app</code> skill lists where each pnpm version reads build approvals (<code>allowBuilds</code> on 10.26+, workspace <code>onlyBuiltDependencies</code> on 10.5–10.25, <code>package.json</code> before 10.5); it used to say only <code>allowBuilds</code> works."
+            },
+            {
+              "type": "Fixed",
+              "html": "Graceful shutdown no longer waits out its timeout on keep-alive connections whose request finished during the drain: in-flight responses answer <code>Connection: close</code> and connections are closed as they go idle (default <code>forceCloseConnections: \"idle\"</code>), so later connectors still shut down. Active responses are never cut short (WR-014)."
+            },
+            {
+              "type": "Fixed",
+              "html": "A <code>response.sse()</code> or <code>response.stream()</code> started after graceful shutdown began keeps the drain's <code>Connection: close</code>; its own <code>Connection: keep-alive</code> used to override it and hold <code>close()</code> until the shutdown timeout."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>response.sse()</code> removes line breaks and NUL from event names and ids, and writes a multi-line <code>comment()</code> as one comment line per line, so values built from user input cannot inject SSE fields or events."
+            },
+            {
+              "type": "Fixed",
+              "html": "An <code>onDisconnect</code> handler on <code>response.sse()</code> or <code>response.stream()</code> that throws is logged and no longer crashes the process or skips the handlers after it."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock.config.ts</code> loads when it imports local TypeScript without an extension (<code>./src/connectors/local</code>) or through a tsconfig <code>paths</code> alias, on Node without native TypeScript and with native type stripping alike. The fallback bundles the config's local graph with esbuild, keeps packages external (one <code>BaseConnector</code>/container identity), runs the config once, rethrows its own errors unchanged, keeps each inlined module's <code>import.meta.url</code>, and removes its temp file (WR-004)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>v.file()</code> rule methods (<code>maxSize</code>, <code>image</code>, <code>accept</code>, <code>mimeType</code>, …) return <code>this</code>, so the <code>UploadedFile</code> output type survives the chain; <code>saveTo()</code> is typed as a <code>string</code> output (WR-020)."
+            },
+            {
+              "type": "Fixed",
+              "html": "The dev server and the HTTP test server register module <code>src/app/&lt;module&gt;/utils/locales.json</code> dictionaries at boot; they were left out of the boot file set, so <code>t()</code> printed raw keys until the file was edited (FW-02)."
+            },
+            {
+              "type": "Fixed",
+              "html": "The HTTP test server no longer keeps Vitest's main process alive after teardown: the loader-hook <code>MessagePort</code> is unreferenced except while a version-bump flush waits for its acknowledgement (FW-05)."
+            },
+            {
+              "type": "Fixed",
+              "html": "A quoted config key (<code>\"machine-thumb\"</code>, <code>'single-quoted'</code>) is written to <code>.warlock/typings/config.d.ts</code> without its quotes, so the generated file stays valid TypeScript; computed keys are skipped, and a quoted storage driver name is no longer quoted twice (FW-06). The typings manifest now records its generator version, and a manifest written by an older version is discarded, so a <code>config.d.ts</code> broken by 5.29 is regenerated on the first boot after upgrading instead of only when a config file changes."
+            },
+            {
+              "type": "Fixed",
+              "html": "The circular-dependency check no longer reports a file as importing itself because a comment mentions <code>import(\"./same-file\")</code>: the regex fallback ignores comments and self imports are not dependency edges (FW-13). Comments are found with the TypeScript parser, so a regex literal such as <code>/\\/*$/</code> or <code>//</code> inside JSX text is never mistaken for one and the imports after it are kept. A pure <code>export type { X } from</code> re-export adds no dependency edge on either parsing path."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add web</code>'s <code>src/web/root.tsx</code> stub notes that <code>&lt;Head /&gt;</code> renders the viewport tag (<code>metadata.viewport</code> changes or disables it) and does not hand-write a second one (FW-03)."
+            },
+            {
+              "type": "Fixed",
+              "html": "Mail logs no longer print recipient addresses: send, development, test-mode, partial-rejection and error lines show <code>m***@example.com</code> (FW-04). <code>MailResult</code> and a thrown <code>MailError</code> still carry the real addresses."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>http.rateLimit</code> had no way to share counts between processes except an ioredis client, which the node-redis connection of <code>@warlock.js/cache</code> cannot provide (FW-14)."
+            },
+            {
+              "type": "Fixed",
+              "html": "Request log snapshots mask credential query parameters (<code>code</code>, <code>signature</code>, <code>sig</code>, <code>X-Amz-*</code>, <code>X-Goog-*</code>, the logger's secret keys and <code>http.logging.redactQueryParams</code>) in the parsed <code>query</code> too, not only in <code>url</code>; OAuth authorization codes no longer reach log lines. New <code>redactQueryCredentials()</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock.config.ts</code> fallback: a catch-all tsconfig <code>paths</code> pattern (<code>\"*\": [\"./types/*\"]</code>) no longer inlines packages into the config bundle; an alias is inlined only when it resolves outside <code>node_modules</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock.config.ts</code> fallback: <code>import.meta.url</code>/<code>dirname</code>/<code>filename</code> are replaced only where they are real expressions, so the same words inside a string or comment no longer break or alter the bundled config."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock.config.ts</code> fallback runs only for the config's own unresolved relative or aliased imports (not for a package that is not installed, or a module missing inside <code>node_modules</code>), and also when native type stripping refuses the TypeScript (<code>ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX</code>, <code>ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING</code>). A loading error in the bundled config names <code>warlock.config.ts</code> instead of the temporary module."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add image</code> on pnpm 9 and 10.0–10.4 no longer creates a settings-only <code>pnpm-workspace.yaml</code> (<code>packages field missing or empty</code>): the sharp approval goes where the installed pnpm reads it (<code>package.json</code> <code>pnpm.onlyBuiltDependencies</code> before 10.5, the workspace's <code>onlyBuiltDependencies</code> on 10.5–10.25, <code>allowBuilds</code> from 10.26). Inside a parent pnpm workspace no per-app file is written."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 20,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 6
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 9
+            },
+            {
+              "type": "Security",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>&lt;Form query={{ … }}&gt;</code> sets the query string of the URL the form posts to (the current page, or <code>to</code>'s page), without touching the body or the named <code>action</code> (WR-011)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>&lt;Form independent&gt;</code> submits alongside a pending submission instead of sharing it: a Cancel next to a long-running Start. Neither aborts the other; a double submit of the same form with the same fields still shares one request, another form posting the same action (a Cancel per row) never does, and unmounting a form cancels only its own submission. Its result, redirect included, is dropped once the user has moved to another page (WR-013)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>LinkPropsWithout&lt;K&gt;</code> and <code>DistributiveOmit&lt;T, K&gt;</code>: omit props from <code>LinkProps</code> without collapsing its destination union, so a wrapper keeps the required-params check (WR-021)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>isRouteName(name)</code> narrows a data-driven string to a route name after checking the published route table, so it reaches <code>&lt;Link to&gt;</code> or <code>href()</code> without a cast (WR-021)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>metadata.viewport</code> (<code>string | false</code>). <code>&lt;Head /&gt;</code> now emits <code>&lt;meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"&gt;</code> by default, so a new app lays out at device width on phones; a <code>meta</code> entry named <code>viewport</code> is still honoured. Like the charset it is document-level: client navigation never rewrites it, nor a viewport tag <code>root.tsx</code> writes itself (FW-03)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>webConnector({ build: { testOnly } })</code>: app-root-relative folders or files the production build's page-graph scan skips (FW-15)."
+            },
+            {
+              "type": "Changed",
+              "html": "A page action that redirects now ends its submission once the redirected page is on screen: <code>useIsSubmitting()</code> stays <code>true</code> and <code>onSuccess</code> waits until the destination's fresh loader data has committed, so a revision-guarded form cannot resubmit stale data (WR-002)."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>useIsSubmitting()</code> is <code>true</code> while any submission is in flight, including independent ones."
+            },
+            {
+              "type": "Changed",
+              "html": "A production start no longer loads Vite, Rollup or <code>@babel/parser</code>: the web connector imports its Vite dev-server config, page-registry plugin, dev route installer, dev 404 reporter and the sitemap's page-walk fallback only on the development path, so its static graph shrinks from 185 to 67 modules (WR-027)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>&lt;Form&gt;</code> honours the submit button's <code>formAction</code> and its <code>name</code>/<code>value</code>. The enhanced path posted to the form's URL; with no navigation runtime the fallback called <code>form.submit()</code>, which dropped both. Without a runtime the browser now submits natively, and a late fallback re-submits through the same button (WR-011)."
+            },
+            {
+              "type": "Fixed",
+              "html": "A page request the client abandoned before its loaders finished no longer renders: it stops with <code>ClientDisconnectedError</code> before anything is committed, and the page handler neither reports it nor writes a response. It used to render layouts without their loader data and log a 500. A loader timeout on a connected request still renders its 504 (WR-016)."
+            },
+            {
+              "type": "Fixed",
+              "html": "A 4xx error page (a thrown <code>ForbiddenError</code>/<code>BadRequestError</code>, a failed page validation) now hydrates. The client payload gate accepted only 500–599 and only <code>name</code>/<code>message</code>/<code>stack</code>, so it refused the 4xx status, the validation <code>errors</code> and the production <code>errorCode</code> the server sends, and logged \"hydration payload … could not be read\" (FW-01)."
+            },
+            {
+              "type": "Fixed",
+              "html": "The production build's <code>import.meta.url</code> / static-asset scan skips <code>*.spec.*</code> and <code>*.test.*</code> files and <code>__tests__</code> / <code>__mocks__</code> folders; a test helper under <code>src/web</code> no longer fails <code>warlock build</code> (FW-15)."
+            },
+            {
+              "type": "Fixed",
+              "html": "Web's React contexts (locale, document, session) live in one <code>Symbol.for</code> registry on <code>globalThis</code>, so a second evaluation of their module under <code>warlock dev</code> reuses them instead of making <code>useLocale()</code> throw \"called outside Warlock's LocaleProvider\" until restart (FW-07)."
+            },
+            {
+              "type": "Fixed",
+              "html": "A request abandoned between the layout and page loaders no longer renders the page with <code>data</code> undefined; covered by the abandoned-request fix above, with a regression test for this case (FW-08)."
+            },
+            {
+              "type": "Fixed",
+              "html": "An abandoned page request still reports a genuine failure (a loader or session-resolver bug) that happened before the disconnect; only failures the abort itself caused stay silent."
+            },
+            {
+              "type": "Fixed",
+              "html": "An independent submission no longer draws the page the user left over the page a navigation already in flight committed, and a page swap no longer leaves another operation's pending commit unresolved, which could keep <code>useIsNavigating()</code> true and hang a redirect's wait."
+            },
+            {
+              "type": "Fixed",
+              "html": "The FW-15 test-folder skip reads folder names below the web root, so an app located under a <code>__tests__</code> folder is still scanned."
+            },
+            {
+              "type": "Security",
+              "html": "A redirect target is followed or emitted only when it is relative or <code>http:</code>/<code>https:</code>. <code>response.redirect()</code> in a loader or action throws for <code>javascript:</code>, <code>data:</code> and other schemes (and for control characters), so <code>redirect(request.input(\"next\"))</code> can no longer send script to the browser; the client refuses such an <code>x-warlock-redirect</code> header and never hands one to <code>window.location.assign()</code>."
+            },
+            {
+              "type": "Security",
+              "html": "<code>&lt;Form&gt;</code> enhances only same-origin <code>http(s)</code> targets. A submit button whose <code>formaction</code> names another origin is posted natively instead of being fetched, so the page never trusts another origin's redirect header or page payload."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 13,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 6
+            },
+            {
+              "type": "Fixed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>TypedValidationResult&lt;T&gt;</code> and <code>ValidatedOutput&lt;T&gt;</code> types."
+            },
+            {
+              "type": "Added",
+              "html": "<code>pnpm bench:types</code> measures inference compile cost on a generated composed-schema project (16 entities, 8 services) and fails when instantiations or types grow more than 5% over <code>bench/types-baseline.json</code> (WR-001). It also fails when it cannot read a metric or is given a malformed option, warns when the TypeScript version differs from the baseline's (<code>--strict</code> makes that a failure), and removes its temporary project on Ctrl+C."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>validate()</code> takes <code>data: unknown</code> instead of <code>any</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>Infer.Input</code>/<code>Infer.Output</code> of an object is one flat object type instead of an intersection of its optional and required halves; the shape is unchanged and compile cost moves by 0.1%."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>pnpm typecheck</code> now also checks the <code>expectTypeOf</code> assertions in <code>tests/unit/types/</code> (<code>tsconfig.typecheck.json</code>); they were never enforced before."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>.refine()</code> callbacks stay <code>value: any</code> on purpose: custom rules run before an object or array validates its children, so the value is not the schema output (WR-020)."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Behaviour change:</strong> <code>v.union([...])</code> now checks a present empty value (<code>\"\"</code>) against its members instead of accepting it unchecked; a missing key is still the required/<code>.optional()</code> question. <code>v.union([v.literal(\"x\"), v.int()]).present()</code> now rejects <code>\"\"</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>validate()</code> keeps the typed output of <code>v.record(...)</code> (<code>Record&lt;string, …&gt;</code>); only an index signature over <code>any</code>/<code>unknown</code> (the wide <code>Schema</code>) stays <code>any</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>v.literal(\"\")</code> accepts a present <code>\"\"</code> again (regressed in 5.25): its default (implicit) required state and <code>.present()</code> keep it, <code>.optional()</code> and <code>.nullable()</code> no longer drop it. An explicit <code>.required()</code> or <code>requiredIf(...)</code> still rejects <code>\"\"</code>. A literal set without a blank value still reads <code>\"\"</code> as missing (WR-008)."
+            },
+            {
+              "type": "Fixed",
+              "html": "A field with an empty default (<code>v.string().max(n).default(\"\")</code>) no longer fails \"is required\" when the input omits it, sends <code>null</code>, or sends a blank string (an untouched HTML input); the output is the default (WR-008)."
+            },
+            {
+              "type": "Fixed",
+              "html": "A <code>null</code> default no longer satisfies \"required\" on a field that is not <code>.nullable()</code>, and an empty default of the wrong type (<code>v.int().default(\"\")</code>) now fails the type rule instead of being returned unchecked."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>v.discriminatedUnion(...).optional()</code> accepts an absent, <code>undefined</code> or <code>null</code> field, as every other validator does; <code>.default(...)</code> replaces <code>null</code> too and is validated through its branch. A required union reports a missing or <code>null</code> field with the <code>required</code> error; <code>.nullable()</code> keeps <code>null</code> (WR-007)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>schema[\"~standard\"].validate(...)</code> on a discriminated union resolves to the branch output union instead of <code>unknown</code> (WR-020)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 10,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 4
+            },
+            {
+              "type": "Fixed",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>log.onChannelError(handler)</code> / <code>configure({ onChannelError })</code> and the <code>ChannelErrorHandler</code> type: receives a channel's sync throw or async rejection from <code>log()</code>, a redaction that threw, or a timed-out <code>flush()</code>. Default: one stderr line. The handler may be async; a rejection is swallowed."
+            },
+            {
+              "type": "Added",
+              "html": "<code>maskEmail(address)</code> and <code>maskEmailsInText(text)</code>: mask email addresses (<code>m***@example.com</code>) inside message strings and cache keys, which key-based redaction cannot reach. Core's mail logs and the cache drivers' key logs use them (FW-04)."
+            },
+            {
+              "type": "Changed",
+              "html": "Logging is fire-and-forget: level methods no longer return a promise, so <code>@typescript-eslint/no-floating-promises</code> no longer flags every call site (WR-019)."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>log.flush()</code> drains every channel concurrently: each waits for its own in-flight async deliveries (including entries logged while the flush runs), then runs its <code>flush()</code>, so a hung network channel no longer holds up the file channel."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>log.flush({ timeout })</code> is bounded: it resolves after <code>timeout</code> ms (default 5000, <code>DEFAULT_FLUSH_TIMEOUT_MS</code>; <code>Infinity</code> waits without a limit) and reports each channel still draining to the channel error handler. Before, one delivery that never settled made <code>flush()</code> (and a graceful shutdown awaiting it) wait forever."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>maskEmailsInText</code> cuts text longer than <code>MASK_EMAILS_MAX_LENGTH</code> (16,384 characters) and marks the cut, so masking a huge cache key or message has a bounded cost."
+            },
+            {
+              "type": "Fixed",
+              "html": "A channel whose <code>log()</code> rejected became an unhandled rejection (looping through <code>captureAnyUnhandledRejection</code>), and one that threw synchronously stopped delivery to the channels after it; both are now isolated and reported to the channel error handler."
+            },
+            {
+              "type": "Fixed",
+              "html": "A redaction that threw (a <code>censor</code> function that fails on an unexpected value) threw at the call site and skipped the remaining channels. A channel's own redaction failure is now isolated like any channel failure; a logger-wide one drops the entry (it is never delivered unredacted) and is reported to the channel error handler."
+            },
+            {
+              "type": "Fixed",
+              "html": "An async <code>onChannelError</code> handler that rejected became an unhandled rejection."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Security:</strong> <code>maskEmailsInText</code> backtracked quadratically on long runs of address-like characters with no domain (about 11 s on 75 KB), and it runs on cache keys built from request input. Its pattern is now bounded and linear. It also masks addresses with letters from any script (<code>jöhn@exämple.de</code>), and <code>maskEmail</code> no longer keeps half of a surrogate pair."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 9,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 7
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>Provider content blocks</strong>: <code>ProviderContentBlock</code> (<code>{ provider, type, data }</code>) on <code>ModelResponse.blocks</code>, the streaming <code>done</code> chunk, <code>Message.blocks</code>, <code>CapturedMessage.blocks</code>, <code>LLMTrip.blocks</code> and <code>AgentResult.blocks</code>. The agent copies a response's blocks onto the assistant turn so the adapter can replay it verbatim (thinking, compaction) (WR-022)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>FinishReason</code> values <code>context_exceeded</code>, <code>pause_turn</code> and <code>refusal</code>. The agent resumes a <code>pause_turn</code> by replaying the paused turn, within <code>maxTrips</code> (WR-023)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>toolDispatch: \"concurrent\" | \"sequential\"</code> on <code>AgentConfig</code> and <code>AgentExecuteOptions</code> (<code>ToolDispatchMode</code>), concurrent by default (WR-024)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>maxConcurrentTools</code> on <code>AgentConfig</code> and <code>AgentExecuteOptions</code> (default <code>4</code>): the cap on a trip's tool calls running at once, so a model (or a prompt injected into its context) cannot start an unbounded number of tool calls in one turn."
+            },
+            {
+              "type": "Added",
+              "html": "<code>mapWithConcurrency(items, limit, mapper)</code> utility: an order-preserving <code>Promise.all</code> with a concurrency cap."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ModelCallOptions.providerOptions</code> (adapter-only options keyed by wire format) and <code>cacheControl.ttl</code> (<code>\"5m\" | \"1h\"</code>) (WR-025)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>MockModelResponse.blocks</code> for scripting provider blocks in tests."
+            },
+            {
+              "type": "Fixed",
+              "html": "The semantic cache no longer stores a paused (<code>pause_turn</code>) turn as a final answer, and stores a resumed turn whole (every segment), not only its last segment."
+            },
+            {
+              "type": "Fixed",
+              "html": "VCR request hashes include <code>providerOptions</code>, so two calls that differ only in provider options (betas, <code>context_management</code>, …) no longer replay the same recording. It joins the hash only when a provider entry carries a value — <code>{}</code>, <code>{ anthropic: {} }</code> and <code>{ anthropic: { betas: undefined } }</code> hash like no <code>providerOptions</code> — so existing cassettes recorded without it still match. <code>cacheControl</code> (breakpoints, <code>ttl</code>) stays out of the hash: it changes billing, not output (WR-025)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 9,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Responses with thinking, redacted-thinking, compaction, server-tool or cited-text blocks return the whole ordered turn as <code>ModelResponse.blocks</code> (and on the streaming <code>done</code> chunk); an assistant message carrying Anthropic <code>blocks</code> is replayed verbatim (WR-022)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>providerOptions.anthropic</code> (<code>AnthropicCallOptions</code>): <code>betas</code> routes the call through <code>client.beta.messages</code>, <code>body</code> merges extra request fields last (<code>context_management</code>, <code>fallbacks</code>, <code>inference_geo</code>, …), <code>thinkingDisplay</code> sets <code>thinking.display</code> (WR-025)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>AnthropicModel.countTokens(messages, options?)</code> counts input tokens through <code>messages.countTokens</code>; <code>AnthropicModel</code> is exported and <code>AnthropicSDK.model()</code> returns it (WR-025)."
+            },
+            {
+              "type": "Added",
+              "html": "Per-call <code>cacheControl.ttl</code> overrides the model's <code>promptCacheTtl</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "Consecutive tool results are sent as one <code>user</code> message with several <code>tool_result</code> blocks, as Anthropic expects for parallel tool use (WR-024)."
+            },
+            {
+              "type": "Changed",
+              "html": "Claude 5-family thinking rules: Opus 5.5, Sonnet 5.5 and Fable 5 / 5.1 never receive <code>budget_tokens</code> or <code>disabled</code> (WR-026)."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>effort: \"none\"</code> on Claude Sonnet 5.5 sends <code>thinking: { type: \"between_tools\" }</code> (its only thinking-off form, sent alone with no <code>output_config.effort</code> or <code>display</code>); it used to omit <code>thinking</code>, so the model still thought at its default effort. Opus 5.5 and Fable 5 / 5.1 have no thinking-off form and keep omitting <code>thinking</code> (WR-026)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>providerOptions.anthropic.thinkingDisplay</code> is applied only to adaptive thinking, so it is never sent beside <code>between_tools</code> (a 400)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Security:</strong> a stored block is replayed only when its <code>data.type</code> equals its declared <code>type</code> and the type is one Claude returns on an assistant turn (text, thinking, redacted thinking, tool use, server-tool use and results, MCP, container upload, compaction). A transcript from outside the process can no longer smuggle a <code>tool_use</code> or user-side block past the tool-id check; such turns are rebuilt from <code>content</code> + <code>toolCalls</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 9,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 6
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>exec()</code> takes a per-call <code>signal</code> (<code>ExecOptions</code>); <code>run_shell</code> and <code>run_tests</code> pass the agent run's <code>ctx.signal</code>. An already-aborted signal never starts the command; an abort mid-run kills the process tree. Both resolve with the new <code>cancelled: true</code> on <code>RunShellResult</code>, never together with <code>timedOut</code> (WR-010)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>WorkspaceBackendExecOptions.signal</code> and <code>WorkspaceBackendExecResult.cancelled?</code> for custom backends; the local backend removes its abort listener when the command settles, and the mock backend honours a pre-aborted signal."
+            },
+            {
+              "type": "Added",
+              "html": "Read results carry <code>startLine</code>, <code>endLine</code>, <code>truncated</code>, <code>bytesCapped</code> and <code>totalBytes</code>; <code>readFile()</code> and the <code>read_file</code> tool now return the same <code>ReadFileResult</code> for the same arguments."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>read.maxBytes</code> is enforced: the returned <code>content</code> (line-number prefixes and newlines included) never exceeds it, so a single long line no longer bypasses the cap. Lines are cut on a character boundary, never mid-character; <code>hash</code> remains the SHA-256 of the whole file (WR-009)."
+            },
+            {
+              "type": "Fixed",
+              "html": "Command output clipped at <code>shell.maxOutputBytes</code> is cut on a character boundary instead of ending in a replacement character."
+            },
+            {
+              "type": "Fixed",
+              "html": "A read window past the end of the file returns empty <code>content</code> instead of one numbered empty line."
+            },
+            {
+              "type": "Fixed",
+              "html": "Writes, edits and removes of the same path are serialized, so two concurrent <code>edit_file</code> calls (the agent now dispatches a trip's tool calls concurrently) can no longer both pass the stale-hash guard and silently drop one edit; the second re-reads and is rejected as stale, or applies on top when it pinned no hash."
+            },
+            {
+              "type": "Fixed",
+              "html": "Aborting a command after it has already exited (while its stdio is still draining) no longer reports it as <code>cancelled</code>; the tree is still reaped so the result settles."
+            },
+            {
+              "type": "Fixed",
+              "html": "On Windows, a <code>taskkill</code> that cannot be started no longer crashes the process with an unhandled <code>'error'</code> event; the direct child is killed instead."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Email addresses inside logged cache keys are masked (<code>user.member@example.com</code> logs as <code>u***@example.com</code>), in the base driver's operation log, in error lines (written even with logging off: SWR refresh failures, lock release, clone failures), in the \"Cannot increment non-numeric value\" error, and in the null driver (FW-04)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>redis</code> driver <code>increment()</code> works on Redis 6.</strong> With a default <code>ttl</code> configured it ran <code>EXPIRE … NX</code>, which only Redis 7+ accepts: on Redis 6 the call threw after the count had already gone up, which silently disabled login throttles and the cache-backed rate limiter. The increment and the default TTL are now applied together by one Lua script, and a TTL the counter already has is never shortened."
+            },
+            {
+              "type": "Fixed",
+              "html": "The default <code>increment()</code> (file and null drivers) reads a counter's value and deadline in one read. A counter that expired between two separate reads used to be rewritten from its stale value with no expiry at all, and every increment rounded the remaining TTL up, pushing the deadline up to a second later each time."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>file</code> driver: an entry stored without a TTL (its <code>expiresAt</code> is written to JSON as <code>null</code>) was read back by the internal entry reader as already expired, so <code>swr()</code> freshness checks and TTL-preserving writes treated it as missing."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Selecting notifications scaffolds the smaller, convention-following <code>src/app/notifications</code> module that <code>warlock add notifications</code> now writes (FW-09; see <code>@warlock.js/core</code>)."
+            },
+            {
+              "type": "Fixed",
+              "html": "New apps get the viewport tag from <code>&lt;Head /&gt;</code> (<code>@warlock.js/web</code> 5.30.0), so phones lay pages out at device width and responsive CSS applies; the scaffolded <code>src/web/root.tsx</code> says so and does not hand-write a second one (FW-03)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>pnpm before 10.5 could not install a new app</strong> (<code>ERROR packages field missing or empty</code>): pnpm 7–9 and 10.0–10.4 reject the settings-only <code>pnpm-workspace.yaml</code>. The scaffold now reads <code>pnpm --version</code> and writes approvals where that version reads them: no workspace file and <code>pnpm.onlyBuiltDependencies</code> in <code>package.json</code> before 10.5; the workspace file plus <code>onlyBuiltDependencies</code> on 10.5–10.25 (which ignore <code>allowBuilds</code>); the unchanged <code>allowBuilds</code> file on 10.26+, 11 and 12. It does not add <code>packages: [\".\"]</code>, which fails every later <code>pnpm add</code> on those versions (<code>ERR_PNPM_ADDING_TO_ROOT</code>). Feature approvals (sharp) follow the same rule; apps inside an existing workspace still get neither."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>The feature multiselect no longer prints stacked copies of itself</strong> in a short or narrow terminal: the 22-option list pages to the terminal's height, and each row's hint is shortened to fit one line (a wrapped row made clack redraw below the previous frame). The AI and agent-target multiselects use the same sizing. <code>@clack/prompts</code> is now <code>^0.8.2</code>, the first version whose multiselect pages."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<strong>The login throttle keys accounts and IPs by a keyed hash</strong> (<code>auth.throttle.count.email.&lt;hmac&gt;</code>, <code>auth.throttle.count.ip.&lt;hmac&gt;</code>) instead of the raw address or IP, so cache logs never show them. The HMAC key is derived from <code>auth.accessToken.secret</code> (as the OTP code MAC is), so a list of known addresses cannot reverse it; without a configured secret it falls back to SHA-256. The value is trimmed and lower-cased first, so <code>\" Sara@x.io\"</code> and <code>\"sara@x.io\"</code> share one bucket. Applies to <code>loginThrottleMiddleware</code> and every preset built on it (token issue/consume, OTP); a custom <code>identify</code> is used as is. <code>throttleIdentifierHash(kind, value)</code> is exported (FW-04)."
+            },
+            {
+              "type": "Changed",
+              "html": "A throttle lock stores its own deadline, so a cache driver with sliding expiration (<code>memoryExtended</code>) can no longer keep a retrying client locked past <code>lockoutDuration</code>. Locks written by 5.29 (<code>true</code>) are still honoured until they expire."
+            },
+            {
+              "type": "Changed",
+              "html": "The throttle warns once when the cache driver is <code>null</code>, which stores nothing, so the throttle can never lock."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>moveDirectoryNoReplaceAsync(from, to, { expectedSource?, syncParents? })</code> (also <code>fs.dirs.moveNoReplace</code>): moves a directory only when nothing holds the destination, refusing atomically instead of replacing an empty directory the way <code>rename()</code> does. It claims the name with an exclusive <code>mkdir</code>, renames over that placeholder, verifies the moved <code>(dev, ino)</code> and never falls back to copy + delete (WR-015)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>DirectoryMoveError</code> with <code>outcome</code> (<code>not-moved</code>: this call moved and replaced nothing / <code>moved</code> / <code>uncertain</code>), <code>reason</code>, and <code>placeholderCleanupError</code> when the empty placeholder it claimed could not be removed; <code>directoryIdentityAsync()</code> and the <code>DirectoryIdentity</code> type. When the source vanishes just before the rename the claim is released and the error is <code>not-moved</code> / <code>source-identity-mismatch</code>. The destination parent may be a symlink to a directory (macOS <code>/tmp</code>, a deploy <code>current</code> link). POSIX only: refuses explicitly on Windows and across filesystems."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Docs and skills point at the model path <code>warlock add notifications</code> writes since 5.30.0: <code>app/notifications/models/notification/notification.model</code> (FW-09)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/sitemap",
+          "slug": "sitemap",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Lockstep release; package APIs are unchanged."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.29.0",
       "id": "v5-29-0",
       "date": "October 1, 2026",
