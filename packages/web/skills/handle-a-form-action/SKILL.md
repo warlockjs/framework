@@ -199,3 +199,23 @@ with 422 before the action runs. `useSubmitForm` is for Core API routes; use
 `useSubmitAction` for a page action. Keep database uniqueness checks and any
 other server-only rule out of this shared schema: keep them server-side or
 split the browser-safe constraints into a shared schema.
+
+## Observe failures and cancellations
+
+```tsx
+<Form onSettled={outcome => {
+  if (outcome.type === "failed") setMessage(outcome.reason);
+  if (outcome.type === "dropped") setMessage("Submission cancelled");
+}}>
+  <button>Start</button>
+  <button data-independent>Cancel</button>
+</Form>
+```
+
+`onSettled` receives the exported `ActionSubmitOutcome` after existing success/error
+callbacks: `{ type: "success" }`, `{ type: "redirected", url }`,
+`{ type: "error", actionData }`, `{ type: "failed", reason }`, or `{ type: "dropped" }`.
+It runs for enhanced submissions, including cancellation and unmount; native
+browser submissions do not call it. A submit button with `data-independent`
+opts only that submission into independent mode. Unmarked buttons follow the
+form's `independent` prop.

@@ -2,6 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ActionSubmitOutcome } from "../client/navigation/action-submitter";
 import { connectActionSubmitter } from "../client/navigation/action-submitter";
 import { DocumentContext } from "./document-context";
 import { FieldError } from "./field-error";
@@ -21,7 +22,9 @@ function mount(node: React.ReactElement, actionData?: unknown) {
   const root = createRoot(container);
 
   act(() =>
-    root.render(createElement(DocumentContext.Provider, { value: documentValue(actionData) }, node)),
+    root.render(
+      createElement(DocumentContext.Provider, { value: documentValue(actionData) }, node),
+    ),
   );
 
   return { container, root };
@@ -66,6 +69,76 @@ describe("<Form>", () => {
     expect(submitter).toHaveBeenCalledTimes(1);
     expect((submitter.mock.calls[0] as unknown[])[1] instanceof FormData).toBe(true);
     expect(onSuccess).toHaveBeenCalled();
+  });
+
+  it.each<ActionSubmitOutcome>([
+    { type: "success" },
+    { type: "redirected", url: "/done" },
+    { type: "error", actionData: { errors: { email: "Required" } } },
+    { type: "failed", reason: "network" },
+    { type: "dropped" },
+  ])("settles $type submissions after their existing callback", async (outcome) => {
+    const order: string[] = [];
+    connectActionSubmitter(async () => outcome);
+    const onSettled = vi.fn(() => order.push("settled"));
+    const { container } = mount(
+      <Form
+        onSuccess={() => order.push("success")}
+        onError={() => order.push("error")}
+        onSettled={onSettled}
+      />,
+    );
+    await submit(container);
+    expect(onSettled).toHaveBeenCalledExactlyOnceWith(outcome);
+    expect(order).toEqual(
+      outcome.type === "success" || outcome.type === "redirected"
+        ? ["success", "settled"]
+        : outcome.type === "error"
+          ? ["error", "settled"]
+          : ["settled"],
+    );
+  });
+
+  it("opts only the marked submit button into independent submissions", async () => {
+    const submitter = vi.fn(async () => ({ type: "success" as const }));
+    connectActionSubmitter(submitter);
+    const { container } = mount(
+      <Form>
+        <button>Start</button>
+        <button data-independent>Cancel</button>
+      </Form>,
+    );
+    const buttons = container.querySelectorAll("button");
+    await act(async () => buttons[0].click());
+    await act(async () => buttons[1].click());
+    expect((submitter.mock.calls[0] as unknown[])[2]).toMatchObject({ independent: false });
+    expect((submitter.mock.calls[1] as unknown[])[2]).toMatchObject({
+      independent: true,
+      signal: expect.any(AbortSignal),
+    });
+  });
+
+  it("settles an independent submission dropped when its form unmounts", async () => {
+    connectActionSubmitter(
+      (_url, _data, options) =>
+        new Promise((resolve) => {
+          options?.signal?.addEventListener("abort", () => resolve({ type: "dropped" }), {
+            once: true,
+          });
+        }),
+    );
+    const onSettled = vi.fn();
+    const { container, root } = mount(<Form independent onSettled={onSettled} />);
+    await submit(container);
+    await act(async () => root.unmount());
+    expect(onSettled).toHaveBeenCalledExactlyOnceWith({ type: "dropped" });
+  });
+
+  it("does not settle submissions left to the native browser", async () => {
+    const onSettled = vi.fn();
+    const { container } = mount(<Form onSettled={onSettled} />);
+    await submit(container);
+    expect(onSettled).not.toHaveBeenCalled();
   });
 
   it("shares one request between a double submit", async () => {
@@ -139,15 +212,15 @@ describe("<Form>", () => {
     const form = container.querySelector("form")!;
     const button = container.querySelector("button")!;
     const redispatched: boolean[] = [];
-    const requestSubmit = vi
-      .spyOn(form, "requestSubmit")
-      .mockImplementation(function (this: HTMLFormElement) {
-        // What the browser does: a submit event, then (unprevented) the post.
-        const event = new Event("submit", { bubbles: true, cancelable: true });
+    const requestSubmit = vi.spyOn(form, "requestSubmit").mockImplementation(function (
+      this: HTMLFormElement,
+    ) {
+      // What the browser does: a submit event, then (unprevented) the post.
+      const event = new Event("submit", { bubbles: true, cancelable: true });
 
-        this.dispatchEvent(event);
-        redispatched.push(event.defaultPrevented);
-      });
+      this.dispatchEvent(event);
+      redispatched.push(event.defaultPrevented);
+    });
 
     await act(async () => {
       button.click();

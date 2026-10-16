@@ -48,7 +48,7 @@ export default function ContactPage() {
       <FieldError name="email" />
       <textarea name="message" defaultValue={result?.values?.message} />
       <FieldError name="message" />
-      {result?.formErrors.map(message => (
+      {result?.formErrors.map((message) => (
         <p role="alert" key={message}>
           {message}
         </p>
@@ -159,14 +159,14 @@ browser-safe schema.
 
 `useActionData<typeof action>()` returns `undefined` before any submit, otherwise:
 
-| Field | Meaning |
-|---|---|
-| `action` | `"default"` or the action name |
-| `status`, `ok` | HTTP status and whether it succeeded |
-| `data` | The action's returned value, or a failure helper's payload |
-| `errors` | Field name (dotted) to first message |
-| `formErrors` | A helper's `message`, plus messages for inputs without a field |
-| `values` | Submitted strings, echoed on failure only |
+| Field          | Meaning                                                        |
+| -------------- | -------------------------------------------------------------- |
+| `action`       | `"default"` or the action name                                 |
+| `status`, `ok` | HTTP status and whether it succeeded                           |
+| `data`         | The action's returned value, or a failure helper's payload     |
+| `errors`       | Field name (dotted) to first message                           |
+| `formErrors`   | A helper's `message`, plus messages for inputs without a field |
+| `values`       | Submitted strings, echoed on failure only                      |
 
 `values` never includes files, and omits names matching `web.forms.redactValues`. The default is `["password", "password_confirmation", "*token*", "*secret*"]`; `*` matches any run of characters. Set `forms.redactValues` in the `web` config to replace the list.
 
@@ -182,16 +182,16 @@ The action's `response` is buffered like a loader's, so `header()` and `cookie()
 
 ## Outcomes
 
-| Action result | No JS (native POST) | With JS (`<Form>`) |
-|---|---|---|
-| `redirect(url)` | `303` with `Location` (301/302 are rewritten to 303) | `204` with `x-warlock-redirect`; the client navigates there, external URLs hard-navigate |
-| Returns data | Loaders re-run, page renders `200` with `actionData` | Page data swaps in place, same URL |
-| Validation / failure helper | Page renders at `422` (or the helper's status) with `actionData` including `values` | `422`/4xx body of `actionData` only; the page tree is not swapped |
-| Throws | Error page through the normal boundary | Page stays; `routerEvents.onNavigationError` fires |
+| Action result               | No JS (native POST)                                                                 | With JS (`<Form>`)                                                                       |
+| --------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `redirect(url)`             | `303` with `Location` (301/302 are rewritten to 303)                                | `204` with `x-warlock-redirect`; the client navigates there, external URLs hard-navigate |
+| Returns data                | Loaders re-run, page renders `200` with `actionData`                                | Page data swaps in place, same URL                                                       |
+| Validation / failure helper | Page renders at `422` (or the helper's status) with `actionData` including `values` | `422`/4xx body of `actionData` only; the page tree is not swapped                        |
+| Throws                      | Error page through the normal boundary                                              | Page stays; `routerEvents.onNavigationError` fires                                       |
 
 ## `<Form>`
 
-`<Form>` renders a real `<form method="post">` with `encType` defaulting to `multipart/form-data`. Props: `action` (an action name, not a URL), `to` and `params` (post to another page's route by name), `query` (the query string of the URL it posts to), `independent`, `resetOnSuccess`, `onSuccess(outcome)`, `onError(actionData)`, and any other form attribute except `action` and `method`. If the navigation runtime is not connected, `<Form>` leaves the submit to the browser, which posts natively. A submit button whose `formaction` names another origin is always posted natively: the runtime only enhances same-origin targets.
+`<Form>` renders a real `<form method="post">` with `encType` defaulting to `multipart/form-data`. Props: `action` (an action name, not a URL), `to` and `params` (post to another page's route by name), `query` (the query string of the URL it posts to), `independent`, `resetOnSuccess`, `onSuccess(outcome)`, `onError(actionData)`, `onSettled(outcome)`, and any other form attribute except `action` and `method`. If the navigation runtime is not connected, `<Form>` leaves the submit to the browser, which posts natively. A submit button whose `formaction` names another origin is always posted natively: the runtime only enhances same-origin targets.
 
 A submit button's own `formAction` and its `name`/`value` are honoured on both paths, as the browser does: the button below posts to `/runs?mode=inspect` with `purpose=inspect` alongside the form's fields.
 
@@ -248,7 +248,9 @@ import { middleware } from "@warlock.js/core";
 
 export const config: PageConfig = {
   route: { path: "/contact", name: "contact" },
-  action: { middleware: [middleware.rateLimit({ max: 5, duration: 60_000, key: "user", guests: "ip" })] },
+  action: {
+    middleware: [middleware.rateLimit({ max: 5, duration: 60_000, key: "user", guests: "ip" })],
+  },
 };
 ```
 
@@ -257,3 +259,34 @@ The bucket is keyed on `request.locals.user.id`, so the page needs `pageSession(
 ## Middleware
 
 App, layout, and page middleware run before every action, so a page's auth guard protects its actions. `config.action.middleware` runs after those.
+
+### Observe every submission outcome
+
+`onSettled` runs after `onSuccess` or `onError` for every enhanced submission,
+including network failures and submissions dropped after cancellation, unmount,
+or a newer navigation. Native browser submissions have no enhanced outcome.
+The exported `ActionSubmitOutcome` union is:
+
+| `type`       | Other fields                                    | Existing callback     |
+| ------------ | ----------------------------------------------- | --------------------- |
+| `success`    | None                                            | `onSuccess(outcome)`  |
+| `redirected` | `url: string`                                   | `onSuccess(outcome)`  |
+| `error`      | `actionData: Readonly<Record<string, unknown>>` | `onError(actionData)` |
+| `failed`     | `reason: string`                                | None                  |
+| `dropped`    | None                                            | None                  |
+
+```tsx
+<Form
+  onSettled={(outcome) => {
+    if (outcome.type === "failed") setMessage(outcome.reason);
+    if (outcome.type === "dropped") setMessage("Submission cancelled");
+  }}
+>
+  <button>Start</button>
+  <button data-independent>Cancel</button>
+</Form>
+```
+
+The presence of `data-independent` on a submit button opts that submission into
+independent mode. Other buttons follow the form's `independent` prop. The same
+form-instance deduplication and unmount cancellation apply to marked buttons.

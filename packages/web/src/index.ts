@@ -290,6 +290,7 @@ export { useIsNavigating } from "./client/navigation/use-is-navigating";
 export { useIsSubmitting } from "./client/navigation/submitting-store";
 export { Form } from "./components/form";
 export type { FormProps } from "./components/form";
+export type { ActionSubmitOutcome } from "./client/navigation/action-submitter";
 export { useActionData } from "./components/use-action-data";
 export type { ActionData } from "./components/use-action-data";
 export { FieldError } from "./components/field-error";

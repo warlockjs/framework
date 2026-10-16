@@ -8,7 +8,10 @@ import type { RouteQuery } from "../routing/route-table";
 import { DocumentContext } from "./document-context";
 import { fieldErrorId } from "./field-error";
 
-export type FormProps = Omit<FormHTMLAttributes<HTMLFormElement>, "action" | "method" | "onError"> & {
+export type FormProps = Omit<
+  FormHTMLAttributes<HTMLFormElement>,
+  "action" | "method" | "onError"
+> & {
   /** The NAME of a page action (sent as hidden `_action`), not a URL. */
   action?: string;
   /** Another page's route name; its action is resolved with `href()`. */
@@ -33,6 +36,12 @@ export type FormProps = Omit<FormHTMLAttributes<HTMLFormElement>, "action" | "me
   resetOnSuccess?: boolean;
   onSuccess?: (outcome: ActionSubmitOutcome) => void;
   onError?: (actionData: Readonly<Record<string, unknown>>) => void;
+  /**
+   * Called after every enhanced submission outcome, after onSuccess/onError:
+   * success, redirected (url), error (actionData), failed (reason), or dropped
+   * (superseded, aborted, navigated away, or unmounted). Native submissions do not call it.
+   */
+  onSettled?: (outcome: ActionSubmitOutcome) => void;
 };
 
 type Submitter = HTMLElement & { form?: HTMLFormElement | null };
@@ -65,8 +74,7 @@ function canEnhance(target: string): boolean {
   }
 
   return (
-    (url.protocol === "http:" || url.protocol === "https:") &&
-    url.origin === window.location.origin
+    (url.protocol === "http:" || url.protocol === "https:") && url.origin === window.location.origin
   );
 }
 
@@ -101,14 +109,14 @@ export function Form({
   resetOnSuccess,
   onSuccess,
   onError,
+  onSettled,
   onSubmit,
   children,
   ...rest
 }: FormProps): ReactElement {
   const ref = useRef<HTMLFormElement>(null);
   const actionData = useContext(DocumentContext)?.payload.actionData as
-    | { errors?: Record<string, string> }
-    | undefined;
+    { errors?: Record<string, string> } | undefined;
   const errors = actionData?.errors;
 
   // Wire aria on errored inputs after render; `<FieldError>` owns the message id.
@@ -177,13 +185,16 @@ export function Form({
 
     let signal: AbortSignal | undefined;
 
-    if (independent) {
+    const independentSubmission =
+      independent === true || submitter?.hasAttribute("data-independent") === true;
+
+    if (independentSubmission) {
       independentController.current ??= new AbortController();
       signal = independentController.current.signal;
     }
 
     const outcome = await submitAction(target, new FormData(form, submitter), {
-      independent: independent === true,
+      independent: independentSubmission,
       signal,
       dedupeKey: instanceKey.current,
     });
@@ -196,13 +207,17 @@ export function Form({
       return;
     }
 
-    if (outcome.type === "success") {
-      if (resetOnSuccess) form.reset();
-      onSuccess?.(outcome);
-    } else if (outcome.type === "redirected") {
-      onSuccess?.(outcome);
-    } else if (outcome.type === "error") {
-      onError?.(outcome.actionData);
+    try {
+      if (outcome.type === "success") {
+        if (resetOnSuccess) form.reset();
+        onSuccess?.(outcome);
+      } else if (outcome.type === "redirected") {
+        onSuccess?.(outcome);
+      } else if (outcome.type === "error") {
+        onError?.(outcome.actionData);
+      }
+    } finally {
+      onSettled?.(outcome);
     }
   }
 
