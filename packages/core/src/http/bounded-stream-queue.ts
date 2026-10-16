@@ -35,6 +35,7 @@ export function createBoundedStreamQueue(
   const waiters = new Set<(drained: boolean) => void>();
   let bytes = 0;
   let ending = false;
+  let dropped = 0;
   let onFinished: (() => void) | undefined;
 
   function settle(drained: boolean) {
@@ -73,6 +74,9 @@ export function createBoundedStreamQueue(
   raw.once("close", close);
 
   return {
+    get dropped() {
+      return dropped;
+    },
     get ending() {
       return ending;
     },
@@ -80,10 +84,13 @@ export function createBoundedStreamQueue(
       return pending.length > 0 || transport.backpressured;
     },
     enqueue(data: string | Uint8Array): boolean {
+      if (typeof data !== "string" && !(data instanceof Uint8Array))
+        throw new TypeError("Stream data must be a string or Uint8Array");
       if (ending || transport.closed) return false;
       const size = typeof data === "string" ? Buffer.byteLength(data) : data.byteLength;
       if (bytes + (raw.writableLength ?? 0) + size > limit) {
-        if (options.onOverflow !== "drop") {
+        if (options.onOverflow === "drop") dropped++;
+        else {
           transport.disconnect();
           close();
           raw.destroy();

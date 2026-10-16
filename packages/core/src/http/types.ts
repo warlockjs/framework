@@ -521,7 +521,8 @@ export type ResponseStreamController = {
   /**
    * Send data and wait until the transport can take more. Resolves `true`
    * when it can, `false` when the stream ended or the client disconnected —
-   * stop producing then.
+   * stop producing then. In drop mode, true means the stream is ready to continue;
+   * inspect dropped to detect rejected output and schedule a resync.
    */
   write: (data: string | Uint8Array) => Promise<boolean>;
   /**
@@ -551,6 +552,8 @@ export type ResponseStreamController = {
    * Whether the transport is currently holding more than its high-water mark.
    */
   backpressured: boolean;
+  /** Chunks/events/comments rejected by onOverflow: "drop", including send/write/render paths. */
+  readonly dropped: number;
   /**
    * Detect whether stream is ended (by `end()` or a client disconnect)
    */
@@ -601,7 +604,8 @@ export type ResponseSSEController = {
   /**
    * Send an SSE event and wait until the transport can take more.
    * Resolves `true` when it can, `false` when the stream ended or the client
-   * disconnected — stop producing then.
+   * disconnected — stop producing then. In drop mode, true means ready to continue;
+   * inspect dropped to detect rejected output and schedule a resync.
    */
   write: (
     event: string | undefined,
@@ -624,6 +628,8 @@ export type ResponseSSEController = {
    * Whether the transport is currently holding more than its high-water mark.
    */
   backpressured: boolean;
+  /** Chunks/events/comments rejected by onOverflow: "drop", including send/write/render paths. */
+  readonly dropped: number;
   /**
    * Send a comment to keep the connection alive (invisible to client)
    */

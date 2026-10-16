@@ -335,14 +335,20 @@ string data and emits one safe `data:` line per input line. Event/id line breaks
 and NUL are removed, so raw data cannot inject event fields.
 
 Both `sse({ headers })` and `stream(contentType, { headers })` apply caller headers
-before flushing; a Cache-Control set on the response is respected unless the
-options explicitly override it. Existing defaults apply when neither supplies it.
+before flushing. Cache-Control keeps the safe stream default unless explicitly
+set in options.headers; a pre-existing global cache header does not override it.
+Protocol headers are protected: Content-Length is removed, SSE fixes its content
+type and removes caller Transfer-Encoding, and graceful drain forces Connection: close.
 
 Use synchronous `enqueue()` for event-bus producers. It returns false when closed
 or overflowing. The byte cap includes queued UTF-8 data and Node's unsent buffer.
 It defaults to 1 MiB for enqueue; `onOverflow: "disconnect"` aborts the signal and
 runs disconnect cleanup, while `"drop"` rejects the newest chunk so the producer
-can schedule a resync. Choosing maxQueuedBytes also bounds send/write/render and
+can schedule a resync. Every drop increments controller.dropped, including drops
+from send/write/render/comments. write() still returns false only when ended or
+disconnected; true means ready to continue, so inspect dropped when using drop
+mode. A single event exceeding the byte cap is always rejected (and disconnects
+in the default overflow mode). Choosing maxQueuedBytes also bounds send/write/render and
 SSE comments; using enqueue switches subsequent writes on that controller into
 bounded mode. `drain()` waits for both queues. `end()` stops accepting new output
 and flushes already accepted queued output before ending. Without a byte cap or

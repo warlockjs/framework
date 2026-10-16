@@ -686,13 +686,13 @@ export class Response {
     options: ResponseStreamOptions = {},
   ): ResponseStreamController {
     validateStreamQueueOptions(options);
-    // Set headers using the response API
+    this.header("Cache-Control", "no-cache");
+    this.headers(options.headers ?? {});
+    this.removeHeader("Content-Length");
     this.setContentType(contentType);
     this.header("Transfer-Encoding", "chunked");
-    if (!this.getHeader("Cache-Control")) this.header("Cache-Control", "no-cache");
-    this.keepLongLivedConnectionAlive();
     this.header("X-Content-Type-Options", "nosniff");
-    this.headers(options.headers ?? {});
+    this.keepLongLivedConnectionAlive();
 
     // Trigger sending events
     Response.trigger("sending", this);
@@ -763,7 +763,9 @@ export class Response {
        * stream ended or the client disconnected (stop producing).
        */
       write: (data: any): Promise<boolean> => {
-        if (transport.closed || queue.ending || !writeChunk(data)) return Promise.resolve(false);
+        if (transport.closed || queue.ending) return Promise.resolve(false);
+
+        writeChunk(data);
 
         return queue.waitForDrain();
       },
@@ -841,6 +843,10 @@ export class Response {
        */
       get backpressured() {
         return queue.backpressured;
+      },
+
+      get dropped() {
+        return queue.dropped;
       },
 
       /**
@@ -930,13 +936,13 @@ export class Response {
    */
   public sse(options: ResponseSSEOptions = {}): ResponseSSEController {
     validateStreamQueueOptions(options);
-    // Set SSE-specific headers
-    this.setContentType("text/event-stream");
-    if (!this.getHeader("Cache-Control"))
-      this.header("Cache-Control", "no-cache, no-store, must-revalidate");
-    this.keepLongLivedConnectionAlive();
-    this.header("X-Accel-Buffering", "no"); // Disable nginx buffering
+    this.header("Cache-Control", "no-cache, no-store, must-revalidate");
     this.headers(options.headers ?? {});
+    this.removeHeader("Content-Length");
+    this.removeHeader("Transfer-Encoding");
+    this.setContentType("text/event-stream");
+    this.header("X-Accel-Buffering", "no");
+    this.keepLongLivedConnectionAlive();
 
     // Trigger sending events
     Response.trigger("sending", this);
@@ -1033,7 +1039,7 @@ export class Response {
       ): Promise<boolean> => {
         if (transport.closed || queue.ending) return Promise.resolve(false);
 
-        if (!writeMessage(event, data, id, messageOptions)) return Promise.resolve(false);
+        writeMessage(event, data, id, messageOptions);
 
         return waitForDrain();
       },
@@ -1124,6 +1130,10 @@ export class Response {
         return queue.backpressured;
       },
 
+      get dropped() {
+        return queue.dropped;
+      },
+
       /**
        * Check if the stream has ended (either via end() or client disconnect)
        */
@@ -1181,7 +1191,10 @@ export class Response {
   protected keepLongLivedConnectionAlive() {
     const current = this.baseResponse.raw.getHeader("connection");
 
-    if (typeof current === "string" && current.toLowerCase() === "close") return;
+    if (typeof current === "string" && current.toLowerCase() === "close") {
+      this.header("Connection", "close");
+      return;
+    }
 
     this.header("Connection", "keep-alive");
   }

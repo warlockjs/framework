@@ -98,18 +98,18 @@ describe("response.sse()", () => {
     expect(result.body).toBe("id: idvalue\ndata: already serialized\ndata: event: injected\n\n");
   });
 
-  it("preserves a caller's cache policy and applies headers before flushing", async () => {
+  it("uses safe cache defaults and applies explicit stream headers before flushing", async () => {
     app = Fastify();
     app.get("/sse", async (_request, reply) => {
       const response = bind(reply);
-      response.header("Cache-Control", "private, no-store");
+      response.header("Cache-Control", "public, max-age=3600");
       const sse = response.sse({ headers: { "X-Stream": "ready" } });
       expect(sse.enqueue(undefined, { ok: true })).toBe(true);
       sse.end();
       return reply;
     });
     const result = await app.inject({ method: "GET", url: "/sse" });
-    expect(result.headers["cache-control"]).toBe("private, no-store");
+    expect(result.headers["cache-control"]).toBe("no-cache, no-store, must-revalidate");
     expect(result.headers["x-stream"]).toBe("ready");
     expect(result.body).toBe('data: {"ok":true}\n\n');
   });
@@ -120,10 +120,36 @@ describe("response.sse()", () => {
       const sse = bind(reply).sse({ maxQueuedBytes: 0, onOverflow: "drop" });
       expect(sse.enqueue("tick", { large: true })).toBe(false);
       expect(sse.signal.aborted).toBe(false);
+      expect(await sse.write("tick", { large: true })).toBe(true);
+      sse.send("tick", { large: true });
+      sse.comment("too much");
+      expect(sse.dropped).toBe(4);
       sse.end();
       return reply;
     });
     expect((await app.inject({ method: "GET", url: "/sse" })).body).toBe("");
+  });
+
+  it("protects SSE protocol headers while accepting explicit cache policy", async () => {
+    app = Fastify();
+    app.get("/sse", async (_request, reply) => {
+      const sse = bind(reply).sse({
+        headers: {
+          "Content-Type": "text/html",
+          "Content-Length": "3",
+          "Transfer-Encoding": "gzip",
+          "Cache-Control": "private, no-store",
+        },
+      });
+      sse.send("tick", { ok: true });
+      sse.end();
+      return reply;
+    });
+    const result = await app.inject({ method: "GET", url: "/sse" });
+    expect(result.headers["content-type"]).toBe("text/event-stream");
+    expect(result.headers["content-length"]).toBeUndefined();
+    expect(result.headers["transfer-encoding"]).not.toBe("gzip");
+    expect(result.headers["cache-control"]).toBe("private, no-store");
   });
 
   it("keeps no events on the response body by default", async () => {

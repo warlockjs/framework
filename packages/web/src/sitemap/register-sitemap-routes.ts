@@ -2,8 +2,8 @@
  * HTTP readers for immutable sitemap manifests. Requests only read published
  * state: they never regenerate, upload, poll manually, or touch lifecycle
  * ownership. Storage streams go directly to Fastify after Response has set
- * the protocol headers; Response.stream() is unsuitable here because it
- * unconditionally installs `Cache-Control: no-cache` before writing headers.
+ * the protocol headers. Response.stream() is for producer-controlled writes;
+ * storage streams pipe directly here to preserve file validators and ranges.
  */
 import path from "node:path";
 import type { HttpContext, Response, ReturnedResponse, Router } from "@warlock.js/core";

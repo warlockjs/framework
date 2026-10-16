@@ -129,8 +129,9 @@ describe("long-lived responses during a graceful drain", () => {
   });
 
   async function connectionHeaderFor(
-    kind: "sse" | "stream",
+    type: "sse" | "stream",
     drainFirst: boolean,
+    headers?: Record<string, string>,
   ): Promise<string | null> {
     server = startHttpServer();
     const started = deferred();
@@ -142,13 +143,13 @@ describe("long-lived responses during a graceful drain", () => {
 
       const response = bind(reply);
 
-      if (kind === "sse") {
-        const sse = response.sse();
+      if (type === "sse") {
+        const sse = response.sse({ headers });
 
         sse.send("tick", { n: 1 });
         sse.end();
       } else {
-        const stream = response.stream("text/plain");
+        const stream = response.stream("text/plain", { headers });
 
         stream.send("chunk");
         stream.end();
@@ -181,6 +182,15 @@ describe("long-lived responses during a graceful drain", () => {
   it("a stream started after the drain began keeps Connection: close", async () => {
     await expect(connectionHeaderFor("stream", true)).resolves.toBe("close");
   });
+
+  it.each(["sse", "stream"] as const)(
+    "caller keep-alive cannot override a draining %s reply",
+    async (type) => {
+      await expect(connectionHeaderFor(type, true, { Connection: "keep-alive" })).resolves.toBe(
+        "close",
+      );
+    },
+  );
 
   it("without a drain, an SSE stream still asks for keep-alive", async () => {
     await expect(connectionHeaderFor("sse", false)).resolves.toBe("keep-alive");

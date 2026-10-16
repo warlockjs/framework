@@ -16,8 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Image variants support object-storage disks through `resolveImageVariant`, `createUploadedFileController` and `generateImageVariants({ disk, urlPrefix })`. Remote originals retain their driver URL; derivatives are cached locally, with bounded source reads and content hashes that isolate buckets and tenant prefixes.
 - `uploads.images.maxCacheBytes` (default 512 MiB) and `maxCacheAge` (default seven days) bound cached derivatives. Expired hits render again; cleanup removes expired and oldest files, retaining the derivative being returned even when it alone exceeds the byte budget. Cleanup runs when variants are requested, so idle caches are reclaimed on the next request.
-- SSE supports unnamed events (`send(undefined, data)`) and raw string payloads through a fourth `{ raw: true }` argument, with safe multiline `data:` encoding. SSE and streams preserve pre-set cache headers and accept `headers` before flushing.
-- SSE and stream controllers gain synchronous `enqueue()` with a byte cap (`maxQueuedBytes`, default 1 MiB for enqueue), disconnect/drop overflow policies, ordered draining and flushing accepted queued output on `end()`.
+- SSE supports unnamed events (`send(undefined, data)`) and raw string payloads through a fourth `{ raw: true }` argument, with safe multiline `data:` encoding. SSE and streams accept explicit cache `headers` before flushing while protecting protocol/drain headers and keeping safe cache defaults.
+- SSE and stream controllers gain synchronous `enqueue()` with a byte cap (`maxQueuedBytes`, default 1 MiB for enqueue), disconnect/drop overflow policies with a visible `dropped` counter, ordered draining and flushing accepted queued output on `end()`.
 - `http.logging.private` applies path-prefix or regular-expression policies to decoded, normalized request URLs, including unmatched requests. Matching policies check raw, decoded and resolved paths plus the matched route pattern, remove input before snapshots are built and cannot be overridden by per-route logging. Dev-dispatch error URLs use the same policy.
 
 ### Fixed

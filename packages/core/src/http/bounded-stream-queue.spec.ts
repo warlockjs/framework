@@ -26,6 +26,7 @@ describe("bounded stream queue", () => {
     expect(queue.enqueue("aaaa")).toBe(true);
     expect(queue.enqueue("bbbb")).toBe(true);
     expect(queue.enqueue("c")).toBe(false);
+    expect(queue.dropped).toBe(1);
     const drained = queue.waitForDrain();
     expect(written).toEqual(["aaaa"]);
     callbacks.shift()!();
@@ -82,6 +83,11 @@ describe("bounded stream queue", () => {
     expect(await drained).toBe(false);
     expect(transport.signal.aborted).toBe(true);
     expect(raw.listenerCount("drain")).toBe(0);
+  });
+
+  it("rejects untyped array-like chunks instead of bypassing the byte cap", () => {
+    const { queue } = fixture();
+    expect(() => queue.enqueue({ length: 1 } as unknown as Uint8Array)).toThrow(TypeError);
   });
 
   it.each([-1, 1.5, Infinity, NaN])("rejects invalid byte cap %s", (maxQueuedBytes) => {

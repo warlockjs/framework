@@ -93,7 +93,11 @@ describe("response.stream()", () => {
       const response = bind(reply);
       response.header("Cache-Control", "private, no-store");
       const stream = response.stream("text/plain", {
-        headers: { "Cache-Control": "private, max-age=0", "X-Stream": "ready" },
+        headers: {
+          "Cache-Control": "private, max-age=0",
+          "X-Stream": "ready",
+          "Content-Length": "3",
+        },
       });
       expect(stream.enqueue("hello")).toBe(true);
       stream.end();
@@ -103,6 +107,7 @@ describe("response.stream()", () => {
     expect(result.headers["cache-control"]).toBe("private, max-age=0");
     expect(result.headers["x-stream"]).toBe("ready");
     expect(result.body).toBe("hello");
+    expect(result.headers["content-length"]).toBeUndefined();
   });
 
   it("drops overflow without disconnecting when requested", async () => {
@@ -111,6 +116,10 @@ describe("response.stream()", () => {
       const stream = bind(reply).stream("text/plain", { maxQueuedBytes: 0, onOverflow: "drop" });
       expect(stream.enqueue("too much")).toBe(false);
       expect(stream.signal.aborted).toBe(false);
+      expect(await stream.write("too much")).toBe(true);
+      stream.send("too much");
+      stream.render(createElement("p", null, "too much"));
+      expect(stream.dropped).toBe(4);
       stream.end();
       return reply;
     });
