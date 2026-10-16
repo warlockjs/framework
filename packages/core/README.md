@@ -45,3 +45,8 @@ feature that needs it:
 ## Documentation
 
 Full documentation is available at the [official documentation](https://warlock.js.org).
+
+For an application moving from 5.29, use the shipped
+[upgrade skill](skills/upgrade-from-5-29/SKILL.md). It covers logger delivery,
+tool concurrency, request-log snapshots, counters, derivative caches and viewport
+metadata, with an additional checklist for 5.31's runtime and Seal changes.

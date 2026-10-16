@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - End-to-end configuration recipes cover a non-default R2 image disk, variant ingestion and serving, and shared Redis rate-limit windows across two servers with outage behavior.
 
+- The `upgrade-from-5-29` skill guides application upgrades through logger delivery, tool concurrency, request snapshots, rate-limit counters, image cache layouts and viewport metadata, with relevant 5.31 compatibility checks.
+
 - Skills include complete examples for request cancellation, stream/SSE backpressure and retention, HTTP error mapping, shared rate limits and signed-in test clients.
 
 - Notification scaffolds with test support emit real signed-in controller specs and isolated two-recipient fixtures for listing, unread counts, marking one/all read, query validation and ownership checks. Fixtures use the configured auth model and revoke/delete only their own credentials and rows.
