@@ -270,7 +270,9 @@ The fixture uses the configured `auth.userType.user` model and `actingAs(user)`
 from `@warlock.js/core/tests`, which issues real credentials and leaves auth
 middleware active. Run against a migrated test database, and adjust the fixture's
 name/email/password fields if your user model needs more. Each test revokes its
-own tokens and permanently deletes only the rows and users it created.
+own tokens and permanently deletes only the rows and users it created. Partial
+setup rolls back every recorded resource; cleanup attempts all owned resources
+even if one deletion fails.
 
 Generated specs use `.spec.ts`. New test setup includes both `.test.ts` and
 `.spec.ts`; existing apps should set Vitest's `include` to

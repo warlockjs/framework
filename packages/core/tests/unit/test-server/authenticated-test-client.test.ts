@@ -9,16 +9,31 @@ const user = (token: string) => ({
 });
 
 beforeEach(() => {
+  vi.stubEnv("NODE_ENV", "test");
   fetchMock.mockReset().mockResolvedValue(new Response("{}"));
   vi.stubGlobal("fetch", fetchMock);
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 
 function headers(index: number) {
   return new Headers((fetchMock.mock.calls[index][1] as RequestInit).headers);
 }
 
 describe("actingAs", () => {
+  it.each(["production", "development", undefined])(
+    "refuses NODE_ENV=%s before minting credentials",
+    async (environment) => {
+      vi.stubEnv("NODE_ENV", environment);
+      const actor = user("unused");
+      await expect(actingAs(actor)).rejects.toThrow('requires NODE_ENV="test"');
+      expect(actor.generateAccessToken).not.toHaveBeenCalled();
+      expect(actor.removeAccessToken).not.toHaveBeenCalled();
+    },
+  );
+
   it("keeps simultaneous users and anonymous helpers independent", async () => {
     const ada = user("ada-token");
     const bob = user("bob-token");
@@ -72,6 +87,7 @@ describe("actingAs", () => {
   it("propagates authentication policy failures and refuses an empty token", async () => {
     const actor = user(" ");
     await expect(actingAs(actor)).rejects.toThrow(/non-empty access token/);
+    expect(actor.removeAccessToken).toHaveBeenCalledExactlyOnceWith(" ");
     const denied = user("unused");
     denied.generateAccessToken.mockRejectedValueOnce(new Error("account disabled"));
     await expect(actingAs(denied)).rejects.toThrow("account disabled");

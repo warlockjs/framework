@@ -330,7 +330,9 @@ Either works. The first is easier to find when you're fixing a specific endpoint
 `actingAs(user)` from `@warlock.js/core/tests` issues a real persisted access token
 through an Auth-compatible model and returns a client with `get`, `post`, `put`,
 `patch`, `delete` and `request` methods. Authentication middleware and account
-policies still run. No global credential or test-only middleware is installed.
+policies still run. `actingAs()` requires `NODE_ENV="test"` before issuing a
+credential. No global credential or test-only middleware is installed.
+Cookie-only auth middleware needs the app's login route rather than this Bearer client.
 
 ```ts
 import { actingAs, expectJson } from "@warlock.js/core/tests";

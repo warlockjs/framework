@@ -687,7 +687,7 @@ export const notificationLocalesStub = `{
 export const notificationTestFixtureStub = `import type { Auth } from "@warlock.js/auth";
 import type { ChildModel } from "@warlock.js/cascade";
 import { config } from "@warlock.js/core";
-import { actingAs } from "@warlock.js/core/tests";
+import { actingAs, type AuthenticatedTestClient } from "@warlock.js/core/tests";
 import { randomUUID } from "node:crypto";
 import { Notification } from "../models/notification/notification.model";
 
@@ -695,42 +695,66 @@ import { Notification } from "../models/notification/notification.model";
 export async function createNotificationTestFixture() {
   const User = config.key<ChildModel<Auth>>("auth.userType.user");
   if (!User) throw new Error("Notification specs need the configured auth.userType.user model.");
+  const users: Auth[] = [];
+  const clients: AuthenticatedTestClient[] = [];
+  const rows: Notification[] = [];
 
-  const createUser = () =>
-    User.create({
+  async function cleanup() {
+    const credentials = await Promise.allSettled(
+      clients.splice(0).map((client) => client.dispose()),
+    );
+    const notifications = await Promise.allSettled(
+      rows.splice(0).map((row) => row.destroy({ strategy: "permanent" })),
+    );
+    const recipients = await Promise.allSettled(
+      users.splice(0).map((user) => user.destroy({ strategy: "permanent" })),
+    );
+    const errors = [...credentials, ...notifications, ...recipients]
+      .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+      .map((result) => result.reason);
+    if (errors.length) throw new AggregateError(errors, "Notification fixture cleanup failed.");
+  }
+
+  const createUser = async () => {
+    const user = await User.create({
       name: "Notification test user",
       email: "notifications-" + randomUUID() + "@example.test",
       password: "test-password",
     });
-  const [user, otherUser] = await Promise.all([createUser(), createUser()]);
-  const [client, otherClient] = await Promise.all([actingAs(user), actingAs(otherUser)]);
-  const createNotification = (recipientId: string | number, title: string, readAt?: Date) =>
-    Notification.create({ user_id: recipientId, type: "test", title, read_at: readAt });
-  const [own, alreadyRead, foreign, otherUnread] = await Promise.all([
-    createNotification(user.id, "Own unread notification"),
-    createNotification(user.id, "Own read notification", new Date()),
-    createNotification(otherUser.id, "Other user's notification"),
-    createNotification(otherUser.id, "Other user's second notification"),
-  ]);
-
-  return {
-    user,
-    otherUser,
-    client,
-    otherClient,
-    own,
-    alreadyRead,
-    foreign,
-    async cleanup() {
-      await Promise.all([client.dispose(), otherClient.dispose()]);
-      await Promise.all(
-        [own, alreadyRead, foreign, otherUnread].map((row) =>
-          row.destroy({ strategy: "permanent" }),
-        ),
-      );
-      await Promise.all([user, otherUser].map((row) => row.destroy({ strategy: "permanent" })));
-    },
+    users.push(user);
+    return user;
   };
+  const signIn = async (user: Auth) => {
+    const client = await actingAs(user);
+    clients.push(client);
+    return client;
+  };
+  const createNotification = async (recipientId: string | number, title: string, readAt?: Date) => {
+    const row = await Notification.create({
+      user_id: recipientId,
+      type: "test",
+      title,
+      read_at: readAt,
+    });
+    rows.push(row);
+    return row;
+  };
+
+  try {
+    const user = await createUser();
+    const otherUser = await createUser();
+    const client = await signIn(user);
+    const otherClient = await signIn(otherUser);
+    const own = await createNotification(user.id, "Own unread notification");
+    const alreadyRead = await createNotification(user.id, "Own read notification", new Date());
+    const foreign = await createNotification(otherUser.id, "Other user's notification");
+    await createNotification(otherUser.id, "Other user's second notification");
+    return { user, otherUser, client, otherClient, own, alreadyRead, foreign, cleanup };
+  } catch (error) {
+    // Preserve the setup failure after attempting every owned resource's cleanup.
+    await cleanup().catch(() => undefined);
+    throw error;
+  }
 }
 `;
 
@@ -819,15 +843,17 @@ describe("${method} ${path}", () => {
   });
 
   describe("signed in", () => {
-    let fixture: Awaited<ReturnType<typeof createNotificationTestFixture>>;
+    let fixture: Awaited<ReturnType<typeof createNotificationTestFixture>> | undefined;
     beforeEach(async () => {
       fixture = await createNotificationTestFixture();
     });
     afterEach(async () => {
-      await fixture?.cleanup();
+      const current = fixture;
+      fixture = undefined;
+      await current?.cleanup();
     });
 
-${signedInCases}
+${signedInCases.replaceAll("fixture.", "fixture!.")}
   });
 });
 `;

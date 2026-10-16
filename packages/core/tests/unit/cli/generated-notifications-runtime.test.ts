@@ -221,7 +221,9 @@ afterEach(async () => {
   vitest.vi.unstubAllGlobals();
 });
 
-const fixture = evaluate<object>(stubs.notificationTestFixtureStub, {
+const fixture = evaluate<{
+  createNotificationTestFixture(): Promise<{ cleanup(): Promise<void> }>;
+}>(stubs.notificationTestFixtureStub, {
   "@warlock.js/core": { config },
   "@warlock.js/core/tests": { actingAs },
   "node:crypto": { randomUUID },
@@ -240,3 +242,46 @@ for (const [method, path] of [
     "../tests/notifications.fixture": fixture,
   });
 }
+
+describe("generated notification fixture rollback", () => {
+  it("revokes the first token and removes both users when the second sign-in fails", async () => {
+    const generate = FixtureUser.prototype.generateAccessToken;
+    vitest.vi
+      .spyOn(FixtureUser.prototype, "generateAccessToken")
+      .mockImplementationOnce(generate)
+      .mockRejectedValueOnce(new Error("Second account cannot authenticate"));
+    await expect(fixture.createNotificationTestFixture()).rejects.toThrow(
+      "Second account cannot authenticate",
+    );
+    expect(tokens.size).toBe(0);
+    expect(users.size).toBe(0);
+    expect(rows.size).toBe(0);
+
+    const next = await fixture.createNotificationTestFixture();
+    await next.cleanup();
+    expect(tokens.size + users.size + rows.size).toBe(0);
+  });
+
+  it("removes previously created rows and credentials after a later row write fails", async () => {
+    const create = FixtureNotification.create;
+    vitest.vi
+      .spyOn(FixtureNotification, "create")
+      .mockImplementationOnce(create)
+      .mockImplementationOnce(create)
+      .mockRejectedValueOnce(new Error("Notification write failed"));
+    await expect(fixture.createNotificationTestFixture()).rejects.toThrow(
+      "Notification write failed",
+    );
+    expect(tokens.size + users.size + rows.size).toBe(0);
+  });
+
+  it("attempts every cleanup operation even when one row cannot be deleted", async () => {
+    const current = await fixture.createNotificationTestFixture();
+    const first = [...rows.values()][0]!;
+    vitest.vi.spyOn(first, "destroy").mockRejectedValueOnce(new Error("Delete failed"));
+    await expect(current.cleanup()).rejects.toThrow("Notification fixture cleanup failed");
+    expect(tokens.size).toBe(0);
+    expect(users.size).toBe(0);
+    expect([...rows.keys()]).toEqual([first.id]);
+  });
+});

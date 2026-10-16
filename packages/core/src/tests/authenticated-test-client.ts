@@ -24,8 +24,16 @@ export type AuthenticatedTestClient = {
  * are installed. The bound identity takes precedence over per-request headers.
  */
 export async function actingAs(user: TestAuthenticableUser): Promise<AuthenticatedTestClient> {
+  if (process.env.NODE_ENV !== "test") {
+    throw new Error(
+      `actingAs() requires NODE_ENV="test", but received NODE_ENV=${JSON.stringify(process.env.NODE_ENV)}. Set NODE_ENV=test before creating a test client.`,
+    );
+  }
   const { token } = await user.generateAccessToken();
-  if (!token.trim()) throw new Error("actingAs() requires a non-empty access token.");
+  if (!token.trim()) {
+    await user.removeAccessToken(token).catch(() => undefined);
+    throw new Error("actingAs() requires a non-empty access token.");
+  }
 
   const authorized = (options: RequestInit = {}): RequestInit => {
     const headers = new Headers(options.headers);

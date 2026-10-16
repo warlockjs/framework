@@ -37,6 +37,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Notification test fixtures roll back partially created users, tokens and rows on setup failure, attempt all cleanup operations and clear their reference before teardown. `actingAs()` refuses non-test environments before issuing credentials and revokes a newly issued blank token before rejecting it.
+
 - Image-variant generation and purging reject a cache directory that equals or contains any configured local storage root, including runtime-registered disks and symlink aliases. Validation happens in the shared cache-directory resolver, so `purgeImageVariants()` cannot bypass it and delete uploads through an overlapping cache setting.
 
 - Oxlint failures preserve stdout config errors alongside stderr warnings and bound command diagnostics without echoing file arguments. Health-worker shutdown waits briefly for child cleanup before forced termination.
