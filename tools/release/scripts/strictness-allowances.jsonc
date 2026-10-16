@@ -1,4 +1,6 @@
 {
+  // 2026-10-16: measured release compiler counts; unchecked indexed reads
+  // now carry proven nonempty bounds and explicit test preconditions.
   // Strictness ratchet baseline, re-measured on 2026-09-09 with:
   // `node --import tsx builder/scripts/strictness-gate.ts`
   // Every package keeps its own config for resolution and file inclusion, while
@@ -16,7 +18,7 @@
   // `core` fell 119 -> 47 and `web` rose 186 -> 187; every other package's
   // count was unchanged. Ratchet applied both directions per policy.
   "access": 0,
-  "ai": 463,
+  "ai": 453,
   "ai-anthropic": 19,
   "ai-bedrock": 27,
   "ai-deepseek": 0,
@@ -24,18 +26,18 @@
   "ai-groq": 0,
   "ai-live": 1,
   "ai-mistral": 0,
-  "ai-ollama": 30,
+  "ai-ollama": 29,
   "ai-openai": 31,
   "ai-panoptic": 61,
   "ai-tools": 69,
   "ai-workspace": 12,
   "ai-xai": 0,
-  "auth": 22,
-  "cache": 16,
+  "auth": 16,
+  "cache": 15,
   "cascade": 0,
   "context": 0,
-  "core": 46,
-  "create-warlock": 9,
+  "core": 41,
+  "create-warlock": 8,
   "devtools": 0,
   "docs": 18,
   "fs": 1,
@@ -43,11 +45,11 @@
   "logger": 0,
   "notifications": 0,
   "queue": 0,
-  "scheduler": 23,
+  "scheduler": 7,
   "seal": 0,
   // 2026-09-18: new package in 5.15.0. Seeded at 0 deliberately — a package
   // written today has no reason to start with an allowance, and the ratchet
   // only moves down.
   "sitemap": 0,
-  "web": 178
+  "web": 169
 }

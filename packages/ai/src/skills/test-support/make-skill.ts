@@ -76,7 +76,7 @@ export class FakeEmbedder implements EmbedderContract {
       const code = char.charCodeAt(0) - 97;
 
       if (code >= 0 && code < 26 && code < this.dims) {
-        counts[code] += 1;
+        counts[code] = counts[code]! + 1;
       }
     }
 

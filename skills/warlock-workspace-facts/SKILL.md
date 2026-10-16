@@ -81,3 +81,8 @@ unavailable integration cases with a clear message while unit cases still run.
 CI and `WARLOCK_REDIS_INTEGRATION=1` require a reachable service. Use a disposable
 Redis instance with persistence disabled for local testing; never flush a shared
 database. HTTP socket tests bind port `0` to avoid depending on port 3000.
+
+Strictness allowances are measured per source owner; lower them after fixing
+indexed reads and retain explicit nonempty bounds or runtime assertions. Never
+raise an existing allowance to absorb new errors. Empty generator selections
+reject before opening stdin.

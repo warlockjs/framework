@@ -42,7 +42,7 @@ describe("stampReportLineage", () => {
 
     expect(root.rootRunId).toBe("outer_agent_1");
     expect(composite.rootRunId).toBe("outer_agent_1");
-    expect(composite.children[0].rootRunId).toBe("outer_agent_1");
+    expect(composite.children[0]?.rootRunId).toBe("outer_agent_1");
   });
 
   it("derives parentRunId from walk position (each child's parent is its parent node's runId)", () => {

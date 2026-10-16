@@ -93,7 +93,7 @@ describe("run-context ambient frame", () => {
     });
 
     expect(sink).toHaveLength(1);
-    expect(sink[0].name).toBe("deep");
+    expect(sink[0]?.name).toBe("deep");
   });
 
   it("nests frames — an inner frame shadows the outer for its own subtree only", () => {

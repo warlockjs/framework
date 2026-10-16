@@ -13,6 +13,10 @@ import {
  * (pascal/camel/kebab/snake) plus pluralization used throughout the stubs.
  */
 describe("parseModulePath", () => {
+  it("preserves an empty unqualified name", () => {
+    expect(parseModulePath("")).toEqual({ name: "" });
+  });
+
   it("splits module and name on the slash", () => {
     expect(parseModulePath("users/create-user")).toEqual({
       module: "users",

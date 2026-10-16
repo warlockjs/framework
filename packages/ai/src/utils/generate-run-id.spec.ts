@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { describe, expect, it } from "vitest";
 import { generateRunId } from "./generate-run-id";
 
@@ -23,6 +24,7 @@ describe("generateRunId", () => {
     const after = Date.now();
 
     const timestamp = id.split("_")[1];
+    assert.ok(timestamp, "timestamp segment must exist");
     const decoded = parseInt(timestamp, 36);
 
     expect(decoded).toBeGreaterThanOrEqual(before);
@@ -33,6 +35,7 @@ describe("generateRunId", () => {
     // Source slices Math.random().toString(36) at [2, 10) → ≤ 8 chars.
     for (let i = 0; i < 50; i++) {
       const random = generateRunId("x").split("_")[2];
+      assert.ok(random, "random segment must exist");
       expect(random.length).toBeGreaterThanOrEqual(1);
       expect(random.length).toBeLessThanOrEqual(8);
     }

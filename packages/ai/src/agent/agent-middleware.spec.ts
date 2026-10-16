@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { describe, expect, it } from "vitest";
 import type { AgentMiddleware } from "../contracts/middleware";
@@ -42,7 +43,9 @@ describe("agent + middleware — execute-level", () => {
 
     expect(result.error).toBeInstanceOf(BudgetExceededError);
     expect(result.report.trips).toHaveLength(0);
-    expect(sdk.models[0].callCount).toBe(0);
+    const model = sdk.models[0];
+    assert.ok(model, "configured model must exist");
+    expect(model.callCount).toBe(0);
   });
 
   it("execute.after can transform the result without touching runCore state", async () => {
@@ -102,7 +105,9 @@ describe("agent + middleware — trip-level short-circuit", () => {
 
     expect(result.text).toBe("cached-answer");
     expect(result.usage.total).toBe(0);
-    expect(sdk.models[0].callCount).toBe(0);
+    const model = sdk.models[0];
+    assert.ok(model, "configured model must exist");
+    expect(model.callCount).toBe(0);
   });
 
   it("trip.onError recovery returns a synthetic response; trip continues", async () => {
@@ -239,7 +244,9 @@ describe("agent + middleware — streaming", () => {
     expect(result.text).toBe("from-middleware");
     expect(result.error).toBeUndefined();
     expect(events).toContain("agent.completed");
-    expect(sdk.models[0].callCount).toBe(0);
+    const model = sdk.models[0];
+    assert.ok(model, "configured model must exist");
+    expect(model.callCount).toBe(0);
   });
 });
 

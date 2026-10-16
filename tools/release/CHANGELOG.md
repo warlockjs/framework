@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Ratcheted strictness budgets to measured counts: AI 453, Core 41, Web 169, Auth 16, Cache 15, Scheduler 7, scaffolder 8 and Ollama 29. Indexed reads now retain proven bounds and test preconditions.
+
 - The release gate regenerates every package llms reference before public-text validation and clean-tree checks, so stale projections must be reviewed and committed before packing.
 
 - Package-manager documentation exceptions match exact content and file instead of drifting line numbers, while replacement commands remain checked. CI now runs shipped-doc and skill-snippet gates; the new devtools skill starts with a measured zero-failure allowance.

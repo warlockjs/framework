@@ -211,7 +211,7 @@ export async function loadMigrationFile(absPath: string) {
   if (!MigrationClass.migrationName) {
     MigrationClass.migrationName = path
       .basename(absPath)
-      .split(".")[0]
+      .split(".")[0]!
       .replace("-migration", "")
       .replace("_migration", "");
   }

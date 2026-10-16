@@ -12,7 +12,7 @@ export function parseModulePath(input: string): { module?: string; name: string 
   const parts = input.split("/");
 
   if (parts.length === 1) {
-    return { name: parts[0] };
+    return { name: input };
   }
 
   return {

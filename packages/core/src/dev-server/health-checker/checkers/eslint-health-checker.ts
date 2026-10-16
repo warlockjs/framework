@@ -207,13 +207,12 @@ export class EslintHealthChecker extends BaseHealthChecker implements FileHealth
         filePath: file.absolutePath,
       });
 
-      if (lintResults.length === 0) {
+      const lintResult = lintResults[0];
+      if (!lintResult) {
         console.log("No lint results", file.relativePath);
         result.markAsHealthy();
         return result;
       }
-
-      const lintResult = lintResults[0];
 
       // Convert ESLint messages to FileHealthResult format
       const errors: Array<{

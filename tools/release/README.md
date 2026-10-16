@@ -424,3 +424,7 @@ The release gate runs every package reference generator before validation and
 clean-tree checks. Run `pnpm docs:references` in the workspace to prepare those
 files; commit any changed projections before gating. Generator failure stops the
 gate, and stale generated changes cannot be silently packed.
+
+The strictness ratchet also checks noUncheckedIndexedAccess. Preserve real bounds
+checks and assertions rather than widening types, and lower budgets to measured
+counts after fixes. The release gate verifies the full workspace again.

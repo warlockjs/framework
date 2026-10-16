@@ -62,7 +62,7 @@ describe("response.setLocale / request.locale — shared cookie name", () => {
     // Read back exactly what the writer emitted — name, value, and nothing
     // assumed about either.
     expect(setCookie).toHaveBeenCalledTimes(1);
-    const [writtenName, writtenValue] = setCookie.mock.calls[0];
+    const [writtenName, writtenValue] = setCookie.mock.calls[0]!;
     expect(writtenValue).toBe("ar");
 
     // Feed it through the real reader as an incoming cookie, under whatever
@@ -77,7 +77,7 @@ describe("response.setLocale / request.locale — shared cookie name", () => {
 
     response.setLocale("ar");
 
-    const [writtenName] = setCookie.mock.calls[0];
+    const [writtenName] = setCookie.mock.calls[0]!;
 
     // Deliberately wrong key — simulates the reader and writer disagreeing.
     const request = new Request().setRequest(
@@ -95,7 +95,7 @@ describe("response.setLocale / request.locale — shared cookie name", () => {
 
     response.setLocale("ar");
 
-    expect(setCookie.mock.calls[0][1]).toBe("ar");
+    expect(setCookie.mock.calls[0]![1]).toBe("ar");
   });
 
   it("clears the host-only JS preference before writing the authoritative locale cookie", () => {
@@ -178,6 +178,6 @@ describe("response.setLocale / request.locale — shared cookie name", () => {
     const { response, setCookie } = createResponse();
 
     expect(() => response.setLocale("fr")).not.toThrow();
-    expect(setCookie.mock.calls[0][1]).toBe("fr");
+    expect(setCookie.mock.calls[0]![1]).toBe("fr");
   });
 });

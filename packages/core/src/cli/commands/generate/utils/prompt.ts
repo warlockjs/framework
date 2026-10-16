@@ -48,6 +48,7 @@ export async function input(message: string, defaultValue?: string): Promise<str
  * Prompt user to select from choices
  */
 export async function select(message: string, choices: string[]): Promise<string> {
+  if (choices.length === 0) throw new RangeError("Selection requires at least one choice.");
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -65,9 +66,9 @@ export async function select(message: string, choices: string[]): Promise<string
       const index = parseInt(answer.trim(), 10) - 1;
 
       if (index >= 0 && index < choices.length) {
-        resolve(choices[index]);
+        resolve(choices[index]!);
       } else {
-        resolve(choices[0]);
+        resolve(choices[0]!);
       }
     });
   });

@@ -107,7 +107,7 @@ export async function registerLoader(transpile: TranspileInit): Promise<MessageP
     plugins: [resolveExternalsFromCore],
   });
 
-  const bundledCode = bundleResult.outputFiles[0].text;
+  const bundledCode = bundleResult.outputFiles[0]!.text;
   // Caller (filesOrchestrator.init) guarantees .warlock/ exists before this runs.
   const hookBundlePath = path.join(process.cwd(), ".warlock", "loader-hook.mjs");
   await putFileAsync(hookBundlePath, bundledCode);
