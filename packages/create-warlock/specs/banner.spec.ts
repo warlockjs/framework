@@ -121,6 +121,33 @@ describe("getSuccessScreen", () => {
     },
   );
 
+  it("aligns wrapped features beneath the value and keeps command indentation", () => {
+    const screen = visible(
+      getSuccessScreen(
+        {
+          projectName: "app",
+          database: "MongoDB",
+          packageManager: "npm",
+          features: Array.from(
+            { length: 22 },
+            (_, index) => `feature-${index}`,
+          ),
+        },
+        80,
+      ),
+    );
+    const lines = screen.split("\n");
+    const first = lines.findIndex(line => line.includes("Features:"));
+    const column = lines[first].indexOf("feature-0");
+    const continued = lines
+      .slice(first + 1)
+      .filter(line => line.includes("feature-"));
+    expect(continued.length).toBeGreaterThan(0);
+    for (const line of continued) expect(line.indexOf("feature-")).toBe(column);
+    expect(lines).toContain("     cd app");
+    expect(lines).toContain("     npm run dev");
+  });
+
   it("prints `none` when no features were selected", () => {
     const screen = visible(
       getSuccessScreen({

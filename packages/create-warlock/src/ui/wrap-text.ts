@@ -44,3 +44,34 @@ export function wrapText(text: string, width: number): string[] {
   if (line || !lines.length) lines.push(line);
   return lines;
 }
+
+export type StyledSegment = { text: string; style: (text: string) => string };
+
+export function wrapStyledText(
+  segments: StyledSegment[],
+  width: number,
+): string[] {
+  const text = segments.map(segment => segment.text).join("");
+  let offset = 0;
+  return wrapText(text, width).map(line => {
+    while (/\s/u.test(text[offset] ?? "") && offset < text.length) offset++;
+    const start = offset;
+    offset += line.length;
+    let segmentStart = 0;
+    return segments
+      .map(segment => {
+        const segmentEnd = segmentStart + segment.text.length;
+        const from = Math.max(start, segmentStart);
+        const to = Math.min(offset, segmentEnd);
+        const result =
+          to > from
+            ? segment.style(
+                segment.text.slice(from - segmentStart, to - segmentStart),
+              )
+            : "";
+        segmentStart = segmentEnd;
+        return result;
+      })
+      .join("");
+  });
+}

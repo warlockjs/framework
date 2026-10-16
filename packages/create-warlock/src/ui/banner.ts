@@ -1,5 +1,10 @@
 import { colors } from "@mongez/copper";
-import { visibleWidth, wrapText } from "./wrap-text";
+import {
+  visibleWidth,
+  wrapStyledText,
+  wrapText,
+  type StyledSegment,
+} from "./wrap-text";
 
 export const warlockTextAnsi = `
 \x1b[49m
@@ -86,11 +91,19 @@ export function getSuccessScreen(
   const contentWidth = Math.max(2, terminalWidth - (narrow ? 0 : 10));
   const heading = "🎉 YOUR PROJECT IS READY! 🎉";
   const entries = [
-    `Project:  ${projectName}`,
-    `Database: ${database}`,
-    `Features: ${features.join(", ") || "none"}`,
+    { label: "Project:", value: projectName },
+    { label: "Database:", value: database },
+    { label: "Features:", value: features.join(", ") || "none" },
   ];
-  const rows = entries.flatMap(text => wrapText(text, contentWidth));
+  const rows = entries.flatMap(({ label, value }) =>
+    wrapText(value, Math.max(2, contentWidth - 10)).map(
+      (line, index) =>
+        colors.dim((index === 0 ? label : "").padEnd(10)) +
+        (label === "Features:" && !features.length
+          ? colors.dim(line)
+          : colors.white(line)),
+    ),
+  );
   let summary: string[];
   if (narrow) {
     summary = [...wrapText(heading, contentWidth), "", ...rows];
@@ -116,33 +129,71 @@ export function getSuccessScreen(
       row(""),
       row(colors.bold(colors.green(heading)), true),
       row(""),
-      ...rows.map(text => row(colors.white(text))),
+      ...rows.map(text => row(text)),
       row(""),
       border("╰", "╯"),
     ];
   }
   const devCommand =
     packageManager === "npm" ? "npm run dev" : `${packageManager} dev`;
-  const nextSteps = [
-    "",
-    "🚀 Next steps:",
-    "",
-    `cd ${projectName}`,
-    devCommand,
-    "",
-    "💡 Pro tip: Install the Generator Z extension in VSCode for helpful code snippets and productivity boosters!",
-    "",
-    "📚 Docs: https://warlock.js.org",
-    "⭐ Star us: https://github.com/warlockjs/framework",
+  const nextSteps: { indent: string; segments: StyledSegment[] }[] = [
+    {
+      indent,
+      segments: [
+        {
+          text: "🚀 Next steps:",
+          style: text => colors.bold(colors.cyan(text)),
+        },
+      ],
+    },
+    {
+      indent: narrow ? "" : "     ",
+      segments: [
+        { text: "cd ", style: colors.cyan },
+        { text: projectName, style: colors.white },
+      ],
+    },
+    {
+      indent: narrow ? "" : "     ",
+      segments: [{ text: devCommand, style: colors.cyan }],
+    },
+    {
+      indent,
+      segments: [
+        { text: "💡 Pro tip: Install the ", style: colors.dim },
+        { text: "Generator Z", style: colors.yellow },
+        {
+          text: " extension in VSCode for helpful code snippets and productivity boosters!",
+          style: colors.dim,
+        },
+      ],
+    },
+    {
+      indent,
+      segments: [
+        { text: "📚 Docs: ", style: colors.dim },
+        { text: "https://warlock.js.org", style: colors.cyan },
+      ],
+    },
+    {
+      indent,
+      segments: [
+        { text: "⭐ Star us: ", style: colors.dim },
+        { text: "https://github.com/warlockjs/framework", style: colors.cyan },
+      ],
+    },
   ];
   return [
     "",
     ...summary,
-    ...nextSteps.flatMap(text =>
-      wrapText(text, Math.max(2, terminalWidth - indent.length)).map(
-        line => indent + colors.cyan(line),
-      ),
-    ),
+    "",
+    ...nextSteps.flatMap(({ indent: lineIndent, segments }, index) => [
+      ...(index === 1 || index === 3 || index === 4 ? [""] : []),
+      ...wrapStyledText(
+        segments,
+        Math.max(2, terminalWidth - lineIndent.length),
+      ).map(line => lineIndent + line),
+    ]),
     "",
   ].join("\n");
 }
