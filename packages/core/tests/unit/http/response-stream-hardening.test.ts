@@ -1,6 +1,7 @@
 import { log } from "@warlock.js/logger";
 import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import http from "node:http";
+import { connect } from "node:http2";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Request } from "../../../src/http/request";
@@ -210,3 +211,33 @@ describe("long-lived responses during a graceful drain", () => {
   });
 });
 
+
+it.each(["stream", "sse"] as const)("serves %s over HTTP/2 without connection-specific headers", async type => {
+  const app = Fastify({ http2: true });
+  app.get("/events", async (_request, reply) => {
+    const response = bind(reply as unknown as FastifyReply);
+    response.header("Connection", "keep-alive").header("Transfer-Encoding", "chunked");
+    const stream = type === "sse" ? response.sse({ headers: { Connection: "keep-alive" } }) : response.stream("text/plain", { headers: { Connection: "keep-alive" } });
+    if (type === "sse") (stream as ReturnType<Response["sse"]>).send("tick", { ok: true });
+    else (stream as ReturnType<Response["stream"]>).send("hello");
+    stream.end();
+    return reply;
+  });
+  await app.listen({ port: 0, host: "127.0.0.1" });
+  const client = connect(`http://127.0.0.1:${(app.server.address() as AddressInfo).port}`);
+  try {
+    const request = client.request({ ":path": "/events" });
+    const headers = await new Promise<http.IncomingHttpHeaders>((resolve, reject) => {
+      request.on("response", resolve);
+      request.on("error", reject);
+      request.resume();
+      request.end();
+    });
+    expect(headers[":status"]).toBe(200);
+    expect(headers.connection).toBeUndefined();
+    expect(headers["transfer-encoding"]).toBeUndefined();
+  } finally {
+    client.destroy();
+    await app.close();
+  }
+});

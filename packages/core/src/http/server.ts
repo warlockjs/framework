@@ -1,6 +1,10 @@
 import config from "@mongez/config";
 import Fastify, { type FastifyServerOptions } from "fastify";
 import type { Server as NodeHttpServer, ServerResponse } from "node:http";
+import type { Http2Server, Http2SecureServer, Http2ServerResponse, ServerHttp2Session } from "node:http2";
+
+type DrainServer = NodeHttpServer | Http2Server | Http2SecureServer;
+type DrainResponse = ServerResponse | Http2ServerResponse;
 import { normalizeRequestPath } from "../router/normalize-request-path";
 import type { HttpServerOptions } from "./types";
 
@@ -100,7 +104,7 @@ export function startHttpServer(options?: HttpServerOptions): FastifyInstance {
   // the shutdown budget expires. Track responses so the drain can
   // retire those connections as they go idle.
   if (forceCloseConnections === "idle") {
-    trackConnectionsForDrain(server.server as NodeHttpServer);
+    trackConnectionsForDrain(server.server as DrainServer);
   }
 
   return server;
@@ -128,7 +132,8 @@ export type ClosableServer = {
  * graceful shutdown has begun.
  */
 type DrainState = {
-  inFlight: Set<ServerResponse>;
+  inFlight: Set<DrainResponse>;
+  sessions: Set<ServerHttp2Session>;
   draining: boolean;
 };
 
@@ -139,14 +144,16 @@ const drainStates = new WeakMap<object, DrainState>();
  * before the headers go out; a response that already streams its headers is
  * retired by {@link reapIdleConnections} after it finishes instead.
  */
-function retireAfterResponse(response: ServerResponse): void {
+function retireAfterResponse(response: DrainResponse): void {
+  // HTTP/2 drains the session with GOAWAY; connection headers are forbidden.
+  if ("stream" in response) return;
   if (response.headersSent || response.writableEnded) return;
 
   response.setHeader("Connection", "close");
 }
 
-function reapIdleConnections(rawServer: NodeHttpServer): void {
-  if (typeof rawServer.closeIdleConnections === "function") {
+function reapIdleConnections(rawServer: DrainServer): void {
+  if ("closeIdleConnections" in rawServer && typeof rawServer.closeIdleConnections === "function") {
     rawServer.closeIdleConnections();
   }
 }
@@ -163,14 +170,20 @@ function reapIdleConnections(rawServer: NodeHttpServer): void {
  * when it is done (`Connection: close`), and every connection is reaped as
  * soon as its response has finished.
  */
-export function trackConnectionsForDrain(rawServer: NodeHttpServer): void {
+export function trackConnectionsForDrain(rawServer: DrainServer): void {
   if (!rawServer || typeof rawServer.on !== "function" || drainStates.has(rawServer)) return;
 
-  const state: DrainState = { inFlight: new Set(), draining: false };
+  const state: DrainState = { inFlight: new Set(), sessions: new Set(), draining: false };
 
   drainStates.set(rawServer, state);
 
-  rawServer.on("request", (_request, response: ServerResponse) => {
+  rawServer.on("session", (session: ServerHttp2Session) => {
+    state.sessions.add(session);
+    session.once("close", () => state.sessions.delete(session));
+    if (state.draining) session.close();
+  });
+
+  rawServer.on("request", (_request: unknown, response: DrainResponse) => {
     state.inFlight.add(response);
 
     if (state.draining) retireAfterResponse(response);
@@ -206,7 +219,10 @@ export function beginHttpDrain(rawServer: unknown): boolean {
     retireAfterResponse(response);
   }
 
-  reapIdleConnections(rawServer as NodeHttpServer);
+  // close() sends GOAWAY and waits for active streams before closing the socket.
+  for (const session of state.sessions) session.close();
+
+  reapIdleConnections(rawServer as DrainServer);
 
   return true;
 }

@@ -690,7 +690,9 @@ export class Response {
     this.applyStreamHeaders(options.headers);
     this.removeHeader("Content-Length");
     this.setContentType(contentType);
-    this.header("Transfer-Encoding", "chunked");
+    if (this.baseResponse.raw.req.httpVersionMajor !== 2) {
+      this.header("Transfer-Encoding", "chunked");
+    }
     this.header("X-Content-Type-Options", "nosniff");
     this.keepLongLivedConnectionAlive();
 
@@ -939,7 +941,9 @@ export class Response {
     this.header("Cache-Control", "no-cache, no-store, must-revalidate");
     this.applyStreamHeaders(options.headers);
     this.removeHeader("Content-Length");
-    this.header("Transfer-Encoding", "chunked");
+    if (this.baseResponse.raw.req.httpVersionMajor !== 2) {
+      this.header("Transfer-Encoding", "chunked");
+    }
     this.setContentType("text/event-stream");
     this.header("X-Accel-Buffering", "no");
     this.keepLongLivedConnectionAlive();
@@ -1206,6 +1210,13 @@ export class Response {
    * and hold the server's `close()` until the shutdown budget runs out.
    */
   protected keepLongLivedConnectionAlive() {
+    if (this.baseResponse.raw.req.httpVersionMajor === 2) {
+      for (const name of ["connection", "keep-alive", "proxy-connection", "upgrade", "transfer-encoding"]) {
+        this.removeHeader(name);
+      }
+      return;
+    }
+
     const current = this.baseResponse.raw.getHeader("connection");
 
     if (typeof current === "string" && current.toLowerCase() === "close") {

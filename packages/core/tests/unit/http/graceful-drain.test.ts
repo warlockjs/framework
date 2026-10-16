@@ -1,8 +1,9 @@
 import config from "@mongez/config";
 import type { FastifyReply } from "fastify";
+import { connect, createServer } from "node:http2";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { beginHttpDrain, closeServerWithTimeout, startHttpServer } from "../../../src/http/server";
+import { beginHttpDrain, closeServerWithTimeout, startHttpServer, trackConnectionsForDrain } from "../../../src/http/server";
 
 /**
  * a request in flight when graceful shutdown begins finishes its
@@ -149,4 +150,42 @@ describe("graceful HTTP drain with keep-alive clients", () => {
     expect(beginHttpDrain(undefined)).toBe(false);
     expect(beginHttpDrain({})).toBe(false);
   });
+});
+
+
+it("drains HTTP/2 sessions without connection-specific headers or cutting active streams", async () => {
+  const raw = createServer();
+  trackConnectionsForDrain(raw);
+  const started = gate();
+  const release = gate();
+  raw.on("request", async (_request, response) => {
+    started.release();
+    await release.promise;
+    response.end("complete");
+  });
+  await new Promise<void>(resolve => raw.listen(0, "127.0.0.1", resolve));
+  const client = connect(`http://127.0.0.1:${(raw.address() as AddressInfo).port}`);
+  const request = client.request({ ":path": "/slow" });
+  let connection: unknown;
+  request.on("response", headers => { connection = headers.connection; });
+  const body = new Promise<string>((resolve, reject) => {
+    let text = "";
+    request.setEncoding("utf8");
+    request.on("data", chunk => { text += chunk; });
+    request.on("end", () => resolve(text));
+    request.on("error", reject);
+  });
+  request.end();
+  try {
+    await started.promise;
+    const closing = closeServerWithTimeout({ server: raw, close: () => new Promise<void>((resolve, reject) => raw.close(error => error ? reject(error) : resolve())) }, 2000);
+    release.release();
+    expect(await body).toBe("complete");
+    await expect(closing).resolves.toBe(true);
+    expect(connection).toBeUndefined();
+  } finally {
+    release.release();
+    client.destroy();
+    await new Promise<void>(resolve => raw.close(() => resolve()));
+  }
 });
