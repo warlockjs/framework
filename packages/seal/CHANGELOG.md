@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/seal` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.31.0
+
+### Upgrading
+
+- **BREAKING:** `.refine()` now runs against successful output after child validation and transformers, and skips absent/null or invalid values. Callbacks are typed from the validator's output instead of `any`. Move checks that need input before child validation to `.addRule()`.
+
+### Fixed
+
+- Object, array, tuple and lazy Standard Schema output declarations preserve child defaults and catches independently of their input types.
+
 ## 5.30.0 - 2026-10-16
 
 ### Upgrading
@@ -112,6 +122,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Lockstep release maintenance and dependency refresh.
+
 ## 5.20.0 - 2026-09-24
 
 ### Changed

@@ -52,7 +52,7 @@ export const v: ValidatorV = {
   array: <T extends BaseValidator>(validator: T, errorMessage?: string) =>
     new ArrayValidator(validator, errorMessage) as ArrayValidator & {
       validator: T;
-    } & StandardSchemaV1<Array<Infer<T>>>,
+    } & StandardSchemaV1<Array<Infer.Input<T>>, Array<Infer.Output<T>>>,
 
   /** Create a record validator - object with dynamic keys and consistent value types */
   record: <T extends BaseValidator>(validator?: T, errorMessage?: string) =>
@@ -64,7 +64,10 @@ export const v: ValidatorV = {
   tuple: <T extends BaseValidator[]>(validators: T, errorMessage?: string) =>
     new TupleValidator(validators, errorMessage) as TupleValidator & {
       validators: T;
-    } & StandardSchemaV1<{ [K in keyof T]: Infer<T[K]> }>,
+    } & StandardSchemaV1<
+        { [K in keyof T]: Infer.Input<T[K]> },
+        { [K in keyof T]: Infer.Output<T[K]> }
+      >,
 
   /** Create a date validator */
   date: (errorMessage?: string) =>
@@ -106,7 +109,8 @@ export const v: ValidatorV = {
    * });
    */
   lazy: <T extends BaseValidator>(thunk: () => T) =>
-    new LazyValidator(thunk) as LazyValidator<T> & StandardSchemaV1<Infer<T>>,
+    new LazyValidator(thunk) as LazyValidator<T> &
+      StandardSchemaV1<Infer.Input<T>, Infer.Output<T>>,
 
   /** Create a string validator */
   string,
@@ -226,7 +230,7 @@ export interface ValidatorV {
     errorMessage?: string,
   ) => ArrayValidator & {
     validator: T;
-  } & StandardSchemaV1<Array<Infer<T>>>;
+  } & StandardSchemaV1<Array<Infer.Input<T>>, Array<Infer.Output<T>>>;
   record: <T extends BaseValidator>(
     validator?: T,
     errorMessage?: string,
@@ -238,7 +242,10 @@ export interface ValidatorV {
     errorMessage?: string,
   ) => TupleValidator & {
     validators: T;
-  } & StandardSchemaV1<{ [K in keyof T]: Infer<T[K]> }>;
+  } & StandardSchemaV1<
+      { [K in keyof T]: Infer.Input<T[K]> },
+      { [K in keyof T]: Infer.Output<T[K]> }
+    >;
   date: (errorMessage?: string) => DateValidator & StandardSchemaV1<Date>;
   literal: <T extends readonly [string | number | boolean, ...(string | number | boolean)[]]>(
     ...values: T
@@ -247,7 +254,9 @@ export interface ValidatorV {
     ctor: new (...args: any[]) => T,
     errorMessage?: string,
   ) => InstanceOfValidator<T> & StandardSchemaV1<T>;
-  lazy: <T extends BaseValidator>(thunk: () => T) => LazyValidator<T> & StandardSchemaV1<Infer<T>>;
+  lazy: <T extends BaseValidator>(
+    thunk: () => T,
+  ) => LazyValidator<T> & StandardSchemaV1<Infer.Input<T>, Infer.Output<T>>;
   string: (errorMessage?: string) => StringValidator & StandardSchemaV1<string>;
   email: (errorMessage?: string) => StringValidator & StandardSchemaV1<string>;
   enum: {

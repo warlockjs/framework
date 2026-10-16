@@ -66,7 +66,7 @@ export class LazyValidator<T extends BaseValidator = BaseValidator> extends Base
   }
 
   public override async validate(data: any, context: SchemaContext): Promise<ValidationResult> {
-    return this.resolve().validate(data, context);
+    return this.refineResult(await this.resolve().validate(data, context), context);
   }
 
   public override matchesType(value: any): boolean {

@@ -77,19 +77,19 @@ export class ComputedValidator<TResult = any> extends BaseValidator {
           };
         }
 
-        return {
+        return this.refineResult({
           isValid: true,
           errors: [],
           data: validation.data,
-        };
+        }, context);
       }
 
       // No validation - return computed result directly
-      return {
+      return this.refineResult({
         isValid: true,
         errors: [],
         data: result,
-      };
+      }, context);
     } catch (error) {
       // Handle callback execution errors
       return {

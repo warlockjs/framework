@@ -17,7 +17,9 @@ When `validate()` runs against a value, the order is:
 3. optional/required check — decide whether to run rules
 4. requiredRule  — required-condition rule (.requiredIf, .requiredWith, etc.)
 5. rules         — every other rule, in declaration order
-6. transformers  — reshape value into data (.toISOString, .toLowerCase)
+6. children      — validate container members, fill defaults and computed fields
+7. transformers  — reshape value into data (.toISOString, .toLowerCase)
+8. refinements   — typed custom checks against successful output
 ```
 
 If a rule fails, transformers don't run for that field.
@@ -34,6 +36,21 @@ v.string().addMutator(s => s.trim()).min(3)
 // trim only the OUTPUT — use a transformer (.trim() on string is a transformer)
 v.string().min(3).trim()
 // "  Hi  " → rules see "  Hi  " (length 6, passes min(3)) → trim → data = "Hi"
+```
+
+## `.refine()`
+
+Refinements receive the validator's output type, after children, defaults, computed
+fields and output transformers. They skip failed validation and absent/null values,
+including when `firstErrorOnly: false`. Return an error string to reject the value;
+return `undefined` to accept it. Async callbacks are supported. Use `.addRule()`
+when a check must run against input before children validate.
+
+```ts
+v.object({ count: v.int().optional().default(1) }).refine((value) => {
+  // count is a number, and defaults have already been applied.
+  return value.count > 10 ? "Too many items" : undefined;
+});
 ```
 
 ## `.required()` / `.optional()` / `.present()`

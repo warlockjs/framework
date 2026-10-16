@@ -397,7 +397,7 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
       this.setRuleAttributesList(rule);
     }
 
-    const result = await super.validate(mutatedData, context);
+    const result = await this.validateRules(mutatedData, context);
 
     if (result.isValid === false) return result;
 
@@ -529,11 +529,14 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
             ...except(mutatedData, Object.keys(this.schema)),
           };
 
-    return {
-      isValid: true,
-      errors: [],
-      data: output,
-    };
+    return this.refineResult(
+      {
+        isValid: true,
+        errors: [],
+        data: output,
+      },
+      context,
+    );
   }
 
   /**

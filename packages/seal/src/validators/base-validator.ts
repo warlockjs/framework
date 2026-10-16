@@ -25,6 +25,7 @@ import type {
  */
 export class BaseValidator<TInput = unknown, TOutput = TInput> {
   public rules: ContextualSchemaRule[] = [];
+  protected refinements: ContextualSchemaRule[] = [];
   public mutators: ContextualizedMutator[] = [];
   protected defaultValue: any | (() => any);
   protected description?: string;
@@ -357,6 +358,7 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
 
     // Copy all BaseValidator properties
     cloned.rules = [...this.rules];
+    cloned.refinements = [...this.refinements];
     cloned.mutators = [...this.mutators];
     cloned.dataTransformers = [...this.dataTransformers];
     cloned.defaultValue = this.defaultValue;
@@ -541,31 +543,49 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
   }
 
   /**
-   * Define custom rule
-   *
-   * `value` is deliberately untyped: custom rules run in the rule pipeline,
-   * before a container validates its children (an object's fields are not yet
-   * validated or defaulted) and, when `firstErrorOnly` is `false` (the default
-   * is `true`), even after the type rule has failed. Typing it as the schema
-   * output would promise a shape the callback does not always receive.
+   * Validate the successful output after type rules, children and transformers.
+   * Refinements are skipped for absent/null values and failed validation.
    */
   public refine(
     callback: (
-      value: any,
+      value: NonNullable<this["~standard"]["types"]>["output"],
       context: SchemaContext,
     ) => Promise<string | undefined> | string | undefined,
-  ) {
-    return this.addRule({
-      name: "custom",
-      async validate(value, context) {
-        const result = await callback(value, context);
-        if (result) {
-          this.context.errorMessage = result;
-          return invalidRule(this, context);
-        }
-        return VALID_RULE;
-      },
-    });
+  ): this {
+    const instance = this.instance;
+    instance.refinements.push(
+      instance.createRule({
+        name: "custom",
+        async validate(value, context) {
+          const result = await callback(value, context);
+          if (result) {
+            this.context.errorMessage = result;
+            return invalidRule(this, context);
+          }
+          return VALID_RULE;
+        },
+      }),
+    );
+    return instance;
+  }
+
+  /** Complete validation only after the entire output is available. */
+  protected async refineResult(
+    result: ValidationResult,
+    context: SchemaContext,
+  ): Promise<ValidationResult> {
+    if (!result.isValid || result.data == null) return result;
+
+    const errors: ValidationResult["errors"] = [];
+    for (const rule of this.refinements) {
+      this.setRuleAttributesList(rule);
+      const refined = await rule.validate(result.data, context);
+      if (!refined.isValid) {
+        errors.push({ type: rule.name, error: refined.error, input: refined.path ?? context.path });
+        if (context.configurations?.firstErrorOnly ?? true) break;
+      }
+    }
+    return errors.length ? { isValid: false, errors, data: undefined } : result;
   }
 
   /**
@@ -672,6 +692,20 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
    * Validate the data
    */
   public async validate(data: any, context: SchemaContext): Promise<ValidationResult> {
+    const result = await this.refineResult(await this.validateRules(data, context), context);
+
+    if (!result.isValid && this.hasCatch) {
+      const fallback =
+        typeof this.catchValue === "function"
+          ? await this.catchValue(result.errors, data)
+          : this.catchValue;
+      return { isValid: true, errors: [], data: fallback };
+    }
+    return result;
+  }
+
+  /** Validate presence and value rules before containers descend into children. */
+  protected async validateRules(data: any, context: SchemaContext): Promise<ValidationResult> {
     if (data === null && this.isNullable) {
       return { isValid: true, errors: [], data: null };
     }
@@ -784,18 +818,6 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
           ? await this.startTransformationPipeline(mutatedData, context)
           : undefined,
     };
-
-    // Catch fallback — only on the leaf path. Container validators override
-    // validate() and don't run this hook on their own outcome, so catching
-    // a whole object/array/record is a no-op in v1.
-    if (result.isValid === false && this.hasCatch) {
-      const fallback =
-        typeof this.catchValue === "function"
-          ? await this.catchValue(result.errors, data)
-          : this.catchValue;
-
-      return { isValid: true, errors: [], data: fallback };
-    }
 
     return result;
   }

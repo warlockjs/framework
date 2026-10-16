@@ -166,7 +166,7 @@ export class DiscriminatedUnionValidator<
       };
     }
 
-    return branch.validate(data, context);
+    return this.refineResult(await branch.validate(data, context), context);
   }
 
   public override clone(): this {

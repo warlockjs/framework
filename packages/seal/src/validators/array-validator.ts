@@ -147,7 +147,7 @@ export class ArrayValidator extends BaseValidator {
     const valueForRules = data ?? this.getDefaultValue();
     const mutatedData = await this.mutate(valueForRules, context);
 
-    const result = await super.validate(data, context);
+    const result = await this.validateRules(data, context);
 
     if (result.isValid === false) return result;
 
@@ -183,11 +183,11 @@ export class ArrayValidator extends BaseValidator {
 
     await Promise.all(validationPromises);
 
-    return {
+    return this.refineResult({
       isValid: errors.length === 0,
       errors,
       data: await this.startTransformationPipeline(mutatedData, context),
-    };
+    }, context);
   }
 
   /**

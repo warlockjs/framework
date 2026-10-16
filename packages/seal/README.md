@@ -192,7 +192,7 @@ v.string().refine(async value => {
 });
 ```
 
-The callback's `value` is typed `any` on purpose: custom rules run before an object or array validates its children, so the value is the (mutated) input, not the schema output. Check the shape you rely on.
+The callback's `value` is typed from the validator's output. Refinements run after value rules, child validation (including defaults and computed fields), and output transformers succeed. They skip absent/null values and failed validation, even with `firstErrorOnly: false`. Multiple refinements run in declaration order and respect `firstErrorOnly`. Use `.addRule()` for checks that need the input before child validation.
 
 ### ✅ Mutators & Transformers
 
